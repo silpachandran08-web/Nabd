@@ -401,3 +401,12 @@
   .header { flex-direction: column; align-items: stretch; }
   .headerActions > button { flex: 1 1 100%; justify-content: center; }
 }
+
+/* ADM-018: summary tiles and tabs */
+.kpis { list-style: none; margin: 0 0 var(--nb-space-16); padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--nb-space-12); }
+.kpi { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12) var(--nb-space-16); display: grid; gap: var(--nb-space-4); }
+.kpiValue { font-size: 1.5rem; font-weight: 600; }
+.kpiLabel { color: var(--nb-text-secondary); font-size: 0.8125rem; }
+.tabs { display: flex; gap: var(--nb-space-8); margin-block-end: var(--nb-space-16); overflow-x: auto; }
+.tab { min-block-size: 44px; padding-inline: var(--nb-space-16); background: transparent; border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); color: var(--nb-text-secondary); font: inherit; cursor: pointer; white-space: nowrap; }
+.tabActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); border-color: var(--nb-accent-500); }

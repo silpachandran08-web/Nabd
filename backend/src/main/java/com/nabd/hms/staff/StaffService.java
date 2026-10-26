@@ -125,7 +125,7 @@ public class StaffService {
 
         StaffRow row = staffRepo.findById(tenantId, id).orElseThrow();
         log.info("staff {} invited by {} (tenant {}, role {})", id, invitedBy, tenantId, req.roleId());
-        return new StaffInviteResponse(toResponse(row), rawToken);
+        return new StaffInviteResponse(toResponse(row), rawToken, id, expiresAt);
     }
 
     @Transactional

@@ -3,10 +3,12 @@
 import { decodeJwtPayload } from "../lib/jwt";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Dialog from "../components/ui/Dialog";
 import Icon from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { mfaBadge } from "./mfaStatus";
+import { isSeatLimit, needsMfaReminder, staffKpis, type Seats } from "./staffKpis";
 import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import PermissionMatrix from "../components/staff/PermissionMatrix";
 import RegistrationNoDialog from "../components/staff/RegistrationNoDialog";
@@ -181,6 +183,11 @@ export default function StaffAccessPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [roleNotice, setRoleNotice] = useState<string | null>(null);
   const [owner, setOwner] = useState(false);
+  // ADM-018: tabs, seat tile, one-tap invite resend and MFA reminder.
+  const [tab, setTab] = useState<"people" | "roles" | "invites">("people");
+  const [seats, setSeats] = useState<Seats>(null);
+  const [seatLimitHit, setSeatLimitHit] = useState(false);
+  const [rowNotice, setRowNotice] = useState<string | null>(null);
 
   // FEF-018 step-up: the client asks this when a call answers "step-up-required"; the dialog resolves with a step-up
   // token (the client then replays the original request once) or null (Cancel).
@@ -239,6 +246,7 @@ export default function StaffAccessPage() {
         side<Role[]>("/roles", setRoles, setRolesFailed),
         side<ClinicianReview[]>("/staff/clinician-review", setReview, setReviewFailed),
         side<Department[]>("/departments", setDepartments),
+        decodePermissions(token).includes("setup:view") ? side<{ seatsUsed: number; seatsLimit: number | null }>("/setup/subscription", (b) => setSeats({ seatsUsed: b.seatsUsed, seatsLimit: b.seatsLimit })) : null,
         side<{ items?: BreakGlassGrant[] }>("/auth/break-glass/active", (b) => setBreakGlass(b.items ?? [])),
       ]);
     } finally {
@@ -357,6 +365,7 @@ export default function StaffAccessPage() {
   async function submitInvite(e: React.FormEvent) {
     e.preventDefault();
     setInviteFormError(null);
+    setSeatLimitHit(false);
     if (!inviteEmail || !inviteName || !invitePhone || !inviteRoleId) {
       setInviteFormError("Fill in every field.");
       return;
@@ -379,6 +388,7 @@ export default function StaffAccessPage() {
       setInviteDepartmentId("");
       setInviteOpen(false);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && isSeatLimit(e.problem)) setSeatLimitHit(true);
       setInviteFormError(reasonText(e, "Couldn't send invite."));
     } finally {
       setInviting(false);
@@ -483,6 +493,36 @@ export default function StaffAccessPage() {
     }
   }
 
+  // ADM-018: a new 72 h link in one tap; the owner relays it like a first invite.
+  async function resendInvite(s: Staff) {
+    setBusyId(s.id);
+    setRowNotice(null);
+    try {
+      const body = await api.post<{ inviteToken: string }>(`/staff/${s.id}/invite/resend`, {});
+      setLastInvite({ name: s.name, link: `${window.location.origin}/accept-invite/${body.inviteToken}` });
+    } catch (e) {
+      setRowNotice(reasonText(e, "Couldn't resend the invite."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function remindMfa(s: Staff) {
+    setBusyId(s.id);
+    setRowNotice(null);
+    try {
+      await api.post(`/staff/${s.id}/mfa/remind`, {});
+      setRowNotice(`MFA reminder queued for ${s.name}.`);
+    } catch (e) {
+      setRowNotice(reasonText(e, "Couldn't send the reminder."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const kpis = staffKpis(staff, seats);
+  const pending = staff.filter((s) => s.status === "invited");
+
   const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? roles[0] ?? null;
 
   const canInvite = permissions.includes("staff:create");
@@ -527,7 +567,49 @@ export default function StaffAccessPage() {
         </div>
       )}
 
-      <div className={styles.card}>
+      {rowNotice && <div className={styles.formError} role="status">{rowNotice}</div>}
+      {!loading && !forbidden && staff.length > 0 && (
+        <>
+          <ul className={styles.kpis} aria-label="Team summary">
+            <li className={styles.kpi}><span className={styles.kpiValue}>{kpis.active}</span><span className={styles.kpiLabel}>Active staff</span></li>
+            <li className={styles.kpi} data-testid="kpi-mfa">
+              <span className={styles.kpiValue}>{kpis.mfaPercent == null ? "—" : `${kpis.mfaPercent}%`}</span>
+              <span className={styles.kpiLabel}>MFA coverage{kpis.mfaMissing > 0 ? ` · ${kpis.mfaMissing} to set up` : ""}</span>
+            </li>
+            <li className={styles.kpi}><span className={styles.kpiValue}>{kpis.pendingInvites}</span><span className={styles.kpiLabel}>Pending invites</span></li>
+            {kpis.seatsText && <li className={styles.kpi} data-testid="kpi-seats"><span className={styles.kpiValue}>{kpis.seatsText}</span><span className={styles.kpiLabel}>Seats{kpis.seatsLeft != null ? ` · ${kpis.seatsLeft} left` : ""}</span></li>}
+          </ul>
+          <div className={styles.tabs} role="tablist" aria-label="Staff sections">
+            {([["people", "People"], ["roles", "Roles & permissions"], ["invites", `Invites${kpis.pendingInvites ? ` (${kpis.pendingInvites})` : ""}`]] as const).map(([k, label]) => (
+              <button key={k} type="button" role="tab" aria-selected={tab === k} className={`${styles.tab} ${tab === k ? styles.tabActive : ""}`} onClick={() => setTab(k)}>{label}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {tab === "invites" && !loading && !forbidden && (
+        <div className={styles.card}>
+          {pending.length === 0 ? <EmptyState icon="users" title="No pending invites." /> : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table} aria-label="Pending invites">
+                <thead><tr><th scope="col">Invitee</th><th scope="col">Role</th><th scope="col"></th></tr></thead>
+                <tbody>
+                  {pending.map((s) => (
+                    <tr key={s.id}>
+                      <td><span className={styles.staffName}>{s.name}</span><span className={styles.staffEmail}>{s.email}</span></td>
+                      <td>{roleName(s.roleId)}</td>
+                      <td>{canInvite && <button className={styles.actionBtn} disabled={busyId === s.id} onClick={() => resendInvite(s)}>Resend invite</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className={styles.note}>Invite links work once and last 72 hours. Resending replaces the old link.</p>
+        </div>
+      )}
+
+      <div className={styles.card} hidden={tab !== "people"}>
         {loading ? (
           <Skeleton rows={5} label="Loading staff" />
         ) : forbidden ? (
@@ -574,6 +656,12 @@ export default function StaffAccessPage() {
                           {s.professionalRegistrationNo ? "Reg. no. & clinician" : "Add reg. no. & clinician"}
                         </button>
                       )}
+                      {canResetMfa && needsMfaReminder(s) && (
+                        <button className={styles.actionBtn} disabled={busyId === s.id} onClick={() => remindMfa(s)}>Send MFA reminder</button>
+                      )}
+                      {canInvite && s.status === "invited" && (
+                        <button className={styles.actionBtn} disabled={busyId === s.id} onClick={() => resendInvite(s)}>Resend invite</button>
+                      )}
                       {canResetMfa && s.status === "active" && (
                         <button className={styles.actionBtn} onClick={() => startReset(s.id)}>Reset authenticator</button>
                       )}
@@ -598,7 +686,7 @@ export default function StaffAccessPage() {
         )}
       </div>
 
-      {!loading && !forbidden && (
+      {!loading && !forbidden && tab === "roles" && (
         <>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Role presets</h2>
@@ -639,6 +727,11 @@ export default function StaffAccessPage() {
           </div>
           {roleNotice && <div className={styles.formError} role="status">{roleNotice}</div>}
 
+        </>
+      )}
+
+      {!loading && !forbidden && tab === "people" && (
+        <>
           {reviewFailed && <div className={styles.formError} role="alert">Couldn&apos;t load the clinicians to confirm. Reload to try again.</div>}
           {review.length > 0 && (
             <>
@@ -750,7 +843,7 @@ export default function StaffAccessPage() {
           <button className={styles.submit} type="submit" disabled={inviting}>
             {inviting ? "Inviting…" : "Invite staff"}
           </button>
-          {inviteFormError && <div className={styles.formError} role="alert">{inviteFormError}</div>}
+          {inviteFormError && <div className={styles.formError} role="alert">{inviteFormError}{seatLimitHit && <> <Link href="/setup?tab=subscription">Upgrade your plan</Link></>}</div>}
         </form>
         </Dialog>
       )}
