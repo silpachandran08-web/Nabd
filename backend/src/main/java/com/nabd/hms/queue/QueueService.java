@@ -81,12 +81,16 @@ public class QueueService {
     private final ActorDirectory actors;
     private final QueueEventRepository eventRepo;
     private final DoctorSessionService sessions;
+    private final EtaService eta;
+    private final ServiceTimeService serviceTimes;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, OrganizationConfig departmentService, TenantContext tenantContext, ClinicClock clock,
                  com.nabd.hms.common.AuditService auditService,
                  com.nabd.hms.common.EventPublisher events, ActorDirectory actors,
-                 QueueEventRepository eventRepo, DoctorSessionService sessions) {
+                 QueueEventRepository eventRepo, DoctorSessionService sessions, EtaService eta, ServiceTimeService serviceTimes) {
+        this.eta = eta;
+        this.serviceTimes = serviceTimes;
         this.eventRepo = eventRepo;
         this.sessions = sessions;
         this.actors = actors;
@@ -364,21 +368,15 @@ public class QueueService {
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
-    // ponytail: 30-visit sample, most-recent-first — enough to smooth out one unusually long/short
-    // visit without dragging in a doctor's schedule from months ago. Revisit if a doctor's typical
-    // visit length genuinely drifts week to week and this window turns out too short to track it.
-    private static final int WAIT_ESTIMATE_SAMPLE_SIZE = 30;
-    private static final double DEFAULT_VISIT_MINUTES = 15.0; // no billed history yet — same default as slot length
-
-    /** NB-101: estimated minutes until a patient checking in right now sees this doctor. */
+    /** NB-101 / ACC-017: minutes until a patient checking in right now sees this doctor, read from the ETA projection (not computed per call). */
     @Transactional
     public WaitEstimateResponse waitEstimate(UUID tenantId, UUID doctorId) {
         tenantContext.set(tenantId);
-        Optional<Double> avg = repo.averageRecentVisitMinutes(tenantId, doctorId, WAIT_ESTIMATE_SAMPLE_SIZE);
-        double avgVisitMinutes = avg.orElse(DEFAULT_VISIT_MINUTES);
-        int patientsAhead = repo.countActiveAhead(tenantId, doctorId, clock.today(tenantId));
-        int estimatedMinutes = (int) Math.round(avgVisitMinutes * patientsAhead);
-        return new WaitEstimateResponse(estimatedMinutes, patientsAhead, avgVisitMinutes, avg.isPresent());
+        EtaService.Day d = eta.day(doctorId, clock.today(tenantId));
+        var learned = serviceTimes.estimate(doctorId, "new", "default");
+        int minutes = d.newcomerP50() == null ? 0 : (int) Math.max(0, java.time.Duration.between(clock.now(), d.newcomerP50()).toMinutes());
+        return new WaitEstimateResponse(minutes, (int) d.results().stream().filter(r -> r.entryId() != null).count(),
+                learned.dist().medianS() / 60.0, learned.n() > 0);
     }
 
     /** NB-098 — same session cap AppointmentService.book() enforces, applied to the walk-in path. */

@@ -122,6 +122,8 @@ export type EncounterResponse = { assessment?: string; diagnosis?: string; docto
 export type Entry = { patientId?: string; patientName?: string; priorNoShowCount?: number; };
 export type EtaAccuracyItem = { clinicDate?: string; doctorId?: string; lowConfidence?: boolean; maeMin?: number; n?: number; p80HitRate?: number; within10Pct?: number; };
 export type EtaAccuracyResponse = { items?: Array<EtaAccuracyItem>; };
+export type EtaItem = { appointmentId?: string; p50At?: string; p80At?: string; position?: number; queueEntryId?: string; rangeLabel?: string; };
+export type EtaResponse = { items?: Array<EtaItem>; v?: number; };
 export type ExpiredWithValue = { expiredOn?: string; instanceId?: string; packageName?: string; patientName?: string; remainingValue?: number; };
 export type ExpiringSoonResponse = { alertTier?: number; expiresOn?: string; instanceId?: string; packageName?: string; patientName?: string; quantityConsumed?: number; quantityTotal?: number; reminderSentForTier?: boolean; valueLeft?: number; };
 export type ExportJobRequest = { exportType: string; };
@@ -161,6 +163,7 @@ export type InternalAppointmentActionRequest = { newStartTime?: string; patientR
 export type InternalAvailability = { doctors?: Array<InternalDoctorSessions>; v?: number; };
 export type InternalBookRequest = { doctorId: string; patientRef: string; startTime: string; };
 export type InternalDoctorSessions = { doctorId?: string; sessions?: Array<InternalSession>; };
+export type InternalEtaResponse = { display?: Record<string, Record<string, unknown>>; p50At?: string; p80At?: string; position?: number; v?: number; };
 export type InternalSession = { date?: string; id?: string; mode?: string; slots?: Array<string>; tokensLeft?: number; };
 export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
@@ -330,6 +333,8 @@ export type ScheduleDayResponse = { counts?: Counts; date?: string; doctors?: Ar
 export type ScheduleWeekResponse = { days?: Array<Day>; start?: string; today?: string; };
 export type SellPackageRequest = { packageId: string; patientId: string; paymentMethod: string; };
 export type Service = { name?: string; revenue?: number; };
+export type ServiceTimeItem = { medianMin?: number; n?: number; p80Min?: number; priorSource?: string; visitType?: string; };
+export type ServiceTimesResponse = { items?: Array<ServiceTimeItem>; };
 export type Session = { end?: string; label?: string; rows?: Array<Row>; start?: string; stepMinutes?: number; };
 export type SessionActionRequest = { reasonCode?: string; };
 export type SessionCount = { booked?: number; free?: number; label?: string; };
@@ -429,6 +434,7 @@ export type Operations = {
   InternalSchedulingController_book: { method: "post"; path: "/internal/v1/tenants/{tid}/appointments"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: InternalBookRequest; response: Record<string, Record<string, unknown>> };
   InternalSchedulingController_act: { method: "post"; path: "/internal/v1/tenants/{tid}/appointments/{id}/{action}"; permission: "authenticated"; pathParams: { tid: string; id: string; action: string; }; query: never; body: InternalAppointmentActionRequest; response: Record<string, Record<string, unknown>> };
   InternalSchedulingController_availability: { method: "get"; path: "/internal/v1/tenants/{tid}/availability"; permission: "authenticated"; pathParams: { tid: string; }; query: { doctorId?: string; specialtyCode?: string; from: string; to: string; }; body: never; response: InternalAvailability };
+  EtaController_one: { method: "get"; path: "/internal/v1/tenants/{tid}/eta/appointments/{appointmentId}"; permission: "authenticated"; pathParams: { tid: string; appointmentId: string; }; query: never; body: never; response: InternalEtaResponse };
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
   AppointmentController_list: { method: "get"; path: "/v1/appointments"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; patientId?: string; date?: string; limit?: number; cursor?: string; }; body: never; response: AppointmentPage };
   AppointmentController_book: { method: "post"; path: "/v1/appointments"; permission: "queue:create"; pathParams: never; query: never; body: AppointmentWriteRequest; response: AppointmentResponse };
@@ -540,6 +546,7 @@ export type Operations = {
   ScheduleController_clearDelay: { method: "post"; path: "/v1/doctors/{id}/delay/clear"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   ScheduleController_listLeave: { method: "get"; path: "/v1/doctors/{id}/leave"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: Array<DoctorLeaveResponse> };
   ScheduleController_addLeave: { method: "post"; path: "/v1/doctors/{id}/leave"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: DoctorLeaveWriteRequest; response: DoctorLeaveResponse };
+  DoctorServiceTimesController_get: { method: "get"; path: "/v1/doctors/{id}/service-times"; permission: "isAuthenticated()"; pathParams: { id: string; }; query: never; body: never; response: ServiceTimesResponse };
   DoctorSessionController_today: { method: "get"; path: "/v1/doctors/{id}/session"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: DoctorSessionResponse };
   DoctorSessionController_act: { method: "post"; path: "/v1/doctors/{id}/session/{action}"; permission: "hasAuthority('queue:edit') and (authentication.name == #id.toString() or hasAuthority('setup:edit'))"; pathParams: { id: string; action: string; }; query: never; body: SessionActionRequest; response: DoctorSessionResponse };
   ScheduleController_listWorkingHours: { method: "get"; path: "/v1/doctors/{id}/working-hours"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: Array<WorkingHoursResponse> };
@@ -675,6 +682,7 @@ export type Operations = {
   PublicNoticeController_page: { method: "get"; path: "/v1/public/notices/{tenantSlug}/{version}"; permission: "public"; pathParams: { tenantSlug: string; version: string; }; query: { lang?: string; }; body: never; response: string };
   QueueController_list: { method: "get"; path: "/v1/queue"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; departmentId?: string; date?: string; priority?: boolean; }; body: never; response: Array<QueueEntryResponse> };
   QueueController_checkIn: { method: "post"; path: "/v1/queue/check-in"; permission: "queue:create"; pathParams: never; query: never; body: CheckInRequest; response: QueueEntryResponse };
+  EtaController_get: { method: "get"; path: "/v1/queue/eta"; permission: "queue:view"; pathParams: never; query: { doctorId: string; date?: string; }; body: never; response: EtaResponse };
   QueueController_waitEstimate: { method: "get"; path: "/v1/queue/wait-estimate"; permission: "queue:view"; pathParams: never; query: { doctorId: string; }; body: never; response: WaitEstimateResponse };
   QueueController_extend: { method: "post"; path: "/v1/queue/{id}/extend"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: ConsultExtendRequest; response: ConsultExtendResponse };
   QueueController_acknowledgePriority: { method: "post"; path: "/v1/queue/{id}/priority/acknowledge"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: QueueEntryResponse };

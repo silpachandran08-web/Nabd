@@ -139,6 +139,8 @@ export const EncounterResponseSchema = z.object({ assessment: z.string().optiona
 export const EncounterPageSchema = z.object({ data: z.array(EncounterResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const EtaAccuracyItemSchema = z.object({ clinicDate: z.string().optional(), doctorId: z.string().optional(), lowConfidence: z.boolean().optional(), maeMin: z.number().optional(), n: z.number().int().optional(), p80HitRate: z.number().optional(), within10Pct: z.number().optional() });
 export const EtaAccuracyResponseSchema = z.object({ items: z.array(EtaAccuracyItemSchema).optional() });
+export const EtaItemSchema = z.object({ appointmentId: z.string().optional(), p50At: z.string().optional(), p80At: z.string().optional(), position: z.number().int().optional(), queueEntryId: z.string().optional(), rangeLabel: z.string().optional() });
+export const EtaResponseSchema = z.object({ items: z.array(EtaItemSchema).optional(), v: z.number().int().optional() });
 export const ExpiredWithValueSchema = z.object({ expiredOn: z.string().optional(), instanceId: z.string().optional(), packageName: z.string().optional(), patientName: z.string().optional(), remainingValue: z.number().optional() });
 export const ExpiringSoonResponseSchema = z.object({ alertTier: z.number().int().optional(), expiresOn: z.string().optional(), instanceId: z.string().optional(), packageName: z.string().optional(), patientName: z.string().optional(), quantityConsumed: z.number().int().optional(), quantityTotal: z.number().int().optional(), reminderSentForTier: z.boolean().optional(), valueLeft: z.number().optional() });
 export const ExportJobRequestSchema = z.object({ exportType: z.string().min(1) });
@@ -183,6 +185,7 @@ export const InternalSessionSchema = z.object({ date: z.string().optional(), id:
 export const InternalDoctorSessionsSchema = z.object({ doctorId: z.string().optional(), sessions: z.array(InternalSessionSchema).optional() });
 export const InternalAvailabilitySchema = z.object({ doctors: z.array(InternalDoctorSessionsSchema).optional(), v: z.number().int().optional() });
 export const InternalBookRequestSchema = z.object({ doctorId: z.string(), patientRef: z.string().min(1), startTime: z.string() });
+export const InternalEtaResponseSchema = z.object({ display: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), p50At: z.string().optional(), p80At: z.string().optional(), position: z.number().int().optional(), v: z.number().int().optional() });
 export const TaxPartSchema = z.object({ amountMinor: z.number().int().optional(), ratePercent: z.number().optional(), type: z.string().optional() });
 export const LineItemResponseSchema = z.object({ category: z.string().optional(), chargeCode: z.string().optional(), chargeName: z.string().optional(), lineTotal: z.number().optional(), listUnitPrice: z.number().optional(), overrideReason: z.string().optional(), quantity: z.number().int().optional(), taxRatePercent: z.number().optional(), taxableMinor: z.number().int().optional(), taxes: z.array(TaxPartSchema).optional(), tier: z.string().optional(), unitPrice: z.number().optional() });
 export const PaymentResponseSchema = z.object({ amount: z.number().optional(), id: z.string().optional(), idempotencyKey: z.string().optional(), method: z.string().optional(), recordedAt: z.string().optional() });
@@ -346,6 +349,8 @@ export const SessionSchema = z.object({ end: z.string().optional(), label: z.str
 export const ScheduleDayResponseSchema = z.object({ counts: CountsSchema.optional(), date: z.string().optional(), doctors: z.array(DoctorSchema).optional(), holiday: z.string().optional(), sessions: z.array(SessionSchema).optional(), timezone: z.string().optional(), today: z.boolean().optional() });
 export const ScheduleWeekResponseSchema = z.object({ days: z.array(DaySchema).optional(), start: z.string().optional(), today: z.string().optional() });
 export const SellPackageRequestSchema = z.object({ packageId: z.string(), patientId: z.string(), paymentMethod: z.string().min(1) });
+export const ServiceTimeItemSchema = z.object({ medianMin: z.number().optional(), n: z.number().int().optional(), p80Min: z.number().optional(), priorSource: z.string().optional(), visitType: z.string().optional() });
+export const ServiceTimesResponseSchema = z.object({ items: z.array(ServiceTimeItemSchema).optional() });
 export const SessionActionRequestSchema = z.object({ reasonCode: z.string().optional() });
 export const SessionResponseSchema = z.object({ current: z.boolean().optional(), device: z.string().optional(), id: z.string().optional(), ip: z.string().optional(), lastSeenAt: z.string().optional() });
 export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().optional(), skippedAt: z.string().optional(), status: z.string().optional(), step: z.string().optional() });
@@ -431,6 +436,7 @@ export const operationSchemas = {
   InternalSchedulingController_book: { body: InternalBookRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalSchedulingController_act: { body: InternalAppointmentActionRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalSchedulingController_availability: { response: InternalAvailabilitySchema },
+  EtaController_one: { response: InternalEtaResponseSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   AppointmentController_list: { response: AppointmentPageSchema },
   AppointmentController_book: { body: AppointmentWriteRequestSchema, response: AppointmentResponseSchema },
@@ -542,6 +548,7 @@ export const operationSchemas = {
   ScheduleController_clearDelay: {  },
   ScheduleController_listLeave: { response: z.array(DoctorLeaveResponseSchema) },
   ScheduleController_addLeave: { body: DoctorLeaveWriteRequestSchema, response: DoctorLeaveResponseSchema },
+  DoctorServiceTimesController_get: { response: ServiceTimesResponseSchema },
   DoctorSessionController_today: { response: DoctorSessionResponseSchema },
   DoctorSessionController_act: { body: SessionActionRequestSchema, response: DoctorSessionResponseSchema },
   ScheduleController_listWorkingHours: { response: z.array(WorkingHoursResponseSchema) },
@@ -677,6 +684,7 @@ export const operationSchemas = {
   PublicNoticeController_page: { response: z.string() },
   QueueController_list: { response: z.array(QueueEntryResponseSchema) },
   QueueController_checkIn: { body: CheckInRequestSchema, response: QueueEntryResponseSchema },
+  EtaController_get: { response: EtaResponseSchema },
   QueueController_waitEstimate: { response: WaitEstimateResponseSchema },
   QueueController_extend: { body: ConsultExtendRequestSchema, response: ConsultExtendResponseSchema },
   QueueController_acknowledgePriority: { response: QueueEntryResponseSchema },

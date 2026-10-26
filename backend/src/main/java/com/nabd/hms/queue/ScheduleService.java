@@ -48,9 +48,11 @@ public class ScheduleService {
 
     private final com.nabd.hms.common.EventPublisher events;
     private final ActorDirectory actors;
+    private final EtaTrigger etaTrigger;
 
     ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
-                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors, EtaTrigger etaTrigger) {
+        this.etaTrigger = etaTrigger;
         this.events = events;
         this.actors = actors;
         this.clock = clock;
@@ -243,6 +245,7 @@ public class ScheduleService {
     private void delayChanged(UUID tenantId, UUID doctorId, UUID delayId, int delayMinutes, String status) {
         events.publish(tenantId, com.nabd.hms.common.DomainEventType.DOCTOR_DELAY_CHANGED, doctorId, java.util.Map.of(
                 "doctorId", doctorId, "delayId", delayId, "delayMinutes", delayMinutes, "status", status));
+        etaTrigger.afterCommit(tenantId, doctorId, clock.today(tenantId)); // ACC-017: every waiting and booked ETA shifts
     }
 
     @Transactional

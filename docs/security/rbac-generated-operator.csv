@@ -110,6 +110,7 @@ super_admin,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,allo
 super_admin,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 super_admin,GET /v1/platform/territories,territories:view,allow
 super_admin,GET /v1/queue,queue:view,deny-401
+super_admin,GET /v1/queue/eta,queue:view,deny-401
 super_admin,GET /v1/queue/wait-estimate,queue:view,deny-401
 super_admin,GET /v1/reports/billing-leakage,reports:view,deny-401
 super_admin,GET /v1/reports/daily-money,reports:view,deny-401
@@ -418,6 +419,7 @@ implementation,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,a
 implementation,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 implementation,GET /v1/platform/territories,territories:view,deny-403
 implementation,GET /v1/queue,queue:view,deny-401
+implementation,GET /v1/queue/eta,queue:view,deny-401
 implementation,GET /v1/queue/wait-estimate,queue:view,deny-401
 implementation,GET /v1/reports/billing-leakage,reports:view,deny-401
 implementation,GET /v1/reports/daily-money,reports:view,deny-401
@@ -726,6 +728,7 @@ support_engineer,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view
 support_engineer,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 support_engineer,GET /v1/platform/territories,territories:view,deny-403
 support_engineer,GET /v1/queue,queue:view,deny-401
+support_engineer,GET /v1/queue/eta,queue:view,deny-401
 support_engineer,GET /v1/queue/wait-estimate,queue:view,deny-401
 support_engineer,GET /v1/reports/billing-leakage,reports:view,deny-401
 support_engineer,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1034,6 +1037,7 @@ billing,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 billing,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 billing,GET /v1/platform/territories,territories:view,deny-403
 billing,GET /v1/queue,queue:view,deny-401
+billing,GET /v1/queue/eta,queue:view,deny-401
 billing,GET /v1/queue/wait-estimate,queue:view,deny-401
 billing,GET /v1/reports/billing-leakage,reports:view,deny-401
 billing,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1342,6 +1346,7 @@ sre,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 sre,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 sre,GET /v1/platform/territories,territories:view,allow
 sre,GET /v1/queue,queue:view,deny-401
+sre,GET /v1/queue/eta,queue:view,deny-401
 sre,GET /v1/queue/wait-estimate,queue:view,deny-401
 sre,GET /v1/reports/billing-leakage,reports:view,deny-401
 sre,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1650,6 +1655,7 @@ commercial,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-
 commercial,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 commercial,GET /v1/platform/territories,territories:view,allow
 commercial,GET /v1/queue,queue:view,deny-401
+commercial,GET /v1/queue/eta,queue:view,deny-401
 commercial,GET /v1/queue/wait-estimate,queue:view,deny-401
 commercial,GET /v1/reports/billing-leakage,reports:view,deny-401
 commercial,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1958,6 +1964,7 @@ compliance_dpo,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,a
 compliance_dpo,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 compliance_dpo,GET /v1/platform/territories,territories:view,allow
 compliance_dpo,GET /v1/queue,queue:view,deny-401
+compliance_dpo,GET /v1/queue/eta,queue:view,deny-401
 compliance_dpo,GET /v1/queue/wait-estimate,queue:view,deny-401
 compliance_dpo,GET /v1/reports/billing-leakage,reports:view,deny-401
 compliance_dpo,GET /v1/reports/daily-money,reports:view,deny-401

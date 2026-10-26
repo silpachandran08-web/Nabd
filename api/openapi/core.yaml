@@ -659,6 +659,44 @@ paths:
       tags:
       - queue
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/eta/appointments/{appointmentId}:
+    get:
+      operationId: EtaController_one
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: appointmentId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalEtaResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/households/{phoneHash}:
     get:
       operationId: InternalHouseholdController_household
@@ -4859,6 +4897,44 @@ paths:
       tags:
       - queue
       x-required-permission: queue:edit
+  /v1/doctors/{id}/service-times:
+    get:
+      operationId: DoctorServiceTimesController_get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ServiceTimesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: isAuthenticated()
   /v1/doctors/{id}/session:
     get:
       operationId: DoctorSessionController_today
@@ -9972,6 +10048,50 @@ paths:
       tags:
       - queue
       x-required-permission: queue:create
+  /v1/queue/eta:
+    get:
+      operationId: EtaController_get
+      parameters:
+      - in: query
+        name: doctorId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: date
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EtaResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
   /v1/queue/wait-estimate:
     get:
       operationId: QueueController_waitEstimate
@@ -16011,6 +16131,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EtaAccuracyItem"
+    EtaItem:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        p50At:
+          type: string
+          format: date-time
+        p80At:
+          type: string
+          format: date-time
+        position:
+          type: integer
+          format: int32
+        queueEntryId:
+          type: string
+          format: uuid
+        rangeLabel:
+          type: string
+    EtaResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EtaItem"
+        v:
+          type: integer
+          format: int64
     ExpiredWithValue:
       type: object
       properties:
@@ -16625,6 +16775,25 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/InternalSession"
+    InternalEtaResponse:
+      type: object
+      properties:
+        display:
+          type: object
+          additionalProperties:
+            type: object
+        p50At:
+          type: string
+          format: date-time
+        p80At:
+          type: string
+          format: date-time
+        position:
+          type: integer
+          format: int32
+        v:
+          type: integer
+          format: int64
     InternalSession:
       type: object
       properties:
@@ -19651,6 +19820,29 @@ components:
           type: string
         revenue:
           type: number
+    ServiceTimeItem:
+      type: object
+      properties:
+        medianMin:
+          type: number
+          format: double
+        "n":
+          type: integer
+          format: int32
+        p80Min:
+          type: number
+          format: double
+        priorSource:
+          type: string
+        visitType:
+          type: string
+    ServiceTimesResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceTimeItem"
     Session:
       type: object
       properties:

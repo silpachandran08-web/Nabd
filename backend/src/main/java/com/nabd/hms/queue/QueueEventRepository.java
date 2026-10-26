@@ -14,10 +14,12 @@ class QueueEventRepository {
     private final JdbcTemplate jdbc;
 
     private final ServiceTimeService serviceTimes;
+    private final EtaTrigger etaTrigger;
 
-    QueueEventRepository(JdbcTemplate jdbc, ServiceTimeService serviceTimes) {
+    QueueEventRepository(JdbcTemplate jdbc, ServiceTimeService serviceTimes, EtaTrigger etaTrigger) {
         this.jdbc = jdbc;
         this.serviceTimes = serviceTimes;
+        this.etaTrigger = etaTrigger;
     }
 
     /** Encounter, doctor and clinic date are read from the entry row itself (they never change on a transition). */
@@ -31,6 +33,7 @@ class QueueEventRepository {
         if ("in_consult".equals(fromStatus) && "transition".equals(kind)) {
             serviceTimes.onConsultEnd(entryId, at); // ACC-016: the consult just ended; learned in the same transaction
         }
+        etaTrigger.afterCommit(tenantId, entryId); // ACC-017: recompute that doctor-day's ETAs once this commits
         if ("in_consult".equals(toStatus) && "transition".equals(kind)) { // ACC-019: first call time of the visit closes its predictions
             jdbc.update("UPDATE eta_prediction_log SET actual_called_at = ? WHERE tenant_id = ? AND actual_called_at IS NULL AND " +
                             "(queue_entry_id = ? OR appointment_id = (SELECT appointment_id FROM queue_entries WHERE tenant_id = ? AND id = ?))",
