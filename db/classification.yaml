@@ -32,6 +32,8 @@ schemas:
       route: phi
       site: phi
       created_at: operational
+      change_seq: operational
+      updated_at: operational
     administration_records:
       id: operational
       tenant_id: operational
@@ -55,6 +57,7 @@ schemas:
       is_follow_up: operational
       arrived_at: operational
       booking_kind: operational
+      change_seq: operational
       policy_version: operational
       channel: operational
       visit_type: operational
@@ -319,6 +322,27 @@ schemas:
       witness_staff_id: operational
       evidence: pii
       guardian_patient_id: pii
+    cross_tenant_ref_quarantine:
+      table_name: operational
+      column_name: operational
+      row_id: operational
+      child_tenant_id: operational
+      parent_tenant_id: operational
+      found_at: operational
+    tenant_data_keys:
+      tenant_id: operational
+      kid: operational
+      wrapped_dek: operational
+      kms_key_ref: operational
+      status: operational
+      created_at: operational
+      rotated_at: operational
+      destroyed_at: operational
+    kms_region_keys:
+      region_code: operational
+      current_key_ref: operational
+      created_at: operational
+      last_rotated_at: operational
     crypto_reencrypt_progress:
       table_name: operational
       column_name: operational
@@ -719,6 +743,8 @@ schemas:
       paid_minor: financial
       document_type: operational
       buyer_gstin: financial
+      change_seq: operational
+      updated_at: operational
     legal_entities:
       id: operational
       owner_id: operational
@@ -1056,6 +1082,7 @@ schemas:
       phone_digits: pii
       phone_last10: pii
       name_search: pii
+      change_seq: operational
     pharmacy_item_profiles:
       item_id: operational
       tenant_id: operational
@@ -1167,6 +1194,8 @@ schemas:
       safety_dictionary_version: operational
       signed_by: operational
       signed_by_registration_no: pii
+      change_seq: operational
+      updated_at: operational
     notice_templates:
       key: operational
       market: operational
@@ -1238,6 +1267,8 @@ schemas:
       consent_signed_name: pii
       consent_recorded_by: operational
       consent_signed_at: operational
+      change_seq: operational
+      updated_at: operational
     projector_applied_events:
       tenant_id: operational
       consumer_group: operational
@@ -1302,6 +1333,7 @@ schemas:
       transfer_reason: operational
       transfer_reason_note: phi  # uncertain: free text, may carry clinical reason
       legacy_duplicate: operational
+      change_seq: operational
       order_reason: operational
       called_seq: operational
       placed_as_walkin_late: operational
@@ -1610,6 +1642,8 @@ schemas:
       weight_recorded_at: operational
       blood_sugar: phi
       pain_score: phi
+      change_seq: operational
+      updated_at: operational
     waitlist_entries:
       id: operational
       tenant_id: operational
@@ -1620,6 +1654,8 @@ schemas:
       offered_slot_start: operational
       offer_expires_at: operational
       booked_appointment_id: operational
+      change_seq: operational
+      updated_at: operational
     notification_requests:
       id: operational
       tenant_id: operational

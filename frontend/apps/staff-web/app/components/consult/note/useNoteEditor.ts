@@ -10,7 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteDraft, writeDraft, type NoteFields } from "../draftStore";
 import type { AuthedFetch } from "../shared";
 import { useOnline } from "./useOnline";
-import { AUTOSAVE_MS, BLANK_DRAFT, LOCAL_DRAFT_MS, sameFields, toFields } from "./noteLogic";
+import { BLANK_DRAFT, LOCAL_DRAFT_MS, sameFields, toFields } from "./noteLogic";
+import { createAutosave } from "../../../lib/autosave";
 import type { Note, NoteDraft, SaveState } from "../visit/types";
 
 export type Conflict = { mine: NoteFields; server: NoteFields; serverUpdatedAt: string | null };
@@ -45,7 +46,9 @@ export function useNoteEditor(authedFetch: AuthedFetch, entryId: string, setNoti
 
   const setNoteLoad = useCallback((v: "loading" | "ok" | "error") => { noteLoadRef.current = v; setNoteLoadState(v); }, []);
 
+  const autosaveRef = useRef<ReturnType<typeof createAutosave> | null>(null);
   function scheduleLocalDraft() {
+    autosaveRef.current?.touch(); // OPS-006: idle 3 s / max 30 s debounce (app/lib/autosave.ts)
     if (localTimerRef.current) clearTimeout(localTimerRef.current);
     localTimerRef.current = setTimeout(() => {
       if (!dirtyRef.current) return;
@@ -124,10 +127,15 @@ export function useNoteEditor(authedFetch: AuthedFetch, entryId: string, setNoti
   const saveRef = useRef(saveNote);
   useEffect(() => { saveRef.current = saveNote; });
 
-  // Autosave every 10s while there are unsaved changes. A failed save keeps `dirty` set, so this retries on the next tick.
+  // OPS-006 (DP-27): one autosave when typing pauses 3 s, at the latest 30 s after the first unsaved edit. A failed save keeps
+  // `dirty` set, so the flush touches again and retries after the next idle pause. No audit row until sign/amend.
   useEffect(() => {
-    const id = setInterval(() => { if (dirtyRef.current) void saveRef.current(); }, AUTOSAVE_MS);
-    return () => clearInterval(id);
+    const saver = createAutosave(() => {
+      if (!dirtyRef.current) return;
+      void saveRef.current().finally(() => { if (dirtyRef.current) saver.touch(); });
+    });
+    autosaveRef.current = saver;
+    return () => { saver.cancel(); autosaveRef.current = null; };
   }, []);
 
   // On reconnect, retry straight away (the server copy is compared first).

@@ -61,8 +61,10 @@ public class AppointmentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('queue:view')")
-    public AppointmentResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.get(tenantId(jwt), id);
+    public ResponseEntity<AppointmentResponse> get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                   @org.springframework.web.bind.annotation.RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        java.util.List<Long> seq = service.changeSeq(id); // OPS-006: 304 without loading the appointment
+        return com.nabd.hms.shared.ETags.respond(!seq.isEmpty(), seq.isEmpty() ? null : seq.get(0), ifNoneMatch, () -> service.get(tenantId(jwt), id));
     }
 
     @PostMapping("/{id}/cancel")

@@ -50,13 +50,15 @@ class ProvisioningStepRunner {
     private final OwnerService ownerService;
     private final com.nabd.hms.common.EventPublisher events;
     private final com.nabd.hms.organization.api.RegionRules regions;
+    private final com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys;
 
-    ProvisioningStepRunner(ProvisioningRepository repo, TenantContext tenantContext,
+    ProvisioningStepRunner(com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys, ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
                             OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
                             com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates) {
+        this.tenantKeys = tenantKeys;
         this.catalogueTemplates = catalogueTemplates;
         this.events = events;
         this.regions = regions;
@@ -199,6 +201,7 @@ class ProvisioningStepRunner {
         UUID tenantId = repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
         repo.setJobCreatedRefs(job.id(), tenantId, ownerId, brandId);
         repo.setJobCreationFlags(job.id(), ownerIsNew, brandIsNew);
+        tenantKeys.provision(tenantId, job.region()); // PLT-045: the tenant's DEK exists before any patient row can be written
         log.info("provisioning job {} created tenant {} (owner {}, brand {})", job.id(), tenantId, ownerId, brandId);
     }
 

@@ -652,7 +652,7 @@ public class AuthService {
             }
         }
 
-        UUID sessionId = bg != null ? bg.sessionId() : UUID.randomUUID();
+        UUID sessionId = bg != null ? bg.sessionId() : com.nabd.hms.shared.UuidV7.next();
         Instant now = Instant.now(clock);
         Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 

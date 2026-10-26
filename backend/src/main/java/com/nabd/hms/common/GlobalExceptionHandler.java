@@ -43,6 +43,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     /** Constraint failures a service did not translate to a named Problem: 500 with the trace id, never a guessed 409. */
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ProblemDetail handleIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        ProblemDetail tenantFk = tenantForeignKey(ex);
+        if (tenantFk != null) return withTraceId(tenantFk);
         String traceId = MDC.get(RequestCorrelationFilter.MDC_KEY);
         log.error("[{}] unmapped integrity violation: {}", traceId, ex.getMostSpecificCause().getClass().getSimpleName(), ex); // log-phi-ok: exception class name
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -50,6 +52,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setTitle("Unexpected error");
         problem.setDetail("The request could not be saved. Quote the trace id to support.");
         return withTraceId(problem);
+    }
+
+    private static final java.util.regex.Pattern TENANT_FK = java.util.regex.Pattern.compile("foreign key constraint \"fk_\\w+?_tenant_(patient|doctor|staff|granted_by|department)\"");
+
+    /** OPS-005: a composite (tenant_id, x_id) key refused a reference to another clinic's patient/staff/department: 404 like an unknown id, never 500. */
+    private static ProblemDetail tenantForeignKey(org.springframework.dao.DataIntegrityViolationException ex) {
+        String msg = ex.getMostSpecificCause().getMessage();
+        java.util.regex.Matcher m = msg == null ? null : TENANT_FK.matcher(msg);
+        if (m == null || !m.find()) return null;
+        String what = switch (m.group(1)) {
+            case "patient" -> "patient";
+            case "doctor" -> "doctor";
+            case "department" -> "department";
+            default -> "staff";
+        };
+        ProblemDetail p = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        p.setType(URI.create(TYPE_BASE + what + "-not-found"));
+        p.setTitle(Character.toUpperCase(what.charAt(0)) + what.substring(1) + " not found");
+        p.setDetail("The " + what + " does not exist in this clinic.");
+        return p;
     }
 
     @Override

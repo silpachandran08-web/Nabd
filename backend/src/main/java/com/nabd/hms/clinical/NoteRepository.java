@@ -30,7 +30,7 @@ class NoteRepository {
     }
 
     Optional<NoteRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT * FROM clinical_notes WHERE tenant_id = ? AND queue_entry_id = ?",
+        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, subjective, objective, assessment, plan, status, signed_at, created_at, updated_at, diagnosis, signed_by FROM clinical_notes WHERE tenant_id = ? AND queue_entry_id = ?",
                 mapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
@@ -65,7 +65,7 @@ class NoteRepository {
     }
 
     List<AmendmentRow> listAmendments(UUID tenantId, UUID noteId) {
-        return jdbc.query("SELECT * FROM note_amendments WHERE tenant_id = ? AND note_id = ? ORDER BY created_at",
+        return jdbc.query("SELECT id, tenant_id, note_id, amended_by, reason, subjective, objective, assessment, plan, diagnosis, created_at FROM note_amendments WHERE tenant_id = ? AND note_id = ? ORDER BY created_at",
                 (rs, i) -> new AmendmentRow(
                         UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("note_id")),
                         UUID.fromString(rs.getString("amended_by")), rs.getString("reason"),

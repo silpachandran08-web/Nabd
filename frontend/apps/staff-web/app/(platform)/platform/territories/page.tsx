@@ -20,7 +20,15 @@ type RegionSummary = {
   taxIdTypes: string[];
   planMix: PlanMix[];
   newClinicsLast30d: number;
+  kmsKeyCreatedAt?: string | null; // PLT-045: region KMS key metadata, absent until the region has a tenant key
+  kmsKeyRotatedAt?: string | null;
 };
+
+const DAY_MS = 86_400_000;
+function keyAgeDays(r: RegionSummary): number | null {
+  const since = r.kmsKeyRotatedAt ?? r.kmsKeyCreatedAt;
+  return since ? Math.max(0, Math.floor((Date.now() - Date.parse(since)) / DAY_MS)) : null;
+}
 
 const REGION_NAME: Record<string, string> = { IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia", QA: "Qatar" };
 
@@ -90,6 +98,17 @@ export default function TerritoriesPage() {
                   <span className={styles.statLabel}>New (30d)</span>
                   <span className={styles.statValue}>{r.newClinicsLast30d}</span>
                 </div>
+              </div>
+
+              <div className={styles.section} data-testid={`kms-${r.region}`}>
+                <div className={styles.sectionLabel}>Encryption key (KMS)</div>
+                {keyAgeDays(r) === null ? (
+                  <span className={styles.muted}>No tenant key yet</span>
+                ) : (
+                  <span>
+                    Key age {keyAgeDays(r)} days · last rotation {r.kmsKeyRotatedAt ? new Date(r.kmsKeyRotatedAt).toISOString().slice(0, 10) : "never"}
+                  </span>
+                )}
               </div>
 
               <div className={styles.section}>

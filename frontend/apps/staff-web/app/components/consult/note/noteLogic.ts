@@ -2,7 +2,6 @@
 import type { NoteFields } from "../draftStore";
 import type { Note } from "../visit/types";
 
-export const AUTOSAVE_MS = 10_000;
 export const LOCAL_DRAFT_MS = 800;
 export const BLANK_DRAFT: NoteFields = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
 

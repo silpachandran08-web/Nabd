@@ -2578,9 +2578,10 @@ paths:
     get:
       tags: [Queue]
       x-required-permission: queue:view
-      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      parameters: [{ $ref: "#/components/parameters/PathId" }, { $ref: "#/components/parameters/IfNoneMatch" }]
       responses:
-        "200": { description: "Appointment", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "200": { description: "Appointment (ETag header W/\"<change_seq>\", OPS-006)", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "304": { description: "Unchanged since the If-None-Match tag; no body" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /appointments/{id}/cancel:
@@ -4477,9 +4478,10 @@ paths:
         An invoice with its derived balance (`balanceDue`), status (`unpaid` / `partial` / `paid`, or `void` / `cancelled` / `refunded`)
         and payments. Status is recomputed from paid vs total in the same transaction as every payment or totals change (FIN-001).
       x-required-permission: billing:view
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IfNoneMatch" }]
       responses:
-        "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
+        "200": { description: "The invoice (ETag header W/\"<change_seq>\", OPS-006)", content: { application/json: { schema: { type: object } } } }
+        "304": { description: "Unchanged since the If-None-Match tag; no body" }
         "404": { $ref: "#/components/responses/NotFound" }
   /billing/invoices/{id}/payments:
     post:
@@ -5420,6 +5422,12 @@ components:
         tenant/role headers.
 
   parameters:
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: OPS-006. The weak ETag W/"<change_seq>" from an earlier read; when unchanged the API answers 304 with no body and Cache-Control private, no-cache.
+      schema: { type: string }
     PlatformAuditIncludeValues:
       name: includeValues
       in: query

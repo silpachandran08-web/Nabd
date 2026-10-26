@@ -106,7 +106,7 @@ class QueueRepository {
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
                 UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status,
                 String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote, Instant createdAt) {
-        UUID id = UUID.randomUUID();
+        UUID id = com.nabd.hms.shared.UuidV7.next();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
                         "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note, created_at) " +
                         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", // PLT-028: created_at from the injected clock, so session-time checks see the same "now"
