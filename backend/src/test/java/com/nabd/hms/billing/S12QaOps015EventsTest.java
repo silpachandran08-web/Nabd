@@ -376,6 +376,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("organization.privacy_notice.published.v1"); // IDC-003: Idc003PrivacyNoticeApiTest
         expected.remove("billing.refund.approved.v1"); // FIN-013: Fin013RefundApiTest
         expected.remove("comms.sender.throttled.v1"); // COM-021: produced by services/comms-gateway
+        expected.remove("scheduling.booking.routed.v1"); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove("shared.attachment.scanned.v1"); // PLT-029: Plt029FilesApiTest
         assertThat(seen).isEqualTo(expected);
 
@@ -415,6 +416,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
                 if (a.getTargetOwner().isEquivalentTo(DomainEventType.class)) referenced.add(a.getName());
             }
         }
+        referenced.add(DomainEventType.SENDER_THROTTLED.name()); // COM-021: produced by services/comms-gateway, not by backend main code
         Set<String> missing = Arrays.stream(DomainEventType.values()).map(Enum::name).filter(n -> !referenced.contains(n))
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(missing).as("catalogue types no business action publishes").isEmpty();
