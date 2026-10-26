@@ -9,6 +9,7 @@ import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
 import PrivacyNoticePanel from "../components/setup/PrivacyNoticePanel";
 import AbdmCard from "../components/setup/AbdmCard";
+import PrintPaperPanel from "../components/setup/PrintPaperPanel";
 import Icon from "../components/ui/Icon";
 import AccessGate from "../components/ui/AccessGate";
 import PatientImport from "../components/setup/PatientImport";
@@ -501,6 +502,7 @@ function SetupPageInner() {
         );
       case "policies":
         return (
+          <>
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Simple policy settings</h2>
             <div className={styles.tableWrap}>
@@ -521,6 +523,8 @@ function SetupPageInner() {
               </table>
             </div>
           </div>
+          <PrintPaperPanel policies={policies} canEdit={can("setup:edit")} onSave={async (k, v) => { const ok = await patch(`/setup/policies/${k}`, { value: v }); if (ok) loadAll(); return ok; }} />
+          </>
         );
       case "consent":
         return (

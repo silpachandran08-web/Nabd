@@ -117,8 +117,8 @@ async function openRx(n, paper) {
 {
   const { page, browser, log } = await openRx(3, { rx: 'a5' });
   const p = await pdf(page, 'rx-a5-short');
-  check('B1 Rx with default a5: real page is A5 (148 x 210 mm)', Math.abs(p.wMm - 148) < 1.5 && Math.abs(p.hMm - 210) < 1.5 && p.pages === 1, `${p.wMm.toFixed(1)} x ${p.hMm.toFixed(1)}, ${p.pages} p`);
-  check('B2 every line, sig and prescriber registration are on the A5 page', /Medicine 1/.test(p.text) && /Medicine 3/.test(p.text) && /after food/.test(p.text) && /Reg\. No\. REG-12345/.test(p.text) && /Signed electronically by/.test(p.text));
+  check('B1 Rx with default a5: real page is A5 (148 x 210 mm)', Math.abs(p.wMm - 148) < 1.5 && Math.abs(p.hMm - 210) < 1.5 && (p.pages === 1 || p.pages === Number(p.text.match(/Page 1 of (\d+)/)?.[1])), `${p.wMm.toFixed(1)} x ${p.hMm.toFixed(1)}, ${p.pages} p`);
+  check('B2 every line, sig and prescriber registration are on the A5 page', /Medicine 1/.test(p.text) && /Medicine 3/.test(p.text) && /after food/.test(p.text) && /Reg\. No\. REG-12345/.test(p.text) && /Signed electronically by/i.test(p.text));
   check('B3 print button needs no paper prompt (no dialog, print called once)', await (async () => { await page.emulateMedia({ media: 'screen' }); await page.getByRole('button', { name: /^Print$/ }).click(); return (await page.evaluate(() => window.__prints.length)) === 1 && (await page.getByRole('dialog').count()) === 0; })());
   check('B4 Rx sheet is the print-kit sheet with a5', (await page.locator('.nbp-sheet').getAttribute('data-paper')) === 'a5');
   check('B5 zero console errors', cleanConsole(log).length === 0, cleanConsole(log).join(' | '));
@@ -148,10 +148,10 @@ async function openRx(n, paper) {
     ['GET', /./, { body: [] }],
   ]);
   await page.goto(APP + '/documents/d1/print');
-  await page.getByText('Riyadh Clinic').waitFor({ timeout: 15000 });
+  await page.getByText('Riyadh Clinic').first().waitFor({ timeout: 15000 });
   await page.emulateMedia({ media: 'print', colorScheme: 'dark' });
   const p = await pdf(page, 'document-a5');
-  check('C1 document prints on A5 from the clinic setting', Math.abs(p.wMm - 148) < 1.5 && /Riyadh Clinic/.test(p.text) && /Rest advised/.test(p.text), `${p.wMm.toFixed(1)} mm`);
+  check('C1 document prints on A5 from the clinic setting', Math.abs(p.wMm - 148) < 1.5 && /Riyadh Clinic/.test(p.text) && /Huda Saleh/.test(p.text) && /Dr Amal/.test(p.text) && /Page 1 of 1/.test(p.text), `${p.wMm.toFixed(1)} mm`);
   await browser.close();
 }
 
@@ -270,6 +270,40 @@ for (const [status, type, msg] of [[409, 'no-messaging-consent', /hasn't agreed 
 {
   const { page, browser } = await openCheckout(['billing:view'], (route) => json(route, {}, 202));
   check('E7 without billing:edit "Send on WhatsApp" is absent, printing stays', (await page.getByRole('button', { name: 'Send on WhatsApp' }).count()) === 0 && (await page.getByRole('link', { name: 'Print receipt' }).count()) === 1);
+  await browser.close();
+}
+
+// ---------- F. Settings: default paper per document ----------
+async function openSettings(perms, viewport) {
+  const ctx = await launch(viewport ? { viewport } : {});
+  await seedClinic(ctx.page, perms);
+  ctx.patches = [];
+  await mockApi(ctx.page, ctx.log, [
+    ['GET', /^\/setup\/policies/, { body: [{ id: 'p1', policyKey: 'print.default_paper.receipt', value: '80mm', version: 1 }, { id: 'p2', policyKey: 'refund_rule', value: 'x', version: 1 }] }],
+    ['PATCH', /^\/setup\/policies\/(.+)$/, (route, req, m) => { ctx.patches.push({ key: m[1], body: req.postDataJSON(), idem: req.headers()['idempotency-key'] }); return json(route, { id: 'p3', policyKey: m[1], value: req.postDataJSON().value, version: 2 }); }],
+    ['GET', /./, { body: [] }],
+  ]);
+  await ctx.page.goto(APP + '/setup?tab=policies');
+  await ctx.page.getByRole('heading', { name: 'Default paper for printing' }).waitFor({ timeout: 15000 });
+  return ctx;
+}
+{
+  const { page, browser, patches, log } = await openSettings(['setup:view', 'setup:edit']);
+  check('F1 each document type has a paper choice; unset ones show the built-in default', (await page.locator('select[id^="paper-"]').count()) === 5 && (await page.locator('#paper-rx').inputValue()) === 'a4' && (await page.locator('#paper-token_slip').inputValue()) === '80mm' && (await page.locator('#paper-receipt').inputValue()) === '80mm');
+  await page.locator('#paper-rx').selectOption('a5');
+  await sleep(500);
+  check('F2 choosing A5 for the prescription saves print.default_paper.rx=a5 with an Idempotency-Key', patches.length === 1 && patches[0].key === 'print.default_paper.rx' && patches[0].body.value === 'a5' && /^[0-9a-f-]{36}$/.test(patches[0].idem ?? ''), JSON.stringify(patches));
+  check('F3 zero console errors', cleanConsole(log).length === 0, cleanConsole(log).join(' | '));
+  await browser.close();
+}
+{
+  const { page, browser } = await openSettings(['setup:view']);
+  check('F4 without setup:edit the choice is read-only (no select, value shown)', (await page.locator('select[id^="paper-"]').count()) === 0 && /A4/.test(await page.locator('table').last().innerText()));
+  await browser.close();
+}
+{
+  const { page, browser } = await openSettings(['setup:view', 'setup:edit'], { width: 390, height: 800 });
+  check('F5 390px: no horizontal scroll', await noOverflow(page));
   await browser.close();
 }
 

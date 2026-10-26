@@ -221,3 +221,7 @@
 }
 
 /* FEF-046: printing (paper size, shell hiding, black on white) comes from the print kit (PrintSheet). */
+@media print {
+  .sheet { gap: var(--nb-space-8); font-size: 12px; }
+  .letterhead { padding-block-end: var(--nb-space-8); }
+}

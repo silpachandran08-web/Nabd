@@ -15,7 +15,8 @@ export function PrintSheet({ paper, label, bare, children }: { paper: Paper; lab
   useLayoutEffect(() => {
     const el = ref.current;
     if (paper !== "80mm" || !el || typeof ResizeObserver === "undefined") return;
-    const measure = () => setHeightMm(Math.ceil((el.getBoundingClientRect().height * 25.4) / 96) + 1);
+    // The sheet is laid out differently while printing; only the on-screen (72 mm wide) layout is measured.
+    const measure = () => { if (window.matchMedia("print").matches) return; setHeightMm(Math.ceil((el.getBoundingClientRect().height * 25.4) / 96) + 1); };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
