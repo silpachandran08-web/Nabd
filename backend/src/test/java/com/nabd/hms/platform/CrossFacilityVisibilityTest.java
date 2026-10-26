@@ -106,7 +106,7 @@ class CrossFacilityVisibilityTest extends ApiTestBase {
                     "WHERE tablename = ?", (rs, i) -> rs.getString(1), t);
             assertThat(defs).as(t).isNotEmpty();
             assertThat(String.join(" ", defs)).as(t).doesNotContain("accessible_tenant_ids");
-            boolean singleOnly = t.equals("roles") || t.equals("staff") || t.equals("sessions");
+            boolean singleOnly = t.equals("roles") || t.equals("staff") || t.equals("sessions") || t.equals("clinic_setup_progress"); // ADM-007 (S6)
             assertThat(String.join(" ", defs).contains("visible_tenant_ids")).as(t + " widens?").isEqualTo(!singleOnly);
             if (!singleOnly) {
                 assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE tablename = ? AND cmd IN ('INSERT','UPDATE') AND with_check IS NOT NULL",

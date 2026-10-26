@@ -39,6 +39,7 @@ async function open(perms, state, path = '/setup/wizard', viewport = { width: 12
   await seedClinic(s.page, perms);
   await mockApi(s.page, s.log, handlers(state));
   await s.page.goto(`${APP}${path}`, { waitUntil: 'networkidle' });
+  if (path === '/setup/wizard') await s.page.getByRole('button', { name: 'DPA', exact: true }).click(); // ADM-007: the DPA panel moved from Go live to its own step
   return s;
 }
 

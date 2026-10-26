@@ -51,9 +51,9 @@ class SetupRepository {
     List<SetupProgressRow> listProgress(UUID tenantId) {
         ensureProgressSeeded(tenantId);
         return jdbc.query(
-                "SELECT id, step, status, skipped_at, done_at FROM clinic_setup_progress " +
-                        "WHERE tenant_id = ? ORDER BY array_position(ARRAY['welcome','profile','tax','doctors','departments','schedule','charges','pharmacy','whatsapp','go_live'], step)",
-                progressMapper(), tenantId);
+                "SELECT id, step, status, skipped_at, done_at, draft::text AS draft, version, updated_at FROM clinic_setup_progress " +
+                        "WHERE tenant_id = ? ORDER BY array_position(?::text[], step)",
+                progressMapper(), tenantId, SetupSteps.ALL.toArray(new String[0]));
     }
 
     void updateProgress(UUID tenantId, String step, String status) {
@@ -69,12 +69,23 @@ class SetupRepository {
                 status, status, status, tenantId, step);
     }
 
+    /** ADM-007: compare-and-set on the version; the new version, or empty when someone saved first. */
+    java.util.OptionalInt saveDraft(UUID tenantId, String step, String draftJson, int expectedVersion) {
+        ensureProgressSeeded(tenantId);
+        List<Integer> v = jdbc.queryForList("UPDATE clinic_setup_progress SET draft = ?::jsonb, version = version + 1, updated_at = now() " +
+                "WHERE tenant_id = ? AND step = ? AND version = ? RETURNING version", Integer.class, draftJson, tenantId, step, expectedVersion);
+        return v.isEmpty() ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(v.get(0));
+    }
+
+    boolean hasDpaAcceptance() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM dpa_acceptances)", Boolean.class));
+    }
+
     /** Per-step upsert (not a single "seed if empty" guard) so a step added after a tenant already
      * had its checklist seeded — e.g. "departments" — still appears for it, without a one-off
      * migration-time backfill. UNIQUE(tenant_id, step) makes this a no-op for steps already there. */
     private void ensureProgressSeeded(UUID tenantId) {
-        String[] steps = {"welcome", "profile", "tax", "doctors", "departments", "schedule", "charges", "pharmacy", "whatsapp", "go_live"};
-        for (String step : steps) {
+        for (String step : SetupSteps.ALL) {
             jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, ?, 'pending') " +
                     "ON CONFLICT (tenant_id, step) DO NOTHING", tenantId, step);
         }
@@ -378,7 +389,8 @@ class SetupRepository {
                 rs.getString("step"),
                 rs.getString("status"),
                 rs.getTimestamp("skipped_at") == null ? null : rs.getTimestamp("skipped_at").toInstant(),
-                rs.getTimestamp("done_at") == null ? null : rs.getTimestamp("done_at").toInstant());
+                rs.getTimestamp("done_at") == null ? null : rs.getTimestamp("done_at").toInstant(),
+                rs.getString("draft"), rs.getInt("version"), rs.getTimestamp("updated_at").toInstant());
     }
 
     private RowMapper<TenantProfileRow> profileMapper() {

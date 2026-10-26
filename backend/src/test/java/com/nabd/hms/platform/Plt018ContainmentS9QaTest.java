@@ -26,10 +26,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class Plt018ContainmentS9QaTest extends ApiTestBase {
 
     private static final List<String> WIDENED_READ = List.of("patients", "doctor_working_hours", "doctor_leave", "appointments", "queue_entries",
-            "consents", "patient_merges", "clinical_notes", "clinic_setup_progress", "charge_catalogue", "clinic_policies", "clinic_holidays",
+            "consents", "patient_merges", "clinical_notes", "charge_catalogue", "clinic_policies", "clinic_holidays",
             "staff_shifts", "attendance_records", "licence_registry", "data_import_jobs", "data_export_jobs",
             "day_closes", "day_close_events"); // FIN-005 (S12): ADR-07 widened read on purpose
-    private static final List<String> NEVER_WIDE = List.of("roles", "staff", "sessions");
+    private static final List<String> NEVER_WIDE = List.of("roles", "staff", "sessions", "clinic_setup_progress"); // ADM-007 (S6): the wizard is per clinic, no sibling read
 
     private record Pair(SeededTenant a, SeededTenant b) {}
 

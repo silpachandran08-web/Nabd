@@ -184,6 +184,8 @@ schemas:
       done_at: operational
       created_at: operational
       updated_at: operational
+      draft: pii            # ADM-007: a step's in-progress form (doctor names and phones)
+      version: operational
     clinical_documents:
       id: operational
       tenant_id: operational
