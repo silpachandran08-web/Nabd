@@ -170,7 +170,7 @@ try {
   await s.page.keyboard.press('F2'); await s.page.waitForFunction(() => document.activeElement?.id === 'newName');
   check('E2 a stored doctor that is not on the roster is ignored', (await s.page.locator('#doctor').inputValue()) === '');
   await s.page.keyboard.press('Control+Enter');
-  check('E3 Ctrl+Enter with a missing doctor shows the validation message, no request', /Pick a doctor/.test(await s.page.getByRole('alert').innerText()) && !s.log.requests.some((r) => r.method === 'POST' && r.path === '/patients'));
+  check('E3 Ctrl+Enter with a missing doctor shows the validation message, no request', /Pick a doctor/.test(await s.page.locator('[role=dialog] [role=alert]').innerText()) && !s.log.requests.some((r) => r.method === 'POST' && r.path === '/patients'));
   await s.browser.close(); s = null;
 
   // ---------- F. shortcut sheet: en, hi, permission-absent, other desk screens, F2 from another screen

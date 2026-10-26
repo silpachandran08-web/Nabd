@@ -50,7 +50,7 @@ export default function DetailRail({ row, doctorName, grants, sendingId, h, onCl
         <dl className={styles.railList}>
           <div><dt>{t("rail.phone")}</dt><dd>{p.phone || "—"}</dd></div>
           <div><dt>{t("rail.dob")}</dt><dd>{p.dob || "—"}</dd></div>
-          <div><dt>{t("rail.sex")}</dt><dd>{p.gender || "—"}</dd></div>
+          <div><dt>{t("rail.sex")}</dt><dd>{p.gender ? (t.has(`walkIn.${p.gender}`) ? t(`walkIn.${p.gender}`) : p.gender) : "—"}</dd></div>
         </dl>
       )}
       {grants.patientsView && <ReackPrompt patientId={row.patientId} />}

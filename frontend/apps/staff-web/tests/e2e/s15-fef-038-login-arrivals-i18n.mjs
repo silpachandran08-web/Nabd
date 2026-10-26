@@ -28,7 +28,7 @@ const handlers = [
 async function rawEnglish(page, scope = 'main') {
   return page.evaluate(({ scope, names }) => {
     const root = document.querySelector(scope) ?? document.body; const out = [];
-    const PROPER = /\b(PIN|UPI|OTP|WhatsApp|SMS|Nabd|MRN|SpO2|BP|ID)\b/g; // product and clinical abbreviations are the same in every language
+    const PROPER = /\b(PIN|UPI|OTP|WhatsApp|SMS|Nabd|MRN|SpO2|BP|ID|mmHg|bpm|kg|cm)\b/g; // product and clinical abbreviations are the same in every language
     const ok = (s) => { const t = s.trim().replace(PROPER, ''); return !/[A-Za-z]{3,}/.test(t) || /^[\u202b]?\[/.test(t) || names.some((n) => t.includes(n)) || /^(MRN-|https?:|#?\d)/.test(t); };
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n; (n = w.nextNode());) {
