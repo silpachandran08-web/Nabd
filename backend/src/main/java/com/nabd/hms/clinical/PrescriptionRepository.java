@@ -123,7 +123,7 @@ class PrescriptionRepository {
                                         String legacyLike, String prefix, int limit) {
         return jdbc.query(
                 "SELECT name, source, code, in_stock, rx_only, drug_id, brand, strength, form, generic, schedule FROM (" +
-                        " SELECT * FROM (" +
+                        " SELECT name, source, code, in_stock, rx_only, drug_id, brand, strength, form, generic, schedule, src_rank, boost, pfx FROM (" +
                         "  SELECT m.brand AS name, 'master' AS source, NULL::text AS code, " +
                         "   EXISTS (SELECT 1 FROM charge_catalogue c WHERE c.tenant_id = ? AND c.drug_id = m.id AND c.active AND c.stock_qty > 0) AS in_stock, " +
                         "   (cardinality(m.schedule) > 0) AS rx_only, m.id AS drug_id, m.brand AS brand, m.strength AS strength, m.form AS form, " +

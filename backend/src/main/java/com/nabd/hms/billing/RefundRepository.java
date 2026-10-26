@@ -39,10 +39,12 @@ class RefundRepository {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    private final com.nabd.hms.pharmacy.api.StockCommands stock;
 
-    RefundRepository(JdbcTemplate jdbc, ObjectMapper json) {
+    RefundRepository(JdbcTemplate jdbc, ObjectMapper json, com.nabd.hms.pharmacy.api.StockCommands stock) {
         this.jdbc = jdbc;
         this.json = json;
+        this.stock = stock;
     }
 
     Optional<InvoiceHead> lockInvoice(UUID tenantId, UUID invoiceId) {
@@ -157,10 +159,7 @@ class RefundRepository {
         List<UUID> item = jdbc.query("SELECT c.id FROM invoice_line_items li JOIN charge_catalogue c ON c.tenant_id = li.tenant_id AND c.code = li.charge_code " +
                 "AND c.stock_qty IS NOT NULL WHERE li.tenant_id = ? AND li.id = ?", (rs, i) -> rs.getObject("id", UUID.class), tenantId, lineId);
         if (item.isEmpty()) return false;
-        Integer after = jdbc.queryForObject("UPDATE charge_catalogue SET stock_qty = stock_qty + ?, updated_at = now() WHERE tenant_id = ? AND id = ? RETURNING stock_qty",
-                Integer.class, qty, tenantId, item.get(0));
-        jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id, actor_id) VALUES (?,?,'restock',?,?,?,?,?,?)",
-                tenantId, item.get(0), qty, after - qty, after, reason, invoiceId, staffId);
+        stock.returnIn(item.get(0), qty, invoiceId, staffId, reason);
         return true;
     }
 
