@@ -50,3 +50,9 @@
 
 /* ACC-031: announced to screen readers when the token is issued; see globals.css .srOnly */
 .srOnly { position: absolute; inset-inline-start: 0; inline-size: 1px; block-size: 1px; margin: -1px; padding: 0; clip-path: inset(50%); white-space: nowrap; }
+
+/* ACC-031: the note line keeps two lines of room so the slip does not shift when the queue facts arrive */
+.note { min-block-size: 2.6em; }
+@media (max-width: 430px) {
+  .select, .primaryBtn, .secondaryBtn { min-block-size: 44px; }
+}

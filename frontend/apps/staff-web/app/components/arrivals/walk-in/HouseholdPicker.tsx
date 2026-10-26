@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import styles from "../arrivals.module.css";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "../../../lib/api";
+import { dateLocale } from "../dateLocale";
 import { getter, key } from "../../../lib/query";
 
 export type HouseholdMember = { patientId: string; displayName: string; age: number; sex: string; relation: "guardian" | "child" | "member"; lastVisitAt?: string | null; guardianId?: string | null };
@@ -21,7 +22,7 @@ type Household = { household: HouseholdMember[] };
 export default function HouseholdPicker({ phone, onPick }: { phone: string; onPick: (m: HouseholdMember) => void }) {
   const t = useTranslations("arrivals.household");
   const locale = useLocale();
-  const lastVisit = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(locale) : t("noVisit"));
+  const lastVisit = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(dateLocale(locale, "en-GB")) : t("noVisit"));
   const relationOf = (r: HouseholdMember["relation"]) => (r === "member" ? "" : t("relation", { relation: t(r) }));
   const [settled, setSettled] = useState(""); // the number, once typing paused for 150 ms
   useEffect(() => {

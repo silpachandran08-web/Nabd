@@ -798,3 +798,8 @@
 .shortcutList dt { flex: 0 0 8.5rem; font-size: 13px; color: var(--nb-text-secondary); }
 .shortcutList dd { margin: 0; font-size: 14px; color: var(--nb-text-primary); }
 .shortcutList kbd { padding: 2px 8px; font: inherit; font-weight: 600; background: var(--nb-surface-3); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-sm, 6px); }
+
+/* ACC-031: 44px touch targets for the desk forms on phones */
+@media (max-width: 430px) {
+  .input, .select, .submitBtn, .cancelBtn, .searchResultRow, .linkBtn { min-block-size: 44px; }
+}

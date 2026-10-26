@@ -9,6 +9,7 @@ import { api, errorText, intentKeys } from "../../lib/api";
 import type { StaffOption, WaitEstimate } from "@nabd/api-client/types";
 import type { QueueEntry } from "@nabd/domain";
 import styles from "./checkin.module.css";
+import { dateLocale } from "./dateLocale";
 import { readDeskDefault, writeDeskDefault } from "./walk-in/deskDefaults";
 
 // One check-in overlay shared by Arrivals and Patients (REC-041, REC-017): confirm -> POST
@@ -59,7 +60,7 @@ export function CheckInResultDialog({ result, onClose }: { result: CheckInResult
           <div><dt>{sl("doctor")}</dt><dd>{result.doctorName || "—"}</dd></div>
           <div><dt>{sl("position")}</dt><dd>{loading ? "…" : position ? `#${position}` : "—"}</dd></div>
           <div><dt>{sl("wait")}</dt><dd>{loading ? "…" : waitMin != null ? sl("waitValue", { n: waitMin }) : "—"}</dd></div>
-          <div><dt>{sl("time")}</dt><dd>{new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</dd></div>
+          <div><dt>{sl("time")}</dt><dd>{new Date().toLocaleTimeString(dateLocale(locale), { hour: "2-digit", minute: "2-digit" })}</dd></div>
         </dl>
         <p className={`${styles.note} ${styles.noPrint}`}>{!loading && (position == null || waitMin == null) ? sl("unavailable") : "\u00a0"}</p>
       </div>
@@ -164,7 +165,7 @@ export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
   if (result) return <CheckInResultDialog result={result} onClose={finish} />;
 
   const time = patient.nextAppointment
-    ? new Date(patient.nextAppointment).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }) : "";
+    ? new Date(patient.nextAppointment).toLocaleTimeString(dateLocale(locale, "en-GB"), { hour: "2-digit", minute: "2-digit" }) : "";
   return (
     <Dialog title={t("checkin.title", { name: patient.name })} onClose={onClose}>
       <form onSubmit={submit}>

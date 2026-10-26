@@ -1,6 +1,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { CallbackEntryResponse } from "@nabd/api-client/generated";
 import styles from "../arrivals.module.css";
+import { dateLocale } from "../dateLocale";
 import StatusPill from "../../ui/StatusPill";
 import { EmptyState, ErrorState } from "../../ui/StateViews";
 import type { DoctorQueue, Grants } from "../types";
@@ -54,7 +55,7 @@ export default function SideColumn({ doctors, rosterFailed, onRetryRoster, callb
                 <span className={styles.doctorName}>{c.patientName}</span>
                 {c.status === "no_show" ? <StatusPill tone="danger" label={t("missed")} /> : <StatusPill tone="warn" label={t("overdue")} />}
               </div>
-              <span className={styles.callbackNote}>{t("followUpWas", { date: new Date(c.startTime ?? "").toLocaleDateString(locale) })}</span>
+              <span className={styles.callbackNote}>{t("followUpWas", { date: new Date(c.startTime ?? "").toLocaleDateString(dateLocale(locale)) })}</span>
             </div>
           ))}
         </div>

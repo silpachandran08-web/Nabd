@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import type { AppointmentPage } from "@nabd/api-client/generated";
@@ -9,6 +9,7 @@ import Dialog from "../../ui/Dialog";
 import { EmptyState, Skeleton } from "../../ui/StateViews";
 import { api } from "../../../lib/api";
 import { key } from "../../../lib/query";
+import { dateLocale } from "../dateLocale";
 import { failText } from "../failText";
 import { patientDetailQuery } from "../hooks/useArrivals";
 import type { AppointmentOption, Row, Staff } from "../types";
@@ -41,9 +42,12 @@ export default function CheckinPicker({ rows, staff, patientsView, onPick, onClo
   });
   // ACC-031: type to narrow, Enter takes the first match, the arrows walk the list.
   const [filter, setFilter] = useState("");
+  const filterRef = useRef<HTMLInputElement>(null);
   const all = q.isPending ? null : q.data ?? [];
   const needle = filter.trim().toLowerCase();
   const list = all && (needle ? all.filter((a) => `${a.patientName} ${a.doctorName}`.toLowerCase().includes(needle)) : all);
+  const loaded = all !== null;
+  useEffect(() => { if (loaded) filterRef.current?.focus(); }, [loaded]);
   const error = q.isError ? failText(q.error, t("checkinPicker.fail"), t("page.denied")) : null;
 
   return (
@@ -55,7 +59,7 @@ export default function CheckinPicker({ rows, staff, patientsView, onPick, onClo
         <>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="checkinFilter">{t("checkinPicker.filter")}</label>
-            <input id="checkinFilter" className={styles.input} autoComplete="off" value={filter} onChange={(e) => setFilter(e.target.value)}
+            <input id="checkinFilter" ref={filterRef} className={styles.input} autoComplete="off" value={filter} onChange={(e) => setFilter(e.target.value)}
               onKeyDown={(e) => {
                 const rows = e.currentTarget.closest("[role=dialog]")?.querySelectorAll<HTMLButtonElement>("[data-results] button");
                 if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && list.length > 0) { e.preventDefault(); rows?.[0]?.click(); }
@@ -75,7 +79,7 @@ export default function CheckinPicker({ rows, staff, patientsView, onPick, onClo
         }}>
           {list.map((a) => (
             <div key={a.id} className={styles.appointmentRow}>
-              <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</span>
+              <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString(dateLocale(locale), { hour: "2-digit", minute: "2-digit" })}</span>
               <button type="button" className={styles.actionBtn} onClick={() => onPick(a)}>{t("page.checkIn")}</button>
             </div>
           ))}

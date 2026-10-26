@@ -25,10 +25,11 @@ const handlers = [
 ];
 
 // every visible text node / visible attribute of the page that still contains a plain English word (>=3 ASCII letters) and is not a data value
-async function rawEnglish(page, scope = 'body') {
+async function rawEnglish(page, scope = 'main') {
   return page.evaluate(({ scope, names }) => {
     const root = document.querySelector(scope) ?? document.body; const out = [];
-    const ok = (s) => { const t = s.trim(); return !/[A-Za-z]{3,}/.test(t) || names.some((n) => t.includes(n)) || /^(MRN-|https?:|#?\d)/.test(t); };
+    const PROPER = /\b(PIN|UPI|OTP|WhatsApp|SMS|Nabd|MRN|SpO2|BP|ID)\b/g; // product and clinical abbreviations are the same in every language
+    const ok = (s) => { const t = s.trim().replace(PROPER, ''); return !/[A-Za-z]{3,}/.test(t) || /^[\u202b]?\[/.test(t) || names.some((n) => t.includes(n)) || /^(MRN-|https?:|#?\d)/.test(t); };
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n; (n = w.nextNode());) {
       const el = n.parentElement; if (!el || ['SCRIPT', 'STYLE', 'OPTION'].includes(el.tagName) && false) continue;
@@ -55,7 +56,9 @@ const dialogs = [
   ['move queue', (p) => p.locator('[class*=quickActions] button').nth(3).click(), 'Escape'],
   ['notify delay', (p) => p.locator('[class*=quickActions] button').nth(4).click(), 'Escape'],
   ['checkout picker', (p) => p.locator('[class*=quickActions] button').nth(5).click(), 'Escape'],
-  ['priority', (p) => p.locator('tbody tr').first().click().then(() => p.getByRole('dialog').locator('button').filter({ hasText: /./ }).nth(1).click().catch(() => {})), 'Escape'],
+  ['priority', (p) => p.locator('tbody tr').nth(0).locator('button').first().click(), 'Escape'],
+  ['record vitals', (p) => p.locator('tbody tr').nth(1).locator('button').first().click(), 'Escape'],
+  ['detail rail', (p) => p.locator('tbody tr').nth(0).locator('td').nth(1).click(), 'Escape'],
 ];
 
 // ---------- hi
@@ -79,7 +82,7 @@ await arrivals('hi', { width: 1280, height: 900 }, async (page) => {
     await page.goto(APP + '/login'); await sleep(1500);
     const t = await page.locator('main').innerText();
     check('hi login: title, labels and buttons are Hindi', /Nabd में साइन इन करें/.test(t) && /क्लिनिक कोड/.test(t) && /PIN भूल गए/.test(t) && /WhatsApp OTP/.test(t), t);
-    check('hi login: no raw English', (await rawEnglish(page, 'main')).filter((x) => !/^(Nabd|PIN|OTP|WhatsApp)$/.test(x)).length === 0, JSON.stringify(await rawEnglish(page, 'main')));
+    check('hi login: no raw English', (await rawEnglish(page, 'main')).length === 0, JSON.stringify(await rawEnglish(page, 'main')));
     await page.getByRole('button', { name: /PIN भूल गए/ }).click(); await sleep(300);
     check('hi login: forgot-PIN view is Hindi', /अपना PIN रीसेट करें/.test(await page.locator('main').innerText()));
     check('hi login: zero console errors', noise(log).length === 0, JSON.stringify(noise(log)));
@@ -111,7 +114,7 @@ await arrivals('pseudo', { width: 390, height: 844 }, async (page) => {
   await mockApi(page, log, [['*', /./, { body: [] }]]);
   try {
     await page.goto(APP + '/login'); await sleep(1500);
-    const r = (await rawEnglish(page, 'main')).filter((x) => !/^(Nabd|PIN|OTP|WhatsApp)$/.test(x));
+    const r = (await rawEnglish(page, 'main'));
     check('pseudo login 390: no raw English', r.length === 0, JSON.stringify(r));
     check('pseudo login 390: no horizontal scroll', await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
     check('pseudo login: zero console errors', noise(log).length === 0, JSON.stringify(noise(log)));

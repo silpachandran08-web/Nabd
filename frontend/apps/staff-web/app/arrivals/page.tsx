@@ -9,6 +9,7 @@ import { useLocale, useTranslations } from "next-intl";
 import styles from "../components/arrivals/arrivals.module.css";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
+import { dateLocale } from "../components/arrivals/dateLocale";
 import DeskShortcuts from "../components/arrivals/shortcuts/DeskShortcuts";
 import ArrivalsDialogs, { type Dlg } from "../components/arrivals/ArrivalsDialogs";
 import DialogBoundary from "../components/arrivals/DialogBoundary";
@@ -38,7 +39,7 @@ function ArrivalsPageInner() {
   const a = useArrivals();
   const { mounted, grants, rows, staff, forbidden, error, sendRow, clearDelay } = a;
   const [dlg, setDlg] = useState<Dlg | null>(null);
-  const dateLabel = mounted ? new Date().toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }) : "";
+  const dateLabel = mounted ? new Date().toLocaleDateString(dateLocale(locale), { weekday: "short", day: "numeric", month: "short" }) : "";
 
   // TopBar's "Register walk-in" (on the schedule board) lands here with ?action=walkin; open once and strip it
   // so back/refresh doesn't reopen the dialog.

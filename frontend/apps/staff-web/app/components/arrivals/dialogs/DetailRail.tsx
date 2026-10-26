@@ -7,6 +7,7 @@ import styles from "../arrivals.module.css";
 import Dialog from "../../ui/Dialog";
 import StatusPill from "../../ui/StatusPill";
 import { ErrorState, Skeleton } from "../../ui/StateViews";
+import { dateLocale } from "../dateLocale";
 import { bucketOf } from "../board/boardLogic";
 import { visitLabel } from "../board/visitLabel";
 import RowActions, { type RowHandlers } from "../board/RowActions";
@@ -38,7 +39,7 @@ export default function DetailRail({ row, doctorName, grants, sendingId, h, onCl
         <div><dt>{t("rail.visit")}</dt><dd>{visitLabel(t, row)}</dd></div>
         <div><dt>{t("rail.doctor")}</dt><dd>{doctorName}</dd></div>
         <div><dt>{t("rail.waiting")}</dt><dd>{b === "waiting" || b === "in_consult" ? <WaitCell createdAt={row.createdAt} long /> : "—"}</dd></div>
-        <div><dt>{t("rail.arrived")}</dt><dd>{new Date(row.createdAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</dd></div>
+        <div><dt>{t("rail.arrived")}</dt><dd>{new Date(row.createdAt).toLocaleTimeString(dateLocale(locale), { hour: "2-digit", minute: "2-digit" })}</dd></div>
       </dl>
       <div className={styles.sideTitle} style={{ paddingInline: 0 }}>{t("rail.patient")}</div>
       {!p && !patientQ.isError ? (
