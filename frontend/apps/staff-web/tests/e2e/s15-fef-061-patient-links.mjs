@@ -75,7 +75,7 @@ for (const l of ['en', 'hi', 'kn', 'te']) {
   await s.page.locator('h1').waitFor();
   await s.page.evaluate(() => document.fonts.ready);
   const faces = await s.page.evaluate(async () => { await Promise.all([...document.fonts].map((f) => f.load().catch(() => null))); return [...document.fonts].map((f) => ({ range: f.unicodeRange, status: f.status })); });
-  check('te-telugu-font-loaded', faces.some((f) => /0C00-0C7F/i.test(f.range) && f.status === 'loaded'), JSON.stringify(faces.map((f) => f.status)));
+  check('te-telugu-font-loaded', faces.some((f) => /U\+0?C00-0?C7F/i.test(f.range) && f.status === 'loaded'), JSON.stringify(faces.map((f) => f.status)));
   const family = await s.page.evaluate(() => getComputedStyle(document.body).fontFamily);
   check('te-body-font-is-telugu-first', /telu/i.test(family.split(',')[0]), family.split(',')[0]);
   check('te-page-is-telugu', (await s.page.locator('h1').innerText()) === m.otpTitle);
@@ -92,7 +92,8 @@ for (const l of ['en', 'hi', 'kn', 'te']) {
   await s.page.getByRole('button', { name: m.otpSend }).click();
   await s.page.locator('#otp').fill('000000');
   await s.page.getByRole('button', { name: m.otpVerify }).click();
-  check('wrong-otp-shows-error-and-stays-gated', (await s.page.getByRole('alert').innerText()) === m.otpWrong && (await s.page.getByRole('button', { name: m.approve }).count()) === 0);
+  await s.page.locator('main [role=alert]').waitFor();
+  check('wrong-otp-shows-error-and-stays-gated', (await s.page.locator('main [role=alert]').innerText()) === m.otpWrong && (await s.page.getByRole('button', { name: m.approve }).count()) === 0);
   await s.page.locator('#otp').fill(state.codeOk);
   await s.page.getByRole('button', { name: m.otpVerify }).click();
   await s.page.getByRole('button', { name: m.approve }).waitFor();
@@ -113,7 +114,8 @@ for (const l of ['en', 'hi', 'kn', 'te']) {
   await s.page.getByText(m.consentApproved).waitFor();
   const d = state.decisions;
   check('decision-sends-bearer-hash-and-idempotency-key', d.length === 2 && d.every((x) => x.auth === 'Bearer patient-session-token' && x.artefactHash === 'sha256-aaa' && x.decision === 'approve' && /^[0-9a-f-]{36}$/.test(x.key)));
-  check('retry-reuses-the-same-idempotency-key', d[0].key === d[1].key);
+  // a reloaded (changed) artefact is a new decision: it must not replay the key whose cached answer was the 409
+  check('changed-artefact-gets-a-fresh-idempotency-key', d[0].key !== d[1].key);
   check('buttons-gone-after-decision', (await s.page.getByRole('button', { name: m.decline }).count()) === 0);
   // storage holds nothing
   const store = await s.page.evaluate(() => [JSON.stringify({ ...localStorage }), JSON.stringify({ ...sessionStorage }), document.cookie].join('|'));
@@ -162,7 +164,7 @@ for (const l of ['en', 'hi', 'kn', 'te']) {
     if (verify) await verifyOtp(s.page);
     await s.page.getByRole('heading', { name: m.expiredTitle }).waitFor();
     const text = await s.page.locator('main').innerText();
-    check(`${name}-says-expired-and-resend`, text.includes(m.expiredTitle) && text.includes(m.expiredHint) && `${m.expiredTitle} — ${m.expiredHint}`.replace('.', '').includes('ask the clinic to resend'));
+    check(`${name}-says-expired-and-resend`, text.includes(m.expiredTitle) && text.includes(m.expiredHint) && /ask the clinic to resend/i.test(text));
     check(`${name}-reveals-no-document-type`, !/prescription|report|invoice|consent|appointment|booking|lab/i.test(text.replace(/Language/g, '')));
     check(`${name}-no-otp-or-content`, (await s.page.locator('#otp').count()) === 0 && (await s.page.getByRole('button', { name: /Approve|Send code/ }).count()) === 0);
     check(`${name}-console-clean`, consoleClean(s));
@@ -190,7 +192,7 @@ for (const l of ['en', 'hi', 'kn', 'te']) {
   let fail = true;
   await mockApi(s.page, s.log, [['GET', /^\/patient-links\//, (r) => (fail ? r.fulfill({ status: 503, contentType: 'application/problem+json', body: '{"title":"x"}' }) : r.fulfill({ status: 200, contentType: 'application/json', body: '{"clinicName":"Sunrise Clinic"}' }))]]);
   await s.page.goto(`${APP}/l/${ID.doc}`);
-  await s.page.getByRole('alert').waitFor();
+  await s.page.locator('main [role=alert]').waitFor();
   check('api-down-shows-error-with-retry', (await s.page.getByRole('button', { name: 'Try again' }).count()) === 1);
   fail = false;
   await s.page.getByRole('button', { name: 'Try again' }).click();
