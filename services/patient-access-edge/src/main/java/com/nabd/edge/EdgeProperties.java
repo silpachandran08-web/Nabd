@@ -19,5 +19,7 @@ public record EdgeProperties(
         @DefaultValue("30") int projectionTtlSeconds,
         @DefaultValue("300") int holdSeconds,
         @DefaultValue("2000") int coreTimeoutMs,
-        @DefaultValue("edge-1") String consumerName) {
+        @DefaultValue("edge-1") String consumerName,
+        /** IDC-005: public origin of the notice page (the Core public API); the consent message links {origin}{path from Core}. */
+        @DefaultValue("") String noticeBaseUrl) {
 }

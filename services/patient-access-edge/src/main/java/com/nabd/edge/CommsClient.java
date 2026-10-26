@@ -33,11 +33,22 @@ public class CommsClient {
                 n.path("contactHash").asString(""));
     }
 
+    /** An interactive reply button: id is the signed payload that comes back in Inbound.buttonPayload. */
+    public record SignedButton(String id, String title) {
+    }
+
     public void send(UUID tenantId, String channel, String contactHash, String text) {
+        send(tenantId, channel, contactHash, text, java.util.List.of());
+    }
+
+    public void send(UUID tenantId, String channel, String contactHash, String text, java.util.List<SignedButton> buttons) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("channel", channel);
         m.put("contactHash", contactHash);
         m.put("text", text);
+        if (!buttons.isEmpty()) {
+            m.put("buttons", buttons.stream().map(b -> Map.of("id", b.id(), "title", b.title())).toList());
+        }
         http.post(base + "/internal/v1/tenants/" + tenantId + "/messages", json.writeValueAsString(m));
     }
 }

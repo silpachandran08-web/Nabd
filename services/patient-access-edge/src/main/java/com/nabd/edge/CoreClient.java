@@ -32,4 +32,33 @@ public class CoreClient {
         }
         return json.createArrayNode();
     }
+
+    /** IDC-005: the privacy notice in force for a language (version echoed back on capture, path of the public page). */
+    public record Notice(String version, String language, String path) {
+    }
+
+    public Notice currentNotice(UUID tenantId, String language) {
+        JsonNode n = json.readTree(http.get(base + "/internal/v1/tenants/" + tenantId + "/privacy-notice/current?language=" + language));
+        return new Notice(n.path("version").asString(""), n.path("language").asString(language), n.path("path").asString(""));
+    }
+
+    /** IDC-005: relays the taps. Idempotent on the wamid at Core, so a re-run after a version conflict stores nothing twice.
+     * @return false when Core says the notice version is stale (409): the caller shows the current notice again. */
+    public boolean relayConsent(UUID tenantId, String phoneHash, java.util.Map<String, Boolean> decisions, String noticeVersion, String language, String wamid) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("phoneHash", phoneHash);
+        m.put("decisions", decisions.entrySet().stream().map(e -> java.util.Map.of("purpose", e.getKey(), "granted", e.getValue())).toList());
+        m.put("noticeVersion", noticeVersion);
+        m.put("language", language);
+        m.put("evidence", java.util.Map.of("wamid", wamid));
+        try {
+            http.post(base + "/internal/v1/tenants/" + tenantId + "/patients/consents", json.writeValueAsString(m));
+            return true;
+        } catch (Http.UpstreamStatusException e) {
+            if (e.status == 409) {
+                return false;
+            }
+            throw e;
+        }
+    }
 }
