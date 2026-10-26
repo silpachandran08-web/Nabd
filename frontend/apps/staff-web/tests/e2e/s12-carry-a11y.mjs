@@ -38,7 +38,7 @@ try {
   let c, field;
   ({ s, c, field } = await consult({ width: 1280, height: 900 }));
   await typeIn(field, 'zz');
-  await s.page.getByText(/No match in your pharmacy list/).first().waitFor({ timeout: 5000 });
+  await s.page.getByText(/No match in the drug list, your pharmacy list/).first().waitFor({ timeout: 5000 });
   check('A1 no suggestions: no role=listbox in the DOM', await s.page.locator('[role=listbox]').count() === 0);
   check('A2 no suggestions: combobox aria-expanded=false', await attr(field, 'aria-expanded') === 'false');
   check('A3 no suggestions: the "no match" note is still shown and announced', /No match/.test(await s.page.getByRole('status').filter({ hasText: /No match/ }).first().innerText().catch(() => '')));

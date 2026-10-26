@@ -15,6 +15,7 @@
 .resultSub { margin-inline-start: auto; font-size: 12px; color: var(--nb-text-tertiary); }
 .empty { padding: var(--nb-space-16); color: var(--nb-text-secondary); font-size: 13px; }
 .planned { padding: var(--nb-space-24); }
+@media (max-width: 767px) { .chip { padding-inline: var(--nb-space-8); } .chipIcon { display: none; } } /* tablet: a compact role chip keeps the top bar inside the viewport */
 /* Phone top bar is already full (search, language, connection): theme lives in the user menu width, the role chip drops its icon. */
 @media (max-width: 543px) {
   .themeBtn { display: none; }

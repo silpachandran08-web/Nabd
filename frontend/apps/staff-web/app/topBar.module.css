@@ -147,3 +147,8 @@
   .syncPill { padding: 0 var(--nb-space-8); }
   .syncTime { display: none; }
 }
+
+/* Tablet widths: the sync time and shortcut hints go first so the user chip never leaves the viewport. */
+@media (max-width: 767px) {
+  .kbd, .syncTime, .spacer, .iconBtn { display: none; } /* iconBtn = sidebar collapse: no sidebar below 768 */
+}
