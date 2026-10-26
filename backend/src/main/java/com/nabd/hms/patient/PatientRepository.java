@@ -24,11 +24,9 @@ class PatientRepository {
 
     /**
      * NB-053: consent is checked here, in the query, not filtered after the fact in the service or
-     * the UI — a withdrawn data_processing consent removes the patient from every read path.
+     * the UI — a withdrawn (IDC-006: or missing, on default-deny clinics) data_processing consent removes the patient from every read path.
      */
-    static final String CONSENT_GATE =
-            "AND NOT EXISTS (SELECT 1 FROM consents c WHERE c.patient_id = patients.id " +
-                    "AND c.consent_type = 'data_processing' AND c.withdrawn_at IS NOT NULL) ";
+    static final String CONSENT_GATE = com.nabd.hms.patient.api.ConsentGateSql.gate("patients.id", "patients.tenant_id");
 
     /**
      * NB-051: "own patients only" scoping, enforced in the query — a null scopedToDoctorId means no
@@ -451,8 +449,20 @@ class PatientRepository {
     }
 
     void withdrawConsent(UUID tenantId, UUID patientId, String consentType) {
-        jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type, withdrawn_at) VALUES (?,?,?,now())",
-                tenantId, patientId, consentType);
+        withdrawConsent(tenantId, patientId, consentType, null);
+    }
+
+    void withdrawConsent(UUID tenantId, UUID patientId, String consentType, String channel) {
+        jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type, withdrawn_at, channel) VALUES (?,?,?,now(),?)",
+                tenantId, patientId, consentType, channel);
+    }
+
+    /** IDC-006: a newer withdrawn 'treatment' row ends an emergency basis (the gate reads the newest treatment row). */
+    void withdrawEmergencyBasis(UUID tenantId, UUID patientId) {
+        jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type, withdrawn_at) SELECT ?,?,'treatment',now() WHERE EXISTS "
+                + "(SELECT 1 FROM consents WHERE patient_id = ? AND consent_type = 'treatment' AND withdrawn_at IS NULL AND evidence->>'basis' = 'emergency' "
+                + "AND NOT EXISTS (SELECT 1 FROM consents n WHERE n.patient_id = consents.patient_id AND n.consent_type = 'treatment' AND (n.created_at, n.id) > (consents.created_at, consents.id)))",
+                tenantId, patientId, patientId);
     }
 
     /** NB-081: the grant side of the same consents table NB-053 already reads (only withdrawal was

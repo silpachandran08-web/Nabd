@@ -178,7 +178,7 @@ public class PatientController {
     @PreAuthorize("hasAuthority('patients:edit')")
     public ResponseEntity<Void> withdrawConsent(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                                  @Valid @RequestBody WithdrawConsentRequest req) {
-        service.withdrawConsent(tenantId(jwt), staffId(jwt), id, req.consentTypeOrDefault());
+        service.withdrawConsent(tenantId(jwt), staffId(jwt), id, req.consentTypeOrDefault(), req.channel());
         return ResponseEntity.noContent().build();
     }
 

@@ -542,14 +542,18 @@ public class PatientService {
     }
 
     @Transactional
-    public void withdrawConsent(UUID tenantId, UUID callerStaffId, UUID patientId, String consentType) {
+    public void withdrawConsent(UUID tenantId, UUID callerStaffId, UUID patientId, String consentType, String channel) {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         if (!repo.existsActive(tenantId, patientId)) {
             throw notFound();
         }
-        repo.withdrawConsent(tenantId, patientId, consentType);
+        repo.withdrawConsent(tenantId, patientId, consentType, channel);
         consentChanged(tenantId, patientId, consentType, "withdrawn");
+        if ("data_processing".equals(consentType)) {
+            repo.withdrawEmergencyBasis(tenantId, patientId); // IDC-006: withdrawing processing also ends the desk's emergency treatment basis
+        }
+        audit(tenantId, callerStaffId, "patient.consent_withdrawn", patientId, null, Map.of("purpose", consentType, "channel", channel == null ? "DESK" : channel));
         log.info("consent '{}' withdrawn for patient {} by {} (tenant {})", consentType, patientId, callerStaffId, tenantId);
     }
 
