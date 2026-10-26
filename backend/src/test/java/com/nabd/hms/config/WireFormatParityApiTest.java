@@ -37,6 +37,7 @@ class WireFormatParityApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(seedStaff(tenant, seedFullAccessRole(tenant.id()), "w1@a.com", "+919400000091", false));
         assertThat(exchange("/v1/roles", HttpMethod.POST, authedJsonBody(token, Map.of("name", "r", "grants", List.of())), String.class)
                 .getStatusCode().value()).isEqualTo(400);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class); // PHL-004: new clinics start external
         assertThat(exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of("name", "x", "price", -1)), String.class)
                 .getStatusCode().value()).isEqualTo(400);
         assertThat(exchange("/v1/packages", HttpMethod.POST, authedJsonBody(token, Map.of("name", "p", "price", 1, "validityDays", 1, "items", List.of())), String.class)

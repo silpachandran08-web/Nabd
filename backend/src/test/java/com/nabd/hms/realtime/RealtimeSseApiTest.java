@@ -1,5 +1,6 @@
 package com.nabd.hms.realtime;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.shared.events.consumer.ConsumerGroups;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.ValkeyTestSupport;
@@ -76,7 +77,7 @@ class RealtimeSseApiTest extends ApiTestBase {
         drain();
         tenant = seedTenant();
         fullStaff = staff(tenant, seedFullAccessRole(tenant.id()));
-        queueOnly = staff(tenant, seedRole(tenant.id(), "Queue only", false, fullGrant("queue")));
+        queueOnly = staff(tenant, seedRole(tenant.id(), "Queue only", false, new ModuleGrant("queue", true, false, false, false, false, false, false))); // ACC-010: the requests topic needs queue:create, so "queue only" is view-only
     }
 
     @AfterEach

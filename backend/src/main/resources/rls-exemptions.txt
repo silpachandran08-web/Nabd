@@ -6,4 +6,3 @@ master.support_access_grants    # operator plane: grants clinics give to support
 master.subscriptions            # operator plane: billing
 master.discount_requests        # operator plane: commercial approvals
 master.tenant_feature_overrides # operator plane: per-clinic feature switches, read by tenant_id only (PLT-059)
-master.trial_signups            # operator plane: pre-tenant self-serve sign-ups, mobile stored hashed (ADM-003)

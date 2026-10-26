@@ -21,8 +21,15 @@ class BlobController {
     }
 
     @PutMapping(LocalObjectStorage.PATH)
-    ResponseEntity<Void> put(@RequestParam String m, @RequestParam String b, @RequestParam String k, @RequestParam long e,
-                             @RequestParam long x, @RequestParam String s, @RequestBody byte[] body) {
+    ResponseEntity<Void> put(@RequestParam(required = false) String m, @RequestParam(required = false) String b, @RequestParam(required = false) String k,
+                             @RequestParam(required = false) Long e, @RequestParam(required = false) Long x, @RequestParam(required = false) String s,
+                             @RequestBody(required = false) byte[] body) {
+        if (unsigned(m, b, k, e, x, s)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (body == null) {
+            body = new byte[0];
+        }
         if (!"PUT".equals(m) || !storage.validSignature(m, b, k, e, x, s) || storage.expired(e)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -34,8 +41,11 @@ class BlobController {
     }
 
     @GetMapping(LocalObjectStorage.PATH)
-    ResponseEntity<byte[]> get(@RequestParam String m, @RequestParam String b, @RequestParam String k, @RequestParam long e,
-                               @RequestParam long x, @RequestParam String s) {
+    ResponseEntity<byte[]> get(@RequestParam(required = false) String m, @RequestParam(required = false) String b, @RequestParam(required = false) String k,
+                               @RequestParam(required = false) Long e, @RequestParam(required = false) Long x, @RequestParam(required = false) String s) {
+        if (unsigned(m, b, k, e, x, s)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         if (!"GET".equals(m) || !storage.validSignature(m, b, k, e, x, s) || storage.expired(e)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -43,5 +53,15 @@ class BlobController {
                 .map(d -> ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "inline")
                         .header("X-Content-Type-Options", "nosniff").contentType(MediaType.APPLICATION_OCTET_STREAM).body(d))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** No signature material at all (e.g. a bearer token instead): 401, never a 400 that hints at the parameters. */
+    private static boolean unsigned(Object... p) {
+        for (Object o : p) {
+            if (o == null) {
+                return true;
+            }
+        }
+        return false;
     }
 }
