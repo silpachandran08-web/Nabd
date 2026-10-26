@@ -39,7 +39,7 @@ final class Http {
         try {
             HttpResponse<String> r = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (r.statusCode() / 100 != 2) {
-                throw new IllegalStateException("upstream status " + r.statusCode());
+                throw new UpstreamStatusException(r.statusCode());
             }
             return r.body();
         } catch (IOException e) {
@@ -47,6 +47,16 @@ final class Http {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("interrupted", e);
+        }
+    }
+
+    /** A non-2xx answer; the status lets a caller tell a rule refusal (409) from an outage. Same message as before. */
+    static final class UpstreamStatusException extends IllegalStateException {
+        final int status;
+
+        UpstreamStatusException(int status) {
+            super("upstream status " + status);
+            this.status = status;
         }
     }
 }

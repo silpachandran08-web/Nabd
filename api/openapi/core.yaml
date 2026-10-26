@@ -700,6 +700,151 @@ paths:
       tags:
       - patient
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/patients/consents:
+    post:
+      operationId: InternalChatConsentController_capture
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConsentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ChatConsentResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/privacy-notice/current:
+    get:
+      operationId: InternalChatConsentController_currentNotice
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: language
+        required: false
+        schema:
+          type: string
+          default: en
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ChatNoticeCurrent"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: authenticated
+  /v1/abha/enrol:
+    post:
+      operationId: AbhaController_enrol
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbhaEnrolRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbhaResult"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - identity
+      x-required-permission: patients:edit
+  /v1/abha/status:
+    get:
+      operationId: AbhaController_status
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbhaStatus"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - identity
+      x-required-permission: patients:edit
   /v1/appointments:
     get:
       operationId: AppointmentController_list
@@ -8073,6 +8218,50 @@ paths:
       tags:
       - patient
       x-required-permission: patients:edit
+  /v1/patients/{id}/abha/verify:
+    post:
+      operationId: AbhaController_verify
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbhaVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbhaResult"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - identity
+      x-required-permission: patients:edit
   /v1/patients/{id}/consent/withdraw:
     post:
       operationId: PatientController_withdrawConsent
@@ -15090,6 +15279,76 @@ components:
           minLength: 0
       required:
       - enabled
+    AbhaEnrolRequest:
+      type: object
+      properties:
+        aadhaarNumber:
+          type: string
+          maxLength: 14
+          minLength: 0
+        mobile:
+          type: string
+          maxLength: 16
+          minLength: 0
+        mode:
+          type: string
+          minLength: 1
+          pattern: aadhaar|mobile
+        otp:
+          type: string
+          maxLength: 8
+          minLength: 0
+        patientId:
+          type: string
+          format: uuid
+        step:
+          type: string
+          minLength: 1
+          pattern: init|confirm
+        txnId:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - mode
+      - step
+    AbhaResult:
+      type: object
+      properties:
+        abhaAddress:
+          type: string
+        abhaLast4:
+          type: string
+        txnId:
+          type: string
+        verified:
+          type: boolean
+    AbhaStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+    AbhaVerifyRequest:
+      type: object
+      properties:
+        abhaNumberOrAddress:
+          type: string
+          maxLength: 64
+          minLength: 0
+        otp:
+          type: string
+          maxLength: 8
+          minLength: 0
+        step:
+          type: string
+          minLength: 1
+          pattern: init|confirm
+        txnId:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - step
     AcceptInviteRequest:
       type: object
       properties:
@@ -15959,6 +16218,73 @@ components:
           format: int32
         taxRatePercent:
           type: number
+    ChatConsentDecision:
+      type: object
+      properties:
+        granted:
+          type: boolean
+        purpose:
+          type: string
+          maxLength: 20
+          minLength: 0
+      required:
+      - granted
+      - purpose
+    ChatConsentEvidence:
+      type: object
+      properties:
+        wamid:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9=_.:-]{1,128}$"
+      required:
+      - wamid
+    ChatConsentRequest:
+      type: object
+      properties:
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatConsentDecision"
+          maxItems: 3
+          minItems: 0
+        evidence:
+          $ref: "#/components/schemas/ChatConsentEvidence"
+        language:
+          type: string
+          minLength: 1
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+        noticeVersion:
+          type: string
+          maxLength: 40
+          minLength: 0
+        phoneHash:
+          type: string
+          minLength: 1
+          pattern: "^[0-9a-f]{64}$"
+      required:
+      - decisions
+      - evidence
+      - language
+      - noticeVersion
+      - phoneHash
+    ChatConsentResponse:
+      type: object
+      properties:
+        consentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    ChatNoticeCurrent:
+      type: object
+      properties:
+        language:
+          type: string
+        path:
+          type: string
+        version:
+          type: string
     CheckInRequest:
       type: object
       properties:

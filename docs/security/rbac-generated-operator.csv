@@ -12,6 +12,7 @@ super_admin,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary
 super_admin,DELETE /v1/waitlist/{id},queue:edit,deny-401
 super_admin,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,allow
 super_admin,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,allow
+super_admin,GET /v1/abha/status,patients:edit,deny-401
 super_admin,GET /v1/appointments,queue:view,deny-401
 super_admin,GET /v1/appointments/callback-list,queue:view,deny-401
 super_admin,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -202,6 +203,7 @@ super_admin,POST /internal/v1/safety-dictionaries/{region}/versions,safety_conte
 super_admin,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,allow
 super_admin,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,allow
 super_admin,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,allow
+super_admin,POST /v1/abha/enrol,patients:edit,deny-401
 super_admin,POST /v1/appointments,queue:create,deny-401
 super_admin,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 super_admin,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -256,6 +258,7 @@ super_admin,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 super_admin,POST /v1/patients,patients:create,deny-401
 super_admin,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 super_admin,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+super_admin,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/merge,patients:delete,deny-401
@@ -334,6 +337,7 @@ implementation,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumer
 implementation,DELETE /v1/waitlist/{id},queue:edit,deny-401
 implementation,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-403
 implementation,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-403
+implementation,GET /v1/abha/status,patients:edit,deny-401
 implementation,GET /v1/appointments,queue:view,deny-401
 implementation,GET /v1/appointments/callback-list,queue:view,deny-401
 implementation,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -524,6 +528,7 @@ implementation,POST /internal/v1/safety-dictionaries/{region}/versions,safety_co
 implementation,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-403
 implementation,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-403
 implementation,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,allow
+implementation,POST /v1/abha/enrol,patients:edit,deny-401
 implementation,POST /v1/appointments,queue:create,deny-401
 implementation,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 implementation,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -578,6 +583,7 @@ implementation,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 implementation,POST /v1/patients,patients:create,deny-401
 implementation,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 implementation,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+implementation,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/merge,patients:delete,deny-401
@@ -656,6 +662,7 @@ support_engineer,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernum
 support_engineer,DELETE /v1/waitlist/{id},queue:edit,deny-401
 support_engineer,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-403
 support_engineer,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-403
+support_engineer,GET /v1/abha/status,patients:edit,deny-401
 support_engineer,GET /v1/appointments,queue:view,deny-401
 support_engineer,GET /v1/appointments/callback-list,queue:view,deny-401
 support_engineer,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -846,6 +853,7 @@ support_engineer,POST /internal/v1/safety-dictionaries/{region}/versions,safety_
 support_engineer,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-403
 support_engineer,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-403
 support_engineer,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-403
+support_engineer,POST /v1/abha/enrol,patients:edit,deny-401
 support_engineer,POST /v1/appointments,queue:create,deny-401
 support_engineer,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 support_engineer,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -900,6 +908,7 @@ support_engineer,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 support_engineer,POST /v1/patients,patients:create,deny-401
 support_engineer,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 support_engineer,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+support_engineer,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/merge,patients:delete,deny-401
@@ -978,6 +987,7 @@ billing,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id
 billing,DELETE /v1/waitlist/{id},queue:edit,deny-401
 billing,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-403
 billing,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-403
+billing,GET /v1/abha/status,patients:edit,deny-401
 billing,GET /v1/appointments,queue:view,deny-401
 billing,GET /v1/appointments/callback-list,queue:view,deny-401
 billing,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -1168,6 +1178,7 @@ billing,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:e
 billing,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-403
 billing,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-403
 billing,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-403
+billing,POST /v1/abha/enrol,patients:edit,deny-401
 billing,POST /v1/appointments,queue:create,deny-401
 billing,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 billing,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -1222,6 +1233,7 @@ billing,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 billing,POST /v1/patients,patients:create,deny-401
 billing,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 billing,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+billing,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 billing,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 billing,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 billing,POST /v1/patients/{id}/merge,patients:delete,deny-401
@@ -1300,6 +1312,7 @@ sre,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},sp
 sre,DELETE /v1/waitlist/{id},queue:edit,deny-401
 sre,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-403
 sre,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-403
+sre,GET /v1/abha/status,patients:edit,deny-401
 sre,GET /v1/appointments,queue:view,deny-401
 sre,GET /v1/appointments/callback-list,queue:view,deny-401
 sre,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -1490,6 +1503,7 @@ sre,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,
 sre,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-403
 sre,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-403
 sre,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-403
+sre,POST /v1/abha/enrol,patients:edit,deny-401
 sre,POST /v1/appointments,queue:create,deny-401
 sre,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 sre,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -1544,6 +1558,7 @@ sre,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 sre,POST /v1/patients,patients:create,deny-401
 sre,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 sre,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+sre,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 sre,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 sre,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 sre,POST /v1/patients/{id}/merge,patients:delete,deny-401
@@ -1622,6 +1637,7 @@ commercial,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/
 commercial,DELETE /v1/waitlist/{id},queue:edit,deny-401
 commercial,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-403
 commercial,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-403
+commercial,GET /v1/abha/status,patients:edit,deny-401
 commercial,GET /v1/appointments,queue:view,deny-401
 commercial,GET /v1/appointments/callback-list,queue:view,deny-401
 commercial,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -1812,6 +1828,7 @@ commercial,POST /internal/v1/safety-dictionaries/{region}/versions,safety_conten
 commercial,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-403
 commercial,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-403
 commercial,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-403
+commercial,POST /v1/abha/enrol,patients:edit,deny-401
 commercial,POST /v1/appointments,queue:create,deny-401
 commercial,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 commercial,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -1866,6 +1883,7 @@ commercial,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 commercial,POST /v1/patients,patients:create,deny-401
 commercial,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 commercial,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+commercial,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/merge,patients:delete,deny-401
@@ -1944,6 +1962,7 @@ compliance_dpo,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumer
 compliance_dpo,DELETE /v1/waitlist/{id},queue:edit,deny-401
 compliance_dpo,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-403
 compliance_dpo,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-403
+compliance_dpo,GET /v1/abha/status,patients:edit,deny-401
 compliance_dpo,GET /v1/appointments,queue:view,deny-401
 compliance_dpo,GET /v1/appointments/callback-list,queue:view,deny-401
 compliance_dpo,GET /v1/appointments/follow-ups,queue:view,deny-401
@@ -2134,6 +2153,7 @@ compliance_dpo,POST /internal/v1/safety-dictionaries/{region}/versions,safety_co
 compliance_dpo,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-403
 compliance_dpo,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-403
 compliance_dpo,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-403
+compliance_dpo,POST /v1/abha/enrol,patients:edit,deny-401
 compliance_dpo,POST /v1/appointments,queue:create,deny-401
 compliance_dpo,POST /v1/appointments/{id}/cancel,queue:edit,deny-401
 compliance_dpo,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
@@ -2188,6 +2208,7 @@ compliance_dpo,POST /v1/packages/{id}/deactivate,packages:edit,deny-401
 compliance_dpo,POST /v1/patients,patients:create,deny-401
 compliance_dpo,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-401
 compliance_dpo,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
+compliance_dpo,POST /v1/patients/{id}/abha/verify,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/merge,patients:delete,deny-401

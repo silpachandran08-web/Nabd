@@ -60,6 +60,7 @@ abstract class EdgeTestBase {
         r.add("edge.comms-url", UP::commsUrl);
         r.add("edge.button-key", () -> BUTTON_KEY);
         r.add("edge.ip-per-min", () -> "30");
+        r.add("edge.notice-base-url", () -> "https://notice.example.test");
     }
 
     @Autowired StringRedisTemplate valkey;
@@ -73,6 +74,9 @@ abstract class EdgeTestBase {
         UP.slotsByDoctor.clear();
         UP.coreDelayMs = 0;
         UP.coreCalls.set(0);
+        UP.relayed.clear();
+        UP.consentStatus = 201;
+        UP.noticeVersion = "v1";
         counting.invocations.set(0);
         valkey.keys("edge:avail:*").forEach(valkey::delete);
     }

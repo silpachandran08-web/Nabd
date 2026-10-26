@@ -2,6 +2,10 @@
 
 export type AbdmSettings = { enabled?: boolean; hfrId?: string; hfrVerified?: boolean; };
 export type AbdmSettingsRequest = { enabled: boolean; hfrId?: string; };
+export type AbhaEnrolRequest = { aadhaarNumber?: string; mobile?: string; mode: string; otp?: string; patientId?: string; step: string; txnId?: string; };
+export type AbhaResult = { abhaAddress?: string; abhaLast4?: string; txnId?: string; verified?: boolean; };
+export type AbhaStatus = { enabled?: boolean; };
+export type AbhaVerifyRequest = { abhaNumberOrAddress?: string; otp?: string; step: string; txnId?: string; };
 export type AcceptInviteRequest = { pin: string; };
 export type AcceptOwnerInviteRequest = { pin: string; };
 export type Accepted = { acceptanceId?: string; at?: string; by?: string; method?: string; version?: string; };
@@ -57,6 +61,11 @@ export type Cell = { bookings?: Array<Booking>; doctorId?: string; kind?: string
 export type ChargeHeadResponse = { active?: boolean; baseAmount?: number; category?: string; code?: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom?: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; id?: string; name?: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeHeadWriteRequest = { active?: boolean; baseAmount: number; category: string; code: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; name: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeResponse = { baseAmount?: number; category?: string; code?: string; followUpAmount?: number; id?: string; isRx?: boolean; name?: string; stockQty?: number; taxRatePercent?: number; };
+export type ChatConsentDecision = { granted: boolean; purpose: string; };
+export type ChatConsentEvidence = { wamid: string; };
+export type ChatConsentRequest = { decisions: Array<ChatConsentDecision>; evidence: ChatConsentEvidence; language: string; noticeVersion: string; phoneHash: string; };
+export type ChatConsentResponse = { consentIds?: Array<string>; };
+export type ChatNoticeCurrent = { language?: string; path?: string; version?: string; };
 export type CheckInRequest = { appointmentId?: string; doctorId: string; patientId: string; paymentMode?: string; presentingComplaint?: string; source?: string; };
 export type Checkout = { outstanding?: number; pending?: number; };
 export type CheckoutContextResponse = { charges?: Array<ChargeResponse>; currency?: string; departmentId?: string; doctorName?: string; followUpEligible?: boolean; patientName?: string; pendingProcedures?: Array<ChargeResponse>; prescribedItems?: Array<PrescribedItemResponse>; queueEntryId?: string; queueStatus?: string; suggestedLines?: Array<SuggestedLine>; visitType?: string; };
@@ -464,6 +473,10 @@ export type Operations = {
   InternalSchedulingController_act: { method: "post"; path: "/internal/v1/tenants/{tid}/appointments/{id}/{action}"; permission: "authenticated"; pathParams: { tid: string; id: string; action: string; }; query: never; body: InternalAppointmentActionRequest; response: Record<string, Record<string, unknown>> };
   InternalSchedulingController_availability: { method: "get"; path: "/internal/v1/tenants/{tid}/availability"; permission: "authenticated"; pathParams: { tid: string; }; query: { doctorId?: string; specialtyCode?: string; from: string; to: string; }; body: never; response: InternalAvailability };
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
+  InternalChatConsentController_capture: { method: "post"; path: "/internal/v1/tenants/{tid}/patients/consents"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatConsentRequest; response: ChatConsentResponse };
+  InternalChatConsentController_currentNotice: { method: "get"; path: "/internal/v1/tenants/{tid}/privacy-notice/current"; permission: "authenticated"; pathParams: { tid: string; }; query: { language?: string; }; body: never; response: ChatNoticeCurrent };
+  AbhaController_enrol: { method: "post"; path: "/v1/abha/enrol"; permission: "patients:edit"; pathParams: never; query: never; body: AbhaEnrolRequest; response: AbhaResult };
+  AbhaController_status: { method: "get"; path: "/v1/abha/status"; permission: "patients:edit"; pathParams: never; query: never; body: never; response: AbhaStatus };
   AppointmentController_list: { method: "get"; path: "/v1/appointments"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; patientId?: string; date?: string; limit?: number; cursor?: string; }; body: never; response: AppointmentPage };
   AppointmentController_book: { method: "post"; path: "/v1/appointments"; permission: "queue:create"; pathParams: never; query: never; body: AppointmentWriteRequest; response: AppointmentResponse };
   AppointmentController_callbackList: { method: "get"; path: "/v1/appointments/callback-list"; permission: "queue:view"; pathParams: never; query: never; body: never; response: Array<CallbackEntryResponse> };
@@ -653,6 +666,7 @@ export type Operations = {
   PatientController_registry: { method: "get"; path: "/v1/patients/registry"; permission: "patients:view"; pathParams: never; query: { q?: string; filter?: string; limit?: number; cursor?: string; }; body: never; response: PatientRegistryResponse };
   PatientController_get: { method: "get"; path: "/v1/patients/{id}"; permission: "patients:view"; pathParams: { id: string; }; query: never; body: never; response: PatientDetailResponse };
   PatientController_patch: { method: "patch"; path: "/v1/patients/{id}"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: PatientPatchRequest; response: PatientResponse };
+  AbhaController_verify: { method: "post"; path: "/v1/patients/{id}/abha/verify"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: AbhaVerifyRequest; response: AbhaResult };
   PatientController_withdrawConsent: { method: "post"; path: "/v1/patients/{id}/consent/withdraw"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: WithdrawConsentRequest; response: void };
   ConsentCaptureController_state: { method: "get"; path: "/v1/patients/{id}/consents"; permission: "patients:view"; pathParams: { id: string; }; query: never; body: never; response: PatientConsentState };
   ConsentCaptureController_capture: { method: "post"; path: "/v1/patients/{id}/consents"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: ConsentCaptureRequest; response: ConsentCaptureResponse };

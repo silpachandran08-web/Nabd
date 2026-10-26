@@ -20,6 +20,10 @@ final class FakeUpstreams {
     final Map<String, String> messages = new ConcurrentHashMap<>();         // messageId -> JSON body
     final List<String> sent = new CopyOnWriteArrayList<>();
     volatile int coreDelayMs = 0;
+    /** IDC-005: the notice version Core reports, the status it answers a consent relay with, and the relayed bodies. */
+    volatile String noticeVersion = "v1";
+    volatile int consentStatus = 201;
+    final List<String> relayed = new CopyOnWriteArrayList<>();
     final HttpServer core;
     final HttpServer comms;
 
@@ -27,6 +31,16 @@ final class FakeUpstreams {
         try {
             core = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             core.createContext("/internal/v1/tenants/", ex -> {
+                String path0 = ex.getRequestURI().getPath();
+                if (path0.endsWith("/privacy-notice/current")) {
+                    reply(ex, 200, "{\"version\":\"" + noticeVersion + "\",\"language\":\"x\",\"path\":\"/v1/public/notices/clinic/" + noticeVersion + "?lang=x\"}");
+                    return;
+                }
+                if (path0.endsWith("/patients/consents")) {
+                    relayed.add(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                    reply(ex, consentStatus, consentStatus == 201 ? "{\"consentIds\":[]}" : "{}");
+                    return;
+                }
                 coreCalls.incrementAndGet();
                 try {
                     Thread.sleep(coreDelayMs);
