@@ -146,16 +146,16 @@ function SetupWizard() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Clinic profile</h2>
             <div className={styles.field}>
-              <label className={styles.label}>Clinic name</label>
-              <input className={styles.input} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+              <label className={styles.label} htmlFor="w-name">Clinic name</label>
+              <input id="w-name" className={styles.input} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="clinic-timezone">Timezone</label>
               <TimezoneSelect id="clinic-timezone" className={styles.select} value={profile.timezone} onChange={(timezone) => setProfile({ ...profile, timezone })} />
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>Specialties (comma separated)</label>
-              <input className={styles.input} value={profile.specialties.join(", ")} onChange={(e) => setProfile({ ...profile, specialties: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+              <label className={styles.label} htmlFor="w-spec">Specialties (comma separated)</label>
+              <input id="w-spec" className={styles.input} value={profile.specialties.join(", ")} onChange={(e) => setProfile({ ...profile, specialties: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
             </div>
           </div>
         );
@@ -164,16 +164,16 @@ function SetupWizard() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Tax & business IDs</h2>
             <div className={styles.field}>
-              <label className={styles.label}>Tax ID type</label>
-              <select className={styles.select} value={profile.taxIdType ?? ""} onChange={(e) => setProfile({ ...profile, taxIdType: e.target.value || null })}>
+              <label className={styles.label} htmlFor="w-taxtype">Tax ID type</label>
+              <select id="w-taxtype" className={styles.select} value={profile.taxIdType ?? ""} onChange={(e) => setProfile({ ...profile, taxIdType: e.target.value || null })}>
                 <option value="">—</option>
                 <option value="GSTIN">GSTIN (India)</option>
                 <option value="VAT">VAT (KSA)</option>
               </select>
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>Tax ID</label>
-              <input className={styles.input} value={profile.taxId ?? ""} onChange={(e) => setProfile({ ...profile, taxId: e.target.value })} />
+              <label className={styles.label} htmlFor="w-taxid">Tax ID</label>
+              <input id="w-taxid" className={styles.input} value={profile.taxId ?? ""} onChange={(e) => setProfile({ ...profile, taxId: e.target.value })} />
             </div>
           </div>
         );
@@ -244,8 +244,8 @@ function SetupWizard() {
             <h2 className={styles.cardTitle}>WhatsApp connect</h2>
             <p className={styles.text}>WhatsApp Business onboarding is handled as a managed service. Add the clinic&apos;s WhatsApp number in the profile step and submit for verification.</p>
             <div className={styles.field}>
-              <label className={styles.label}>WhatsApp number</label>
-              <input className={styles.input} value={profile.whatsappNumber ?? ""} onChange={(e) => setProfile({ ...profile, whatsappNumber: e.target.value })} />
+              <label className={styles.label} htmlFor="w-wa">WhatsApp number</label>
+              <input id="w-wa" className={styles.input} value={profile.whatsappNumber ?? ""} onChange={(e) => setProfile({ ...profile, whatsappNumber: e.target.value })} />
             </div>
           </div>
         );

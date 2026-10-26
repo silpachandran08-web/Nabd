@@ -47,11 +47,12 @@ await clinic('390px', clinicPerms, base(ent(['billing'], ['whatsapp_bot'])), '/a
   check('390px: no horizontal scroll with the banner', await noOverflow(page));
 }, { width: 390, height: 800 });
 
+const PERMS = { super_admin: ['command_centre:view', 'billing_revenue:edit', 'billing_revenue:approve', 'onboarding_provisioning:view'], billing: ['command_centre:view', 'billing_revenue:edit'] };
 async function platform(tag, role, handlers, url, fn, viewport) {
   const { browser, page, log } = await launch({ viewport });
   try {
     await seedPlatform(page);
-    await mockApi(page, log, [['GET', /^\/platform\/auth\/me$/, { body: { id: 'o1', name: 'Op', email: 'op@nabd.internal', role, permissions: [], mfaEnabled: true } }], ...handlers]);
+    await mockApi(page, log, [['GET', /^\/platform\/auth\/me$/, { body: { id: 'o1', name: 'Op', email: 'op@nabd.internal', role, permissions: PERMS[role], mfaEnabled: true } }], ...handlers]);
     await page.goto(APP + url); await sleep(2000); await fn({ page, log });
     check(`${tag} zero console errors`, clean(log), JSON.stringify([...log.pageErrors, ...log.console]));
   } finally { dumpLog(tag, log); await browser.close(); }

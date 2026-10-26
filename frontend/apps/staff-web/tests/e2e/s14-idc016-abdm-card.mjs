@@ -37,7 +37,7 @@ await run('hfr not found', ['setup:view', 'setup:edit'], [verify, ['GET', /^\/se
 await run('abdm down', ['setup:view', 'setup:edit'], [verify, ['GET', /^\/settings\/integrations\/abdm$/, { body: off }],
   ['PUT', /^\/settings\/integrations\/abdm$/, { status: 503, body: { type: 'abdm-unavailable', title: 'x' } }]], async ({ page }) => {
   await page.getByLabel('Facility id (HFR)').fill('HFR-1'); await page.getByLabel('Authenticator code').fill('123456');
-  await page.getByRole('button', { name: 'Verify and turn on' }).click(); await sleep(600);
+  await page.getByRole('button', { name: 'Verify and turn on' }).click(); await page.getByText(/cannot be reached right now/).waitFor({ timeout: 5000 }).catch(() => {}); // client retries 503 with backoff
   check('503 shows try later', (await page.getByText(/cannot be reached right now/).count()) === 1);
 });
 await run('read-only', ['setup:view'], [['GET', /^\/settings\/integrations\/abdm$/, { body: on }]], async ({ page }) => {

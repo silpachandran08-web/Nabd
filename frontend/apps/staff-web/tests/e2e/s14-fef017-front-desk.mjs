@@ -247,7 +247,7 @@ await run('packages', async () => {
   await finish(s, 'packages', (x) => x.includes('status of 400'));
 });
 await run('packages-403', async () => {
-  const s = await open('/packages', ['queue:view'], [['GET', /^\/queue/, { body: [] }], ['GET', /^\/packages/, { status: 403, body: { title: 'Forbidden', detail: 'no' } }], ['GET', /^\/staff\/roster/, { body: [] }]]);
+  const s = await open('/packages', ['queue:view', 'packages:view'], [['GET', /^\/queue/, { body: [] }], ['GET', /^\/packages/, { status: 403, body: { title: 'Forbidden', detail: 'no' } }], ['GET', /^\/staff\/roster/, { body: [] }]]);
   await s.page.getByText("doesn't have access to Treatment Packages").waitFor({ timeout: 10000 });
   check('packages: 403 shows the no-access state', true);
   await finish(s, 'packages-403', (x) => x.includes('status of 403'));
