@@ -107,8 +107,10 @@ public class CallOrderService {
     /** Position (1 = next), why-here and an expected range for each still-open entry of each doctor-day; other entries come back unchanged. */
     @Transactional
     public List<QueueEntryResponse> annotate(List<QueueEntryResponse> entries) {
-        if (entries.isEmpty()) return entries;
-        UUID tenantId = tenantContext.current();
+        return entries.isEmpty() ? entries : annotate(tenantContext.current(), entries);
+    }
+
+    private List<QueueEntryResponse> annotate(UUID tenantId, List<QueueEntryResponse> entries) {
         ZoneId zone = clock.zone(tenantId);
         Instant now = clock.now();
         Map<UUID, CallOrderPolicy.Placed> byId = new HashMap<>();
@@ -132,9 +134,10 @@ public class CallOrderService {
         }).toList();
     }
 
+    /** Check-in and its placement annotation in ONE transaction (one tenant bind, OPS-020 statement budget). */
     @Transactional
-    public QueueEntryResponse annotateOne(QueueEntryResponse e) {
-        return annotate(List.of(e)).get(0);
+    public QueueEntryResponse checkInAnnotated(UUID tenantId, UUID callerStaffId, com.nabd.hms.queue.dto.CheckInRequest req) {
+        return annotate(tenantId, List.of(queueService.checkIn(tenantId, callerStaffId, req))).get(0);
     }
 
     /** Stand-in until the ETA engine (ACC-017) supplies p50/p80: patients ahead x the doctor's recent average consult. */

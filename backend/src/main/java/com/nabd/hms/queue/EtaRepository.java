@@ -68,9 +68,4 @@ class EtaRepository {
 
     record DoctorDay(UUID doctorId, LocalDate day) {
     }
-
-    java.util.Optional<DoctorDay> doctorDayOfEntry(UUID tenantId, UUID entryId) {
-        return jdbc.query("SELECT doctor_id, queue_date FROM queue_entries WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> new DoctorDay(rs.getObject(1, UUID.class), rs.getDate(2).toLocalDate()), tenantId, entryId).stream().findFirst();
-    }
 }
