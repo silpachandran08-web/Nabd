@@ -4,6 +4,7 @@
 // GET /v1/queue, /v1/staff/roster (queue:view, so Reception can populate the doctor picker), /v1/patients/{id}
 // (one cached query per patient, shared by the board, the detail rail and the check-in picker).
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { STALE } from "@nabd/api-client/queries";
 import type { CallbackEntryResponse, DoctorDelayResponse, PatientDetailResponse, WaitEstimateResponse } from "@nabd/api-client/generated";
@@ -36,6 +37,7 @@ export const patientDetailQuery = (id: string) => ({ queryKey: key("patient", { 
 
 export function useArrivals() {
   const qc = useQueryClient();
+  const t = useTranslations("arrivals.page");
   // Permissions live in the browser (localStorage token): read only after hydration so the server render and the
   // first client render match. Controls stay absent until known, never disabled.
   const mounted = useHasMounted();
@@ -59,7 +61,7 @@ export function useArrivals() {
   const patientIdx = new Map(patientIds.map((id, i) => [id, i]));
   const rows: Row[] = entries.map((e) => {
     const p = patientQs[patientIdx.get(e.patientId) ?? -1];
-    return { ...e, patientName: p?.data?.name ?? (p?.isPending && grants.patientsView ? "…" : "Unknown patient"), patientMrn: p?.data?.mrn ?? "" };
+    return { ...e, patientName: p?.data?.name ?? (p?.isPending && grants.patientsView ? "…" : t("unknownPatient")), patientMrn: p?.data?.mrn ?? "" };
   });
   // NB-101/NB-100: per-doctor wait estimate and any active delay, for the sidebar.
   const doctorIds = staff.map((s) => s.id);
@@ -80,7 +82,7 @@ export function useArrivals() {
   const qErr = queueQ.error;
   const forbidden = mounted && (!can("queue:view") || (qErr instanceof ApiError && qErr.status === 403));
   const loading = !forbidden && queueQ.isPending;
-  const error = !qErr || forbidden ? null : qErr instanceof ApiError ? "Couldn't load today's arrivals. Try again." : "Couldn't reach the server. Check your connection and try again.";
+  const error = !qErr || forbidden ? null : qErr instanceof ApiError ? t("loadFail") : t("networkFail");
   // Board, wait estimates and delays reload together (poll + return to the tab), newest wins (FEF-004).
   // shortcut: still 2 requests per doctor per poll; GET /queue/board (T-094) folds them into one.
   const reload = useReload("queue", "wait-estimate", "doctor-delay");
@@ -109,7 +111,7 @@ export function useArrivals() {
     },
     onError: (err, _row, ctx) => {
       qc.setQueryData(queueQuery().queryKey, ctx?.before);
-      setActionError((err instanceof ApiError && staleMessage(err.problem)) || failText(err, "Couldn't send the patient for vitals."));
+      setActionError((err instanceof ApiError && staleMessage(err.problem)) || failText(err, t("sendVitalsFail"), t("denied")));
     },
     onSettled: () => invalidateQueue(),
   });
@@ -121,9 +123,9 @@ export function useArrivals() {
       void qc.invalidateQueries({ queryKey: prefix("doctor-delay") });
       void qc.invalidateQueries({ queryKey: prefix("wait-estimate") });
     } catch (err) {
-      setActionError(failText(err, "Couldn't clear the delay."));
+      setActionError(failText(err, t("clearDelayFail"), t("denied")));
     }
-  }, [qc]);
+  }, [qc, t]);
 
   return {
     mounted, grants, region, forbidden, loading, error, rows, staff, doctorQueues, callbackList,

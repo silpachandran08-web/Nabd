@@ -46,15 +46,15 @@ test("reducer: guardianClear resets consent and channel; an error action without
   assert.deepEqual(s.fieldErrs, {});
 });
 
-test("schema: checks run in the page's order with the page's messages", () => {
+test("schema: checks run in the page's order and name their catalogue key (FEF-038: the dialog translates)", () => {
   const s0 = initialWalkIn;
-  assert.equal(walkInProblem(s0, false, false), "Pick a doctor.");
+  assert.equal(walkInProblem(s0, false, false), "pickDoctor");
   const d = { ...s0, doctorId: "d1" };
   assert.equal(walkInProblem(d, true, false), null, "an existing patient needs only a doctor");
-  assert.match(walkInProblem(d, false, false), /name, phone and date of birth/);
+  assert.equal(walkInProblem(d, false, false), "needNew");
   const n = { ...d, name: "A", phone: "1", dob: "2020-01-01" };
-  assert.match(walkInProblem(n, false, true), /guardian is required/);
-  assert.match(walkInProblem({ ...n, guardian: P }, false, true), /guardian's consent/);
+  assert.equal(walkInProblem(n, false, true), "needGuardian");
+  assert.equal(walkInProblem({ ...n, guardian: P }, false, true), "needConsent");
   assert.equal(walkInProblem({ ...n, guardian: P, guardianConsent: true, guardianChannel: "phone" }, false, true), null);
   assert.equal(walkInProblem(n, false, false), null);
 });

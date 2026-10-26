@@ -14,6 +14,13 @@ const MONEY_RULES = [
   { selector: "CallExpression[callee.property.name='toFixed'][callee.object.type='MemberExpression'][callee.object.property.name=/^(amount|price|total|subtotal|fee|charge|balance|paid|due|tax|discount|money|cost|revenue|payment|outstanding)/i]", message: "Do not hand-round money with toFixed. " + MONEY_MESSAGE },
 ];
 
+// FEF-038: Login, MFA, accept-invite and Arrivals are fully extracted (ADR-11 order: Login -> Arrivals -> Consult -> Checkout).
+const MIGRATED = ["app/login/**/*.tsx", "app/accept-invite/**/*.tsx", "app/arrivals/**/*.tsx", "app/components/arrivals/**/*.tsx", "app/components/MfaEnrolCard.tsx"];
+const TEXT_TEMPLATE_RULES = [
+  { selector: "JSXElement > JSXExpressionContainer > :matches(TemplateLiteral, ConditionalExpression > TemplateLiteral, LogicalExpression > TemplateLiteral)", message: "A template literal builds user-facing text. Use a next-intl ICU message with placeholders." },
+  { selector: "JSXAttribute[name.name=/^(aria-label|aria-description|title|placeholder|alt|label|message|hint)$/] > JSXExpressionContainer > TemplateLiteral", message: "A template literal builds user-facing text. Use a next-intl ICU message with placeholders." },
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -35,8 +42,10 @@ const eslintConfig = defineConfig([
   { files: ["app/lib/jwt.ts"], rules: { "no-restricted-globals": "off" } },
   { files: ["app/**/*.{ts,tsx}", "lint-fixtures/**/*.{ts,tsx}"], rules: { "no-restricted-syntax": ["error", ...MONEY_RULES] } },
   // FEF-036: migrated folders/files may not carry a literal UI string in JSX; text comes from next-intl catalogues (packages/i18n/messages).
-  { files: ["app/TopBar.tsx", "app/LanguagePicker.tsx", "lint-fixtures/i18n/**/*.tsx"], plugins: { i18next },
+  { files: ["app/TopBar.tsx", "app/LanguagePicker.tsx", ...MIGRATED, "lint-fixtures/i18n/**/*.tsx"], plugins: { i18next },
     rules: { "i18next/no-literal-string": ["error", { mode: "jsx-text-only", words: { exclude: ["[^a-zA-Z]+", "[A-Z_-]+", "^[⌘⌥⌃⇧]\\w*$"] } }] } },
+  // FEF-038: in migrated folders no template literal may build user-facing text (JSX child or text attribute): use an ICU message.
+  { files: [...MIGRATED, "lint-fixtures/i18n/**/*.tsx"], rules: { "no-restricted-syntax": ["error", ...MONEY_RULES, ...TEXT_TEMPLATE_RULES] } },
   // FEF-011: dates and times in migrated files go through app/lib/clinicTime.ts (clinic timezone, one locale).
   { files: ["app/components/myday/**", "app/components/myschedule/**", "app/components/consult/FollowUpPanel.tsx", "app/components/consult/DocumentSheet.tsx"],
     rules: { "no-restricted-syntax": ["error", ...MONEY_RULES,

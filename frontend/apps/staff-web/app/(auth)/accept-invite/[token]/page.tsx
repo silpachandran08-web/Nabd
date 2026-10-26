@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { decodeAccessToken, landingPathFor } from "../../../lib/session";
 import { storeTokens } from "../../../lib/apiClient";
 import styles from "../../login/login.module.css";
@@ -14,6 +15,7 @@ type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number 
 
 export default function AcceptInvitePage() {
   const router = useRouter();
+  const t = useTranslations("login.invite");
   const params = useParams<{ token: string }>();
   const token = params.token;
 
@@ -29,7 +31,7 @@ export default function AcceptInvitePage() {
     e.preventDefault();
     setFormError(null);
     if (pin !== confirmPin) {
-      setFormError("PINs don't match.");
+      setFormError(t("mismatch"));
       return;
     }
     setLoading(true);
@@ -44,7 +46,7 @@ export default function AcceptInvitePage() {
       const claims = decodeAccessToken(body.accessToken);
       router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.detail || "That invite link is invalid or has expired." : reasonText(err, ""));
+      setFormError(err instanceof ApiError ? err.detail || t("invalid") : reasonText(err, ""));
     } finally {
       setLoading(false);
     }
@@ -56,14 +58,14 @@ export default function AcceptInvitePage() {
         <div className={styles.card}>
           {recoveryCodes ? (
             <>
-              <h1 className={styles.title}>Save your recovery codes</h1>
-              <p className={styles.subtitle}>Each code works once if you lose your authenticator. They won&apos;t be shown again.</p>
+              <h1 className={styles.title}>{t("codesTitle")}</h1>
+              <p className={styles.subtitle}>{t("codesHint")}</p>
               <div className={styles.recoveryCodes}>{recoveryCodes.map((c) => <span key={c}>{c}</span>)}</div>
-              <button className={styles.submit} type="button" onClick={() => router.replace("/login")}>Sign in now</button>
+              <button className={styles.submit} type="button" onClick={() => router.replace("/login")}>{t("signInNow")}</button>
             </>
           ) : (
             <MfaEnrolCard enrollPath="/auth/mfa/enroll" confirmPath="/auth/mfa/confirm" setupToken={setupToken}
-              subtitle="Your role requires an authenticator app before you can sign in."
+              subtitle={t("mfaSubtitle")}
               onDone={(b) => setRecoveryCodes((b as { recoveryCodes?: string[] } | null)?.recoveryCodes ?? [])} />
           )}
         </div>
@@ -74,12 +76,12 @@ export default function AcceptInvitePage() {
   return (
     <main className={styles.page}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Set your PIN</h1>
-        <p className={styles.subtitle}>Choose the PIN you&apos;ll use to sign in from now on. You can change it later.</p>
+        <h1 className={styles.title}>{t("title")}</h1>
+        <p className={styles.subtitle}>{t("subtitle")}</p>
         <form onSubmit={submit} noValidate>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="pin">New PIN</label>
+            <label className={styles.label} htmlFor="pin">{t("newPin")}</label>
             <input
               id="pin"
               type="password"
@@ -94,7 +96,7 @@ export default function AcceptInvitePage() {
             />
           </div>
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="confirmPin">Confirm PIN</label>
+            <label className={styles.label} htmlFor="confirmPin">{t("confirmPin")}</label>
             <input
               id="confirmPin"
               type="password"
@@ -108,7 +110,7 @@ export default function AcceptInvitePage() {
             />
           </div>
           <button className={styles.submit} type="submit" disabled={loading || pin.length < 4}>
-            {loading ? "Setting PIN…" : "Set PIN & sign in"}
+            {loading ? t("submitting") : t("submit")}
           </button>
         </form>
       </div>

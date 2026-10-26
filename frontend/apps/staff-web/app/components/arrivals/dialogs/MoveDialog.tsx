@@ -3,6 +3,7 @@
 // "Move queue": pick an active patient, then the department/doctor transfer picker (POST /queue/{id}/transfer).
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { STALE } from "@nabd/api-client/queries";
 import type { TransferTargetResponse } from "@nabd/api-client/generated";
 import styles from "../arrivals.module.css";
@@ -15,10 +16,12 @@ import { bucketOf } from "../board/boardLogic";
 import type { Row } from "../types";
 
 // REC-021 transfer reasons (S4 contract values); `other` takes a free-text note (<=200 chars).
-const MOVE_REASONS: [string, string][] = [["wrong_department", "Wrong department"], ["doctor_unavailable", "Doctor unavailable"], ["patient_request", "Patient request"], ["other", "Other"]];
+const MOVE_REASONS = ["wrong_department", "doctor_unavailable", "patient_request", "other"] as const;
 
 export default function MoveDialog({ rows, onClose, onMoved }: { rows: Row[]; onClose: () => void; onMoved: () => void }) {
   const qc = useQueryClient();
+  const t = useTranslations("arrivals");
+  const m = useTranslations("arrivals.move");
   const [entryId, setEntryId] = useState("");
   const [targets, setTargets] = useState<TransferTargetResponse[] | null>(null);
   const [departmentId, setDepartmentId] = useState("");
@@ -38,7 +41,7 @@ export default function MoveDialog({ rows, onClose, onMoved }: { rows: Row[]; on
         queryFn: getter<TransferTargetResponse[]>(`/departments/${entry.departmentId}/transfer-targets`),
       }));
     } catch {
-      setError("Couldn't load transfer options.");
+      setError(m("targetsFail"));
       setTargets([]);
     }
   }
@@ -48,7 +51,7 @@ export default function MoveDialog({ rows, onClose, onMoved }: { rows: Row[]; on
   const reasonMissing = movingDept && !reason;
   async function submit() {
     if (!entryId || !departmentId || !doctorId) return;
-    if (reasonMissing) { setError("Choose a reason for moving the patient to another department."); return; }
+    if (reasonMissing) { setError(m("reasonMissing")); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -58,40 +61,40 @@ export default function MoveDialog({ rows, onClose, onMoved }: { rows: Row[]; on
       });
       onMoved();
     } catch (err) {
-      setError(failText(err, "Couldn't move the patient."));
+      setError(failText(err, m("fail"), t("page.denied")));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog title="Move queue" onClose={onClose}>
+    <Dialog title={m("title")} onClose={onClose}>
       <div className={styles.field}>
-        <label className={styles.label} htmlFor="moveEntry">Patient</label>
+        <label className={styles.label} htmlFor="moveEntry">{m("patient")}</label>
         <select id="moveEntry" className={styles.select} value={entryId} onChange={(e) => void selectEntry(e.target.value)}>
-          <option value="">Select a patient…</option>
+          <option value="">{m("selectPatient")}</option>
           {rows.filter((r) => bucketOf(r.status) === "waiting").map((r) => <option key={r.id} value={r.id}>#{r.tokenNumber} · {r.patientName}</option>)}
         </select>
       </div>
       {entryId && (
         targets === null ? (
-          <Skeleton rows={2} label="Loading transfer options" />
+          <Skeleton rows={2} label={m("loadingTargets")} />
         ) : targets.length === 0 ? (
-          <EmptyState icon="info" title="This department isn't configured to transfer patients anywhere" />
+          <EmptyState icon="info" title={m("noTargets")} />
         ) : (
           <>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="moveDepartment">Department</label>
+              <label className={styles.label} htmlFor="moveDepartment">{m("department")}</label>
               <select id="moveDepartment" className={styles.select} value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setDoctorId(""); }}>
-                <option value="">Select a department…</option>
+                <option value="">{m("selectDepartment")}</option>
                 {targets.map((t) => <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>)}
               </select>
             </div>
             {departmentId && (
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="moveDoctor">Doctor</label>
+                <label className={styles.label} htmlFor="moveDoctor">{m("doctor")}</label>
                 <select id="moveDoctor" className={styles.select} value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-                  <option value="">Select a doctor…</option>
+                  <option value="">{m("selectDoctor")}</option>
                   {targets.find((t) => t.departmentId === departmentId)?.doctors?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
@@ -99,15 +102,15 @@ export default function MoveDialog({ rows, onClose, onMoved }: { rows: Row[]; on
             {doctorId && (
               <>
                 <div className={styles.field}>
-                  <label className={styles.label} htmlFor="moveReason">Reason{movingDept ? " (required)" : ""}</label>
+                  <label className={styles.label} htmlFor="moveReason">{movingDept ? m("reasonRequired") : m("reason")}</label>
                   <select id="moveReason" className={styles.select} value={reason} required={movingDept} onChange={(e) => setReason(e.target.value)}>
-                    <option value="">Select a reason…</option>
-                    {MOVE_REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    <option value="">{m("selectReason")}</option>
+                    {MOVE_REASONS.map((v) => <option key={v} value={v}>{m(v)}</option>)}
                   </select>
                 </div>
                 {reason === "other" && (
                   <div className={styles.field}>
-                    <label className={styles.label} htmlFor="moveReasonNote">Note</label>
+                    <label className={styles.label} htmlFor="moveReasonNote">{m("note")}</label>
                     <input id="moveReasonNote" className={styles.input} maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
                   </div>
                 )}
@@ -118,8 +121,8 @@ export default function MoveDialog({ rows, onClose, onMoved }: { rows: Row[]; on
       )}
       {error && <div className={styles.formError} role="alert">{error}</div>}
       <div className={styles.modalActions}>
-        <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-        <button type="button" className={styles.submitBtn} disabled={submitting || !departmentId || !doctorId || reasonMissing} onClick={() => void submit()}>{submitting ? "Moving…" : "Move"}</button>
+        <button type="button" className={styles.cancelBtn} onClick={onClose}>{t("dialog.cancel")}</button>
+        <button type="button" className={styles.submitBtn} disabled={submitting || !departmentId || !doctorId || reasonMissing} onClick={() => void submit()}>{submitting ? m("moving") : m("move")}</button>
       </div>
     </Dialog>
   );

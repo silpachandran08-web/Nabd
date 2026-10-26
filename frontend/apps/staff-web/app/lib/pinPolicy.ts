@@ -9,6 +9,12 @@ export function lockedMessage(retryAfterSeconds: unknown): string {
   return `Too many attempts, try again in ${min} min.`;
 }
 
+/** Whole minutes to show for a lockout, or 0 when the server sent no usable retry hint. */
+export function lockedMinutes(retryAfterSeconds: unknown): number {
+  const s = typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : 0;
+  return s ? Math.ceil(s / 60) : 0;
+}
+
 /** The token claim minted while the account still has a pre-v2 PIN. */
 export function needsPinChange(claims: { pinChange?: boolean } | null | undefined): boolean {
   return claims?.pinChange === true;

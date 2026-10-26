@@ -192,3 +192,6 @@ button:active {
 .skipLink:focus {
   inset-block-start: var(--nb-space-8);
 }
+
+/* FEF-038: directional icons (Icon flip list) mirror in right-to-left locales. */
+[dir="rtl"] svg[data-flip] { transform: scaleX(-1); }

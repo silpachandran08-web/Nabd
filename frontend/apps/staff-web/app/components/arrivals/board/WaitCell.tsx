@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useTranslations } from "next-intl";
 import { waitMinutes } from "./boardLogic";
 
 // The once-a-minute clock lives here, not on the page: a tick re-renders only these small cells.
@@ -21,7 +22,8 @@ const snapshot = () => (minute ||= Date.now());
 const serverSnapshot = () => 0;
 export const useMinuteClock = () => useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 
-export default function WaitCell({ createdAt, unit = "m" }: { createdAt: string; unit?: "m" | " min" }) {
+export default function WaitCell({ createdAt, long = false }: { createdAt: string; long?: boolean }) {
+  const t = useTranslations("arrivals.board");
   const now = useMinuteClock();
-  return <>{waitMinutes(createdAt, now)}{unit}</>;
+  return <>{t(long ? "waitLong" : "waitShort", { n: waitMinutes(createdAt, now) })}</>;
 }
