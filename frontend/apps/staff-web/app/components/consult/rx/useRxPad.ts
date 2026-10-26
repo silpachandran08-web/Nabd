@@ -45,7 +45,7 @@ export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
         .map(({ i, index }) => ({
           drugName: i.drugName, dosage: i.dosage, frequency: i.frequency, duration: i.duration, instructions: i.instructions,
           brandName: i.brandName?.trim() || undefined, sigPattern: i.sigPattern || undefined, route: i.route || undefined,
-          quantity: i.quantity ?? undefined, quantityUnit: i.quantityUnit?.trim() || undefined,
+          quantity: i.quantity ?? undefined, quantityUnit: i.quantityUnit?.trim() || undefined, drugId: i.drugId || undefined,
           overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined }] : undefined,
         }));
       const res = await authedFetch(`/clinical/prescriptions/${entryId}`, { method: "PATCH", body: JSON.stringify({ items }) });

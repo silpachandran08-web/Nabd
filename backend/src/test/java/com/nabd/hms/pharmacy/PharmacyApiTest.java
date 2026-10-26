@@ -92,8 +92,9 @@ class PharmacyApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Sunscreen SPF 50", "isRx", false, "price", 350.00, "stockQty", 10)), Map.class);
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().get("type")).asString().contains("pharmacy-mode-not-hybrid");
+        // PHL-004: the mode gate answers 403 pharmacy-mode-external (was 400 pharmacy-mode-not-hybrid)
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody().get("type")).asString().contains("pharmacy-mode-external");
     }
 
     @Test
@@ -165,6 +166,8 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm8@a.com", "+919600000008", false);
         String token = loginAndGetAccessToken(staff);
+        // PHL-004 (deliberate change): the dispensing queue is hybrid+ only, so the clinic opts in first
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String patientId = registerPatient(token, "PharmQueue", "+919999940008");
         ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "patientId", patientId, "doctorId", staff.id().toString())), Map.class);
@@ -612,22 +615,22 @@ class PharmacyApiTest extends ApiTestBase {
         assertThat(audited.get(0).get("after").toString()).contains("hybrid").contains("Opening OTC counter");
     }
 
-    // PHA-006: in-house (Phase 3) can't be switched to; a tenant already on it is left alone.
+    // PHL-004: In-house is selectable (a clinic without a subscription is unrestricted); leaving a mode still needs a reason.
     @Test
-    void switchingToInHouseIsNotAvailableUnlessAlreadyInHouse() {
+    void switchingToInHouseWorksAndLeavingItNeedsAReason() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         String token = loginAndGetAccessToken(seedStaff(tenant, roleId, "pharm-pha6b@a.com", "+919600000092", false));
 
         ResponseEntity<Map> resp = exchange("/v1/pharmacy/settings", HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("mode", "in_house", "reason", "Want batch tracking")), Map.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().get("type")).asString().contains("mode-not-available");
-
-        // legacy tenant already on in_house (set directly, as before PHA-006): re-saving it is fine, leaving it needs a reason
-        inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode) VALUES (?, 'in_house')", tenant.id()));
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("mode")).isEqualTo("in_house");
+        // re-saving the current mode is a no-op without a reason; leaving it needs one
         assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "in_house")),
                 Map.class).getBody().get("mode")).isEqualTo("in_house");
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")),
+                Map.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Back to hybrid")),
                 Map.class).getBody().get("mode")).isEqualTo("hybrid");
     }

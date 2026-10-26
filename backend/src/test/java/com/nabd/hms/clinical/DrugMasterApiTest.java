@@ -412,7 +412,8 @@ class DrugMasterApiTest extends ApiTestBase {
 
         List<Map> items = exchange("/v1/pharmacy/items", HttpMethod.GET, authed(token), List.class).getBody();
         Map after = items.stream().filter(m -> itemId.equals(m.get("id"))).findFirst().orElseThrow();
-        assertThat(after).containsEntry("drugId", "in-SYN001").containsEntry("isRx", false).containsEntry("stockQty", 7);
+        // PHL-002 (deliberate change): linking sets the legal class, so the earlier H1 link keeps the item Rx; an unscheduled drug no longer clears it
+        assertThat(after).containsEntry("drugId", "in-SYN001").containsEntry("isRx", true).containsEntry("stockQty", 7);
         assertThat(((Number) after.get("price")).doubleValue()).isEqualTo(350.0);
 
         ResponseEntity<Map> unknown = exchange("/v1/pharmacy/items/" + itemId + "/drug-link", HttpMethod.PUT, authedJsonBody(token, Map.of("drugId", "in-NOPE")), Map.class);

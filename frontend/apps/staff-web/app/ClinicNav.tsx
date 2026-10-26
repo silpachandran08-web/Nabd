@@ -9,6 +9,8 @@ import { initials } from "@nabd/domain";
 import { getIdentity, getSessionExpiresAt, ownerPendingTokenValid, regionLabel, signOut, type Identity } from "./lib/session";
 import { isActive, ROLE_LABEL } from "./shell/navRegistry";
 import { useShellNav } from "./shell/useShellNav";
+import { usePharmacyCapabilities } from "./lib/pharmacyCapabilities";
+import { pharmacyNavAllowed } from "./lib/pharmacyRules";
 import { useNavBadges } from "./shell/useNavBadges";
 import FacilitySwitcher from "./shell/FacilitySwitcher";
 
@@ -76,7 +78,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   if (skip || input.perms.length === 0 || items.length === 0) return null;
   const currentTab = searchParams.get("tab");
 
-  const entries = items.map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined }));
+  const pharmacyCaps = usePharmacyCapabilities(pathname, input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
+  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined }));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4): 4 items + "More" when there are more.
   const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
   const overflowEntries = entries.length > 5 ? entries.slice(4) : [];

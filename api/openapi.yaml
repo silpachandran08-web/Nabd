@@ -3849,11 +3849,13 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
     patch:
       tags: [Pharmacy]
-      summary: Set the pharmacy mode (external or hybrid). Items and stock are only managed in hybrid mode.
+      summary: Set the pharmacy mode (external, hybrid or in_house) within the plan's entitlement.
       description: >-
         PHA-006. Changing the mode requires `reason` (3-200 chars, trimmed) else 400 reason-required, and is audited as
         `pharmacy.mode_changed` (before {mode}, after {mode, reason}). Sending the current mode is a no-op (no reason needed).
-        Switching to `in_house` returns 400 mode-not-available (Phase 3, not built) unless the tenant is already in_house.
+        PHL-004: switching to `in_house` without the `pharmacy_inhouse` entitlement is 402 entitlement-required (members `module`, `plan` = the
+        cheapest plan that includes it). An unknown mode is 422 invalid-mode. A mode change never deletes items, stock or dispenses. Licence numbers,
+        the pharmacist in charge and the alert recipient can be saved in the same call.
       x-required-permission: pharmacy:edit
       requestBody:
         required: true
@@ -3861,16 +3863,40 @@ paths:
       responses:
         "200": { description: The settings, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "402": { description: entitlement-required, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: invalid-mode or staff-not-found, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /pharmacy/capabilities:
+    get:
+      tags: [Pharmacy]
+      summary: PHL-004. Which pharmacy features this clinic's mode switches on (empty in External). The nav is built from it.
+      x-required-permission: isAuthenticated()
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyCapabilities" } } } }
+  /pharmacy/schedule-classes:
+    get:
+      tags: [Pharmacy]
+      summary: PHL-002. The schedule classes valid for the clinic's market with their register / Rx rules. 403 pharmacy-mode-external in External mode.
+      x-required-permission: pharmacy:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyScheduleClass" } } } } }
+  /pharmacy/buy-outside:
+    get:
+      tags: [Pharmacy]
+      summary: PHL-004. Lower-cased names of active items flagged "buy outside" (in_house = false), for the doctor's Rx.
+      x-required-permission: isAuthenticated()
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { type: string } } } } }
   /pharmacy/items:
     get:
       tags: [Pharmacy]
-      summary: Pharmacy (stocked) catalogue items, active and inactive
+      summary: Pharmacy (stocked) catalogue items, active and inactive. 403 pharmacy-mode-external in External mode.
       x-required-permission: pharmacy:view
+      parameters: [{ name: class, in: query, required: false, description: "PHL-002: only items of this schedule class.", schema: { type: string } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyItem" } } } } }
     post:
       tags: [Pharmacy]
-      summary: Add a stocked item. `stockQty` is the opening stock and is logged as the first stock movement. 400 pharmacy-mode-not-hybrid outside Hybrid mode.
+      summary: Add a stocked item. `stockQty` is the opening stock and is logged as the first stock movement. 403 pharmacy-mode-external in External mode; 422 schedule-not-valid-for-market.
       x-required-permission: pharmacy:edit
       requestBody:
         required: true
@@ -3881,7 +3907,7 @@ paths:
   /pharmacy/items/{id}:
     patch:
       tags: [Pharmacy]
-      summary: Edit an item's name, price, tax, Rx flag and HSN. `stockQty` in the body is ignored; use POST /pharmacy/items/{id}/stock-adjustments to change stock.
+      summary: Edit an item's name, price, tax, HSN, schedule class (audited as pharmacy.item_schedule_changed) and descriptive fields. `stockQty` in the body is ignored; use POST /pharmacy/items/{id}/stock-adjustments to change stock.
       x-required-permission: pharmacy:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -3891,6 +3917,7 @@ paths:
         "200": { description: The item, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: schedule-not-valid-for-market, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /pharmacy/rx-lines/search:
     post:
       tags: [Pharmacy]
@@ -4379,7 +4406,7 @@ paths:
         stock-movement row plus an audit event (pharmacy.stock_adjusted) record who, when and why. This is the only way to change
         stock by hand: PATCH /pharmacy/items/{id} ignores `stockQty` (it edits name, price, tax, Rx flag and HSN only).
         400 insufficient-stock when the result would be below zero; 400 no-change when the count would not change;
-        400 pharmacy-mode-not-hybrid outside Hybrid mode. A missing or blank `reason` is 400 validation-failed (bean validation).
+        403 pharmacy-mode-external in External mode. A missing or blank `reason` is 400 validation-failed (bean validation).
       x-required-permission: pharmacy:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -5691,11 +5718,18 @@ components:
       type: object
       properties:
         mode: { type: string, enum: [external, hybrid, in_house] }
+        modeChangedAt: { type: [string, "null"], format: date-time }
+        licenceNumbers: { type: object, additionalProperties: { type: string } }
+        pharmacistInChargeStaffId: { type: [string, "null"], format: uuid }
+        alertRecipientStaffId: { type: [string, "null"], format: uuid }
     PharmacySettingsWrite:
       type: object
       properties:
-        mode: { type: string, enum: [external, hybrid, in_house] }
+        mode: { type: string, description: "external | hybrid | in_house; anything else is 422 invalid-mode." }
         reason: { type: string, minLength: 3, maxLength: 200, description: Required when mode changes. }
+        alertRecipientStaffId: { type: [string, "null"], format: uuid }
+        pharmacistInChargeStaffId: { type: [string, "null"], format: uuid }
+        licenceNumbers: { type: object, additionalProperties: { type: string }, description: "e.g. {IN_20B, IN_21B}; replaces the stored map when sent." }
     PharmacyItemWrite:
       type: object
       required: [name, price]
@@ -5706,6 +5740,12 @@ components:
         price: { type: number, minimum: 0 }
         taxRatePercent: { type: [number, "null"], minimum: 0, description: Defaults to 0 }
         stockQty: { type: [integer, "null"], minimum: 0, description: Opening stock on POST; ignored on PATCH }
+        scheduleClass: { type: [string, "null"], description: "PHL-002: must be valid for the tenant's market, else 422 schedule-not-valid-for-market. Omitted = unchanged (on create: derived from isRx)." }
+        drugMasterId: { type: [string, "null"], description: "PHL-002: drug master product to link; its schedule flag sets the class unless scheduleClass is sent. 404 DRUG_NOT_FOUND." }
+        genericName: { type: [string, "null"] }
+        packSize: { type: [integer, "null"], minimum: 1 }
+        unit: { type: [string, "null"] }
+        inHouse: { type: [boolean, "null"], description: "PHL-004: false = buy outside. Omitted = unchanged (true on create)." }
     BillingCharge:
       type: object
       description: Row of the checkout / OTC charge lists (ChargeResponse).
@@ -5837,6 +5877,27 @@ components:
         stockQty: { type: integer, minimum: 0 }
         active: { type: boolean }
         drugId: { type: [string, "null"], description: "CLN-019: linked drug master product" }
+        scheduleClass: { type: string, description: "PHL-002: statutory class code (OTC, IN_H, IN_H1, ...); isRx follows it." }
+        register: { type: [string, "null"], description: "PHL-002: set when the class needs a statutory register (badge for PHL-022/024)." }
+        genericName: { type: [string, "null"] }
+        packSize: { type: [integer, "null"] }
+        unit: { type: [string, "null"] }
+        inHouse: { type: boolean, description: "PHL-004: false = bought outside; listed by GET /pharmacy/buy-outside and never offered at checkout." }
+    PharmacyScheduleClass:
+      type: object
+      properties:
+        code: { type: string }
+        label: { type: string }
+        requiresRx: { type: boolean }
+        register: { type: [string, "null"] }
+        duplicateRxCopy: { type: boolean }
+        retentionYears: { type: [integer, "null"], description: Null until the Clinical Safety Officer supplies the statutory figure. }
+        refillSelfServeAllowed: { type: boolean }
+    PharmacyCapabilities:
+      type: object
+      properties:
+        mode: { type: string, enum: [external, hybrid, in_house] }
+        features: { type: array, items: { type: string, enum: [items, batches, worklist, registers, procurement, offline] } }
     PharmacyStockAdjustment:
       type: object
       required: [reason]
