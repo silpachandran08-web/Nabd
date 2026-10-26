@@ -16,11 +16,13 @@ import Dialog from "../components/ui/Dialog";
 
 type Patient = PatientHit;
 type Candidate = DuplicateCandidate;
-type BookingProblem = { type?: string; detail?: string };
+type BookingProblem = { type?: string; detail?: string; expiresAt?: string };
 
 /** Plain-language booking refusals keyed by the problem type slug; anything unknown gets the generic line, never the raw server text. */
-function bookingMessage(status: number, p: BookingProblem | null | undefined): string {
+function bookingMessage(status: number, p: BookingProblem | null | undefined, timezone?: string): string {
   const slug = p?.type?.split("/").pop();
+  // ACC-026: a slot on live waitlist offer cannot be taken until the offer lapses
+  if (slug === "slot-on-offer") return p?.expiresAt && timezone ? `That time is held for a waitlisted patient until ${clinicTime(p.expiresAt, timezone)}.` : "That time is held for a waitlisted patient for a few more minutes.";
   if (slug === "slot-taken") return "That time was just taken by another booking.";
   if (slug === "doctor-on-leave") return "The doctor is on leave that day. Choose another day.";
   if (slug === "outside-hours") return "The doctor doesn't work at that time. Choose a listed time.";
@@ -95,9 +97,9 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
       onBooked();
     } catch (err) {
       if (err instanceof ApiError && !(err.status === 400 && err.errors.length)) {
-        fe.set(bookingMessage(err.status, err.problem as BookingProblem));
+        fe.set(bookingMessage(err.status, err.problem as BookingProblem, timezone));
         const slug = (err.problem as BookingProblem).type?.split("/").pop();
-        if (slug === "slot-taken" || slug === "session-full") { setConflictSlot(slot); void reloadSlots(); }
+        if (slug === "slot-taken" || slug === "session-full" || slug === "slot-on-offer") { setConflictSlot(slot); void reloadSlots(); }
       } else fe.fail(err, "Couldn't book the appointment. Check the details and try again.");
     } finally {
       setSaving(false);

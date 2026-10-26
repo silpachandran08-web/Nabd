@@ -22,17 +22,21 @@ class AppointmentRepository {
             "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason ";
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.organization.api.BookingRules bookingRules;
 
-    AppointmentRepository(JdbcTemplate jdbc) {
+    AppointmentRepository(JdbcTemplate jdbc, com.nabd.hms.organization.api.BookingRules bookingRules) {
         this.jdbc = jdbc;
+        this.bookingRules = bookingRules;
     }
 
     /** Throws DataIntegrityViolationException if the slot is already booked — see uq_appointments_doctor_slot. */
     UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime, boolean isFollowUp) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up) " +
-                        "VALUES (?,?,?,?,?,?,?)",
-                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp);
+        // ACC-008: every booking path stamps the policy version it was made under (null before the first publish)
+        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up, policy_version) " +
+                        "VALUES (?,?,?,?,?,?,?,?)",
+                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp,
+                bookingRules.publishedVersion().orElse(null));
         return id;
     }
 

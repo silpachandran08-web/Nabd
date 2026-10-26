@@ -819,7 +819,10 @@ function SetupPageInner() {
           <h1 className={styles.title}>Clinic Setup</h1>
           <p className={styles.subtitle}>Configure the clinic before going live.</p>
         </div>
-        <button className={styles.wizardBtn} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>
+        <div style={{ display: "flex", gap: "var(--nb-space-12)", flexWrap: "wrap" }}>
+          {can("queue:view") && <button className={styles.wizardBtn} style={{ minBlockSize: 44 }} onClick={() => router.push("/setup/workflows")}>Booking rules</button>}
+          <button className={styles.wizardBtn} style={{ minBlockSize: 44 }} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>
+        </div>
       </div>
 
       <div className={styles.tabs}>

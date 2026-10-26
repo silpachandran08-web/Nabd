@@ -57,10 +57,13 @@ public class WaitlistService {
     private final SlotValidator slotValidator;
 
     private final ActorDirectory actors;
+    private final int minLeadMinutes;
 
     WaitlistService(WaitlistRepository repo, AppointmentRepository appointmentRepo, ScheduleRepository scheduleRepo,
                      QueueRepository queueRepo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
-                     SlotValidator slotValidator, ActorDirectory actors) {
+                     SlotValidator slotValidator, ActorDirectory actors,
+                     @org.springframework.beans.factory.annotation.Value("${app.waitlist.min-lead-minutes:30}") int minLeadMinutes) {
+        this.minLeadMinutes = minLeadMinutes;
         this.actors = actors;
         this.slotValidator = slotValidator;
         this.clock = clock;
@@ -97,6 +100,11 @@ public class WaitlistService {
     @Transactional
     void onSlotFreed(UUID tenantId, UUID doctorId, Instant freedSlotStart) {
         expireAndCascade(tenantId, doctorId);
+        if (!offerable(freedSlotStart)) { // ACC-026: a missed 10:00 cancelled at 14:00 is not for sale
+            log.info("freed slot {} of doctor {} starts within {} min or is past: not offered", freedSlotStart, doctorId, minLeadMinutes);
+            return;
+        }
+        queueRepo.lockDoctorDay(tenantId, doctorId, freedSlotStart.atZone(clock.zone(tenantId)).toLocalDate()); // same lock as booking
         repo.findOldestWaiting(tenantId, doctorId).ifPresent(entry -> {
             Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
             repo.offer(tenantId, entry.id(), freedSlotStart, expiresAt);
@@ -105,11 +113,27 @@ public class WaitlistService {
         });
     }
 
+    /** ACC-026: only a slot that starts at least the minimum lead time from now may be offered. */
+    private boolean offerable(Instant slotStart) {
+        return slotStart.isAfter(clock.now().plus(minLeadMinutes, ChronoUnit.MINUTES));
+    }
+
+    /** ACC-026: the expiry job's per-tenant step (bound tenant): closes every lapsed offer and passes its slot on, without anyone opening the list. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    int expireDue(UUID tenantId) {
+        List<UUID> doctors = repo.doctorsWithStaleOffers(tenantId);
+        doctors.forEach(d -> expireAndCascade(tenantId, d));
+        return doctors.size();
+    }
+
     /** Closes out any offer past its 15-minute window and re-offers the same slot to whoever is next in line. */
     private void expireAndCascade(UUID tenantId, UUID doctorId) {
         for (WaitlistEntryRow stale : repo.findStaleOffers(tenantId, doctorId)) {
             repo.markExpired(tenantId, stale.id());
             log.info("waitlist offer {} expired unaccepted (patient {}, slot {})", stale.id(), stale.patientId(), stale.offeredSlotStart());
+            if (!offerable(stale.offeredSlotStart())) {
+                continue;
+            }
             repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
                 Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
                 repo.offer(tenantId, next.id(), stale.offeredSlotStart(), expiresAt);
@@ -140,9 +164,17 @@ public class WaitlistService {
             return bookChosenSlot(tenantId, callerStaffId, entry, chosenSlotStart);
         }
 
+        if ("expired".equals(entry.status())) { // ACC-026: 410, the offer ran out
+            throw new ApiException(HttpStatus.GONE, "offer-expired", "Offer expired",
+                    "This waitlist offer has expired.", Map.of("code", "OFFER_EXPIRED"));
+        }
         if (!"offered".equals(entry.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "offer-expired", "Offer no longer available",
                     "This waitlist offer has expired or was already used.");
+        }
+        if (!entry.offeredSlotStart().isAfter(clock.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "in-past", "Time in the past",
+                    "The offered slot has already started.", Map.of("code", "IN_PAST"));
         }
 
         int slotMinutes = resolveSlotMinutes(tenantId, entry.doctorId(), entry.offeredSlotStart());
@@ -181,10 +213,7 @@ public class WaitlistService {
         UUID doctorId = entry.doctorId();
         ZoneId zone = clock.zone(tenantId);
         int slotMinutes = slotValidator.validate(tenantId, doctorId, slotStart, clock.now());
-        if (repo.isSlotOnLiveOffer(tenantId, doctorId, slotStart, entry.id())) {
-            throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
-                    "This slot is currently offered to another patient on the waitlist.");
-        }
+        slotValidator.requireNoLiveOffer(tenantId, doctorId, slotStart, entry.id());
         enforceSessionCapacity(tenantId, doctorId, slotStart, zone);
 
         Instant end = slotStart.plus(slotMinutes, ChronoUnit.MINUTES);
@@ -203,7 +232,7 @@ public class WaitlistService {
         if ("offered".equals(entry.status()) && entry.offeredSlotStart() != null) {
             // the slot this entry was holding is free again: offer it on, exactly as an expiry would
             Instant releasedSlot = entry.offeredSlotStart();
-            repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
+            if (offerable(releasedSlot)) repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
                 Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
                 repo.offer(tenantId, next.id(), releasedSlot, expiresAt);
                 log.info("waitlist entry {} (patient {}) offered released slot {} for doctor {}, expires {}",
