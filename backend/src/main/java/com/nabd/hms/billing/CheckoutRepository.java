@@ -27,9 +27,11 @@ import static com.nabd.hms.billing.CheckoutModels.VoidableInvoice;
 class CheckoutRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.pharmacy.api.StockCommands stock;
 
-    CheckoutRepository(JdbcTemplate jdbc) {
+    CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock) {
         this.jdbc = jdbc;
+        this.stock = stock;
     }
 
     Optional<String> findTenantRegion(UUID tenantId) {
@@ -45,7 +47,9 @@ class CheckoutRepository {
                 "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent, c.stock_qty, " +
                         "COALESCE(c.is_rx, false) AS is_rx " +
                         "FROM charge_catalogue c LEFT JOIN pharmacy_settings ps ON ps.tenant_id = c.tenant_id " +
-                        "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR ps.mode = 'hybrid') " +
+                        "LEFT JOIN pharmacy_item_profiles pp ON pp.item_id = c.id AND pp.tenant_id = c.tenant_id " +
+                        // PHL-004: stocked items are offered in Hybrid / In-house, and never when flagged 'buy outside'
+                        "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR (ps.mode IN ('hybrid', 'in_house') AND COALESCE(pp.in_house, true))) " +
                         "ORDER BY c.display_order, c.name",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("code"), rs.getString("name"),
                         rs.getString("category"), rs.getBigDecimal("base_amount"), rs.getBigDecimal("follow_up_amount"),
@@ -134,16 +138,16 @@ class CheckoutRepository {
     void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder) {
         int order = startOrder;
         for (LineItemInput item : items) {
-            decrementPharmacyStockIfApplicable(tenantId, invoiceId, item.chargeCode(), item.quantity());
+            String scheduleClass = decrementPharmacyStockIfApplicable(invoiceId, item.chargeCode(), item.quantity());
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
-                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
-                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId());
+                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(), scheduleClass);
         }
     }
 
@@ -195,30 +199,11 @@ class CheckoutRepository {
                 (rs, i) -> rs.getString("mode"), tenantId).stream().findFirst();
     }
 
-    /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same
-     * transaction — "one invoice, one-tap stock deduction", the wireframe's own words. Non-pharmacy
-     * charges (stock_qty IS NULL) are untouched. */
-    private void decrementPharmacyStockIfApplicable(UUID tenantId, UUID invoiceId, String chargeCode, int quantity) {
-        List<UUID> pharmacy = jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
-                (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, chargeCode);
-        if (pharmacy.isEmpty()) {
-            return;
-        }
-        // The guarded UPDATE takes the row lock, so it serialises with a manual stock adjustment (PharmacyService).
-        List<Integer> after = jdbc.query(
-                "UPDATE charge_catalogue SET stock_qty = stock_qty - ? WHERE tenant_id = ? AND code = ? AND stock_qty >= ? " +
-                        "RETURNING stock_qty",
-                (rs, i) -> rs.getInt("stock_qty"), quantity, tenantId, chargeCode, quantity);
-        if (after.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Insufficient stock",
-                    "Not enough stock for " + chargeCode + " to dispense " + quantity + " unit(s).");
-        }
-        // Immutable movement row (V51): every stock change, including a checkout dispense, leaves one.
-        if (quantity > 0) {
-            jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id) " +
-                            "VALUES (?,?,'dispense',?,?,?,?,?)",
-                    tenantId, pharmacy.get(0), -quantity, after.get(0) + quantity, after.get(0), "Dispensed at checkout", invoiceId);
-        }
+    /** Billing a stocked pharmacy item takes it off the shelf in the same transaction, through the pharmacy module's
+     * StockCommands (PHL-003); an ordinary charge is untouched. Returns the item's schedule class as sold (PHL-002), else null. */
+    private String decrementPharmacyStockIfApplicable(UUID invoiceId, String chargeCode, int quantity) {
+        return stock.stockedItem(chargeCode)
+                .map(item -> stock.issue(item, quantity, invoiceId, "Dispensed at checkout").scheduleClass()).orElse(null);
     }
 
     /** PHA-011: locks the invoice row so two concurrent voids (or a void racing a payment) run one after the other. */
@@ -247,12 +232,7 @@ class CheckoutRepository {
                 tenantId, invoiceId);
         for (Object[] l : lines) {
             int qty = (Integer) l[2];
-            Integer after = jdbc.queryForObject(
-                    "UPDATE charge_catalogue SET stock_qty = stock_qty + ?, updated_at = now() WHERE tenant_id = ? AND id = ? RETURNING stock_qty",
-                    Integer.class, qty, tenantId, l[0]);
-            jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id, actor_id) " +
-                            "VALUES (?,?,'restock',?,?,?,?,?,?)",
-                    tenantId, l[0], qty, after - qty, after, reason, invoiceId, staffId);
+            stock.returnIn((UUID) l[0], qty, invoiceId, staffId, reason);
             restored.add(new Object[]{l[1], qty});
         }
         return restored;

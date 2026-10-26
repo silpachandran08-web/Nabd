@@ -463,6 +463,7 @@ schemas:
       approval_id: operational
       created_at: operational
     invoice_line_items:
+      schedule_class: operational
       id: operational
       tenant_id: operational
       invoice_id: operational
@@ -889,10 +890,34 @@ schemas:
       phone_digits: pii
       phone_last10: pii
       name_search: pii
+    pharmacy_item_profiles:
+      item_id: operational
+      tenant_id: operational
+      schedule_class: operational
+      generic_name: operational
+      pack_size: operational
+      unit: operational
+      in_house: operational
+      updated_at: operational
+    pharmacy_schedule_rules:
+      market: operational
+      schedule_class: operational
+      label: operational
+      requires_rx: operational
+      register_type: operational
+      duplicate_rx_copy: operational
+      retention_years: operational
+      refill_self_serve_allowed: operational
+      drug_master_flag: operational
     pharmacy_settings:
       tenant_id: operational
       mode: operational
       updated_at: operational
+      mode_changed_at: operational
+      mode_changed_by: operational
+      drug_licence_numbers: operational
+      pharmacist_in_charge_staff_id: operational
+      alert_recipient_staff_id: operational
     pharmacy_stock_movements:
       id: operational
       seq: operational

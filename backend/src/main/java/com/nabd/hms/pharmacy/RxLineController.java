@@ -28,6 +28,7 @@ public class RxLineController {
     }
 
     @PostMapping("/search")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('billing:create')")
     public List<RxGate.RxLineResponse> search(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RxLineSearchRequest req) {
         return rxGate.searchByPhone(UUID.fromString(jwt.getClaimAsString("tenantId")), req.phone());

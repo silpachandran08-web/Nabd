@@ -11,7 +11,7 @@
 modules:
   billing:
     owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoices, tax_rules]
-    reads: []
+    reads: [pharmacy_item_profiles]  # PHL-004: checkout never offers an item flagged 'buy outside' (in_house = false)
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, favourite_rx_set_items, ingredients, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
     reads: []
@@ -50,8 +50,8 @@ modules:
     owns: [consents, internal_patient_refs, notice_templates, patient_duplicate_dismissals, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
     reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
-    owns: [pharmacy_settings, pharmacy_stock_movements]
-    reads: []
+    owns: [pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements]
+    reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
     owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, tenant_lifecycle_events, tenants]
     reads: []

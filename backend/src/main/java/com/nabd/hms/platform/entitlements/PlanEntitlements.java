@@ -82,6 +82,13 @@ public class PlanEntitlements implements Entitlements {
     }
 
     @Override
+    public java.util.Optional<String> planUnlocking(String module) {
+        return jdbc.queryForList("SELECT p.name FROM master.plans p JOIN master.plan_entitlements e " +
+                "ON e.plan_id = p.id AND e.plan_version = p.version WHERE p.active AND e.module_code = ? " +
+                "ORDER BY p.monthly_price_cents, p.name LIMIT 1", String.class, module).stream().findFirst();
+    }
+
+    @Override
     public Map<String, Boolean> modules() {
         UUID t = currentTenant();
         Map<String, Boolean> out = new LinkedHashMap<>();

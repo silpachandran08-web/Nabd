@@ -7665,6 +7665,70 @@ paths:
       tags:
       - patient
       x-required-permission: patients:edit
+  /v1/pharmacy/buy-outside:
+    get:
+      operationId: PharmacyController_buyOutside
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: string
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: isAuthenticated()
+  /v1/pharmacy/capabilities:
+    get:
+      operationId: PharmacyController_capabilities
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PharmacyCapabilitiesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: isAuthenticated()
   /v1/pharmacy/dispensing-queue:
     get:
       operationId: PharmacyController_dispensingQueue
@@ -7701,6 +7765,12 @@ paths:
   /v1/pharmacy/items:
     get:
       operationId: PharmacyController_items
+      parameters:
+      - in: query
+        name: class
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -8024,6 +8094,39 @@ paths:
       tags:
       - pharmacy
       x-required-permission: billing:create
+  /v1/pharmacy/schedule-classes:
+    get:
+      operationId: PharmacyController_scheduleClasses
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PharmacyScheduleClassResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:view
   /v1/pharmacy/settings:
     get:
       operationId: PharmacyController_settings
@@ -18037,6 +18140,15 @@ components:
           type: string
         staffName:
           type: string
+    PharmacyCapabilitiesResponse:
+      type: object
+      properties:
+        features:
+          type: array
+          items:
+            type: string
+        mode:
+          type: string
     PharmacyItemResponse:
       type: object
       properties:
@@ -18046,21 +18158,34 @@ components:
           type: string
         drugId:
           type: string
+        genericName:
+          type: string
         hsnCode:
           type: string
         id:
           type: string
+        inHouse:
+          type: boolean
         isRx:
           type: boolean
         name:
           type: string
+        packSize:
+          type: integer
+          format: int32
         price:
           type: number
+        register:
+          type: string
+        scheduleClass:
+          type: string
         stockQty:
           type: integer
           format: int32
         taxRatePercent:
           type: number
+        unit:
+          type: string
     PharmacyItemStatusRequest:
       type: object
       properties:
@@ -18075,16 +18200,35 @@ components:
     PharmacyItemWriteRequest:
       type: object
       properties:
+        drugMasterId:
+          type: string
+          maxLength: 80
+          minLength: 0
+        genericName:
+          type: string
+          maxLength: 200
+          minLength: 0
         hsnCode:
           type: string
+        inHouse:
+          type: boolean
         isRx:
           type: boolean
         name:
           type: string
           minLength: 1
+        packSize:
+          type: integer
+          format: int32
+          exclusiveMinimum: true
+          minimum: 0
         price:
           type: number
           minimum: 0
+        scheduleClass:
+          type: string
+          maxLength: 40
+          minLength: 0
         stockQty:
           type: integer
           format: int32
@@ -18092,20 +18236,64 @@ components:
         taxRatePercent:
           type: number
           minimum: 0
+        unit:
+          type: string
+          maxLength: 40
+          minLength: 0
       required:
       - name
       - price
+    PharmacyScheduleClassResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        duplicateRxCopy:
+          type: boolean
+        label:
+          type: string
+        refillSelfServeAllowed:
+          type: boolean
+        register:
+          type: string
+        requiresRx:
+          type: boolean
+        retentionYears:
+          type: integer
+          format: int32
     PharmacySettingsResponse:
       type: object
       properties:
+        alertRecipientStaffId:
+          type: string
+          format: uuid
+        licenceNumbers:
+          type: object
+          additionalProperties:
+            type: string
         mode:
           type: string
+        modeChangedAt:
+          type: string
+          format: date-time
+        pharmacistInChargeStaffId:
+          type: string
+          format: uuid
     PharmacySettingsWriteRequest:
       type: object
       properties:
+        alertRecipientStaffId:
+          type: string
+          format: uuid
+        licenceNumbers:
+          type: object
+          additionalProperties:
+            type: string
         mode:
           type: string
-          pattern: external|hybrid|in_house
+        pharmacistInChargeStaffId:
+          type: string
+          format: uuid
         reason:
           type: string
     PharmacyStockAdjustmentRequest:

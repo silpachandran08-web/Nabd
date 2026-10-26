@@ -2,7 +2,9 @@ package com.nabd.hms.pharmacy;
 
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.common.RequestMeta;
+import com.nabd.hms.pharmacy.dto.PharmacyCapabilitiesResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
+import com.nabd.hms.pharmacy.dto.PharmacyScheduleClassResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemStatusRequest;
 import com.nabd.hms.pharmacy.dto.PharmacyStockAdjustmentRequest;
 import com.nabd.hms.pharmacy.dto.PharmacyStockMovementResponse;
@@ -38,12 +40,14 @@ public class PharmacyController {
     }
 
     @GetMapping("/settings")
+    @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
     @PreAuthorize("hasAuthority('pharmacy:view')")
     public PharmacySettingsResponse settings(@AuthenticationPrincipal Jwt jwt) {
         return service.getSettings(tenantId(jwt));
     }
 
     @PatchMapping("/settings")
+    @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacySettingsResponse updateSettings(@AuthenticationPrincipal Jwt jwt,
                                                      @Valid @RequestBody PharmacySettingsWriteRequest req, HttpServletRequest http) {
@@ -51,13 +55,16 @@ public class PharmacyController {
     }
 
     @GetMapping("/items")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:view')")
-    public List<PharmacyItemResponse> items(@AuthenticationPrincipal Jwt jwt) {
-        return service.listItems(tenantId(jwt));
+    public List<PharmacyItemResponse> items(@AuthenticationPrincipal Jwt jwt,
+                                            @org.springframework.web.bind.annotation.RequestParam(name = "class", required = false) String scheduleClass) {
+        return service.listItems(tenantId(jwt), scheduleClass);
     }
 
     @PostMapping("/items")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public ResponseEntity<PharmacyItemResponse> addItem(@AuthenticationPrincipal Jwt jwt,
                                                          @Valid @RequestBody PharmacyItemWriteRequest req, HttpServletRequest http) {
@@ -67,10 +74,11 @@ public class PharmacyController {
 
     @PatchMapping("/items/{id}")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacyItemResponse updateItem(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                            @Valid @RequestBody PharmacyItemWriteRequest req) {
-        return service.updateItem(tenantId(jwt), id, req);
+                                            @Valid @RequestBody PharmacyItemWriteRequest req, HttpServletRequest http) {
+        return service.updateItem(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req);
     }
 
     public record DrugLinkRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 80) String drugId) {
@@ -78,6 +86,7 @@ public class PharmacyController {
 
     /** CLN-019: map the item to a drug master product (idempotent: same body, same result). */
     @org.springframework.web.bind.annotation.PutMapping("/items/{id}/drug-link")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public java.util.Map<String, Object> linkDrug(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                                   @Valid @RequestBody DrugLinkRequest req, HttpServletRequest http) {
@@ -87,6 +96,7 @@ public class PharmacyController {
     /** V2-004: the only way to change stock by hand. Relative (`delta`) or stock-take (`setTo`), reason required. */
     @PostMapping("/items/{id}/stock-adjustments")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacyItemResponse adjustStock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                              @Valid @RequestBody PharmacyStockAdjustmentRequest req, HttpServletRequest http) {
@@ -96,6 +106,7 @@ public class PharmacyController {
     /** V2-007: activate / deactivate an item. */
     @PatchMapping("/items/{id}/status")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacyItemResponse setStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                            @Valid @RequestBody PharmacyItemStatusRequest req, HttpServletRequest http) {
@@ -103,15 +114,41 @@ public class PharmacyController {
     }
 
     @GetMapping("/items/{id}/stock-movements")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:view')")
     public List<PharmacyStockMovementResponse> stockMovements(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.movements(tenantId(jwt), id);
     }
 
     @GetMapping("/dispensing-queue")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:view')")
     public List<DispensingQueueEntryResponse> dispensingQueue(@AuthenticationPrincipal Jwt jwt) {
         return service.dispensingQueue(tenantId(jwt));
+    }
+
+    /** PHL-004: the pharmacy features this clinic's mode switches on; any signed-in staff member (the nav is built from it). */
+    @GetMapping("/capabilities")
+    @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
+    @PreAuthorize("isAuthenticated()")
+    public PharmacyCapabilitiesResponse capabilities() {
+        return service.capabilities();
+    }
+
+    /** PHL-004: lower-cased names of items flagged "buy outside", for the doctor's Rx. */
+    @GetMapping("/buy-outside")
+    @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
+    @PreAuthorize("isAuthenticated()")
+    public List<String> buyOutside() {
+        return service.buyOutside();
+    }
+
+    /** PHL-002: the schedule classes valid for the clinic's market with their register / Rx rules. */
+    @GetMapping("/schedule-classes")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public List<PharmacyScheduleClassResponse> scheduleClasses() {
+        return service.scheduleClasses();
     }
 
     private UUID tenantId(Jwt jwt) {

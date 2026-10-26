@@ -11,6 +11,8 @@ import { initials } from "@nabd/domain";
 import { selfStaffId } from "./lib/doctorQueries";
 import { usePermissions } from "./lib/usePermissions";
 import { navAllowed, useEntitlements } from "./lib/entitlements";
+import { usePharmacyCapabilities } from "./lib/pharmacyCapabilities";
+import { pharmacyNavAllowed } from "./lib/pharmacyRules";
 import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -140,6 +142,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const tokenGrants = usePermissions().permissions; // FEF-019: changes when a token refresh brings a new role, so the nav follows without re-login
   const [permissions, setPermissions] = useState<string[] | null>(null);
   const ent = useEntitlements(pathname); // PLT-059: hide modules the plan does not include
+  const pharmacyCaps = usePharmacyCapabilities(pathname, tokenGrants.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
   const [owner, setOwner] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -261,7 +264,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       badge: badges[item.href],
     })),
   ];
-  const entries = allEntries.filter((e) => navAllowed(e.href, ent));
+  const entries = allEntries.filter((e) => navAllowed(e.href, ent) && pharmacyNavAllowed(e.href, pharmacyCaps));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4) — 4 items + "More" when there are more.
   const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
   const overflowEntries = entries.length > 5 ? entries.slice(4) : [];

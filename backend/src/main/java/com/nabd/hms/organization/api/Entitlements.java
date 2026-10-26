@@ -1,6 +1,7 @@
 package com.nabd.hms.organization.api;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * PLT-059 / ADM-034: what the calling clinic's plan, per-clinic overrides and global kill switches allow. Answers for the
@@ -21,6 +22,9 @@ public interface Entitlements {
 
     /** Branches (clinics under one brand) the plan allows; {@link Integer#MAX_VALUE} when unlimited. */
     int branchLimit();
+
+    /** PHL-004: name of the cheapest active plan whose current version includes the module (for the 402 upsell); empty if none does. */
+    Optional<String> planUnlocking(String module);
 
     /** Every known feature code with its current effective state, for navigation gating and the plan screen. */
     Map<String, Boolean> modules();

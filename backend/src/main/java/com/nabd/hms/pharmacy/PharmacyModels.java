@@ -7,7 +7,15 @@ import java.util.UUID;
 class PharmacyModels {
 
     record PharmacyItemRow(UUID id, String code, String name, boolean isRx, String hsnCode, BigDecimal price,
-                            BigDecimal taxRatePercent, int stockQty, boolean active, String drugId) {
+                            BigDecimal taxRatePercent, int stockQty, boolean active, String drugId,
+                            String scheduleClass, String registerType, String genericName, Integer packSize, String unit, boolean inHouse) {
+    }
+
+    record RuleRow(String code, String label, boolean requiresRx, String register, boolean duplicateRxCopy, Integer retentionYears,
+                   boolean refillSelfServeAllowed, String drugMasterFlag) {
+    }
+
+    record SettingsRow(String mode, Instant modeChangedAt, String licenceJson, UUID pharmacistInChargeStaffId, UUID alertRecipientStaffId) {
     }
 
     record StockMovementRow(UUID id, String kind, int delta, int qtyBefore, int qtyAfter, String reason, UUID actorId,
