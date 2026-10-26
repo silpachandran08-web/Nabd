@@ -69,6 +69,13 @@ public class AppointmentService {
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
         requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
+        ZoneId zone = clock.zone(tenantId);
+        LocalDate day = req.startTime().atZone(zone).toLocalDate();
+        Optional<WorkingHoursRow> tokenBlock = scheduleRepo.findBlockCovering(req.doctorId(), day.getDayOfWeek().getValue() % 7,
+                req.startTime().atZone(zone).toLocalTime()).filter(b -> SessionModes.TOKEN.equals(SessionModes.modeOn(b, day)));
+        if (tokenBlock.isPresent()) {
+            return bookToken(tenantId, callerStaffId, req, tokenBlock.get(), day, zone);
+        }
         int slotMinutes = slotValidator.validate(tenantId, req.doctorId(), req.startTime(), clock.now());
         enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
@@ -82,6 +89,23 @@ public class AppointmentService {
             log.warn("booking conflict: doctor {} already booked at {}", req.doctorId(), req.startTime());
             throw SlotValidator.slotTakenOrRethrow(e);
         }
+    }
+
+    /** ACC-011: a place in a token session. start/end = the session window; the number is reserved under the doctor-day lock. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private AppointmentResponse bookToken(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req, WorkingHoursRow block,
+                                          LocalDate day, ZoneId zone) {
+        Instant start = day.atTime(block.startTime()).atZone(zone).toInstant();
+        Instant end = day.atTime(block.endTime()).atZone(zone).toInstant();
+        slotValidator.validateToken(tenantId, req.doctorId(), block, day, end, clock.now());
+        queueRepo.lockDoctorDay(tenantId, req.doctorId(), day);
+        enforceCapacity(tenantId, req.doctorId(), day, block, zone);
+        int token = scheduleRepo.lowestFreeToken(tenantId, req.doctorId(), block.id(), start, block.maxPatients())
+                .orElseThrow(() -> sessionFull(true));
+        UUID id = repo.insertToken(tenantId, req.patientId(), req.doctorId(), start, end, req.isFollowUpOrDefault(), block.id(), token);
+        log.info("token booking {} by {}: doctor {} token {} on {}", id, callerStaffId, req.doctorId(), token, day); // log-phi-ok: token booking number, not a credential
+        published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), start, "scheduled", Map.of());
+        return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
     @Transactional
@@ -193,15 +217,28 @@ public class AppointmentService {
         LocalTime time = start.atZone(zone).toLocalTime();
 
         Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time);
-        if (block.isEmpty() || block.get().maxPatients() == null) {
+        if (block.isEmpty() || (block.get().maxPatients() == null && block.get().onlineCap() == null)) {
             return;
         }
-
         queueRepo.lockDoctorDay(tenantId, doctorId, date);
-        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
-        if (occupancy >= block.get().maxPatients()) {
-            log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.get().maxPatients());
-            throw sessionFull();
+        enforceCapacity(tenantId, doctorId, date, block.get(), zone);
+    }
+
+    /** ACC-011: online cap (bookings only) and the shared total (bookings + walk-ins); the caller holds the doctor-day lock. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private void enforceCapacity(UUID tenantId, UUID doctorId, LocalDate date, WorkingHoursRow block, ZoneId zone) {
+        if (block.onlineCap() != null
+                && scheduleRepo.countSessionBookings(tenantId, doctorId, date, block.startTime(), block.endTime(), zone) >= block.onlineCap()) {
+            log.warn("online cap reached: doctor {} on {} (cap {})", doctorId, date, block.onlineCap());
+            throw sessionFull(true);
+        }
+        if (block.maxPatients() == null) {
+            return;
+        }
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.startTime(), block.endTime(), zone);
+        if (occupancy >= block.maxPatients()) {
+            log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.maxPatients());
+            throw sessionFull(false);
         }
     }
 
@@ -223,15 +260,27 @@ public class AppointmentService {
 
     private AppointmentResponse toResponse(AppointmentRow row) {
         return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(),
-                row.status(), row.isFollowUp(), row.cancelReason());
+                row.status(), row.isFollowUp(), row.cancelReason(), row.bookingKind(), row.sessionToken(), expectedRange(row));
+    }
+
+    /** ACC-011: a token booking shows an expected range from the average consult time, never a fixed time. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private String expectedRange(AppointmentRow row) {
+        if (!"token".equals(row.bookingKind()) || row.sessionToken() == null) {
+            return null;
+        }
+        double avg = queueRepo.averageRecentVisitMinutes(row.tenantId(), row.doctorId(), 30).orElse(15.0);
+        return SessionModes.expectedRange(row.startTime(), row.endTime(), row.sessionToken(), avg, clock.zone(row.tenantId()));
     }
 
     private ApiException notFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
-    private ApiException sessionFull() {
+    private ApiException sessionFull(boolean online) {
         return new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
-                "This session has reached its patient cap (walk-ins and bookings counted together).", java.util.Map.of("code", "SESSION_FULL"));
+                online ? "Online booking for this session is full; the desk may still add walk-ins."
+                        : "This session has reached its patient cap (walk-ins and bookings counted together).",
+                java.util.Map.of("code", "SESSION_FULL", "scope", online ? "online" : "total"));
     }
 }

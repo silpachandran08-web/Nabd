@@ -55,6 +55,8 @@ schemas:
       is_follow_up: operational
       arrived_at: operational
       booking_kind: operational
+      session_token: operational
+      working_hours_id: operational
     attendance_records:
       id: operational
       tenant_id: operational
@@ -397,6 +399,14 @@ schemas:
       end_time: operational
       slot_minutes: operational
       max_patients: operational
+      session_mode: operational
+      previous_session_mode: operational
+      online_cap: operational
+      label: operational
+      effective_from: operational
+      walkin_mode: operational
+      walkin_ratio: operational
+      late_grace_minutes: operational
     dpa_acceptances:
       id: operational
       tenant_id: operational
@@ -1084,6 +1094,9 @@ schemas:
       transfer_reason: operational
       transfer_reason_note: phi  # uncertain: free text, may carry clinical reason
       legacy_duplicate: operational
+      order_reason: operational
+      called_seq: operational
+      placed_as_walkin_late: operational
     tax_rules:
       id: operational
       jurisdiction: operational
@@ -1482,6 +1495,11 @@ schemas:
       steps: operational
       toggle_keys: operational
       created_at: operational
+    session_reserved_slots:
+      id: operational
+      tenant_id: operational
+      working_hours_id: operational
+      slot_minute: operational
     queue_entry_events:
       id: operational
       tenant_id: operational

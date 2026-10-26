@@ -32,15 +32,27 @@ public class QueueController {
 
     private final QueueService service;
 
-    QueueController(QueueService service) {
+    private final CallOrderService callOrder;
+
+    QueueController(QueueService service, CallOrderService callOrder) {
         this.service = service;
+        this.callOrder = callOrder;
+    }
+
+    /** ACC-012: the next patient by the session's walk-in rule; compare-and-set on the status, 409 when the head changed. */
+    @com.nabd.hms.shared.Idempotent
+    @PostMapping("/doctors/{doctorId}/call-next")
+    @PreAuthorize("hasAuthority('queue:edit')")
+    public com.nabd.hms.queue.dto.CallNextResponse callNext(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID doctorId,
+                                                            @RequestBody(required = false) com.nabd.hms.queue.dto.CallNextRequest req) {
+        return callOrder.callNext(staffId(jwt), doctorId, req == null ? null : req.expectedHeadId());
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/check-in")
     @PreAuthorize("hasAuthority('queue:create')")
     public ResponseEntity<QueueEntryResponse> checkIn(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckInRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.checkIn(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(callOrder.annotateOne(service.checkIn(tenantId(jwt), staffId(jwt), req)));
     }
 
     @GetMapping
@@ -50,7 +62,8 @@ public class QueueController {
                                           @RequestParam(required = false) UUID departmentId,
                                           @RequestParam(required = false) LocalDate date,
                                           @RequestParam(defaultValue = "false") boolean priority) {
-        return service.list(tenantId(jwt), doctorId, departmentId, date, priority);
+        var rows = service.list(tenantId(jwt), doctorId, departmentId, date, priority);
+        return priority ? rows : callOrder.annotate(rows); // ACC-012: position and why-here per doctor and day
     }
 
     @PatchMapping("/{id}/status")

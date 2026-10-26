@@ -2216,6 +2216,22 @@ paths:
           description: Available slot start times
           content: { application/json: { schema: { type: array, items: { type: string, format: date-time } } } }
 
+  /doctors/{id}/availability/sessions:
+    get:
+      tags: [Queue]
+      summary: "Availability by session (ACC-011): per working-hours block its mode, free slots (slot/hybrid), places left and the next token's expected range (token)"
+      x-required-permission: queue:view
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: "sessions[]: id, mode, label, slots? (reserved walk-in slots are never listed), tokensLeft? (places left in the shared pool, capped by the online cap), onlineLeft?, expectedRange?"
+          content: { application/json: { schema: { type: object, properties: { sessions: { type: array, items: { type: object } } } } } }
+
   /appointments:
     get:
       tags: [Queue]
@@ -2433,6 +2449,20 @@ paths:
           schema: { type: string, format: date }
       responses:
         "200": { description: "Queue entries", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/QueueEntry" } } } } }
+
+  /queue/doctors/{doctorId}/call-next:
+    post:
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - { name: doctorId, in: path, required: true, schema: { type: string, format: uuid } }
+      tags: [Queue]
+      summary: "Calls the next waiting patient by the session's walk-in rule and moves the entry with compare-and-set (ACC-012)"
+      x-required-permission: queue:edit
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { expectedHeadId: { type: string, format: uuid } } } } }
+      responses:
+        "200": { description: "entry (QueueEntry) and reason: priority | booked_on_time | interleave | reserved_slot", content: { application/json: { schema: { type: object, properties: { entry: { $ref: "#/components/schemas/QueueEntry" }, reason: { type: string } } } } } }
+        "409": { description: "Problem code QUEUE_EMPTY (nobody waiting), STALE_HEAD (the head is not expectedHeadId) or QUEUE_PAUSED (the doctor paused the session)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue/{id}/status:
     patch:
@@ -5718,6 +5748,14 @@ components:
         endTime: { type: string, example: "17:00" }
         slotMinutes: { type: integer, default: 15, minimum: 1 }
         maxPatients: { type: [integer, "null"], minimum: 1, description: "Session cap shared by scheduled + walk-in patients together; null = uncapped (NB-098)" }
+        sessionMode: { type: string, enum: [slot, token, hybrid], description: "ACC-011: slot = timed appointments (default); token = numbered places, no times; hybrid = slots for bookings, walk-ins draw from the same maxPatients pool. token and hybrid need maxPatients. On update, a change applies from effectiveFrom (default tomorrow) only; earlier dates keep the old mode." }
+        onlineCap: { type: [integer, "null"], minimum: 0, description: "ACC-011: bookings (not walk-ins) allowed in the session; must not exceed maxPatients; null on update = unchanged" }
+        label: { type: [string, "null"], maxLength: 60, description: "ACC-011: e.g. Evening OPD" }
+        effectiveFrom: { type: [string, "null"], format: date, description: "ACC-011: first clinic date of sessionMode; on a mode change it must be tomorrow or later" }
+        reservedWalkInTimes: { type: array, items: { type: string, example: "11:00" }, description: "ACC-012: slot starts kept for walk-ins (never offered to bookings); must sit on the session grid; omitted = unchanged" }
+        walkInMode: { type: string, enum: [interleave, reserved_only, none], description: "ACC-012: interleave = one walk-in after every walkInRatio booked patients; reserved_only = walk-ins only into reserved slots; none = walk-ins after all booked patients" }
+        walkInRatio: { type: integer, minimum: 2, maximum: 4, description: "ACC-012: the N of 1:N (default 3)" }
+        lateGraceMinutes: { type: integer, minimum: 0, maximum: 120, description: "ACC-012: a booked patient later than this after the slot is placed as a walk-in (default 15)" }
 
     WorkingHours:
       allOf:
@@ -5771,6 +5809,9 @@ components:
         status: { type: string, enum: [scheduled, arrived, cancelled, completed, no_show] }
         isFollowUp: { type: boolean }
         cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
+        bookingKind: { type: string, enum: [slot, token], description: "ACC-011: token = a numbered place in a token session; startTime/endTime are then the session window, not a visit time" }
+        sessionToken: { type: [integer, "null"], description: "ACC-011: the reserved token number (token bookings)" }
+        expectedRange: { type: [string, "null"], description: "ACC-011: expected visit window like 17:40-18:00 from the average consult time; token bookings only" }
 
     DelayAnnounceRequest:
       type: object
@@ -5805,6 +5846,9 @@ components:
     QueueEntry:
       type: object
       properties:
+        position: { type: [integer, "null"], description: "ACC-012: 1 = called next, among the doctor's checked-in and waiting entries; null once called" }
+        orderReason: { type: [string, "null"], description: "ACC-012: why here: priority, booked_on_time, interleave, reserved_slot, or 'late arrival - placed as walk-in'" }
+        expectedRange: { type: [string, "null"], description: "ACC-012: expected call window like 10:20-10:45" }
         id: { type: string, format: uuid }
         appointmentId: { type: [string, "null"], format: uuid }
         patientId: { type: string, format: uuid }

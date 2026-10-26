@@ -10,14 +10,17 @@ final class QueueModels {
     }
 
     record WorkingHoursRow(UUID id, UUID doctorId, int dayOfWeek, LocalTime startTime, LocalTime endTime,
-                            int slotMinutes, Integer maxPatients) {
+                            int slotMinutes, Integer maxPatients, String sessionMode, String previousSessionMode,
+                            Integer onlineCap, String label, LocalDate effectiveFrom,
+                            String walkinMode, int walkinRatio, int lateGraceMinutes) {
     }
 
     record DoctorLeaveRow(UUID id, UUID doctorId, LocalDate dateFrom, LocalDate dateTo, String reason) {
     }
 
     record AppointmentRow(UUID id, UUID tenantId, UUID patientId, UUID doctorId, Instant startTime,
-                           Instant endTime, String status, Instant createdAt, boolean isFollowUp, String cancelReason) {
+                           Instant endTime, String status, Instant createdAt, boolean isFollowUp, String cancelReason,
+                           String bookingKind, Integer sessionToken) {
     }
 
     /** NB-116: a follow-up appointment that was missed — no_show, or scheduled 15+ days past its start. */
@@ -31,7 +34,7 @@ final class QueueModels {
                           UUID priorityAcknowledgedBy, Instant priorityAcknowledgedAt, String source,
                           String presentingComplaint, String paymentMode, Instant createdAt,
                           String transferReason, String transferReasonNote, Integer ageYears, String gender,
-                          String doctorName, int waitMinutes, String visitType, String appointmentStatus) {
+                          String doctorName, int waitMinutes, String visitType, String appointmentStatus, String orderReason) {
     }
 
     /** NB-099: a waitlist membership; offeredSlotStart/offerExpiresAt are set only while status='offered'. */

@@ -45,6 +45,11 @@
     "priority": {
       "type": "boolean"
     },
+    "orderReason": {
+      "type": "string",
+      "enum": ["priority", "booked_on_time", "interleave", "reserved_slot"],
+      "description": "ACC-012: why the call-next policy called this entry (set on a call-next move only)."
+    },
     "extendedMinutes": {
       "type": "integer",
       "enum": [5, 10, 15],

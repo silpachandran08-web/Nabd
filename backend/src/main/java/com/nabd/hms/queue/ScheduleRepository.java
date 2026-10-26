@@ -42,9 +42,12 @@ class ScheduleRepository {
         return Boolean.TRUE.equals(exists);
     }
 
+    private static final String WH_COLS = "id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients, " +
+            "session_mode, previous_session_mode, online_cap, label, effective_from, walkin_mode, walkin_ratio, late_grace_minutes ";
+
     List<WorkingHoursRow> listWorkingHours(UUID doctorId) {
         return jdbc.query(
-                "SELECT id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients " +
+                "SELECT " + WH_COLS +
                         "FROM doctor_working_hours WHERE doctor_id = ? ORDER BY day_of_week, start_time",
                 workingHoursMapper(), doctorId);
     }
@@ -57,7 +60,7 @@ class ScheduleRepository {
 
     List<WorkingHoursRow> findForDay(UUID doctorId, int dayOfWeek) {
         return jdbc.query(
-                "SELECT id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients " +
+                "SELECT " + WH_COLS +
                         "FROM doctor_working_hours WHERE doctor_id = ? AND day_of_week = ?",
                 workingHoursMapper(), doctorId, dayOfWeek);
     }
@@ -71,17 +74,19 @@ class ScheduleRepository {
     }
 
     UUID insertWorkingHours(UUID tenantId, UUID doctorId, int dayOfWeek, LocalTime start,
-                             LocalTime end, int slotMinutes, Integer maxPatients) {
+                             LocalTime end, int slotMinutes, Integer maxPatients, String sessionMode, String previousSessionMode,
+                             Integer onlineCap, String label, LocalDate effectiveFrom) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO doctor_working_hours (id, tenant_id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients) " +
-                        "VALUES (?,?,?,?,?,?,?,?)",
-                id, tenantId, doctorId, dayOfWeek, Time.valueOf(start), Time.valueOf(end), slotMinutes, maxPatients);
+        jdbc.update("INSERT INTO doctor_working_hours (id, tenant_id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients, " +
+                        "session_mode, previous_session_mode, online_cap, label, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, doctorId, dayOfWeek, Time.valueOf(start), Time.valueOf(end), slotMinutes, maxPatients,
+                sessionMode, previousSessionMode, onlineCap, label, effectiveFrom == null ? null : Date.valueOf(effectiveFrom));
         return id;
     }
 
     Optional<WorkingHoursRow> findWorkingHours(UUID doctorId, UUID hoursId) {
         return jdbc.query(
-                "SELECT id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients " +
+                "SELECT " + WH_COLS +
                         "FROM doctor_working_hours WHERE doctor_id = ? AND id = ?",
                 workingHoursMapper(), doctorId, hoursId).stream().findFirst();
     }
@@ -101,10 +106,13 @@ class ScheduleRepository {
     }
 
     void updateWorkingHours(UUID doctorId, UUID hoursId, int dayOfWeek, LocalTime start, LocalTime end,
-                            int slotMinutes, Integer maxPatients) {
+                            int slotMinutes, Integer maxPatients, String sessionMode, String previousSessionMode,
+                            Integer onlineCap, String label, LocalDate effectiveFrom) {
         jdbc.update("UPDATE doctor_working_hours SET day_of_week = ?, start_time = ?, end_time = ?, slot_minutes = ?, " +
-                        "max_patients = ? WHERE doctor_id = ? AND id = ?",
-                dayOfWeek, Time.valueOf(start), Time.valueOf(end), slotMinutes, maxPatients, doctorId, hoursId);
+                        "max_patients = ?, session_mode = ?, previous_session_mode = ?, online_cap = ?, label = ?, effective_from = ? " +
+                        "WHERE doctor_id = ? AND id = ?",
+                dayOfWeek, Time.valueOf(start), Time.valueOf(end), slotMinutes, maxPatients, sessionMode, previousSessionMode,
+                onlineCap, label, effectiveFrom == null ? null : Date.valueOf(effectiveFrom), doctorId, hoursId);
     }
 
     void deleteWorkingHours(UUID doctorId, UUID hoursId) {
@@ -184,6 +192,43 @@ class ScheduleRepository {
         return count == null ? 0 : count;
     }
 
+    /** ACC-011: the bookings (appointments) of the session; the rest of countSessionOccupancy is desk walk-ins. Online cap counts these. */
+    int countSessionBookings(UUID tenantId, UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? " +
+                        "AND a.status IN ('scheduled','arrived','completed') AND a.start_time >= ? AND a.start_time < ?",
+                Integer.class, tenantId, doctorId, Timestamp.from(date.atTime(blockStart).atZone(zone).toInstant()),
+                Timestamp.from(date.atTime(blockEnd).atZone(zone).toInstant()));
+        return count == null ? 0 : count;
+    }
+
+    /** ACC-011: lowest token 1..max not held by a live token booking of this session and date; empty = every place is taken. */
+    Optional<Integer> lowestFreeToken(UUID tenantId, UUID doctorId, UUID workingHoursId, Instant sessionStart, int max) {
+        return jdbc.query("SELECT n FROM generate_series(1, ?) n WHERE NOT EXISTS (SELECT 1 FROM appointments a " +
+                        "WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.working_hours_id = ? AND a.start_time = ? " +
+                        "AND a.booking_kind = 'token' AND a.status IN ('scheduled','arrived') AND a.session_token = n) ORDER BY n LIMIT 1",
+                (rs, i) -> rs.getInt(1), max, tenantId, doctorId, workingHoursId, Timestamp.from(sessionStart)).stream().findFirst();
+    }
+
+    /** ACC-012: slot minutes-of-day held back for walk-ins in this session. */
+    java.util.Set<Integer> reservedMinutes(UUID workingHoursId) {
+        return new java.util.HashSet<>(jdbc.query("SELECT slot_minute FROM session_reserved_slots WHERE working_hours_id = ?",
+                (rs, i) -> rs.getInt(1), workingHoursId));
+    }
+
+    void updateWalkinRules(UUID doctorId, UUID hoursId, String mode, Integer ratio, Integer graceMinutes) {
+        jdbc.update("UPDATE doctor_working_hours SET walkin_mode = COALESCE(?, walkin_mode), walkin_ratio = COALESCE(?, walkin_ratio), " +
+                "late_grace_minutes = COALESCE(?, late_grace_minutes) WHERE doctor_id = ? AND id = ?", mode, ratio, graceMinutes, doctorId, hoursId);
+    }
+
+    void replaceReservedMinutes(UUID tenantId, UUID workingHoursId, java.util.Collection<Integer> minutes) {
+        jdbc.update("DELETE FROM session_reserved_slots WHERE working_hours_id = ?", workingHoursId);
+        for (int m : minutes) {
+            jdbc.update("INSERT INTO session_reserved_slots (tenant_id, working_hours_id, slot_minute) VALUES (?,?,?)",
+                    tenantId, workingHoursId, m);
+        }
+    }
+
     // ── delay ladder (NB-100) ────────────────────────────────────────────
 
     private static final String DELAY_SELECT =
@@ -255,7 +300,11 @@ class ScheduleRepository {
                     rs.getTime("start_time").toLocalTime(),
                     rs.getTime("end_time").toLocalTime(),
                     rs.getInt("slot_minutes"),
-                    maxPatientsIsNull ? null : maxPatients);
+                    maxPatientsIsNull ? null : maxPatients,
+                    rs.getString("session_mode"), rs.getString("previous_session_mode"),
+                    (Integer) rs.getObject("online_cap"), rs.getString("label"),
+                    rs.getObject("effective_from", LocalDate.class),
+                    rs.getString("walkin_mode"), rs.getInt("walkin_ratio"), rs.getInt("late_grace_minutes"));
         };
     }
 
