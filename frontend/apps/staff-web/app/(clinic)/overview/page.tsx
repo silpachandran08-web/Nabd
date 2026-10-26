@@ -51,7 +51,8 @@ function setupHref(step: string): string {
     : k.includes("whatsapp") ? "whatsapp"
     : k.includes("consent") ? "consent"
     : k.includes("pharmacy") ? "pharmacy"
-    : k.includes("depart") ? "departments"
+    : k.includes("depart") || k === "preset" ? "departments"
+    : k === "import" ? "data"
     : k.includes("licen") ? "licences"
     : null;
   return tab ? `/setup?tab=${tab}` : "/setup";

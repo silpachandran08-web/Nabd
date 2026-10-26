@@ -985,6 +985,44 @@ paths:
         "403": { description: "forbidden or step-up-required", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /staff/{id}/invite/resend:
+    post:
+      tags: [Staff]
+      summary: "ADM-018: new 72 h single-use link for a pending invite (expired or not); the old link stops working; audited staff.invite_resent"
+      x-required-permission: staff:create
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses:
+        "200":
+          description: New link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [inviteId, expiresAt, inviteToken]
+                properties:
+                  inviteId: { type: string, format: uuid }
+                  expiresAt: { type: string, format: date-time }
+                  inviteToken: { type: string }
+        "403": { description: "GRANT_EXCEEDS_CALLER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "invite-not-pending: already accepted or suspended", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /staff/{id}/mfa/remind:
+    post:
+      tags: [Staff]
+      summary: "ADM-018: WhatsApp/SMS reminder to finish authenticator enrolment; once per clinic day per person; audited staff.mfa_reminder_sent"
+      x-required-permission: staff:edit
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses:
+        "204": { description: "Reminder queued" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "mfa-not-pending: not active, role does not require MFA, or already enrolled", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "TEMPLATE_NOT_SENDABLE (no approved mfa_enrol_reminder template) or no-mobile", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /staff/invitations/{token}/accept:
     post:
       tags: [Staff]
@@ -1190,6 +1228,30 @@ paths:
       responses:
         "200": { description: "Checklist items", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SetupChecklistItem" } } } } }
 
+  /setup/checklist/{step}/draft:
+    put:
+      tags: [Setup]
+      summary: "ADM-007: save a wizard step's draft; version is the one last read (409 VERSION_CONFLICT when another device saved first). A skipped step keeps its draft."
+      x-required-permission: setup:edit
+      parameters: [{ name: step, in: path, required: true, schema: { type: string, enum: [profile, preset, doctors, prices, whatsapp, tax, dpa, import, go_live] } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [draft, version]
+              properties:
+                draft: { type: object, additionalProperties: true }
+                version: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Saved
+          content: { application/json: { schema: { type: object, required: [step, version], properties: { step: { type: string }, version: { type: integer } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: "VERSION_CONFLICT", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "413": { description: "draft-too-large (over 16 KB)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/checklist/{step}/skip:
     post:
       tags: [Setup]
@@ -1202,6 +1264,7 @@ paths:
       responses:
         "204": { description: "Step skipped" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { description: "STEP_INVALID: the dpa step cannot be skipped", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /setup/checklist/{step}/complete:
     post:
@@ -1215,6 +1278,7 @@ paths:
       responses:
         "204": { description: "Step completed" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { description: "STEP_INVALID: dpa needs a signed agreement on file", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /regions:
     get:
@@ -5008,8 +5072,17 @@ components:
               data: { type: array, items: { $ref: "#/components/schemas/Staff" } }
               page: { $ref: "#/components/schemas/PageMeta" }
     StaffCreated:
-      description: Invite created
-      content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } }
+      description: Invite created (ADM-018 adds inviteId and expiresAt; the link is relayed by hand until the invite email service exists)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [staff, inviteToken, inviteId, expiresAt]
+            properties:
+              staff: { $ref: "#/components/schemas/Staff" }
+              inviteToken: { type: string }
+              inviteId: { type: string, format: uuid }
+              expiresAt: { type: string, format: date-time, description: "72 hours after the invite was created or last resent" }
     PatientPage:
       description: Page of patients
       content:
@@ -6300,10 +6373,13 @@ components:
     SetupChecklistItem:
       type: object
       properties:
-        step: { type: string, enum: [welcome, profile, tax, doctors, schedule, charges, pharmacy, whatsapp, go_live] }
-        status: { type: string, enum: [pending, skipped, done] }
+        step: { type: string, enum: [profile, preset, doctors, prices, whatsapp, tax, dpa, import, go_live], description: "ADM-007: the nine wizard steps, in the order the owner sees them" }
+        status: { type: string, enum: [pending, current, skipped, done], description: "current = the first pending step" }
         skippedAt: { type: [string, "null"], format: date-time }
         doneAt: { type: [string, "null"], format: date-time }
+        draft: { type: object, additionalProperties: true, description: "The step's saved form (at most 16 KB); {} when none" }
+        version: { type: integer, minimum: 0, description: "Optimistic version of the draft, 0 until first saved" }
+        updatedAt: { type: string, format: date-time }
 
     DpaStatus:
       type: object

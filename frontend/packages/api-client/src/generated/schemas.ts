@@ -199,6 +199,7 @@ export const InternalSessionSchema = z.object({ date: z.string().optional(), id:
 export const InternalDoctorSessionsSchema = z.object({ doctorId: z.string().optional(), sessions: z.array(InternalSessionSchema).optional() });
 export const InternalAvailabilitySchema = z.object({ doctors: z.array(InternalDoctorSessionsSchema).optional(), v: z.number().int().optional() });
 export const InternalBookRequestSchema = z.object({ doctorId: z.string(), patientRef: z.string().min(1), startTime: z.string() });
+export const InviteResendResponseSchema = z.object({ expiresAt: z.string().optional(), inviteId: z.string().optional(), inviteToken: z.string().optional() });
 export const TaxPartSchema = z.object({ amountMinor: z.number().int().optional(), ratePercent: z.number().optional(), type: z.string().optional() });
 export const LineItemResponseSchema = z.object({ category: z.string().optional(), chargeCode: z.string().optional(), chargeName: z.string().optional(), lineTotal: z.number().optional(), listUnitPrice: z.number().optional(), overrideReason: z.string().optional(), quantity: z.number().int().optional(), taxRatePercent: z.number().optional(), taxableMinor: z.number().int().optional(), taxes: z.array(TaxPartSchema).optional(), tier: z.string().optional(), unitPrice: z.number().optional() });
 export const PaymentResponseSchema = z.object({ amount: z.number().optional(), id: z.string().optional(), idempotencyKey: z.string().optional(), method: z.string().optional(), recordedAt: z.string().optional() });
@@ -365,14 +366,16 @@ export const SessionActionRequestSchema = z.object({ reasonCode: z.string().opti
 export const SessionAvailabilitySchema = z.object({ expectedRange: z.string().optional(), id: z.string().optional(), label: z.string().optional(), mode: z.string().optional(), onlineLeft: z.number().int().optional(), slots: z.array(z.string()).optional(), tokensLeft: z.number().int().optional() });
 export const SessionAvailabilityResponseSchema = z.object({ sessions: z.array(SessionAvailabilitySchema).optional() });
 export const SessionResponseSchema = z.object({ current: z.boolean().optional(), device: z.string().optional(), id: z.string().optional(), ip: z.string().optional(), lastSeenAt: z.string().optional() });
-export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().optional(), skippedAt: z.string().optional(), status: z.string().optional(), step: z.string().optional() });
+export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().optional(), draft: JsonNodeSchema.optional(), skippedAt: z.string().optional(), status: z.string().optional(), step: z.string().optional(), updatedAt: z.string().optional(), version: z.number().int().optional() });
+export const SetupDraftRequestSchema = z.object({ draft: JsonNodeSchema, version: z.number().int().gte(0) });
+export const SetupDraftResponseSchema = z.object({ step: z.string().optional(), version: z.number().int().optional() });
 export const SourceBreakdownResponseSchema = z.object({ revenue: z.number().optional(), source: z.string().optional(), untaggedCount: z.number().int().optional(), visitCount: z.number().int().optional() });
 export const SseEmitterSchema = z.object({ timeout: z.number().int().optional() });
 export const StaffHprSchema = z.object({ hprId: z.string().optional(), hprVerified: z.boolean().optional(), staffId: z.string().optional() });
 export const StaffHprRequestSchema = z.object({ hprId: z.string().min(1) });
 export const StaffInviteRequestSchema = z.object({ departmentId: z.string().optional(), email: z.string().min(1), mobilePhone: z.string().min(1), name: z.string().min(1), roleId: z.string(), scope: z.string().optional() });
 export const StaffResponseSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), email: z.string().optional(), emailVerified: z.boolean().optional(), fieldGrants: z.array(z.string()).optional(), id: z.string().optional(), lastSeenAt: z.string().optional(), loginFactors: z.array(z.string()).optional(), loginMethod: z.string().optional(), mobilePhone: z.string().optional(), mobileVerified: z.boolean().optional(), name: z.string().optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional(), status: z.string().optional() });
-export const StaffInviteResponseSchema = z.object({ inviteToken: z.string().optional(), staff: StaffResponseSchema.optional() });
+export const StaffInviteResponseSchema = z.object({ expiresAt: z.string().optional(), inviteId: z.string().optional(), inviteToken: z.string().optional(), staff: StaffResponseSchema.optional() });
 export const StaffPageSchema = z.object({ data: z.array(StaffResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const StaffPatchRequestSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), fieldGrants: z.array(z.string()).optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional() });
 export const StaffPerformanceResponseSchema = z.object({ collected: z.number().optional(), discountCount: z.number().int().optional(), handledCount: z.number().int().optional(), overrideCount: z.number().int().optional(), paymentCount: z.number().int().optional(), staffId: z.string().optional(), staffName: z.string().optional() });
@@ -740,6 +743,7 @@ export const operationSchemas = {
   TaxHeadController_setTax: { body: RequestSchema, response: ResponseSchema },
   SetupController_checklist: { response: z.array(SetupChecklistItemResponseSchema) },
   SetupController_completeStep: {  },
+  SetupDraftController_save: { body: SetupDraftRequestSchema, response: SetupDraftResponseSchema },
   SetupController_skipStep: {  },
   SetupController_consentContact: { response: ConsentContactResponseSchema },
   SetupController_updateConsentContact: { body: ConsentContactWriteRequestSchema, response: ConsentContactResponseSchema },
@@ -793,6 +797,8 @@ export const operationSchemas = {
   StaffLicenceController_put: { body: LicenceRequestSchema, response: LicenceResponseSchema },
   StaffLicenceController_override: { body: OverrideRequestSchema, response: LicenceResponseSchema },
   StaffHprController_put: { body: StaffHprRequestSchema, response: StaffHprSchema },
+  StaffAccessController_resend: { response: InviteResendResponseSchema },
+  StaffAccessController_remind: {  },
   StaffController_resetMfa: { body: MfaResetRequestSchema },
   StaffController_suspend: {  },
   SupportAccessOwnerController_list: { response: OwnerRequestResponseSchema },

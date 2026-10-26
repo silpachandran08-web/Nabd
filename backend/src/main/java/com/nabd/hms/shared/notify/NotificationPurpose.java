@@ -13,7 +13,9 @@ public enum NotificationPurpose {
     DELAY_NOTICE("delay_notice", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
-    EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-018: owner asks a staff member to finish authenticator enrolment (staff recipient, no params). */
+    MFA_ENROL_REMINDER("mfa_enrol_reminder", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS);
 
     private final String code;
     private final ConsentClass consentClass;

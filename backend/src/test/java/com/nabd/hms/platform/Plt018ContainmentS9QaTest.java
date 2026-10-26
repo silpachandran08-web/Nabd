@@ -26,10 +26,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class Plt018ContainmentS9QaTest extends ApiTestBase {
 
     private static final List<String> WIDENED_READ = List.of("patients", "doctor_working_hours", "doctor_leave", "appointments", "queue_entries",
-            "consents", "patient_merges", "clinical_notes", "clinic_setup_progress", "charge_catalogue", "clinic_policies", "clinic_holidays",
+            "consents", "patient_merges", "clinical_notes", "charge_catalogue", "clinic_policies", "clinic_holidays",
             "staff_shifts", "attendance_records", "licence_registry", "data_import_jobs", "data_export_jobs",
             "day_closes", "day_close_events"); // FIN-005 (S12): ADR-07 widened read on purpose
-    private static final List<String> NEVER_WIDE = List.of("roles", "staff", "sessions");
+    private static final List<String> NEVER_WIDE = List.of("roles", "staff", "sessions", "clinic_setup_progress"); // ADM-007 (S6): the wizard is per clinic, no sibling read
 
     private record Pair(SeededTenant a, SeededTenant b) {}
 
@@ -174,6 +174,9 @@ class Plt018ContainmentS9QaTest extends ApiTestBase {
         seedStaff(p.b(), roleOf(p.b()), "qa18s-b@a.com", "+919400300010", false);
         SeededStaff sa = seedStaff(p.a(), roleOf(p.a()), "qa18s-a@a.com", "+919400300011", false);
         loginAndGetAccessToken(sa);
+        for (var t : List.of(p.a(), p.b())) { // the wizard progress table has no rows until a clinic opens setup
+            inTenantTx(t.id(), () -> jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, 'profile', 'pending') ON CONFLICT DO NOTHING", t.id()));
+        }
         for (String table : NEVER_WIDE) {
             assertThat(inTenantTx(p.a().id(), () -> jdbc.queryForList("SELECT DISTINCT tenant_id FROM " + table, UUID.class))).as(table).containsOnly(p.a().id());
         }

@@ -9,7 +9,7 @@ final class SetupModels {
     private SetupModels() {
     }
 
-    record SetupProgressRow(UUID id, String step, String status, Instant skippedAt, Instant doneAt) {
+    record SetupProgressRow(UUID id, String step, String status, Instant skippedAt, Instant doneAt, String draftJson, int version, Instant updatedAt) {
     }
 
     record TenantProfileRow(UUID id, String name, String region, String timezone,

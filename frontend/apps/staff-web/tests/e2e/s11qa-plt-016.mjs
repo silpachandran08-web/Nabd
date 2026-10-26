@@ -26,6 +26,7 @@ async function open(perms, extra, o = {}, viewport) {
   await seedClinic(s.page, perms, extra);
   await mockApi(s.page, s.log, handlers(o));
   await s.page.goto(`${APP}/staff`, { waitUntil: 'networkidle' });
+  await s.page.getByRole('tab', { name: 'Roles & permissions' }).click().catch(() => {}); // ADM-018: presets moved to their own tab
   return s;
 }
 const errs = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|clinic-timezone-fallback|was preloaded using link preload/.test(x))];

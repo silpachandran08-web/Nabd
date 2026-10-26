@@ -80,7 +80,10 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public List<SetupChecklistItemResponse> getChecklist(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listProgress(tenantId).stream().map(this::toChecklistItem).toList();
+        List<SetupProgressRow> rows = repo.listProgress(tenantId);
+        // ADM-007: the first pending step is the one the owner is on
+        String current = rows.stream().filter(r -> "pending".equals(r.status())).map(SetupProgressRow::step).findFirst().orElse(null);
+        return rows.stream().map(r -> toChecklistItem(r, r.step().equals(current))).toList();
     }
 
     /** status is 'skipped' or 'done', always derived from which endpoint the controller called —
@@ -89,6 +92,14 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     public void updateProgress(UUID tenantId, String step, String status) {
         tenantContext.set(tenantId);
         validateStep(step);
+        if (SetupSteps.DPA.equals(step)) { // ADM-007: never skipped; done only once a DPA is on file
+            if ("skipped".equals(status)) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "step-invalid", "STEP_INVALID", "The data processing agreement cannot be skipped.");
+            }
+            if (!repo.hasDpaAcceptance()) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "step-invalid", "STEP_INVALID", "Accept the data processing agreement first.");
+            }
+        }
         repo.updateProgress(tenantId, step, status);
         if ("go_live".equals(step) && "done".equals(status)) {
             repo.markSetupCompleted(tenantId);
@@ -358,16 +369,18 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     }
 
     private void validateStep(String step) {
-        List<String> valid = List.of("welcome", "profile", "tax", "doctors", "departments", "schedule", "charges", "pharmacy", "whatsapp", "go_live");
-        if (!valid.contains(step)) {
+        if (!SetupSteps.ALL.contains(step)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-step", "Invalid wizard step", "Invalid wizard step: " + step);
         }
     }
 
     // ── Mappers ──
 
-    private SetupChecklistItemResponse toChecklistItem(SetupProgressRow row) {
-        return new SetupChecklistItemResponse(row.step(), row.status(), row.skippedAt(), row.doneAt());
+    private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.json.JsonMapper();
+
+    private SetupChecklistItemResponse toChecklistItem(SetupProgressRow row, boolean current) {
+        return new SetupChecklistItemResponse(row.step(), current ? "current" : row.status(), row.skippedAt(), row.doneAt(),
+                JSON.readTree(row.draftJson()), row.version(), row.updatedAt());
     }
 
     private ClinicProfileResponse toProfileResponse(TenantProfileRow row) {

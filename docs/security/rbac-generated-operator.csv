@@ -297,6 +297,8 @@ super_admin,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 super_admin,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 super_admin,POST /v1/staff,staff:create,deny-401
 super_admin,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+super_admin,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+super_admin,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 super_admin,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 super_admin,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 super_admin,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -312,6 +314,7 @@ super_admin,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,allow
 super_admin,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,allow
 super_admin,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 super_admin,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+super_admin,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 super_admin,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 super_admin,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 super_admin,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
@@ -611,6 +614,8 @@ implementation,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 implementation,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 implementation,POST /v1/staff,staff:create,deny-401
 implementation,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+implementation,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+implementation,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 implementation,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 implementation,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 implementation,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -626,6 +631,7 @@ implementation,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 implementation,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 implementation,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 implementation,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+implementation,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 implementation,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 implementation,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 implementation,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
@@ -925,6 +931,8 @@ support_engineer,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 support_engineer,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 support_engineer,POST /v1/staff,staff:create,deny-401
 support_engineer,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+support_engineer,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+support_engineer,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 support_engineer,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 support_engineer,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 support_engineer,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -940,6 +948,7 @@ support_engineer,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-4
 support_engineer,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 support_engineer,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 support_engineer,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+support_engineer,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 support_engineer,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 support_engineer,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 support_engineer,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
@@ -1239,6 +1248,8 @@ billing,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 billing,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 billing,POST /v1/staff,staff:create,deny-401
 billing,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+billing,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+billing,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 billing,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 billing,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 billing,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -1254,6 +1265,7 @@ billing,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 billing,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 billing,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 billing,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+billing,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 billing,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 billing,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 billing,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
@@ -1553,6 +1565,8 @@ sre,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 sre,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 sre,POST /v1/staff,staff:create,deny-401
 sre,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+sre,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+sre,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 sre,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 sre,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 sre,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -1568,6 +1582,7 @@ sre,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 sre,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 sre,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 sre,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+sre,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 sre,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 sre,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 sre,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
@@ -1867,6 +1882,8 @@ commercial,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 commercial,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 commercial,POST /v1/staff,staff:create,deny-401
 commercial,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+commercial,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+commercial,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 commercial,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 commercial,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 commercial,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -1882,6 +1899,7 @@ commercial,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 commercial,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 commercial,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 commercial,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+commercial,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 commercial,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 commercial,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 commercial,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
@@ -2181,6 +2199,8 @@ compliance_dpo,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
 compliance_dpo,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 compliance_dpo,POST /v1/staff,staff:create,deny-401
 compliance_dpo,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
+compliance_dpo,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
+compliance_dpo,POST /v1/staff/{id}/mfa/remind,staff:edit,deny-401
 compliance_dpo,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-401
 compliance_dpo,POST /v1/staff/{id}/suspend,staff:delete,deny-401
 compliance_dpo,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-401
@@ -2196,6 +2216,7 @@ compliance_dpo,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 compliance_dpo,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 compliance_dpo,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 compliance_dpo,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
+compliance_dpo,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-401
 compliance_dpo,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 compliance_dpo,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
 compliance_dpo,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
