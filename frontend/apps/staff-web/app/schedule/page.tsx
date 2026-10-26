@@ -11,6 +11,7 @@ import { can } from "../lib/permissions";
 import { CancelAppointmentDialog, MoveAppointmentDialog } from "./AppointmentActions";
 import LiveQueueBoard from "./LiveQueueBoard";
 import WaitlistPanel from "./WaitlistPanel";
+import EtaDisplayPanel from "./EtaDisplayPanel";
 import Icon from "../components/ui/Icon";
 import { hijriLabel } from "../lib/hijri";
 import { ApiError } from "../lib/api";
@@ -87,6 +88,7 @@ export default function SchedulePage() {
   const [visitFilter, setVisitFilter] = useState<"all" | Booking["visitType"]>("all");
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [etaOpen, setEtaOpen] = useState(false); // ACC-018
   const closeDialog = useCallback(() => setDialog(null), []);
   const closeWaitlist = useCallback(() => setWaitlistOpen(false), []);
   // Booking needs queue:create (POST /appointments) and patient search needs patients:view.
@@ -191,6 +193,9 @@ export default function SchedulePage() {
         <button type="button" className={mode === "week" ? styles.tbBtnOn : styles.tbBtn} onClick={() => setMode(mode === "day" ? "week" : "day")}>
           {mode === "day" ? "Week overview" : "Day view"}
         </button>
+        {mounted && can("setup:edit") && day && day.doctors.length > 0 && (
+          <button type="button" className={styles.tbBtn} onClick={() => setEtaOpen(true)}>Patient wait display</button>
+        )}
         {canEdit && (
           <button type="button" className={styles.tbBtn} onClick={() => setWaitlistOpen(true)}>
             <Icon name="list" size={14} /> Waitlist
@@ -309,6 +314,7 @@ export default function SchedulePage() {
           ? <CancelAppointmentDialog target={target} onClose={closeDialog} onDone={done} />
           : <MoveAppointmentDialog target={target} timezone={day.timezone} initialDate={day.date} onClose={closeDialog} onDone={done} />;
       })()}
+      {etaOpen && day && <EtaDisplayPanel doctors={day.doctors.map((d) => ({ id: d.id, name: d.name }))} onClose={() => setEtaOpen(false)} />}
       {waitlistOpen && day && (
         <WaitlistPanel doctors={day.doctors} timezone={day.timezone} canJoin={canBook}
           onClose={closeWaitlist} onBooked={() => void load()} />
