@@ -157,6 +157,8 @@ button:active {
 
 .srOnly {
   position: absolute;
+  /* Pin the inline start: an auto-offset abs-pos child of a table cell inside an overflow:auto wrapper keeps its (scrolled-out) static x and widens the document. */
+  inset-inline-start: 0;
   width: 1px;
   height: 1px;
   clip: rect(0 0 0 0);
