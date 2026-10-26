@@ -179,8 +179,7 @@ class Artefacts(unittest.TestCase):
 
     def test_scanners_fail_the_pr_on_high_critical(self):
         t = R(".github/workflows/ci.yml")
-        self.assertRegex(t, r"severity:\s*HIGH,CRITICAL")
-        self.assertIn('exit-code: "1"', t)
+        self.assertIn("./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1", t)  # trivy CLI (install-trivy.sh), not trivy-action
         self.assertIn("--failOnCVSS 7", t)
         self.assertIn("--severity ERROR --error", t)
         self.assertIn("--audit-level=high", t)

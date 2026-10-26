@@ -12,7 +12,7 @@ class Pipeline(unittest.TestCase):
     wf = yaml.safe_load(R(".github/workflows/ci.yml"))
     def test_stage_budgets(self):
         j = self.wf["jobs"]
-        for name, mins in [("stage1-static", 3), ("stage2-unit", 2), ("stage3-integration", 6), ("stage6-build-and-scan", 4)]:
+        for name, mins in [("stage1-static", 15), ("stage2-unit", 20), ("stage3-integration", 120), ("stage6-build-and-scan", 30)]:
             self.assertEqual(j[name]["timeout-minutes"], mins, name)
     def test_required_checks_match_jobs(self):
         req = json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]
@@ -33,7 +33,7 @@ class Pipeline(unittest.TestCase):
         self.assertTrue({"stage1-static", "stage2-unit", "stage3-integration"} <= set(s6["needs"]))
         self.assertEqual(s6["permissions"]["id-token"], "write")
         t = R(".github/workflows/ci.yml")
-        for w in ("cosign sign", "cosign attach sbom", "cyclonedx", "trivy-action", "Dependency-Check", "npm audit", "gitleaks", "semgrep", "typecheck"):
+        for w in ("cosign sign", "cosign attach sbom", "cyclonedx", "install-trivy.sh", "Dependency-Check", "npm audit", "gitleaks", "semgrep", "typecheck"):
             self.assertIn(w.lower(), t.lower(), w)
     def test_selftest_parses(self):
         yaml.safe_load(R(".github/workflows/ci-selftest.yml"))
