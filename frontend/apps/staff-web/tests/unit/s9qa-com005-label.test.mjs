@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { eventLabel } from "../../app/packages/eventLabel.ts";
+import { eventLabel } from "../../app/(clinic)/packages/eventLabel.ts";
 
 test("expiry_warning_sent maps to 'Marked as reminded (N-day)' for 30/14/7 and legacy notes", () => {
   assert.equal(eventLabel("expiry_warning_sent", "30-day: recorded only, no message sent"), "Marked as reminded (30-day)");

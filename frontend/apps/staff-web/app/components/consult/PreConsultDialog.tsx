@@ -64,7 +64,7 @@ export default function PreConsultDialog({
         <section className={s.card} aria-label="Previous medicines">
           <h3 className={s.cardTitle}>Previous medicines</h3>
           <MedicinesList prescriptions={ctx.prescriptions} onRetry={reload} />
-          <p className={s.muted} style={{ marginBlockStart: "var(--nb-space-8)" }}>Whether the last prescription was bought can&apos;t be recorded here yet.</p>
+          <p className={`${s.muted} ${s.mtS}`}>Whether the last prescription was bought can&apos;t be recorded here yet.</p>
         </section>
 
         {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert">{error}</div>}

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { mfaBadge } = await import("../../app/staff/mfaStatus.ts");
+const { mfaBadge } = await import("../../app/(clinic)/staff/mfaStatus.ts");
 
 test("enrolled staff show TOTP", () => {
   assert.deepEqual(mfaBadge({ loginMethod: "authenticator", loginFactors: ["pin", "authenticator"] }), { label: "TOTP", tone: "ok" });

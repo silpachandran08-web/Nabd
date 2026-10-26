@@ -25,13 +25,13 @@ const rd = ratio(tok('text-disabled'), tok('surface-1'));
 check(`T2 disabled ${tok('text-disabled')} on surface-1 >= 3`, rd >= 3, rd.toFixed(2));
 
 // ---- 2. no font-size < 12px in the reception-screen styles (print blocks excluded)
-const SCOPE = ['app/clinicNav.module.css', 'app/topBar.module.css', 'app/schedule/schedule.module.css', 'app/patients/patients.module.css', 'app/components/arrivals/arrivals.module.css',
-  'app/billing/billing.module.css', 'app/checkout/checkout.module.css', 'app/components/ui/ui.module.css', 'app/components/arrivals/checkin.module.css'];
+const SCOPE = ['app/clinicNav.module.css', 'app/topBar.module.css', 'app/(clinic)/schedule/schedule.module.css', 'app/(clinic)/patients/patients.module.css', 'app/components/arrivals/arrivals.module.css',
+  'app/(clinic)/billing/billing.module.css', 'app/(clinic)/checkout/checkout.module.css', 'app/components/ui/ui.module.css', 'app/components/arrivals/checkin.module.css'];
 const stripPrint = (s) => { let out = '', i = 0; for (;;) { const j = s.indexOf('@media print', i); if (j < 0) return out + s.slice(i); out += s.slice(i, j); let d = 0, k = s.indexOf('{', j); for (; k < s.length; k++) { if (s[k] === '{') d++; else if (s[k] === '}' && --d === 0) break; } i = k + 1; } };
 const small = [];
 for (const f of SCOPE) for (const m of stripPrint(readFileSync(join(ROOT, f), 'utf8')).matchAll(/font-size:\s*([\d.]+)px/g)) if (+m[1] < 12) small.push(`${f}:${m[1]}px`);
 check('T3 no font-size < 12px in reception CSS modules', small.length === 0, small.join(', '));
-check('T3b patients/page.tsx has no inline fontSize < 12px', !/fontSize:\s*"(\d|1[01])(\.\d+)?px"/.test(readFileSync(join(ROOT, 'app/patients/page.tsx'), 'utf8')));
+check('T3b patients/page.tsx has no inline fontSize < 12px', !/fontSize:\s*"(\d|1[01])(\.\d+)?px"/.test(readFileSync(join(ROOT, 'app/(clinic)/patients/page.tsx'), 'utf8')));
 
 // ---- 3. browser
 const axeSrc = readFileSync(join(ROOT, 'node_modules/axe-core/axe.min.js'), 'utf8');

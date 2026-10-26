@@ -4509,6 +4509,7 @@ paths:
                 route: { type: string, maxLength: 200, description: "Path only; query string and fragment are cut" }
                 message: { type: string, maxLength: 500, description: Accepted, never stored or logged }
                 stackHash: { type: string, maxLength: 64 }
+                release: { type: string, maxLength: 64, description: "Web build id (FEF-029 error-boundary reports); optional" }
       responses:
         "202": { description: Accepted }
         "400": { description: Invalid report }

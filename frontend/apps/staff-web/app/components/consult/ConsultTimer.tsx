@@ -82,7 +82,7 @@ function TimerInner({ entryId, ended }: { entryId: string; ended: boolean }) {
       <span className={`${s.time} ${overBox ? s.timeOver : ""}`} role="timer" aria-live="off">
         {fmt(over)}{boxMs > 0 ? ` / ${st.extendedMin} min` : ""}
       </span>
-      {done ? <span className={s.timerNote} style={{ flexBasis: "auto" }}>Ended</span> : paused ? <span className={s.timerNote} style={{ flexBasis: "auto" }}>Paused</span> : overBox ? <span className={s.timerNote} style={{ flexBasis: "auto" }}>Over your time box</span> : null}
+      {done ? <span className={`${s.timerNote} ${s.timerNoteInline}`}>Ended</span> : paused ? <span className={`${s.timerNote} ${s.timerNoteInline}`}>Paused</span> : overBox ? <span className={`${s.timerNote} ${s.timerNoteInline}`}>Over your time box</span> : null}
       {!done && (
         <>
           <button type="button" className={s.timerBtn} onClick={pauseResume}>{paused ? "Resume" : "Pause"}</button>

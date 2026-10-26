@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { SHELL_SKIP_PREFIXES } from "./session";
 
 export * from "./entitlementRules";
 import type { Entitlements } from "./entitlementRules";
@@ -20,14 +19,12 @@ function load(): Promise<Entitlements | null> {
   return inflight;
 }
 
-export function useEntitlements(pathname: string | null): Entitlements | null {
+export function useEntitlements(): Entitlements | null {
   const [ent, setEnt] = useState<Entitlements | null>(null);
-  const skip = !!pathname && SHELL_SKIP_PREFIXES.some((p) => pathname.startsWith(p));
   useEffect(() => {
-    if (skip) return;
     let cancelled = false;
     void load().then((e) => { if (!cancelled && e) setEnt(e); });
     return () => { cancelled = true; };
-  }, [skip]);
+  }, []);
   return ent;
 }

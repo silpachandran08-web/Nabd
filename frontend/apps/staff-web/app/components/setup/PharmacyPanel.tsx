@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 import ph from "./pharmacy.module.css";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";

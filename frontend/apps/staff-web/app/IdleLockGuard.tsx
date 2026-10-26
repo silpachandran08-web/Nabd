@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { lockedMessage } from "./lib/pinPolicy";
 import { refreshSession, unlockMessage } from "./lib/apiClient";
-import { SHELL_SKIP_PREFIXES, signOut as endSession } from "./lib/session";
+import { signOut as endSession } from "./lib/session";
 import { clampIdleMinutes, idlePhase, IDLE_POLICY_KEY, onLockMessage, persistLock, persistUnlock, readLockedAt } from "./lib/idleLock";
 
 // NB-044 / FEF-005: shared clinic workstations auto-lock after inactivity (clinic setting
@@ -15,7 +15,6 @@ import { clampIdleMinutes, idlePhase, IDLE_POLICY_KEY, onLockMessage, persistLoc
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function IdleLockGuard({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
   const [booted, setBooted] = useState(false);
   const [released, setReleased] = useState(false); // false = opened locked: render no page until unlocked
@@ -30,7 +29,6 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
   const lockedRef = useRef(false);
   const dialogRef = useRef<HTMLFormElement>(null);
 
-  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const hasToken = () => !!localStorage.getItem("nabd_access_token");
 
   function applyLock(on: boolean) {
@@ -40,18 +38,17 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
   }
 
   useEffect(() => {
-    if (skip) return;
     // A lock left behind by a session that no longer has a token must not trap the next login.
     const on = hasToken() && readLockedAt() !== null;
     if (!on && readLockedAt() !== null) persistUnlock();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     applyLock(on); setBooted(true);
     return onLockMessage((l) => { if (!l || hasToken()) applyLock(l); });
-  }, [skip]);
+  }, []);
 
   // Clinic idle timeout (setup:view only; anyone who cannot read it keeps the 5 min default).
   useEffect(() => {
-    if (skip || !hasToken()) return;
+    if (!hasToken()) return;
     fetch(`${API_BASE}/setup/policies`, { headers: { Authorization: `Bearer ${localStorage.getItem("nabd_access_token")}` } })
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: { policyKey: string; value: string }[]) => {
@@ -59,10 +56,9 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
         setTimeoutMs(clampIdleMinutes(row?.value) * 60_000);
       })
       .catch(() => {});
-  }, [skip]);
+  }, []);
 
   useEffect(() => {
-    if (skip) return;
     lastRef.current = Date.now();
     const bump = () => { if (!lockedRef.current) { lastRef.current = Date.now(); setWarn(null); } };
     const onKey = (e: KeyboardEvent) => {
@@ -89,7 +85,7 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
       window.removeEventListener("keydown", onKey);
       clearInterval(tick);
     };
-  }, [skip, timeoutMs]);
+  }, [timeoutMs]);
 
   async function unlock(e: React.FormEvent) {
     e.preventDefault();
@@ -148,7 +144,6 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
-  if (skip) return <>{children}</>;
   return (
     <>
       <div id="app-root" style={{ display: "contents" }} inert={locked}>{booted && (released || !locked) ? children : null}</div>

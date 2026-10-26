@@ -141,13 +141,13 @@ export default function FollowUpPanel({
         ))}
       </div>
       {interval === "custom" && (
-        <div className={s.row} style={{ marginBlockStart: "var(--nb-space-8)" }}>
+        <div className={`${s.row} ${s.mtS}`}>
           <label className={s.muted} htmlFor="fuDate">Date</label>
           <input id="fuDate" type="date" className={s.input} value={date} min={clinicToday(tz)} onChange={(e) => setDate(e.target.value)} />
         </div>
       )}
       {date && (
-        <div style={{ marginBlockStart: "var(--nb-space-12)" }}>
+        <div className={s.mtM}>
           <p className={s.muted}>Free slots on {date}{tz?.includes("/") ? ` (${tz.split("/")[1].replace("_", " ")} time)` : ""}</p>
           {slots === null ? <Skeleton rows={1} label="Loading slots" /> : slots.length === 0 ? (
             <p className={s.muted}>{slotsError ? "Couldn't load free slots. Pick the date again to retry." : "No free slots that day. Try another interval."}</p>
@@ -160,14 +160,14 @@ export default function FollowUpPanel({
               ))}
             </div>
           )}
-          <div className={s.row} style={{ marginBlockStart: "var(--nb-space-12)" }}>
+          <div className={`${s.row} ${s.mtM}`}>
             <button type="button" className={s.btnPrimary} onClick={book} disabled={busy || !slot}>{busy ? "Booking…" : "Book follow-up"}</button>
           </div>
         </div>
       )}
-      {message && <div className={`${s.notice} ${s.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-8)" }}>{message}</div>}
+      {message && <div className={`${s.notice} ${s.noticeDanger} ${s.mtS}`} role="alert">{message}</div>}
       </>)}
-      <p className={s.muted} style={{ marginBlockStart: "var(--nb-space-8)" }}>
+      <p className={`${s.muted} ${s.mtS}`}>
         Reminder: not available yet. No WhatsApp reminder or booking link is sent; the follow-up appears on the schedule and in Follow-ups.
       </p>
     </section>

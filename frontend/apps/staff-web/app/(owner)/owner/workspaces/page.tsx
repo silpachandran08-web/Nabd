@@ -1,0 +1,210 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import styles from "./workspaces.module.css";
+import StatusPill, { type PillTone } from "../../../components/ui/StatusPill";
+import { ErrorState, Skeleton } from "../../../components/ui/StateViews";
+import { decodeAccessToken, regionLabel, signOut as endClinicSession } from "../../../lib/session";
+import { storeTokens } from "../../../lib/apiClient";
+import { COOKIE_AUTH } from "../../../lib/bffShim";
+import { publicApi, ApiError, reasonText } from "../../../lib/api";
+
+// Matches GET /v1/owners/me/workspaces and POST /v1/owners/workspaces/select (OwnerController).
+type Clinic = { id: string; name: string; slug: string; region: string; status: string };
+type Brand = { id: string; name: string; status: string; clinics: Clinic[] };
+type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
+
+const STATUS_TONE: Record<string, PillTone> = {
+  active: "ok", trialing: "info", provisioning: "sync", overdue: "warn", suspended: "danger", offboarding: "warn", offboarded: "neutral",
+};
+const statusLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+
+// "Last opened" is per device (there is no server-side history): remembered on a successful Enter.
+const LAST_CLINIC_KEY = "nabd_owner_last_clinic";
+type LastOpened = { id: string; at: string };
+function readLastOpened(): LastOpened | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_CLINIC_KEY) ?? "null");
+    return v && typeof v.id === "string" && typeof v.at === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The clinic session already open in this browser (owner entered it earlier), if any. */
+function currentClinicSession(): { tenantId: string; tenantName: string } | null {
+  const token = localStorage.getItem("nabd_access_token");
+  const claims = token ? decodeAccessToken(token) : null;
+  if (!claims?.owner || !claims.tenantId || !claims.exp || claims.exp * 1000 <= Date.now()) return null;
+  return { tenantId: claims.tenantId, tenantName: claims.tenantName ?? "your clinic" };
+}
+
+export default function OwnerWorkspacesPage() {
+  const router = useRouter();
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [openSession, setOpenSession] = useState<{ tenantId: string; tenantName: string } | null>(null);
+  const [lastOpened, setLastOpened] = useState<LastOpened | null>(null);
+  // Only a session for one of THIS owner's clinics counts as "current"; a leftover session from
+  // another account on a shared browser is ignored (and ended if this owner enters a clinic).
+  const current = openSession && brands.some((b) => b.clinics.some((c) => c.id === openSession.tenantId)) ? openSession : null;
+
+  const pendingToken = useCallback(() => sessionStorage.getItem("nabd_owner_pending_token"), []);
+
+  const load = useCallback(async () => {
+    setError(null);
+    const token = pendingToken();
+    if (!token) {
+      router.replace("/owner/login");
+      return;
+    }
+    setError(null);
+    try {
+      // The pending owner token is not a clinic session: it rides on the public client, per call.
+      const body = await publicApi.get<{ brands: Brand[] }>("/owners/me/workspaces", { headers: { Authorization: `Bearer ${token}` }, keepSession: true });
+      setBrands(body.brands);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        sessionStorage.removeItem("nabd_owner_pending_token");
+        router.replace("/owner/login");
+        return;
+      }
+      setError(e instanceof ApiError && e.status < 500 ? "Couldn't load your clinics. Try again." : reasonText(e, ""));
+    } finally {
+      setLoading(false);
+    }
+  }, [pendingToken, router]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      setOpenSession(currentClinicSession());
+      setLastOpened(readLastOpened());
+      return load();
+    });
+  }, [load]);
+
+  async function selectClinic(clinicId: string) {
+    // Already inside this clinic: go back to it rather than minting a second session.
+    if (current?.tenantId === clinicId) {
+      router.push("/overview");
+      return;
+    }
+    const token = pendingToken();
+    if (!token) {
+      router.replace("/owner/login");
+      return;
+    }
+    setSelectingId(clinicId);
+    setError(null);
+    try {
+      // FEF-009: one cookie session per browser, so the old clinic's session ends before the new one replaces it.
+      if (COOKIE_AUTH) await endClinicSession();
+      const pair = await publicApi.post<TokenPair>("/owners/workspaces/select", { clinicId }, { headers: { Authorization: `Bearer ${token}` }, keepSession: true });
+      // Switching from another clinic: end that clinic's session server-side first (best effort).
+      if (!COOKIE_AUTH) await endClinicSession();
+      storeTokens(pair);
+      try { localStorage.setItem(LAST_CLINIC_KEY, JSON.stringify({ id: clinicId, at: new Date().toISOString() })); } catch { /* storage full/blocked: not needed to continue */ }
+      // Unlike staff PIN login (lib/session's landingPathFor, which guesses a home page from
+      // permissions), this caller already knows the identity entering the clinic — the tenant
+      // owner — so it goes straight to the owner's Overview instead of matching queue:view first.
+      router.replace("/overview");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        sessionStorage.removeItem("nabd_owner_pending_token");
+        router.replace("/owner/login");
+        return;
+      }
+      setError(reasonText(e, "Couldn't enter that clinic."));
+    } finally {
+      setSelectingId(null);
+    }
+  }
+
+  async function signOut() {
+    sessionStorage.removeItem("nabd_owner_pending_token");
+    await endClinicSession(); // also any clinic session left open in this browser
+    router.replace("/owner/login");
+  }
+
+  if (loading) {
+    return <main className={styles.page}><Skeleton rows={4} label="Loading your clinics" /></main>;
+  }
+  if (error && brands.length === 0) {
+    return <main className={styles.page}><ErrorState message={error} onRetry={() => { setLoading(true); void load(); }} /></main>;
+  }
+
+  const q = query.trim().toLowerCase();
+  const shown = brands
+    .map((b) => ({ ...b, clinics: q ? b.clinics.filter((c) => [c.name, c.slug, c.region, b.name].some((v) => v.toLowerCase().includes(q))) : b.clinics }))
+    .filter((b) => !q || b.clinics.length > 0);
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Clinic &amp; branch</h1>
+        <p className={styles.subtitle}>Pick a clinic to open. You can come back and pick a different one anytime.</p>
+      </div>
+
+      <div className={styles.toolbar}>
+        <input type="search" className={styles.search} placeholder="Search clinics…" aria-label="Search clinics"
+          value={query} onChange={(e) => setQuery(e.target.value)} />
+        <button type="button" className={styles.signOut} onClick={() => void signOut()}>Sign out</button>
+      </div>
+
+      {current && (
+        <Link href="/overview" className={styles.backLink}>← Back to {current.tenantName}</Link>
+      )}
+
+      {error && <div className={styles.errorState} role="alert">{error}</div>}
+
+      {brands.length === 0 ? (
+        <div className={styles.state}>No clinics under your account yet.</div>
+      ) : shown.length === 0 ? (
+        <div className={styles.state}>No clinics match &ldquo;{query}&rdquo;.</div>
+      ) : (
+        shown.map((b) => (
+          <div key={b.id} className={styles.brandCard}>
+            <div className={styles.brandHead}>
+              <span className={styles.brandName}>{b.name}</span>
+              <StatusPill tone={STATUS_TONE[b.status] ?? "neutral"} label={statusLabel(b.status)} />
+            </div>
+            {b.clinics.length === 0 ? (
+              <div className={styles.state}>No clinics under this brand yet.</div>
+            ) : (
+              <ul className={styles.clinicList}>
+                {b.clinics.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      className={styles.clinicRow}
+                      disabled={selectingId !== null}
+                      onClick={() => selectClinic(c.id)}
+                    >
+                      <span>
+                        <span className={styles.clinicName}>
+                          {c.name}
+                          {current?.tenantId === c.id && <span className={styles.currentTag}>Current</span>}
+                        </span>
+                        <span className={styles.clinicMeta}>
+                          <span className={styles.regionChip}>{regionLabel(c.region)}</span>
+                          {c.slug}
+                          {lastOpened?.id === c.id && <> · Last opened here {new Date(lastOpened.at).toLocaleDateString()}</>}
+                        </span>
+                      </span>
+                      <StatusPill tone={STATUS_TONE[c.status] ?? "neutral"} label={statusLabel(c.status)} />
+                      <span className={styles.enterLabel}>{selectingId === c.id ? "Entering…" : current?.tenantId === c.id ? "Open →" : "Enter →"}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))
+      )}
+    </main>
+  );
+}

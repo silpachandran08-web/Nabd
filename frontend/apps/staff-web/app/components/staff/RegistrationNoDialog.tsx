@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
-import styles from "../../staff/staff.module.css";
+import styles from "../../(clinic)/staff/staff.module.css";
 import { api, reasonText } from "../../lib/api";
 
 // DOC-N1: edit one staff member's professional registration number (printed on signed prescriptions).

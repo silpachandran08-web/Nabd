@@ -226,7 +226,7 @@ export default function NoteTemplates({
       {favourites.length > 0 && (
         <div>
           <div className={s.title}>Favourites</div>
-          <div className={s.chips} style={{ marginBlockStart: "var(--nb-space-8)" }}>
+          <div className={`${s.chips} ${p.mtS}`}>
             {favourites.map((t) => (
               <button key={t.id} type="button" className={`${p.chip} ${p.chipOn}`} onClick={() => apply(t)}>
                 <Icon name="check" size={12} /> {t.name}

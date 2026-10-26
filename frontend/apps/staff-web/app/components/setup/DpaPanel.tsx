@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import styles from "./dpa.module.css";
-import wizard from "../../setup/wizard/wizard.module.css";
+import wizard from "../../(clinic)/setup/wizard/wizard.module.css";
 import { ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { api, reasonText } from "../../lib/api";

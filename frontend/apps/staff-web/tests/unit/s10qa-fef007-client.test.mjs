@@ -236,7 +236,7 @@ test("AC5: timeoutMs is configurable and a fast response clears the timer", asyn
 // AC3 static: the migrated flows are free of hand-rolled fetch logic ---------------------------------
 const src = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-for (const f of ["app/checkout/[queueEntryId]/page.tsx", "app/checkout/otc/page.tsx", "app/components/arrivals/CheckInDialog.tsx"]) {
+for (const f of ["app/(clinic)/checkout/[queueEntryId]/page.tsx", "app/(clinic)/checkout/otc/page.tsx", "app/components/arrivals/CheckInDialog.tsx"]) {
   test(`AC3: ${f} has no fetch(, API_BASE, hand-written Problem type or raw res.json()`, () => {
     const s = strip(src(f));
     assert.doesNotMatch(s, /\bfetch\s*\(/); assert.doesNotMatch(s, /API_BASE/); assert.doesNotMatch(s, /type Problem\b/);

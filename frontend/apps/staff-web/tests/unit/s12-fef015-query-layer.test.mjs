@@ -32,7 +32,7 @@ function effectBodies(src) {
 }
 
 for (const page of ["arrivals", "nursing"]) {
-  const src = page === "arrivals" ? arrivalsSource() : readFileSync(new URL(`../../app/${page}/page.tsx`, import.meta.url), "utf8"); // FEF-028: Arrivals is a folder
+  const src = page === "arrivals" ? arrivalsSource() : readFileSync(new URL(`../../app/(clinic)/${page}/page.tsx`, import.meta.url), "utf8"); // FEF-028: Arrivals is a folder
   test(`${page}: 0 Promise.resolve().then, 0 useEffect fetches, 0 hand-written API types`, () => {
     assert.equal((src.match(/Promise\.resolve\(\)\.then/g) ?? []).length, 0);
     const fetching = effectBodies(src).filter((b) => /\b(fetch|authedFetch|apiFetch|api\.(get|post|patch|put|delete)|load\w*)\(/.test(b));

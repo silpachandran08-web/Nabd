@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import styles from "../login/login.module.css";
+import styles from "../(auth)/login/login.module.css";
 import { publicApi, ApiError, reasonText } from "../lib/api";
 
 // PLT-005: the forced-enrolment step (owner and platform sign-in). The setup token only opens the
