@@ -38,7 +38,7 @@ class Events(unittest.TestCase):
         return run("--root", self.root, "--samples", self.samples)
 
     def test_repo_catalogue_passes_with_28_types(self):
-        r = run(); self.assertEqual(r.returncode, 0, r.stdout); self.assertIn("28 type(s), 0 problem(s)", r.stdout)
+        r = run(); self.assertEqual(r.returncode, 0, r.stdout); self.assertIn("29 type(s), 0 problem(s)", r.stdout)
 
     def test_good_sample_passes(self):
         r = self.sample(self.envelope()); self.assertEqual(r.returncode, 0, r.stdout)

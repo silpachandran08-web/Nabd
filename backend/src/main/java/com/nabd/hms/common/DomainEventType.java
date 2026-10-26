@@ -33,7 +33,8 @@ public enum DomainEventType {
     ORGANIZATION_IMPORT_COMPLETED("organization.import.completed.v1", "core/organization"),
     DRUG_MASTER_VERSION_ACTIVATED("clinical.drug_master.version_activated.v1", "core/clinical"),
     PLATFORM_ENTITLEMENTS_CHANGED("platform.entitlements.changed.v1", "core/platform"),
-    PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization");
+    PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization"),
+    ATTACHMENT_SCANNED("shared.attachment.scanned.v1", "core/shared");
 
     private final String type;
     private final String source;

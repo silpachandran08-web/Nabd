@@ -44,7 +44,7 @@ public class OpenApiConfig {
             "/internal/v1/notification-requests/*", // COM-004: service token, not a bearer
             "/internal/v1/consents:export", // COM-008: same service token
             "/v1/plans/catalogue", // ADM-034: public plan comparison
-            "/v1/public/notices/*/*", "/abdm/v3/callbacks/**"); // IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
+            "/v1/public/notices/*/*", "/abdm/v3/callbacks/**", "/files-blob/object"); // IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig); PLT-029 signed object URLs (FilesBlobSecurityConfig)
 
     private static final Pattern AUTHORITY = Pattern.compile("'([^']+)'");
     /** OPS-035: only a plain OR-chain of hasAuthority/hasAnyAuthority becomes "a | b"; any other SpEL is written verbatim. */
