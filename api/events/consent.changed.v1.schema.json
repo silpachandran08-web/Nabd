@@ -34,6 +34,17 @@
         "withdrawn"
       ]
     },
+    "noticeVersion": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,40}$",
+      "description": "IDC-004: the privacy notice version the decision was given under (absent for withdrawals and legacy rows)."
+    },
+    "guardianRef": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "IDC-004/008: the guardian patient who gave the consent for a minor."
+    },
     "version": {
       "type": "integer",
       "minimum": 1,

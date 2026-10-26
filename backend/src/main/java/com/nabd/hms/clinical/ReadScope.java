@@ -16,9 +16,7 @@ public record ReadScope(UUID tenantId, UUID staffId, UUID scopedToDoctorId, List
      * Args are SQL expressions of the enclosing query (e.g. "q.patient_id", "q.tenant_id").
      */
     public String gate(String patientIdExpr, String tenantIdExpr) {
-        String consent = "AND NOT EXISTS (SELECT 1 FROM consents rs_c WHERE rs_c.tenant_id = " + tenantIdExpr
-                + " AND rs_c.patient_id = " + patientIdExpr
-                + " AND rs_c.consent_type = 'data_processing' AND rs_c.withdrawn_at IS NOT NULL) ";
+        String consent = com.nabd.hms.patient.api.ConsentGateSql.gate(patientIdExpr, tenantIdExpr);
         if (scopedToDoctorId == null) {
             return consent;
         }

@@ -562,3 +562,10 @@
 /* OPS-008: registry infinite-scroll footer */
 .moreRow { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-12); padding-block: var(--nb-space-12); padding-inline: var(--nb-space-16); flex-wrap: wrap; }
 .moreRow .secondaryBtn { min-block-size: 44px; }
+
+/* IDC-004 consent block */
+.consentBlock { border: 1px solid var(--nb-border, #3a3f4b); border-radius: 8px; padding: 12px; margin-block: 8px; }
+.consentRow { display: flex; align-items: center; gap: 10px; min-block-size: 44px; }
+.consentRow input { inline-size: 24px; block-size: 24px; flex: none; }
+.assistedScreen { font-size: 1.6rem; line-height: 1.5; }
+.assistedScreen .consentRow { font-size: 1.4rem; min-block-size: 64px; }
