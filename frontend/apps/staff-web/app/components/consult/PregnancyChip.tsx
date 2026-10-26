@@ -77,7 +77,7 @@ export default function PregnancyChip({ patient, ctx, canEdit, authedFetch, onSa
         {meta && <span className={s.muted}> {meta}</span>}
         {part.status === "error" && <> <button type="button" className={s.linkBtn} onClick={onSaved}>Retry</button></>}
         {canEdit && authedFetch && part.status === "ok" && !open && (
-          <button style={{ marginInlineStart: "var(--nb-space-8)" }} type="button" className={`${s.linkBtn} ${s.linkBtnTouch}`} onClick={() => setOpen(true)}>{documented ? "Update" : "Record"}</button>
+          <button type="button" className={`${s.linkBtn} ${s.linkBtnTouch} ${s.msS}`} onClick={() => setOpen(true)}>{documented ? "Update" : "Record"}</button>
         )}
         {canEdit && open && (
           <fieldset className={s.pregForm}>

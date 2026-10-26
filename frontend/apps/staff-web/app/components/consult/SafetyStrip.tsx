@@ -42,7 +42,7 @@ export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onMa
     <section className={`${s.safety} ${sticky ? s.safetySticky : ""}`} aria-label="Clinical safety">
       <div className={`${s.safetyChip} ${items.length > 0 ? s.safetyAllergy : ""}`}>
         <span className={s.safetyIcon}>
-          <Icon name="alert" size={18} style={items.length > 0 ? { fill: "currentColor", fillOpacity: 0.3 } : undefined} />
+          <span className={items.length > 0 ? s.iconFilled : s.iconPlain}><Icon name="alert" size={18} /></span>
         </span>
         <span>
           <span className={s.safetyLabel}>Allergy</span>

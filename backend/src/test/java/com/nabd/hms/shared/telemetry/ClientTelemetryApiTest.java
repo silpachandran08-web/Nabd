@@ -39,6 +39,25 @@ class ClientTelemetryApiTest extends ApiTestBase {
     }
 
     @Test
+    void boundaryReportCarriesReleaseAndRefusesAnUnsafeOne() {
+        String tok = token();
+        Logger lg = (Logger) LoggerFactory.getLogger(ClientTelemetryController.class);
+        ListAppender<ILoggingEvent> ap = new ListAppender<>();
+        ap.start();
+        lg.addAppender(ap);
+        try {
+            var r = exchange("/v1/client-telemetry", HttpMethod.POST, authedJsonBody(tok, Map.of("kind", "error", "metric", "boundary.clinic.TypeError",
+                    "route", "/consult", "stackHash", "ab12cd", "release", "a1b2c3d4e5f6")), Void.class);
+            assertThat(r.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        } finally {
+            lg.detachAppender(ap);
+        }
+        assertThat(ap.list.get(0).getFormattedMessage()).contains("release=a1b2c3d4e5f6");
+        assertThat(exchange("/v1/client-telemetry", HttpMethod.POST, authedJsonBody(tok, Map.of("kind", "error", "metric", "E", "route", "/",
+                "release", "Asha Rao 9812345678")), Void.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void refusesBadKindOversizeAndAnonymous() {
         String tok = token();
         assertThat(exchange("/v1/client-telemetry", HttpMethod.POST, authedJsonBody(tok, Map.of("kind", "x", "metric", "LCP", "route", "/")), Void.class)

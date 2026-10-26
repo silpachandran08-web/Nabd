@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { weightAge, rateError, weightError } from "../../../../packages/domain/src/doseLogic.ts"; // FEF-013: moved to @nabd/domain
 
 const src = readFileSync(new URL("../../app/components/consult/DoseCalculator.tsx", import.meta.url), "utf8");
-const page = readFileSync(new URL("../../app/consult/page.tsx", import.meta.url), "utf8");
+import { consultSource } from "./consultSource.mjs"; // FEF-030: the consult screen is split over page.tsx and components/consult/**
+const page = consultSource();
 
 test("unknown or garbage recordedAt is never fresh", () => {
   for (const v of [null, undefined, "", "not-a-date"]) assert.equal(weightAge(v).state, "unknown");
@@ -41,7 +42,7 @@ test("component: Record weight action is absent (not disabled) without clinical:
 });
 
 test("consult page also hides the helper for a loaded adult patient (age >= 18)", () => {
-  assert.match(page, /!\(pat && age\(pat\.dob\) >= 18\)/);
+  assert.match(page, /!\(patient && age\(patient\.dob\) >= 18\)/);
 });
 
 test("amber token is a design token, not a hard-coded colour", () => {

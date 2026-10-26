@@ -7,7 +7,6 @@ import EntitlementsBanner from "./EntitlementsBanner";
 import { useClinicTimeZoneBoot } from "./lib/useClinicTimeZone";
 import TopBar from "./TopBar";
 import RouteChrome from "./RouteChrome";
-import "./lib/bffShim"; // FEF-009: cookie-mode fetch routing, before any screen calls Core
 
 const COLLAPSE_KEY = "nabd_sidebar_collapsed";
 

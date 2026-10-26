@@ -30,7 +30,8 @@ public class ClientTelemetryController {
                          Double value,
                          @NotBlank @Size(max = 200) String route,
                          @Size(max = 500) String message,
-                         @Size(max = 64) @Pattern(regexp = "[A-Za-z0-9]*") String stackHash) {
+                         @Size(max = 64) @Pattern(regexp = "[A-Za-z0-9]*") String stackHash,
+                         @Size(max = 64) @Pattern(regexp = "[A-Za-z0-9._-]*") String release) {
     }
 
     @PostMapping("/v1/client-telemetry")
@@ -43,7 +44,7 @@ public class ClientTelemetryController {
         String path = r.route().split("[?#]", 2)[0];
         MDC.put("reasonCode", r.kind().equals("error") ? "CLIENT_ERROR" : "CLIENT_VITAL");
         try {
-            log.info("client telemetry kind={} metric={} route={} value={} stackHash={}", r.kind(), r.metric(), path, r.value(), r.stackHash());
+            log.info("client telemetry kind={} metric={} route={} value={} stackHash={} release={}", r.kind(), r.metric(), path, r.value(), r.stackHash(), r.release());
         } finally {
             MDC.remove("reasonCode");
         }

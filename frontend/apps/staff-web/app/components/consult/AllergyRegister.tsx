@@ -54,8 +54,11 @@ export default function AllergyRegister({
   const [add, setAdd] = useState({ substance: "", severity: "", reaction: "", source: "clinician" });
   const [fixing, setFixing] = useState<{ id: string; substance: string; category: string; severity: string; reaction: string; reason: string } | null>(null);
   const [removing, setRemoving] = useState<{ id: string; reason: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // FEF-030: busy and error travel together (one state keeps this component at 10 hooks); the setters keep their old names.
+  const [op, setOp] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const { busy, error } = op;
+  const setBusy = (b: boolean) => setOp((o) => ({ ...o, busy: b }));
+  const setError = (e: string | null) => setOp((o) => ({ ...o, error: e }));
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
 

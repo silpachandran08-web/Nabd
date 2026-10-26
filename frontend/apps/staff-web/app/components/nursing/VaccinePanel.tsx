@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
-import styles from "../../nursing/nursing.module.css";
+import styles from "../../(clinic)/nursing/nursing.module.css";
 import type { QueueEntry } from "@nabd/domain";
 
 // NUR-B2. Record-only vaccine log. There is NO immunisation schedule anywhere in the product, so

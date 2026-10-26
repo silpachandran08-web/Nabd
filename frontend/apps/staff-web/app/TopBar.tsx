@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
-import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
+import { getPermissions, isOwner } from "./lib/session";
 import { can } from "./lib/permissions";
 import type { AppPermission } from "@nabd/api-client/types";
 import { useLiveStatus } from "./lib/live";
@@ -41,7 +41,6 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
   const t = useTranslations("shell");
   const pathname = usePathname();
   const router = useRouter();
-  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const [hasSession, setHasSession] = useState(false);
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(true);
@@ -49,8 +48,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHasSession(!skip && !!localStorage.getItem("nabd_access_token"));
-  }, [pathname, skip]);
+    setHasSession(!!localStorage.getItem("nabd_access_token"));
+  }, [pathname]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

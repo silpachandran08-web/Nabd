@@ -3,7 +3,7 @@
 // IDC-016: the ABDM switch. Off by default (DEC-33); turning it on verifies the facility's HFR id first.
 // The controls need setup:edit and are absent otherwise; a fresh authenticator code confirms the change.
 import { useCallback, useEffect, useState } from "react";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 import { ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { ApiError, api } from "../../lib/api";

@@ -31,9 +31,9 @@ export default function ConflictDialog({ mine, server, onResolve, onClose }: {
   return (
     <Dialog title="Note changed on the server" onClose={onClose} size="lg">
       <p className={s.muted}>Your unsaved local draft and the saved note both changed. Choose what to keep for each section; nothing is overwritten until you confirm.</p>
-      <div className={s.stack} style={{ marginBlockStart: "var(--nb-space-12)" }}>
+      <div className={`${s.stack} ${s.mtM}`}>
         {differing.map((f) => (
-          <fieldset key={f} className={s.card} style={{ margin: 0 }}>
+          <fieldset key={f} className={`${s.card} ${s.m0}`}>
             <legend className={s.cardTitle}>{NOTE_FIELD_LABEL[f]}</legend>
             <p className={s.muted}><strong>Mine (this device):</strong> {mine[f] || "(empty)"}</p>
             <p className={s.muted}><strong>Server:</strong> {server[f] || "(empty)"}</p>

@@ -32,3 +32,6 @@
   .scrim { align-items: flex-end; padding: 0; }
   .dialog, .dialog_drawer { max-width: none; height: auto; max-height: 92vh; border-radius: var(--nb-radius-lg) var(--nb-radius-lg) 0 0; }
 }
+
+/* FEF-029: route / panel error boundary */
+.routeError { padding: var(--nb-space-24, 24px); max-inline-size: 640px; margin-inline: auto; }

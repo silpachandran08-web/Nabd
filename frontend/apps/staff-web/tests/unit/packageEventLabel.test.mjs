@@ -1,7 +1,7 @@
 // COM-005: ledger label never claims a message was sent. `npm run -s test:unit`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { eventLabel } from "../../app/packages/eventLabel.ts";
+import { eventLabel } from "../../app/(clinic)/packages/eventLabel.ts";
 
 test("reminder event reads Marked as reminded with the tier", () => {
   assert.equal(eventLabel("expiry_warning_sent", "30-day: recorded only, no message sent"), "Marked as reminded (30-day)");

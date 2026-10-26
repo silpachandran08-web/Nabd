@@ -150,7 +150,7 @@ export default function VisitOutputs({
 
   return (
     <section className={p.stack} aria-label="Visit outputs">
-      <div className={p.cardTitle} style={{ marginBlockEnd: 0 }}>Visit outputs</div>
+      <div className={`${p.cardTitle} ${p.mb0}`}>Visit outputs</div>
       {docs === null && !loadError && <Skeleton rows={2} label="Loading visit outputs" />}
       {loadError && <ErrorState message="Couldn't load the documents for this visit." onRetry={() => { setDocs(null); void load(); }} />}
       {docs !== null && DOC_ORDER.map((type) => {
@@ -238,7 +238,7 @@ export default function VisitOutputs({
             <div className={p.dialogActions}>
               <button type="button" className={p.btn} onClick={() => setViewing(null)}>Close</button>
               {viewing.status === "issued" && (
-                <a className={p.btnPrimary} href={`/documents/${viewing.id}/print`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <a className={`${p.btnPrimary} ${p.noDeco}`} href={`/documents/${viewing.id}/print`} target="_blank" rel="noopener noreferrer">
                   <Icon name="list" size={14} /> Open print view
                 </a>
               )}

@@ -2,11 +2,9 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Poppins } from "next/font/google";
 import "./globals.css";
-import AppShell from "./AppShell";
-import IdleLockGuard from "./IdleLockGuard";
+import BffBoot from "./BffBoot";
 import TelemetryReporter from "./TelemetryReporter";
 import { QueryProvider } from "./lib/query";
-import { LiveProvider } from "./lib/live";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { dirOf, isLocale } from "@nabd/i18n";
@@ -38,9 +36,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <NextIntlClientProvider locale={lang} messages={messages}>
           <I18nBoot locale={lang} />
           <TelemetryReporter />
-          <IdleLockGuard>
-            <QueryProvider><LiveProvider><AppShell>{children}</AppShell></LiveProvider></QueryProvider>
-          </IdleLockGuard>
+          <BffBoot />
+          {/* FEF-029: each route group's layout adds its own shell: (clinic) nav + top bar + idle lock, the others a plain frame. */}
+          <QueryProvider>{children}</QueryProvider>
         </NextIntlClientProvider>
       </body>
     </html>

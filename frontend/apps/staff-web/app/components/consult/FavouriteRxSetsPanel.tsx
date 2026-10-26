@@ -73,7 +73,7 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
           <div className={styles.saveRow}>
             <input className={styles.field} aria-label="New set name" placeholder="Save current items as set…" value={name} maxLength={120}
               onChange={(e) => setName(e.target.value)} />
-            <select className={styles.field} style={{ flex: "0 1 180px" }} aria-label="Who can use the new set" value={scope} onChange={(e) => setScope(e.target.value as RxSetScope)}>
+            <select className={`${styles.field} ${styles.fieldScope}`} aria-label="Who can use the new set" value={scope} onChange={(e) => setScope(e.target.value as RxSetScope)}>
               <option value="mine">{SCOPE_LABEL.mine}</option>
               <option value="shared">{SCOPE_LABEL.shared}</option>
               {canStandard && <option value="standard">{SCOPE_LABEL.standard}</option>}

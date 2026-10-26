@@ -30,8 +30,11 @@ export default function DoseCalculator({
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const [weightText, setWeightText] = useState("");
-  const [weightErr, setWeightErr] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // FEF-030: the weight form's error and saving flag travel together (keeps this component at 10 hooks); the setters keep their old names.
+  const [wf, setWf] = useState<{ err: string | null; saving: boolean }>({ err: null, saving: false });
+  const { err: weightErr, saving } = wf;
+  const setWeightErr = (err: string | null) => setWf((w) => ({ ...w, err }));
+  const setSaving = (saving: boolean) => setWf((w) => ({ ...w, saving }));
   const [recorded, setRecorded] = useState(false);
 
   async function calculate(rateText = rate) {

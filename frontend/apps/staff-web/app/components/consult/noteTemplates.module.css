@@ -30,6 +30,7 @@ button.tagChip { cursor: pointer; }
 .timeOver { color: var(--nb-warn-500); }
 .timerBtn { min-height: 32px; padding: 0 var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-4); }
 .timerNote { flex-basis: 100%; margin: 0; font-size: 11px; color: var(--nb-text-tertiary); }
+.timerNoteInline { flex-basis: auto; }
 @media (pointer: coarse) { .timerBtn, .tagChip { min-height: 44px; } }
 .dxWrap { min-width: 0; }
 .fieldLabel input { inline-size: 100%; min-inline-size: 0; box-sizing: border-box; }

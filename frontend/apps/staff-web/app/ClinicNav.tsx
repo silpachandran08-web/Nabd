@@ -11,7 +11,7 @@ import { initials } from "@nabd/domain";
 import { selfStaffId } from "./lib/doctorQueries";
 import { usePermissions } from "./lib/usePermissions";
 import { navAllowed, useEntitlements } from "./lib/entitlements";
-import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 // Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
@@ -137,10 +137,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const tokenGrants = usePermissions().permissions; // FEF-019: changes when a token refresh brings a new role, so the nav follows without re-login
   const [permissions, setPermissions] = useState<string[] | null>(null);
-  const ent = useEntitlements(pathname); // PLT-059: hide modules the plan does not include
+  const ent = useEntitlements(); // PLT-059: hide modules the plan does not include
   const [owner, setOwner] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -176,23 +175,23 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // it — never read it directly during render.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPermissions(skip ? [] : getPermissions());
-    setIdentity(skip ? null : getIdentity());
-    setOwner(skip ? false : isOwner());
-  }, [pathname, skip, tokenGrants]);
+    setPermissions(getPermissions());
+    setIdentity(getIdentity());
+    setOwner(isOwner());
+  }, [pathname, tokenGrants]);
 
   // The Receptionist sidebar's count badges: today's waiting arrivals and visits sent to checkout, off
   // today's queue. FEF-015: the same query (key and request) Arrivals reads, so the two share one GET /queue.
   const perms = permissions ?? [];
-  const nurseNav = !skip && !owner && hasNursingGrant(perms);
-  const queueRows = useQuery({ ...queueQuery(), enabled: !skip && !owner && !nurseNav && !isDoctorNav(perms) && perms.includes("queue:view") }).data;
+  const nurseNav = !owner && hasNursingGrant(perms);
+  const queueRows = useQuery({ ...queueQuery(), enabled: !owner && !nurseNav && !isDoctorNav(perms) && perms.includes("queue:view") }).data;
   // The Nurse sidebar's count badges, off the same queries the nursing page itself reads: priority-flagged
   // queue entries (queue:view) and today's administration orders not yet given (nursing:view).
   const priorityRows = useQuery({ ...queueQuery(true), enabled: nurseNav && perms.includes("queue:view") }).data;
   const adminRows = useQuery({ ...adminOrdersQuery(), enabled: nurseNav && perms.includes("nursing:view") }).data;
   // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view). The JWT subject
   // is the staff id (AuthService.mintTokenPair). FEF-016: the same query My Day and the consult queue read.
-  const me = skip ? "" : selfStaffId();
+  const me = selfStaffId();
   const myDayRows = useQuery({ ...doctorQueueQuery(me), enabled: !!me && isDoctorNav(perms) && perms.includes("queue:view") }).data;
   const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isArray(rows) ? rows.filter(keep).length : undefined);
   const badges: Record<string, number | undefined> = {
@@ -211,7 +210,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
 
   // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
   useEffect(() => {
-    if (skip || !isOwner() || !getPermissions().includes("setup:view")) return;
+    if (!isOwner() || !getPermissions().includes("setup:view")) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
     const ctrl = new AbortController();
@@ -224,9 +223,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       })
       .catch(() => {});
     return () => { cancelled = true; ctrl.abort(); };
-  }, [skip]);
+  }, []);
 
-  if (skip || !permissions || permissions.length === 0) return null;
+  if (!permissions || permissions.length === 0) return null;
 
   // A Nurse's sidebar is DESIGN.md's own dedicated worklist nav, never the generic module list —
   // a staff record that also carries queue:view/patients:view (this local test account does) must

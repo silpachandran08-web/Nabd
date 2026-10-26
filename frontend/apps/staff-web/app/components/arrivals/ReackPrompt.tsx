@@ -4,7 +4,7 @@
 // prompt and one tap records the acknowledgement. Care is never blocked. Absent without patients:view; the button
 // is absent without patients:edit.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 import { can } from "../../lib/permissions";
 import { api, errorText } from "../../lib/api";
 import { getter, key } from "../../lib/query";

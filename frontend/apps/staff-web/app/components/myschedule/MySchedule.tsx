@@ -8,7 +8,7 @@ import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { WEEKDAYS, hhmm, isoDate, useDayGrid, useMySchedule, type DayCell, type Leave, type WorkingHours } from "./useMySchedule";
 import { LeaveDialog, WorkingHoursDialog } from "./ScheduleDialogs";
-import ConfirmDialog from "../../patients/ConfirmDialog";
+import ConfirmDialog from "../../(clinic)/patients/ConfirmDialog";
 import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 

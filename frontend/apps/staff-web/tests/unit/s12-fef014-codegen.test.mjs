@@ -74,7 +74,7 @@ test("AC2: a response field renamed in the spec breaks every consumer in staff-w
     const r = spawnSync(join(APP, "node_modules/.bin/tsc"), ["-p", join(dir, "tsconfig.json"), "--noEmit"], { cwd: APP, encoding: "utf8" });
     const errors = r.stdout.split("\n").filter((l) => /error TS/.test(l));
     assert.notEqual(r.status, 0, "typecheck must fail");
-    const consumers = ["app/checkout/[queueEntryId]/page.tsx", "app/checkout/otc/page.tsx"];
+    const consumers = ["app/(clinic)/checkout/[queueEntryId]/page.tsx", "app/(clinic)/checkout/otc/page.tsx"];
     for (const c of consumers) {
       const mine = errors.filter((l) => l.includes(c));
       assert.ok(mine.length > 0, `${c} must fail compilation:\n${errors.join("\n")}`);

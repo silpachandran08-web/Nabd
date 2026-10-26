@@ -3,7 +3,7 @@
 // IDC-003: the clinic's privacy notice per language. Locked (mandatory) clauses are shown greyed and cannot change; the
 // clinic edits the text around them. Publishing needs setup:edit and a fresh authenticator code. Restricted controls are absent.
 import { useCallback, useEffect, useState } from "react";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { ApiError, api } from "../../lib/api";

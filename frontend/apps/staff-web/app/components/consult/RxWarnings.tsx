@@ -110,7 +110,7 @@ export function OverrideDialog({
             </label>
           ))}
         </fieldset>
-        <label className={s.check} style={{ flexDirection: "column", gap: "var(--nb-space-4)" }}>
+        <label className={`${s.check} ${s.colGap4}`}>
           <span className={s.muted}>Note (optional)</span>
           <textarea className={s.textarea} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
         </label>
