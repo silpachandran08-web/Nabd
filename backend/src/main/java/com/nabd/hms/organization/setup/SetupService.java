@@ -172,6 +172,9 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         if ("cash_variance_tolerance".equals(policyKey) && !req.value().matches("^\\d{1,9}$")) { // FIN-005: minor units
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
         }
+        if (policyKey.startsWith("print.default_paper.") && !req.value().matches("^(a4|a5|80mm)$")) { // FEF-046
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Default paper must be a4, a5 or 80mm");
+        }
         repo.updatePolicy(tenantId, policyKey, req.value());
         log.info("policy {} updated for tenant {} by {}", policyKey, tenantId, callerStaffId);
         configChanged(tenantId, policyKey);

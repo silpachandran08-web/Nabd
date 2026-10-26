@@ -50,6 +50,9 @@ importers:
       '@nabd/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@nabd/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tanstack/react-query':
         specifier: 5.104.1
         version: 5.104.1(react@19.2.8)
@@ -146,7 +149,15 @@ importers:
 
   packages/tokens: {}
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
 
 packages:
 

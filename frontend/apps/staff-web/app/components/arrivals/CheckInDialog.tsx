@@ -8,6 +8,8 @@ import { getIdentity } from "../../lib/session";
 import { api, errorText, intentKeys } from "../../lib/api";
 import type { StaffOption, WaitEstimate } from "@nabd/api-client/types";
 import type { QueueEntry } from "@nabd/domain";
+import { PrintSheet } from "@nabd/ui";
+import { usePrintPaper } from "../../lib/usePrintPaper";
 import styles from "./checkin.module.css";
 
 // One check-in overlay shared by Arrivals and Patients (REC-041, REC-017): confirm -> POST
@@ -44,10 +46,12 @@ export function CheckInResultDialog({ result, onClose }: { result: CheckInResult
     return () => { cancelled = true; };
   }, [result]);
 
+  const paper = usePrintPaper("token_slip"); // FEF-046
   const loading = position === undefined || waitMin === undefined;
   return (
     <Dialog title="Checked in" onClose={onClose}>
-      <div className={`${styles.result} ${styles.printArea}`}>
+      <PrintSheet paper={paper} label="Token slip">
+      <div className={styles.result}>
         <div className={styles.tokenLabel}>Token</div>
         <div className={styles.tokenNumber}>#{result.tokenNumber}</div>
         <div className={styles.patient}>{result.patientName}</div>
@@ -63,6 +67,7 @@ export function CheckInResultDialog({ result, onClose }: { result: CheckInResult
           <p className={`${styles.note} ${styles.noPrint}`}>Position or wait time isn&apos;t available right now.</p>
         )}
       </div>
+      </PrintSheet>
       <div className={`${styles.actions} ${styles.noPrint}`}>
         <button type="button" className={styles.secondaryBtn} onClick={() => window.print()}>Print token</button>
         <button type="button" className={styles.primaryBtn} onClick={onClose}>Done</button>

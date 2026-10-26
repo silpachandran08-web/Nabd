@@ -6,13 +6,8 @@
 .title { margin: 0; font-size: 16px; font-weight: 600; }
 .note { font-size: 13px; color: var(--nb-text-secondary); margin: 0; }
 
-/* Print only the document: hide the app chrome and the toolbar. Scoped to a page that has the print area. */
+/* FEF-046: printing (paper size, hiding the shell, black on white) comes from the print kit (PrintSheet). */
 @media print {
-  /* The app is dark; the paper must not inherit it when "background graphics" is on. */
-  :global(html):has(.printArea), :global(body):has(.printArea) { background: Canvas !important; color: CanvasText !important; }
-  :global(body):has(.printArea) * { visibility: hidden; }
-  :global(body):has(.printArea) .printArea, :global(body):has(.printArea) .printArea * { visibility: visible; }
-  .printArea { position: absolute; inset-block-start: 0; inset-inline: 0; }
-  .printArea > article { border: none; border-radius: 0; padding: 0; }
   .noPrint { display: none !important; }
+  .page { padding: 0; }
 }

@@ -7,6 +7,8 @@ import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { age, type Allergy, type AllergyStatus, type PatientDetail, type Prescription, type PrescriptionAllergySnapshot } from "./shared";
+import { PrintSheet } from "@nabd/ui";
+import { usePrintPaper } from "../../lib/usePrintPaper";
 import r from "./rxPrint.module.css";
 import { responseFetch } from "../../lib/responseFetch";
 
@@ -60,6 +62,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [tick, setTick] = useState(0);
   const allowed = mounted && can("clinical:view");
+  const paper = usePrintPaper("rx"); // FEF-046: clinic default, no prompt
 
   const get = useCallback(async (path: string): Promise<Response> => {
     const res = await responseFetch(path);
@@ -162,6 +165,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         <span>Medicines are printed exactly as the prescriber typed them. No name is added or substituted.</span>
       </div>
 
+      <PrintSheet paper={paper} label="Prescription" bare>
       <article className={r.sheet} aria-label="Prescription">
         <header className={r.letterhead}>
           <div>
@@ -245,6 +249,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
           )}
         </footer>
       </article>
+      </PrintSheet>
     </main>
   );
 }
