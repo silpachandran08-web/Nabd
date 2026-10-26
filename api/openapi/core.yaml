@@ -19318,6 +19318,11 @@ components:
           maxLength: 64
           minLength: 0
           pattern: "[A-Za-z0-9_.:-]+"
+        release:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[A-Za-z0-9._-]*"
         route:
           type: string
           maxLength: 200
