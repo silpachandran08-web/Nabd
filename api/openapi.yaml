@@ -2256,6 +2256,64 @@ paths:
         "400": { description: "Problem `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours` or `off-grid` (each also carries code IN_PAST, CLINIC_CLOSED, DOCTOR_ON_LEAVE, OUTSIDE_HOURS, OFF_GRID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "Problem `slot-taken` (code SLOT_TAKEN; overlapping range, DB exclusion constraint) or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /booking-requests:
+    get:
+      tags: [Queue]
+      summary: "ACC-010. The reviewer's inbox: booking requests held for review (status=requested, triage-flagged first, then by SLA due time) or decided today (status=decided). Each item: appointmentId, patient {displayName, isNew, age}, doctorId, start, channel, reviewReason (new_patient, over_cap, triage_flag, procedure, group, policy_review), triageFlags, slaDueAt, suggestedAlternative (the doctor's nearest free slot after the requested one, or null), status. stats: autoAccepted today and medianReplySeconds. The patient's own note is not returned."
+      x-required-permission: queue:create
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [requested, decided], default: requested } }
+        - { name: doctorId, in: query, required: false, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { description: "{ items, nextCursor, stats }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /booking-requests/{id}/accept:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-010. Accept a held request, optionally into another slot (slotStart). Compare-and-set on status requested: of two simultaneous accepts one gets 200, the other 409 ALREADY_DECIDED. 409 SLOT_TAKEN carries nearestAlternative when the slot is gone. Audited."
+      x-required-permission: queue:create
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { slotStart: { type: string, format: date-time }, note: { type: string, maxLength: 280 } } } } }
+      responses:
+        "200": { description: "{ appointmentId, status: CONFIRMED }", content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_DECIDED or SLOT_TAKEN (problem+json; SLOT_TAKEN may carry nearestAlternative)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /booking-requests/{id}/suggest:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-010. Offer the patient one to three other free slots; the request stays held. The patient's answer arrives through the internal booking-offers choose call."
+      x-required-permission: queue:create
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [slots], properties: { slots: { type: array, minItems: 1, maxItems: 3, items: { type: string, format: date-time } } } } } }
+      responses:
+        "202": { description: "{ offerId, expiresAt }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_DECIDED or SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /booking-requests/{id}/decline:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-010. Decline a held request with a coded reason (reasonCode, lower-case letters, digits and _, 3-40 characters; 400 REASON_REQUIRED without it). Frees the slot; the patient message carries no clinical text."
+      x-required-permission: queue:create
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reasonCode], properties: { reasonCode: { type: string, pattern: "^[a-z0-9_]{3,40}$" }, note: { type: string, maxLength: 280 } } } } }
+      responses:
+        "200": { description: "{ status: DECLINED }", content: { application/json: { schema: { type: object } } } }
+        "400": { description: "REASON_REQUIRED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_DECIDED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /appointments/{id}:
     get:
       tags: [Queue]
@@ -3025,6 +3083,42 @@ paths:
         "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "Tenant not allowed, or unknown patientRef (NOT_OWNER) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/booking-requests:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-009. Create a booking from a patient channel. The clinic's routing policy (acceptance mode, daily auto-accept cap per doctor and clinic day, review SLA) decides: CONFIRMED (status scheduled, decisionSource auto) or REQUESTED (the slot is held, slaDueAt = now + SLA, reviewReason recorded). A triage flag always gives REQUESTED. Idempotency-Key required. shortcut: doctorId + slotStart only (specialtyCode and sessionId wait for ACC-011); no token or expectedRange yet; SLOT_ON_OFFER waits for ACC-006."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [patientRef, doctorId, slotStart, channel], properties: { patientRef: { type: string }, doctorId: { type: string, format: uuid }, slotStart: { type: string, format: date-time }, visitType: { type: string, enum: [new, follow_up, procedure, tele] }, channel: { type: string, enum: [desk, whatsapp, web, widget, app, call_centre, aggregator] }, triageFlags: { type: array, maxItems: 10, items: { type: string, pattern: "^[a-z0-9_]{1,40}$" } }, group: { type: boolean }, note: { type: string, maxLength: 280 } } } } }
+      responses:
+        "201": { description: "{ appointmentId, status: CONFIRMED | REQUESTED, slaDueAt? }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed, or unknown patientRef (NOT_OWNER) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "SLOT_TAKEN or SESSION_FULL (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/booking-offers/{offerId}/choose:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: offerId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Queue]
+      summary: "ACC-010. The patient's answer to offered slots: slotStart (one of the offered) confirms the request into that slot and releases the original hold; no slotStart means 'none of these' (the request stays held). Idempotency-Key required."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [patientRef], properties: { patientRef: { type: string }, slotStart: { type: string, format: date-time } } } } }
+      responses:
+        "200": { description: "{ appointmentId, status: CONFIRMED | REQUESTED }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Tenant not allowed, or not this patient's request (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_DECIDED (offer closed, expired or request decided) or SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/appointments/{id}/{action}:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters:
@@ -5768,8 +5862,10 @@ components:
         doctorId: { type: string, format: uuid }
         startTime: { type: string, format: date-time }
         endTime: { type: string, format: date-time }
-        status: { type: string, enum: [scheduled, arrived, cancelled, completed, no_show] }
+        status: { type: string, enum: [requested, scheduled, arrived, cancelled, completed, no_show, declined] }
         isFollowUp: { type: boolean }
+        decisionSource: { type: [string, "null"], enum: [auto, staff, system, null], description: "ACC-009: who confirmed the booking; staff for a desk booking" }
+        channel: { type: string, enum: [desk, whatsapp, web, widget, app, call_centre, aggregator] }
         cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
 
     DelayAnnounceRequest:

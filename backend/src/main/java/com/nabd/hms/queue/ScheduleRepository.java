@@ -150,11 +150,11 @@ class ScheduleRepository {
                 (rs, i) -> rs.getString("label"), doctorId, tenantId);
     }
 
-    /** Start times already booked (status='scheduled') for a doctor on a given date — used to exclude taken slots. */
+    /** Start times already booked (requested, scheduled, arrived) for a doctor on a given date — used to exclude taken slots. */
     List<Instant> bookedStartTimes(UUID doctorId, Instant dayStart, Instant dayEnd) {
         return jdbc.query(
                 "SELECT start_time FROM appointments " +
-                        "WHERE doctor_id = ? AND status IN ('scheduled','arrived') AND start_time >= ? AND start_time < ?",
+                        "WHERE doctor_id = ? AND status IN ('requested','scheduled','arrived') AND start_time >= ? AND start_time < ?",
                 (rs, i) -> rs.getTimestamp("start_time").toInstant(), doctorId,
                 Timestamp.from(dayStart), Timestamp.from(dayEnd));
     }
@@ -172,7 +172,7 @@ class ScheduleRepository {
         Integer count = jdbc.queryForObject(
                 "SELECT " +
                         // QA-04: a seen booking (completed) still used its place, as a completed walk-in does
-                        "(SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.status IN ('scheduled','arrived','completed') " +
+                        "(SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.status IN ('requested','scheduled','arrived','completed') " +
                         "  AND a.start_time >= ? AND a.start_time < ?) " +
                         "+ " +
                         "(SELECT count(*) FROM queue_entries q WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " +

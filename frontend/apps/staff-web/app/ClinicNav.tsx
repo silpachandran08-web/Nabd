@@ -27,6 +27,7 @@ const WAITING_STATUSES = ["checked_in", "waiting", "billing_pending", "vitals_pe
 const NAV_ITEMS: { href: string; label: string; short: string; icon: IconName; permission: string | null }[] = [
   { href: "/arrivals", label: "Today / Arrivals", short: "Today", icon: "home", permission: "queue:view" },
   { href: "/schedule", label: "Queue & Appointments", short: "Queue", icon: "calendar", permission: "queue:view" },
+  { href: "/requests", label: "Booking requests", short: "Requests", icon: "inbox", permission: "queue:create" }, // ACC-010
   { href: "/patients", label: "Patients", short: "Patients", icon: "users", permission: "patients:view" },
   // clinical:edit, not clinical:view — reception can be granted clinical:view (e.g. for billing
   // lookups) without being a clinician; see lib/session.ts (landingPathFor) for the full reasoning.

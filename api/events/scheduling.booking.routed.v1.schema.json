@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:scheduling.booking.routed.v1",
+  "title": "scheduling.booking.routed.v1",
+  "description": "A booking was routed (confirmed or held for review), decided by staff, offered other slots, or escalated past its review SLA. No patient identity, no free text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "appointmentId",
+    "doctorId",
+    "startTime",
+    "outcome",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "appointmentId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "doctorId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "startTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "requested",
+        "declined",
+        "suggested",
+        "escalated"
+      ]
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "desk",
+        "whatsapp",
+        "web",
+        "widget",
+        "app",
+        "call_centre",
+        "aggregator"
+      ]
+    },
+    "decisionSource": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "staff",
+        "system"
+      ]
+    },
+    "decidedBy": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "reviewReason": {
+      "type": "string",
+      "enum": [
+        "new_patient",
+        "over_cap",
+        "triage_flag",
+        "procedure",
+        "group",
+        "policy_review"
+      ]
+    },
+    "slaDueAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reasonCode": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{3,40}$"
+    },
+    "offerId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reviewerRole": {
+      "type": "string",
+      "enum": [
+        "receptionist"
+      ]
+    },
+    "notifyOwner": {
+      "type": "boolean"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "appointmentId": "33333333-3333-4333-8333-333333333333",
+      "doctorId": "22222222-2222-4222-8222-222222222222",
+      "startTime": "2026-11-02T10:00:00Z",
+      "outcome": "requested",
+      "channel": "whatsapp",
+      "reviewReason": "new_patient",
+      "slaDueAt": "2026-10-30T09:10:00Z",
+      "version": 1
+    }
+  ]
+}

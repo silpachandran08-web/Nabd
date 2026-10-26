@@ -22,6 +22,7 @@ function topicsFor(): string[] {
   const perms = getPermissions();
   const t: string[] = [];
   if (perms.includes("queue:view")) t.push("queue", "doctor-status");
+  if (perms.includes("queue:create")) t.push("requests"); // ACC-010: held booking requests
   if (perms.includes("nursing:view")) t.push("nursing");
   if (perms.includes("patients:view")) t.push("messages"); // COM-006: delivery ticks on the patient file
   return t;

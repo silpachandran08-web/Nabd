@@ -73,7 +73,7 @@ public class AppointmentService {
         enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
-            UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault());
+            UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault(), callerStaffId == null ? "system" : "staff");
             log.info("appointment {} booked by {}: patient {} with doctor {} at {}",
                     id, callerStaffId, req.patientId(), req.doctorId(), req.startTime());
             published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), req.startTime(), "scheduled", Map.of());
@@ -129,7 +129,7 @@ public class AppointmentService {
         enforceSessionCapacity(tenantId, current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
-            UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp());
+            UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp(), callerStaffId == null ? "system" : "staff");
             log.info("appointment {} rescheduled to {} (new id {}) by {}", id, req.newStartTime(), newId, callerStaffId);
             published(tenantId, DomainEventType.APPOINTMENT_RESCHEDULED, newId, current.doctorId(), req.newStartTime(), "scheduled",
                     Map.of("previousAppointmentId", id, "previousStartTime", current.startTime()));
@@ -186,7 +186,7 @@ public class AppointmentService {
      * assignment — booking and walk-in check-in draw from the same pool, so they need to be
      * serialized against each other, not just against themselves.
      */
-    private void enforceSessionCapacity(UUID tenantId, UUID doctorId, Instant start) {
+    void enforceSessionCapacity(UUID tenantId, UUID doctorId, Instant start) {
         ZoneId zone = clock.zone(tenantId);
         LocalDate date = start.atZone(zone).toLocalDate();
         int dayOfWeek = date.getDayOfWeek().getValue() % 7;
@@ -223,7 +223,7 @@ public class AppointmentService {
 
     private AppointmentResponse toResponse(AppointmentRow row) {
         return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(),
-                row.status(), row.isFollowUp(), row.cancelReason());
+                row.status(), row.isFollowUp(), row.cancelReason(), row.decisionSource(), row.channel());
     }
 
     private ApiException notFound() {

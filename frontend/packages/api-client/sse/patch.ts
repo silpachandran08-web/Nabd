@@ -18,7 +18,8 @@ export function resourcesFor(type: string): readonly string[] {
   if (type.startsWith("nursing.")) return ["nursing"];
   if (type.startsWith("doctor.status")) return ["roster", "doctor-delay", "wait-estimate", "doctor-status"];
   if (type.startsWith("comms.message.")) return ["patient-messages"]; // COM-006
-  return []; // requests / exceptions topics have no screen yet
+  if (type.startsWith("scheduling.booking.") || type.startsWith("scheduling.appointment.")) return ["booking-requests"]; // ACC-010
+  return []; // exceptions topic has no screen yet
 }
 
 const PATCHABLE = ["status"] as const; // scalar fields a queue delta may carry

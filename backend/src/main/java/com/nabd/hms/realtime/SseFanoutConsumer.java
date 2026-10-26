@@ -31,7 +31,8 @@ class SseFanoutConsumer implements EventConsumer {
             "scheduling.doctor_delay.changed.v1", new Route(List.of(RealtimeTopic.DOCTOR_STATUS), "doctorId"),
             "scheduling.appointment.booked.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
             "scheduling.appointment.cancelled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
-            "scheduling.appointment.rescheduled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"));
+            "scheduling.appointment.rescheduled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
+            "scheduling.booking.routed.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId")); // ACC-009/010
     /** Revocation: these end the staff member's open streams (or the tenant's, for a role) so permissions are re-checked on reconnect. */
     private static final Set<String> CLOSERS = Set.of("iam.session.revoked.v1", "iam.staff.changed.v1", "iam.role.changed.v1");
 

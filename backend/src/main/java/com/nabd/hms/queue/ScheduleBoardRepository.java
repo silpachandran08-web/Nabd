@@ -98,7 +98,7 @@ class ScheduleBoardRepository {
                 JOIN patients p ON p.id = a.patient_id
                 LEFT JOIN LATERAL (SELECT id, token_number, status FROM queue_entries
                                    WHERE appointment_id = a.id ORDER BY created_at DESC LIMIT 1) q ON true
-                WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ?
+                WHERE a.tenant_id = ? AND a.status NOT IN ('cancelled','declined') AND a.start_time >= ? AND a.start_time < ?
                 ORDER BY a.start_time
                 """, (rs, i) -> new AppointmentRow(rs.getObject("id", UUID.class), rs.getObject("doctor_id", UUID.class),
                         rs.getObject("patient_id", UUID.class), rs.getString("patient_name"),

@@ -19,7 +19,7 @@ import static com.nabd.hms.queue.QueueModels.CallbackEntryRow;
 class AppointmentRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason ";
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel ";
 
     private final JdbcTemplate jdbc;
 
@@ -28,11 +28,11 @@ class AppointmentRepository {
     }
 
     /** Throws DataIntegrityViolationException if the slot is already booked — see uq_appointments_doctor_slot. */
-    UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime, boolean isFollowUp) {
+    UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime, boolean isFollowUp, String decisionSource) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up) " +
-                        "VALUES (?,?,?,?,?,?,?)",
-                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp);
+        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up, decision_source) " +
+                        "VALUES (?,?,?,?,?,?,?,?)",
+                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp, decisionSource);
         return id;
     }
 
@@ -112,7 +112,7 @@ class AppointmentRepository {
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getBoolean("is_follow_up"),
-                rs.getString("cancel_reason"));
+                rs.getString("cancel_reason"), rs.getString("decision_source"), rs.getString("channel"));
     }
 
     /** QA-03: existence checked up front so an unknown id is a 404, not an FK violation mis-reported as a slot conflict. */
