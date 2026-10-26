@@ -91,6 +91,17 @@ Do these in order; each is one line of work.
 - New env: `app.internal.comms-token` (blank = notification claim-check endpoint closed), `app.kb.source-*` (drug knowledge base attribution), `app.realtime.*` (live updates; needs Valkey to push), `app.cache.config-*` (config cache; 0 = off). WhatsApp: each clinic needs the opt-out / opt-in confirmation templates approved (`optout_confirm`, `optin_confirm`) or the confirmation is skipped.
 - Browser scripts that need their own build: cookie mode (`NEXT_PUBLIC_AUTH_MODE=cookie`, `NABD_CORE_URL`, `CORE_PORT`) for s11-fef009-bff-cookies, s11qa-fef009-fef010 and s13-fef020-live-sse; `NABD_CSP_MODE=enforce` for s11-fef-010-csp and s11qa-fef009-fef010.
 
+## After upgrading to Sprint 14 (S5) code
+
+- Migrations V2110-V2290 (ETA rollups, household and duplicate-patient tables, `nabd_control` role grants, audit-chain seals, patient import, plan catalogue and entitlements, drug master, consent export, tax rules, notice templates, ABDM settings, reporting rollups). `nabd_control` is created NOLOGIN by `infra/db/bootstrap-roles.sql`; make the Control Plane login a member per cell (as for `nabd_platform`). `nabd_app` keeps its master grants for now.
+- Two new services with their own databases and Flyway history: `services/comms-gateway` (migrations V1-V5, port 3809, Valkey consumer group `comms`) and `services/patient-access-edge`. Neither is deployed by this repo yet; Core works without them.
+- New env, all blank by default: `ABDM_BASE_URL`, `ABDM_CM_ID`, `ABDM_HFR_LOOKUP`, `ABDM_HPR_LOOKUP`, `ABDM_JWKS_URI` (ABDM is off per clinic until the owner enables it; credentials live in the regional secret store). `COMMS_GATEWAY_URL`, `COMMS_GATEWAY_TOKEN`, `COMMS_OTP_CUTOVER` (blank URL = OTPs use the in-process sender; `true` removes that fallback).
+- New permission `audit_compliance:values`; give it to the DPO role or the value-level audit views stay hidden.
+- Patient import (ADM-012) needs the clinic's DPA gate open (see S4 note) and stores imported allergies as unconfirmed, severity "moderate".
+- Tax (FIN-008/009): seeded GST rates are placeholders until a chartered accountant verifies them. Clinics with no tax registration keep taxed behaviour.
+- Nightly load tests and the residency/egress checks are GitHub workflows (`nightly-load.yml`, `residency*.yml`) that have not had a first run.
+- Five browser scripts need their own builds: see `kanban/CONTEXT.md` (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`).
+
 ## Errors seen and what they mean
 
 | Error | Cause | Fix |
