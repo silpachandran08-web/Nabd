@@ -86,10 +86,11 @@ class ExplainPlanRegressionTest extends ApiTestBase {
 
     @Test
     void nextTokenNumberUsesDoctorDateIndexUnderRls() throws Exception {
-        // Known gap until T-010: the OR-shaped RLS policy keeps tenant_id as a Filter, not an Index Cond. Pin what holds today
-        // (index scan on the doctor/date index, no seq scan); flip to assertIndexed once the array policy ships.
+        // S6 merge: the planner now answers MAX(token_number) from the (tenant, doctor, date, token) unique index (index-only, backward, LIMIT 1)
+        // with tenant_id as an Index Cond; either doctor/date index is fine, a seq scan or a tenant Filter is not.
         String p = plan("SELECT COALESCE(MAX(token_number), 0) FROM queue_entries WHERE doctor_id = '" + D + "' AND queue_date = date '2026-01-10'");
-        assertThat(p).as(p).doesNotContain("Seq Scan").contains("Index Scan using idx_queue_doctor_date");
+        assertThat(p).as(p).doesNotContain("Seq Scan").containsPattern("Index (Only )?Scan.* using (idx_queue_doctor_date|queue_entries_tenant_id_doctor_id_queue_date_token_number_key)")
+                .containsPattern("Index Cond: .*tenant_id");
     }
 
     @Test

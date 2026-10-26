@@ -52,7 +52,7 @@ public class QueueController {
     @PostMapping("/check-in")
     @PreAuthorize("hasAuthority('queue:create')")
     public ResponseEntity<QueueEntryResponse> checkIn(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckInRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(callOrder.annotateOne(service.checkIn(tenantId(jwt), staffId(jwt), req)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(callOrder.checkInAnnotated(tenantId(jwt), staffId(jwt), req));
     }
 
     @GetMapping

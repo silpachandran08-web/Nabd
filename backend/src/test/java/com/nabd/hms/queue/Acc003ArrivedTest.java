@@ -293,7 +293,9 @@ class Acc003ArrivedTest extends ApiTestBase {
         if (!Files.exists(dir)) {
             dir = Path.of("db", "migrations");
         }
-        String v310 = Files.readString(dir.resolve("V310__acc_appointment_arrived.sql"));
+        // V2420 widened appointments_status_check ('requested','declined'); replaying V310's narrower CHECK would fail on rows other tests left in the shared DB, and it is not what this test is about
+        String v310 = Files.readString(dir.resolve("V310__acc_appointment_arrived.sql"))
+                .replaceAll("(?s)ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_status_check;.*?VALIDATE CONSTRAINT appointments_status_check;", "");
         // ACC-011: token bookings of one session legitimately share the session start, so the legacy index is rebuilt for slot rows only
         String v311 = Files.readString(dir.resolve("V311__acc_checkin_unique_indexes.sql"))
                 .replace("WHERE status IN ('scheduled','arrived');", "WHERE status IN ('scheduled','arrived') AND booking_kind = 'slot';");

@@ -92,6 +92,8 @@ class Ops020CacheApiTest extends ApiTestBase {
      * transaction), the liveness SELECT, 2 tenant-zone lookups and 13 business statements (report s12-OPS-020.md).
      */
     static final int BASELINE_WARM_STATEMENTS = 26;
+    /** ACC-012 deliberately returns position + expected range in the check-in response: session block, open candidates, call history, recent average (4 reads, same transaction). */
+    static final int ACC012_PLACEMENT_READS = 4;
 
     @DynamicPropertySource
     static void valkey(DynamicPropertyRegistry r) {
@@ -483,7 +485,7 @@ class Ops020CacheApiTest extends ApiTestBase {
         assertThat(binds).as("one tenant bind per transaction (idempotency claim, check-in, idempotency complete)").isLessThanOrEqualTo(3);
         // PLT-019: RepositoryTransactionGuard (test-only, nabd.tenancy.strict-repositories) adds a verifyBinding() round trip per repository call; production sends none
         long guardChecks = warm.stream().filter(s -> s.startsWith("SELECT current_setting('app.tenant_id', true) || current_setting('app.visible_tenant_ids', true)")).count();
-        assertThat(warm.size() - guardChecks).as("statements per warm check-in (without the test-only binding checks)").isLessThanOrEqualTo(BASELINE_WARM_STATEMENTS - 9);
+        assertThat(warm.size() - guardChecks).as("statements per warm check-in (without the test-only binding checks)").isLessThanOrEqualTo(BASELINE_WARM_STATEMENTS - 9 + ACC012_PLACEMENT_READS);
     }
 
     private List<String> countCheckIn(String token, UUID doctorId) {

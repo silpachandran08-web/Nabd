@@ -56,11 +56,6 @@ public class EtaTrigger {
     }
 
     /** Inside the transaction of the change: remembers the doctor-day and asks after commit. */
-    @Transactional(propagation = Propagation.MANDATORY)
-    void afterCommit(UUID tenantId, UUID entryId) {
-        repo.doctorDayOfEntry(tenantId, entryId).ifPresent(d -> afterCommit(tenantId, d.doctorId(), d.day()));
-    }
-
     void afterCommit(UUID tenantId, UUID doctorId, LocalDate day) {
         Key k = new Key(tenantId, doctorId, day);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
