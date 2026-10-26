@@ -94,13 +94,18 @@ class WaitlistRepository {
         return rows == 1;
     }
 
-    /** True while another entry holds a live (unexpired) offer of exactly this slot with this doctor. */
-    boolean isSlotOnLiveOffer(UUID tenantId, UUID doctorId, Instant slotStart, UUID exceptEntryId) {
-        Boolean held = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM waitlist_entries WHERE tenant_id = ? AND doctor_id = ? " +
-                        "AND status = 'offered' AND offer_expires_at > now() AND offered_slot_start = ? AND id <> ?)",
-                Boolean.class, tenantId, doctorId, Timestamp.from(slotStart), exceptEntryId);
-        return Boolean.TRUE.equals(held);
+    /** ACC-026: when another entry's live (unexpired) offer of exactly this slot with this doctor runs out; empty if none. */
+    Optional<Instant> liveOfferExpiry(UUID tenantId, UUID doctorId, Instant slotStart, UUID exceptEntryId) {
+        return jdbc.query("SELECT offer_expires_at FROM waitlist_entries WHERE tenant_id = ? AND doctor_id = ? " +
+                        "AND status = 'offered' AND offer_expires_at > now() AND offered_slot_start = ? AND id IS DISTINCT FROM ?",
+                (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, doctorId, Timestamp.from(slotStart), exceptEntryId)
+                .stream().findFirst();
+    }
+
+    /** ACC-026: doctors with at least one offer past its window, for the expiry job. */
+    List<UUID> doctorsWithStaleOffers(UUID tenantId) {
+        return jdbc.queryForList("SELECT DISTINCT doctor_id FROM waitlist_entries WHERE tenant_id = ? " +
+                "AND status = 'offered' AND offer_expires_at <= now()", UUID.class, tenantId);
     }
 
     void cancelMembership(UUID tenantId, UUID id) {

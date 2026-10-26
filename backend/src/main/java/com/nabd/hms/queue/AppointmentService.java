@@ -70,6 +70,7 @@ public class AppointmentService {
         tenantContext.set(tenantId);
         requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
         int slotMinutes = slotValidator.validate(tenantId, req.doctorId(), req.startTime(), clock.now());
+        slotValidator.requireNoLiveOffer(tenantId, req.doctorId(), req.startTime(), null);
         enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
@@ -123,6 +124,7 @@ public class AppointmentService {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
         int slotMinutes = slotValidator.validate(tenantId, current.doctorId(), req.newStartTime(), clock.now());
+        slotValidator.requireNoLiveOffer(tenantId, current.doctorId(), req.newStartTime(), null);
 
         repo.cancel(tenantId, id, "rescheduled");
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED);

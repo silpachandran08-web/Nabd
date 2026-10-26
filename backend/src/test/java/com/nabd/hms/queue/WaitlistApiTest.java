@@ -166,7 +166,7 @@ class WaitlistApiTest extends ApiTestBase {
 
         // the expired holder can no longer accept
         ResponseEntity<Map> lateAccept = exchange("/v1/waitlist/" + waitlistId1 + "/accept", HttpMethod.POST, authed(token), Map.class);
-        assertThat(lateAccept.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(lateAccept.getStatusCode()).isEqualTo(HttpStatus.GONE); // ACC-026: 410 OFFER_EXPIRED (was 409)
     }
 
     @Test

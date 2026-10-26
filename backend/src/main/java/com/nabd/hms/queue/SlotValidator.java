@@ -25,10 +25,29 @@ class SlotValidator {
 
     private final ScheduleRepository scheduleRepo;
     private final ClinicClock clock;
+    private final WaitlistRepository waitlistRepo;
+    private final QueueRepository queueRepo;
 
-    SlotValidator(ScheduleRepository scheduleRepo, ClinicClock clock) {
+    SlotValidator(ScheduleRepository scheduleRepo, ClinicClock clock, WaitlistRepository waitlistRepo, QueueRepository queueRepo) {
         this.scheduleRepo = scheduleRepo;
         this.clock = clock;
+        this.waitlistRepo = waitlistRepo;
+        this.queueRepo = queueRepo;
+    }
+
+    /**
+     * ACC-026: every booking path (desk book, Edge booking, reschedule, waitlist chosen slot) refuses a slot that is on a live
+     * waitlist offer to someone else: 409 SLOT_ON_OFFER with the offer's expiry. Takes the doctor-day lock first, the same one
+     * offers and walk-in tokens use, so the check and the insert that follows cannot interleave with a new offer.
+     */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    void requireNoLiveOffer(UUID tenantId, UUID doctorId, Instant start, UUID exceptEntryId) {
+        queueRepo.lockDoctorDay(tenantId, doctorId, start.atZone(clock.zone(tenantId)).toLocalDate());
+        waitlistRepo.liveOfferExpiry(tenantId, doctorId, start, exceptEntryId).ifPresent(expiresAt -> {
+            throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
+                    "This slot is currently offered to a patient on the waitlist.",
+                    java.util.Map.of("code", "SLOT_ON_OFFER", "expiresAt", expiresAt.toString()));
+        });
     }
 
     /** Returns the slot length in minutes, or throws the Problem naming the first broken rule. */
