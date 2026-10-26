@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -69,12 +70,15 @@ public class ScheduleService {
     public WorkingHoursResponse addWorkingHours(UUID tenantId, UUID callerStaffId, UUID doctorId, WorkingHoursWriteRequest req) {
         tenantContext.set(tenantId);
         checkHours(doctorId, null, req);
+        String mode = req.sessionMode() == null ? SessionModes.SLOT : req.sessionMode();
+        checkSessionFields(mode, req.maxPatients(), req.onlineCap());
         UUID id = repo.insertWorkingHours(tenantId, doctorId, req.dayOfWeek(), req.startTime(), req.endTime(),
-                req.slotMinutesOrDefault(), req.maxPatients());
+                req.slotMinutesOrDefault(), req.maxPatients(), mode, SessionModes.SLOT, req.onlineCap(), req.label(), req.effectiveFrom());
+        List<LocalTime> reserved = saveReserved(tenantId, id, req, req.reservedWalkInTimes());
+        repo.updateWalkinRules(doctorId, id, req.walkInMode(), req.walkInRatio(), req.lateGraceMinutes());
         log.info("working hours {} added for doctor {} by {} (day {}, {}-{}, cap {})",
                 id, doctorId, callerStaffId, req.dayOfWeek(), req.startTime(), req.endTime(), req.maxPatients());
-        WorkingHoursResponse created = new WorkingHoursResponse(id, req.dayOfWeek(), req.startTime(), req.endTime(),
-                req.slotMinutesOrDefault(), req.maxPatients());
+        WorkingHoursResponse created = toResponse(repo.findWorkingHours(doctorId, id).orElseThrow(), reserved);
         auditHours(tenantId, callerStaffId, "schedule.working_hours_created", id, null, auditView(doctorId, created));
         return created;
     }
@@ -85,10 +89,27 @@ public class ScheduleService {
         tenantContext.set(tenantId);
         WorkingHoursResponse before = toResponse(repo.findWorkingHours(doctorId, hoursId).orElseThrow(this::hoursNotFound));
         checkHours(doctorId, hoursId, req);
+        WorkingHoursRow old = repo.findWorkingHours(doctorId, hoursId).orElseThrow(this::hoursNotFound);
+        String mode = req.sessionMode() == null ? old.sessionMode() : req.sessionMode();
+        Integer onlineCap = req.onlineCap() == null ? old.onlineCap() : req.onlineCap();
+        checkSessionFields(mode, req.maxPatients(), onlineCap);
+        String previous = old.previousSessionMode();
+        LocalDate effective = old.effectiveFrom();
+        if (!mode.equals(old.sessionMode())) { // ACC-011: a mode change applies to future dates only
+            LocalDate tomorrow = clock.today(tenantId).plusDays(1);
+            if (req.effectiveFrom() != null && req.effectiveFrom().isBefore(tomorrow)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "effective-from-past", "Change must apply to a future date",
+                        "A session mode change takes effect from tomorrow at the earliest.");
+            }
+            previous = SessionModes.modeOn(old, tomorrow);
+            effective = req.effectiveFrom() == null ? tomorrow : req.effectiveFrom();
+        }
         repo.updateWorkingHours(doctorId, hoursId, req.dayOfWeek(), req.startTime(), req.endTime(),
-                req.slotMinutesOrDefault(), req.maxPatients());
-        WorkingHoursResponse after = new WorkingHoursResponse(hoursId, req.dayOfWeek(), req.startTime(), req.endTime(),
-                req.slotMinutesOrDefault(), req.maxPatients());
+                req.slotMinutesOrDefault(), req.maxPatients(), mode, previous, onlineCap,
+                req.label() == null ? old.label() : req.label(), effective);
+        List<LocalTime> reserved = saveReserved(tenantId, hoursId, req, req.reservedWalkInTimes());
+        repo.updateWalkinRules(doctorId, hoursId, req.walkInMode(), req.walkInRatio(), req.lateGraceMinutes());
+        WorkingHoursResponse after = toResponse(repo.findWorkingHours(doctorId, hoursId).orElseThrow(), reserved);
         auditHours(tenantId, callerStaffId, "schedule.working_hours_updated", hoursId,
                 auditView(doctorId, before), auditView(doctorId, after));
         log.info("working hours {} of doctor {} updated by {}", hoursId, doctorId, callerStaffId);
@@ -125,6 +146,11 @@ public class ScheduleService {
         m.put("endTime", h.endTime().toString());
         m.put("slotMinutes", h.slotMinutes());
         m.put("maxPatients", h.maxPatients());
+        m.put("sessionMode", h.sessionMode());
+        m.put("onlineCap", h.onlineCap());
+        m.put("effectiveFrom", h.effectiveFrom() == null ? null : h.effectiveFrom().toString());
+        m.put("walkInMode", h.walkInMode());
+        m.put("walkInRatio", h.walkInRatio());
         return m;
     }
 
@@ -180,10 +206,13 @@ public class ScheduleService {
         Instant now = clock.now();
         List<Instant> slots = new ArrayList<>();
         for (WorkingHoursRow wh : hours) {
+            if (SessionModes.TOKEN.equals(SessionModes.modeOn(wh, date))) continue; // ACC-011: token sessions sell places, not times
+            Set<Integer> reserved = repo.reservedMinutes(wh.id()); // ACC-012: held back for walk-ins, never offered
             Instant slotStart = date.atTime(wh.startTime()).atZone(zone).toInstant();
             Instant blockEnd = date.atTime(wh.endTime()).atZone(zone).toInstant();
             while (!slotStart.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(blockEnd)) {
-                if (slotStart.isAfter(now) && !booked.contains(slotStart)) {
+                if (slotStart.isAfter(now) && !booked.contains(slotStart)
+                        && !reserved.contains(ScheduleGrid.minuteOf(slotStart.atZone(zone).toLocalTime()))) {
                     slots.add(slotStart);
                 }
                 slotStart = slotStart.plus(wh.slotMinutes(), ChronoUnit.MINUTES);
@@ -193,8 +222,50 @@ public class ScheduleService {
     }
 
     private WorkingHoursResponse toResponse(WorkingHoursRow row) {
+        return toResponse(row, reservedTimes(row));
+    }
+
+    private WorkingHoursResponse toResponse(WorkingHoursRow row, List<LocalTime> reserved) {
         return new WorkingHoursResponse(row.id(), row.dayOfWeek(), row.startTime(), row.endTime(),
-                row.slotMinutes(), row.maxPatients());
+                row.slotMinutes(), row.maxPatients(), row.sessionMode(), row.onlineCap(), row.label(), row.effectiveFrom(), reserved,
+                row.walkinMode(), row.walkinRatio(), row.lateGraceMinutes());
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private List<LocalTime> reservedTimes(WorkingHoursRow row) {
+        return repo.reservedMinutes(row.id()).stream().sorted().map(m -> LocalTime.of(m / 60, m % 60)).toList();
+    }
+
+    /** ACC-011: token and hybrid sessions sell places from the max_patients pool; the online cap is a share of it. */
+    private static void checkSessionFields(String mode, Integer maxPatients, Integer onlineCap) {
+        if (!SessionModes.SLOT.equals(mode) && maxPatients == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "max-patients-required", "Session size required",
+                    "A token or hybrid session needs maxPatients.");
+        }
+        if (onlineCap != null && maxPatients != null && onlineCap > maxPatients) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "online-cap-too-large", "Online cap too large",
+                    "The online cap cannot exceed maxPatients.");
+        }
+    }
+
+    /** ACC-012: reserved walk-in starts must sit on the session grid and inside the session; null = leave as is. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private List<LocalTime> saveReserved(UUID tenantId, UUID hoursId, WorkingHoursWriteRequest req, List<LocalTime> times) {
+        if (times == null) {
+            return repo.reservedMinutes(hoursId).stream().sorted().map(m -> LocalTime.of(m / 60, m % 60)).toList();
+        }
+        Set<Integer> minutes = new java.util.TreeSet<>();
+        for (LocalTime t : times) {
+            int off = ScheduleGrid.minuteOf(t) - ScheduleGrid.minuteOf(req.startTime());
+            if (t.getSecond() != 0 || off < 0 || off % req.slotMinutesOrDefault() != 0
+                    || ScheduleGrid.minuteOf(t) + req.slotMinutesOrDefault() > ScheduleGrid.minuteOf(req.endTime())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "reserved-off-grid", "Reserved walk-in slot off the grid",
+                        "Reserved walk-in times must be slot starts inside the session.");
+            }
+            minutes.add(ScheduleGrid.minuteOf(t));
+        }
+        repo.replaceReservedMinutes(tenantId, hoursId, minutes);
+        return minutes.stream().map(m -> LocalTime.of(m / 60, m % 60)).toList();
     }
 
     // ── delay ladder (NB-100) ────────────────────────────────────────────

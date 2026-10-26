@@ -33,8 +33,11 @@ public class ScheduleController {
 
     private final ScheduleService service;
 
-    ScheduleController(ScheduleService service) {
+    private final SessionAvailabilityService sessionAvailability;
+
+    ScheduleController(ScheduleService service, SessionAvailabilityService sessionAvailability) {
         this.service = service;
+        this.sessionAvailability = sessionAvailability;
     }
 
     @GetMapping("/working-hours")
@@ -87,6 +90,14 @@ public class ScheduleController {
     public List<Instant> availability(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                        @RequestParam LocalDate date) {
         return service.availability(tenantId(jwt), id, date);
+    }
+
+    /** ACC-011: availability by session mode (slots, tokens left, expected range). */
+    @GetMapping("/availability/sessions")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public SessionAvailabilityService.SessionsResponse sessionAvailability(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                                           @RequestParam LocalDate date) {
+        return sessionAvailability.sessions(id, date);
     }
 
     @PostMapping("/delay")

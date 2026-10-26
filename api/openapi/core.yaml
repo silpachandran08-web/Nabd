@@ -4850,6 +4850,50 @@ paths:
       tags:
       - queue
       x-required-permission: queue:view
+  /v1/doctors/{id}/availability/sessions:
+    get:
+      operationId: ScheduleController_sessionAvailability
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: date
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SessionAvailabilityResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
   /v1/doctors/{id}/delay:
     get:
       operationId: ScheduleController_delayHistory
@@ -10163,6 +10207,49 @@ paths:
       tags:
       - queue
       x-required-permission: queue:create
+  /v1/queue/doctors/{doctorId}/call-next:
+    post:
+      operationId: QueueController_callNext
+      parameters:
+      - in: path
+        name: doctorId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CallNextRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CallNextResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:edit
   /v1/queue/wait-estimate:
     get:
       operationId: QueueController_waitEstimate
@@ -14537,6 +14624,8 @@ components:
     AppointmentResponse:
       type: object
       properties:
+        bookingKind:
+          type: string
         cancelReason:
           type: string
         doctorId:
@@ -14545,6 +14634,8 @@ components:
         endTime:
           type: string
           format: date-time
+        expectedRange:
+          type: string
         id:
           type: string
           format: uuid
@@ -14553,6 +14644,9 @@ components:
         patientId:
           type: string
           format: uuid
+        sessionToken:
+          type: integer
+          format: int32
         startTime:
           type: string
           format: date-time
@@ -14886,6 +14980,19 @@ components:
         reasonCode:
           type: string
         staffName:
+          type: string
+    CallNextRequest:
+      type: object
+      properties:
+        expectedHeadId:
+          type: string
+          format: uuid
+    CallNextResponse:
+      type: object
+      properties:
+        entry:
+          $ref: "#/components/schemas/QueueEntryResponse"
+        reason:
           type: string
     CallbackEntryResponse:
       type: object
@@ -19240,11 +19347,15 @@ components:
         encounterId:
           type: string
           format: uuid
+        expectedRange:
+          type: string
         gender:
           type: string
         id:
           type: string
           format: uuid
+        orderReason:
+          type: string
         parentQueueEntryId:
           type: string
           format: uuid
@@ -19253,6 +19364,9 @@ components:
           format: uuid
         paymentMode:
           type: string
+        position:
+          type: integer
+          format: int32
         presentingComplaint:
           type: string
         priority:
@@ -19999,6 +20113,35 @@ components:
         reasonCode:
           type: string
           pattern: "^[a-z][a-z0-9_]{0,39}$"
+    SessionAvailability:
+      type: object
+      properties:
+        expectedRange:
+          type: string
+        id:
+          type: string
+        label:
+          type: string
+        mode:
+          type: string
+        onlineLeft:
+          type: integer
+          format: int32
+        slots:
+          type: array
+          items:
+            type: string
+            format: date-time
+        tokensLeft:
+          type: integer
+          format: int32
+    SessionAvailabilityResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionAvailability"
     SessionCount:
       type: object
       properties:
@@ -21228,21 +21371,44 @@ components:
         dayOfWeek:
           type: integer
           format: int32
+        effectiveFrom:
+          type: string
+          format: date
         endTime:
           type: string
           format: time-local
         id:
           type: string
           format: uuid
+        label:
+          type: string
+        lateGraceMinutes:
+          type: integer
+          format: int32
         maxPatients:
           type: integer
           format: int32
+        onlineCap:
+          type: integer
+          format: int32
+        reservedWalkInTimes:
+          type: array
+          items:
+            type: string
+            format: time-local
+        sessionMode:
+          type: string
         slotMinutes:
           type: integer
           format: int32
         startTime:
           type: string
           format: time-local
+        walkInMode:
+          type: string
+        walkInRatio:
+          type: integer
+          format: int32
     WorkingHoursWriteRequest:
       type: object
       properties:
@@ -21251,19 +21417,51 @@ components:
           format: int32
           maximum: 6
           minimum: 0
+        effectiveFrom:
+          type: string
+          format: date
         endTime:
           type: string
           format: time-local
+        label:
+          type: string
+          maxLength: 60
+          minLength: 0
+        lateGraceMinutes:
+          type: integer
+          format: int32
+          maximum: 120
+          minimum: 0
         maxPatients:
           type: integer
           format: int32
           minimum: 1
+        onlineCap:
+          type: integer
+          format: int32
+          minimum: 0
+        reservedWalkInTimes:
+          type: array
+          items:
+            type: string
+            format: time-local
+        sessionMode:
+          type: string
+          pattern: slot|token|hybrid
         slotMinutes:
           type: integer
           format: int32
         startTime:
           type: string
           format: time-local
+        walkInMode:
+          type: string
+          pattern: interleave|reserved_only|none
+        walkInRatio:
+          type: integer
+          format: int32
+          maximum: 4
+          minimum: 2
       required:
       - dayOfWeek
       - endTime

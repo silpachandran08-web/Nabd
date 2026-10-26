@@ -19,7 +19,7 @@ import static com.nabd.hms.queue.QueueModels.CallbackEntryRow;
 class AppointmentRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel ";
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel, booking_kind, session_token ";
 
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.organization.api.BookingRules bookingRules;
@@ -116,7 +116,19 @@ class AppointmentRepository {
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getBoolean("is_follow_up"),
-                rs.getString("cancel_reason"), rs.getString("decision_source"), rs.getString("channel"));
+                rs.getString("cancel_reason"), rs.getString("decision_source"), rs.getString("channel"),
+                rs.getString("booking_kind"),
+                (Integer) rs.getObject("session_token"));
+    }
+
+    /** ACC-011: a token booking takes the whole session window and a reserved number (no overlap constraint, V312). */
+    UUID insertToken(UUID tenantId, UUID patientId, UUID doctorId, Instant start, Instant end, boolean isFollowUp,
+                     UUID workingHoursId, int token) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up, " +
+                        "booking_kind, working_hours_id, session_token) VALUES (?,?,?,?,?,?,?,'token',?,?)",
+                id, tenantId, patientId, doctorId, Timestamp.from(start), Timestamp.from(end), isFollowUp, workingHoursId, token);
+        return id;
     }
 
     /** QA-03: existence checked up front so an unknown id is a 404, not an FK violation mis-reported as a slot conflict. */

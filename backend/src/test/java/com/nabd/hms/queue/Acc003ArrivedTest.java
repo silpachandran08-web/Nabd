@@ -294,7 +294,9 @@ class Acc003ArrivedTest extends ApiTestBase {
             dir = Path.of("db", "migrations");
         }
         String v310 = Files.readString(dir.resolve("V310__acc_appointment_arrived.sql"));
-        String v311 = Files.readString(dir.resolve("V311__acc_checkin_unique_indexes.sql"));
+        // ACC-011: token bookings of one session legitimately share the session start, so the legacy index is rebuilt for slot rows only
+        String v311 = Files.readString(dir.resolve("V311__acc_checkin_unique_indexes.sql"))
+                .replace("WHERE status IN ('scheduled','arrived');", "WHERE status IN ('scheduled','arrived') AND booking_kind = 'slot';");
         try (Connection su = superuserConnection()) {
             su.setAutoCommit(false);
             try (var st = su.createStatement()) {

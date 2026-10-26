@@ -64,7 +64,7 @@ function WeekView({ start, hours, leave, onPickDay, onEdit, onDelete }: {
                 {blocks.map((b) => (
                   <div key={b.id} className={styles.block}>
                     <span className={styles.blockTime}>{hhmm(b.startTime)}–{hhmm(b.endTime)}</span>
-                    <span className={styles.meta}>{b.slotMinutes} min slots{b.maxPatients ? ` · max ${b.maxPatients}` : ""}</span>
+                    <span className={styles.meta}>{b.label ? `${b.label} · ` : ""}{b.sessionMode === "token" ? "tokens" : `${b.slotMinutes} min slots`}{b.sessionMode === "hybrid" ? " + walk-in tokens" : ""}{b.maxPatients ? ` · max ${b.maxPatients}` : ""}{b.onlineCap != null ? ` · online ${b.onlineCap}` : ""}</span>
                     {onEdit && onDelete && (
                       <span className={styles.rowActions}>
                         <button type="button" className={styles.linkBtn} onClick={() => onEdit(b)} aria-label={`Edit ${WEEKDAYS[b.dayOfWeek]} ${hhmm(b.startTime)}–${hhmm(b.endTime)}`}>Edit</button>
