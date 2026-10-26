@@ -140,7 +140,7 @@
   }
 }
 
-@media (max-width: 430px) {
+@media (max-width: 543px) {
   .iconBtn, .kbd, .spacer { display: none; }
   .bar { padding: 0 var(--nb-space-12); gap: var(--nb-space-8); }
   .primaryAction { padding: 0 var(--nb-space-12); white-space: nowrap; }

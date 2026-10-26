@@ -200,6 +200,7 @@
 
 .srOnly {
   position: absolute;
+  inset-inline-start: 0; /* see globals.css .srOnly */
   width: 1px;
   height: 1px;
   overflow: hidden;
