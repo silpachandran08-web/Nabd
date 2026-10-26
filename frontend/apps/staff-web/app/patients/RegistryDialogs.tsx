@@ -10,6 +10,10 @@ import type { PatientPage } from "@nabd/api-client/generated";
 import type { DuplicateCandidate } from "@nabd/api-client/types";
 import { age } from "@nabd/domain";
 import { clinicToday } from "../lib/clinicTime";
+import { can } from "../lib/permissions";
+import ConsentBlock from "./ConsentBlock";
+import AssistedConsent from "./AssistedConsent";
+import { buildCaptureBody, consentProblemText, NO_CONSENT, type ConsentState, type Toggles } from "../lib/consentCapture";
 
 type Candidate = DuplicateCandidate;
 
@@ -43,6 +47,13 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [consent, setConsent] = useState(false);
   const [channel, setChannel] = useState("");
+  // IDC-004/007: itemised consent captured with the registration (only for staff who may record it, patients:edit)
+  const canConsent = can("patients:edit");
+  const [toggles, setToggles] = useState<Toggles>(NO_CONSENT);
+  const [emergency, setEmergency] = useState(false);
+  const [assisted, setAssisted] = useState<{ language: string; witness: string } | null>(null);
+  const [assistedOpen, setAssistedOpen] = useState(false);
+  const [registeredId, setRegisteredId] = useState<string | null>(null); // registered, consent not saved yet: retry only the consent
   const fe = useFormErrors("reg", REGISTER_LABELS);
   const [saving, setSaving] = useState(false);
   const keys = useRef(intentKeys()); // one Idempotency-Key per registration intent, reused when the same request is re-sent
@@ -65,10 +76,29 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [guardianQuery]);
 
+  async function saveConsent(id: string): Promise<boolean> {
+    const state = await api.get<ConsentState>(`/patients/${id}/consents`);
+    const lang = assisted?.language ?? "en";
+    const body = buildCaptureBody(toggles, state.notices, lang, {
+      channel: assisted ? "ASSISTED" : "DESK", guardianPatientId: minor ? guardian?.id : null,
+      witnessStaffIds: assisted?.witness ? [assisted.witness] : [], emergency, minor,
+    });
+    if (!body) { fe.set("The clinic has no privacy notice in this language yet. Publish one in Settings, then record consent from the patient file."); return false; }
+    await api.post(`/patients/${id}/consents`, body, { idempotencyKey: keys.current.get("consent", body) });
+    keys.current.done("consent");
+    return true;
+  }
+
   async function send(confirmed: boolean) {
     if (saving) return;
     setSaving(true);
     fe.clear();
+    if (registeredId) { // the record exists; only the consent is left to save
+      try { if (await saveConsent(registeredId)) onRegistered(registeredId); }
+      catch (e) { fe.set(e instanceof ApiError ? consentProblemText(String(e.problem?.type ?? "").split("/").pop() ?? "", e.detail || "Couldn't save the consent.") : "Couldn't save the consent."); }
+      finally { setSaving(false); }
+      return;
+    }
     const body = {
       name: form.name.trim(), phone: form.phone.trim(), dob: form.dob, gender: form.gender,
       address: form.address.trim() || null, ...(form.nationalId.trim() ? { nationalId: form.nationalId.trim() } : {}), guardianId: minor ? guardian?.id ?? null : null,
@@ -78,6 +108,11 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
     try {
       const created = await api.post<{ id: string }>("/patients", body, { idempotencyKey: keys.current.get("register", body) });
       keys.current.done("register");
+      if (canConsent) {
+        setRegisteredId(created.id);
+        try { if (!(await saveConsent(created.id))) return; }
+        catch (e) { fe.set((e instanceof ApiError ? consentProblemText(String(e.problem?.type ?? "").split("/").pop() ?? "", e.detail || "") : "") || "The patient is registered, but the consent was not saved. Try again."); return; }
+      }
       onRegistered(created.id);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && Array.isArray(e.problem.candidates)) {
@@ -178,6 +213,18 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
                 )}
               </>
             )}
+            {canConsent && !registeredId && (
+              <>
+                <ConsentBlock value={toggles} onChange={setToggles} minor={minor} />
+                {!toggles.processing && (
+                  <label className={styles.consentRow}>
+                    <input type="checkbox" checked={emergency} onChange={(e) => setEmergency(e.target.checked)} />
+                    <span>Emergency or treatment only: record without processing consent</span>
+                  </label>
+                )}
+                <button type="button" className={styles.secondaryBtn} onClick={() => setAssistedOpen(true)}>{assisted ? "Assisted consent ✓" : "Assisted consent"}</button>
+              </>
+            )}
             <ErrorSummary fe={fe} className={styles.errorState} />
             <div className={styles.dialogActions}>
               <button type="button" className={styles.secondaryBtn} onClick={onClose}>Cancel</button>
@@ -186,6 +233,12 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
           </>
         )}
       </form>
+      {assistedOpen && (
+        <AssistedConsent value={toggles} onChange={setToggles} minor={minor} language={assisted?.language ?? "en"} witness={assisted?.witness ?? ""}
+          onLanguage={(language) => setAssisted({ language, witness: assisted?.witness ?? "" })}
+          onWitness={(witness) => setAssisted({ language: assisted?.language ?? "en", witness })}
+          onDone={() => { setAssisted((a) => a ?? { language: "en", witness: "" }); setAssistedOpen(false); }} onClose={() => setAssistedOpen(false)} />
+      )}
     </Dialog>
   );
 }

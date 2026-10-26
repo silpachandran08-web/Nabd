@@ -230,8 +230,8 @@ public abstract class ApiTestBase {
         UUID id = UUID.randomUUID();
         String slug = "t" + id.toString().replace("-", "").substring(0, 12);
         // ADM-002: seeded clinics are 'live' (INSERT is not guarded) so the many tests that register patients keep working;
-        // DataGateApiTest flips a tenant back to demo_only to cover the gate. UTC as before OPS-061: the region default would move every suite's clinic day.
-        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone, data_gate) VALUES (?,?,?,?,?,'UTC','live')",
+        // DataGateApiTest flips a tenant back to demo_only to cover the gate. IDC-006: seeded clinics stay on the legacy consent rule (patients without a consent row stay readable) so the many fixtures that register patients keep working; Idc006* tests switch consent_default_deny on. UTC as before OPS-061: the region default would move every suite's clinic day.
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone, data_gate, consent_default_deny) VALUES (?,?,?,?,?,'UTC','live',false)",
                 id, slug, "Test Clinic " + slug, "IN", "active");
         // Every tenant gets a default department the moment it exists — same backfill guarantee
         // V37's migration gives every already-provisioned tenant, and ProvisioningStepRunner gives

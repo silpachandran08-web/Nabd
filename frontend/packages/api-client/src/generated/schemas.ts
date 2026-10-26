@@ -71,8 +71,13 @@ export const ComplianceHealthResponseSchema = z.object({ items: z.array(ItemSche
 export const ComponentSchema = z.object({ amountMinor: z.number().int().optional(), ratePercent: z.number().optional(), taxableMinor: z.number().int().optional(), type: z.string().optional() });
 export const ConditionResponseSchema = z.object({ condition: z.string().optional(), id: z.string().optional(), patientId: z.string().optional(), recordedAt: z.string().optional(), recordedBy: z.string().optional(), reviewDueDate: z.string().optional(), status: z.string().optional() });
 export const ConditionWriteRequestSchema = z.object({ condition: z.string().min(1), reviewDueDate: z.string().optional() });
+export const ConsentDecisionSchema = z.object({ granted: z.boolean(), purpose: z.string() });
+export const ConsentCaptureRequestSchema = z.object({ channel: z.string(), decisions: z.array(ConsentDecisionSchema), emergencyTreatmentBasis: z.boolean().optional(), guardianPatientId: z.string().optional(), language: z.string().min(1), noticeVersion: z.string().min(0).max(40), witnessStaffIds: z.array(z.string()).optional() });
+export const ConsentCapturedSchema = z.object({ capturedAt: z.string().optional(), granted: z.boolean().optional(), id: z.string().optional(), noticeVersion: z.string().optional(), purpose: z.string().optional() });
+export const ConsentCaptureResponseSchema = z.object({ consents: z.array(ConsentCapturedSchema).optional() });
 export const ConsentContactResponseSchema = z.object({ email: z.string().optional(), name: z.string().optional(), phone: z.string().optional() });
 export const ConsentContactWriteRequestSchema = z.object({ email: z.string().min(1), name: z.string().min(1), phone: z.string().optional() });
+export const ConsentPurposeStateSchema = z.object({ capturedAt: z.string().optional(), channel: z.string().optional(), granted: z.boolean().optional(), language: z.string().optional(), noticeVersion: z.string().optional() });
 export const ConsultExtendRequestSchema = z.object({ minutes: z.number().int() });
 export const ConsultExtendResponseSchema = z.object({ extendedBy: z.number().int().optional(), queueEntryId: z.string().optional() });
 export const CountsSchema = z.object({ appointments: z.number().int().optional(), freeSlots: z.number().int().optional(), walkIns: z.number().int().optional() });
@@ -252,6 +257,7 @@ export const RedemptionSchema = z.object({ sessionsRedeemed: z.number().int().op
 export const SalesDaySchema = z.object({ amount: z.number().optional(), count: z.number().int().optional(), date: z.string().optional() });
 export const PackagesReportResponseSchema = z.object({ expiredWithValue: z.array(ExpiredWithValueSchema).optional(), from: z.string().optional(), redemption: RedemptionSchema.optional(), salesByDay: z.array(SalesDaySchema).optional(), to: z.string().optional() });
 export const PageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
+export const PatientConsentStateSchema = z.object({ emergencyTreatmentBasis: z.boolean().optional(), needsConsent: z.boolean().optional(), needsReack: z.boolean().optional(), notices: z.record(z.string(), z.string()).optional(), processable: z.boolean().optional(), purposes: z.record(z.string(), ConsentPurposeStateSchema).optional() });
 export const PatientDetailResponseSchema = z.object({ activePackages: z.number().int().optional(), allergies: z.array(z.string()).optional(), chronicConditions: z.array(z.string()).optional(), dob: z.string().optional(), gender: z.string().optional(), guardianConsentGrantedAt: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), guardianReviewKeptAt: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), lastVisit: z.string().optional(), lastVisitAt: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), outstandingBalance: z.number().optional(), phone: z.string().optional(), status: z.string().optional() });
 export const PatientResponseSchema = z.object({ dob: z.string().optional(), gender: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), matchedOn: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), phone: z.string().optional(), status: z.string().optional() });
 export const PatientPageSchema = z.object({ data: z.array(PatientResponseSchema).optional(), page: PageMetaSchema.optional() });
@@ -406,7 +412,7 @@ export const WaitEstimateResponseSchema = z.object({ avgVisitMinutes: z.number()
 export const WaitlistAcceptRequestSchema = z.object({ slotStart: z.string().optional() });
 export const WaitlistEntryResponseSchema = z.object({ bookedAppointmentId: z.string().optional(), doctorId: z.string().optional(), id: z.string().optional(), joinedAt: z.string().optional(), offerExpiresAt: z.string().optional(), offeredSlotStart: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), status: z.string().optional() });
 export const WaitlistJoinRequestSchema = z.object({ doctorId: z.string(), patientId: z.string() });
-export const WithdrawConsentRequestSchema = z.object({ consentType: z.string().optional() });
+export const WithdrawConsentRequestSchema = z.object({ channel: z.string().optional(), consentType: z.string().optional() });
 export const WorkingHoursResponseSchema = z.object({ dayOfWeek: z.number().int().optional(), endTime: z.string().optional(), id: z.string().optional(), maxPatients: z.number().int().optional(), slotMinutes: z.number().int().optional(), startTime: z.string().optional() });
 export const WorkingHoursWriteRequestSchema = z.object({ dayOfWeek: z.number().int().gte(0).lte(6), endTime: z.string(), maxPatients: z.number().int().gte(1).optional(), slotMinutes: z.number().int().optional(), startTime: z.string() });
 export const WorklistItemSchema = z.object({ entry: QueueEntryResponseSchema.optional(), patient: PatientDetailResponseSchema.optional(), vitals: VitalsResponseSchema.optional() });
@@ -611,6 +617,8 @@ export const operationSchemas = {
   PatientController_get: { response: PatientDetailResponseSchema },
   PatientController_patch: { body: PatientPatchRequestSchema, response: PatientResponseSchema },
   PatientController_withdrawConsent: { body: WithdrawConsentRequestSchema },
+  ConsentCaptureController_state: { response: PatientConsentStateSchema },
+  ConsentCaptureController_capture: { body: ConsentCaptureRequestSchema, response: ConsentCaptureResponseSchema },
   PatientController_revokeGuardian: {  },
   PatientController_keepGuardian: { body: GuardianReviewDecisionRequestSchema, response: PatientDetailResponseSchema },
   PatientController_merge: { body: MergeRequestSchema, response: PatientDetailResponseSchema },

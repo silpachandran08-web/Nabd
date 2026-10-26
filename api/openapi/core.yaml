@@ -7413,6 +7413,87 @@ paths:
       tags:
       - patient
       x-required-permission: patients:edit
+  /v1/patients/{id}/consents:
+    get:
+      operationId: ConsentCaptureController_state
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PatientConsentState"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:view
+    post:
+      operationId: ConsentCaptureController_capture
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentCaptureRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ConsentCaptureResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/patients/{id}/guardian:
     delete:
       operationId: PatientController_revokeGuardian
@@ -14999,6 +15080,72 @@ components:
           format: date
       required:
       - condition
+    ConsentCaptureRequest:
+      type: object
+      properties:
+        channel:
+          type: string
+          pattern: DESK|ASSISTED
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentDecision"
+          maxItems: 3
+          minItems: 0
+        emergencyTreatmentBasis:
+          type: boolean
+          description: "Processing refused: record the emergency / treatment-only\
+            \ basis"
+        guardianPatientId:
+          type: string
+          format: uuid
+          description: "Required for a patient under 18: the linked guardian"
+        language:
+          type: string
+          minLength: 1
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+        noticeVersion:
+          type: string
+          maxLength: 40
+          minLength: 0
+        witnessStaffIds:
+          type: array
+          description: "ASSISTED: staff who witnessed; the capturing receptionist\
+            \ always counts as a witness"
+          items:
+            type: string
+            format: uuid
+            description: "ASSISTED: staff who witnessed; the capturing receptionist\
+              \ always counts as a witness"
+          maxItems: 3
+          minItems: 0
+      required:
+      - channel
+      - decisions
+      - language
+      - noticeVersion
+    ConsentCaptureResponse:
+      type: object
+      properties:
+        consents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsentCaptured"
+    ConsentCaptured:
+      type: object
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+        granted:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        noticeVersion:
+          type: string
+        purpose:
+          type: string
     ConsentContactResponse:
       type: object
       properties:
@@ -15023,6 +15170,31 @@ components:
       required:
       - email
       - name
+    ConsentDecision:
+      type: object
+      properties:
+        granted:
+          type: boolean
+        purpose:
+          type: string
+          pattern: processing|messaging|marketing
+      required:
+      - granted
+      - purpose
+    ConsentPurposeState:
+      type: object
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+        channel:
+          type: string
+        granted:
+          type: boolean
+        language:
+          type: string
+        noticeVersion:
+          type: string
     ConsultExtendRequest:
       type: object
       properties:
@@ -17740,6 +17912,27 @@ components:
           format: int32
         nextCursor:
           type: string
+    PatientConsentState:
+      type: object
+      properties:
+        emergencyTreatmentBasis:
+          type: boolean
+        needsConsent:
+          type: boolean
+        needsReack:
+          type: boolean
+        notices:
+          type: object
+          additionalProperties:
+            type: string
+            description: "language -> current notice version, for the capture request"
+          description: "language -> current notice version, for the capture request"
+        processable:
+          type: boolean
+        purposes:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ConsentPurposeState"
     PatientDetailResponse:
       type: object
       properties:
@@ -20878,9 +21071,12 @@ components:
     WithdrawConsentRequest:
       type: object
       properties:
+        channel:
+          type: string
+          pattern: DESK|WHATSAPP|ASSISTED|PORTAL
         consentType:
           type: string
-          pattern: treatment|data_processing|messaging
+          pattern: treatment|data_processing|messaging|marketing
     WorkflowTemplateResponse:
       type: object
       properties:

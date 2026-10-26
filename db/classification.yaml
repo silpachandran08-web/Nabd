@@ -237,6 +237,7 @@ schemas:
       channel: operational
       witness_staff_id: operational
       evidence: pii
+      guardian_patient_id: pii
     crypto_reencrypt_progress:
       table_name: operational
       column_name: operational
@@ -1354,6 +1355,8 @@ schemas:
       facility_type: operational
       billing_mode: operational
       tax_registration_id: operational
+      consent_default_deny: operational
+      consent_two_witnesses: operational
     vaccine_records:
       id: operational
       tenant_id: operational

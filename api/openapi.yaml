@@ -1388,6 +1388,30 @@ paths:
         "200": { description: "Published", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticePublished" } } } }
         "409": { description: "version-conflict (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "422": { description: "mandatory-clause-locked | unknown-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /patients/{id}/consents:
+    get:
+      tags: [Patients]
+      summary: Current consent state per purpose, whether the patient is processable, and whether a newer notice needs re-acknowledging (IDC-004)
+      x-required-permission: patients:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "State", content: { application/json: { schema: { $ref: "#/components/schemas/PatientConsentState" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Patients]
+      summary: Record the patient's consent decisions at the desk (DESK) or assisted and witnessed (ASSISTED), against the current notice version (IDC-004, IDC-007)
+      x-required-permission: patients:edit
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ConsentCaptureRequest" } } }
+      responses:
+        "201": { description: "Recorded", content: { application/json: { schema: { $ref: "#/components/schemas/ConsentCaptureResponse" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "notice-version-stale (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "guardian-required | processing-required | minor-marketing-blocked | second-witness-required | witness-unknown (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /patients/{patientId}/privacy-notice:
     get:
       tags: [Patients]
@@ -2069,7 +2093,8 @@ paths:
             schema:
               type: object
               properties:
-                consentType: { type: string, enum: [treatment, data_processing, messaging], default: data_processing }
+                consentType: { type: string, enum: [treatment, data_processing, messaging, marketing], default: data_processing }
+                channel: { type: string, enum: [DESK, WHATSAPP, ASSISTED, PORTAL] }
       responses:
         "204": { description: Withdrawn }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -6001,6 +6026,56 @@ components:
       type: object
       required: [version]
       properties: { version: { type: string } }
+    ConsentDecision:
+      type: object
+      required: [purpose, granted]
+      properties:
+        purpose: { type: string, enum: [processing, messaging, marketing] }
+        granted: { type: boolean }
+    ConsentCaptureRequest:
+      type: object
+      required: [decisions, noticeVersion, language, channel]
+      properties:
+        decisions: { type: array, minItems: 1, maxItems: 3, items: { $ref: "#/components/schemas/ConsentDecision" } }
+        noticeVersion: { type: string, maxLength: 40 }
+        language: { type: string }
+        channel: { type: string, enum: [DESK, ASSISTED] }
+        guardianPatientId: { type: string, format: uuid, description: "Required for a patient under 18: the linked guardian" }
+        witnessStaffIds: { type: array, maxItems: 3, items: { type: string, format: uuid }, description: "ASSISTED: staff who witnessed; the capturing receptionist always counts as a witness" }
+        emergencyTreatmentBasis: { type: boolean, description: "Processing refused: record the emergency / treatment-only basis" }
+    ConsentCaptured:
+      type: object
+      required: [id, purpose, granted, noticeVersion, capturedAt]
+      properties:
+        id: { type: string, format: uuid }
+        purpose: { type: string }
+        granted: { type: boolean }
+        noticeVersion: { type: string }
+        capturedAt: { type: string, format: date-time }
+    ConsentCaptureResponse:
+      type: object
+      required: [consents]
+      properties:
+        consents: { type: array, items: { $ref: "#/components/schemas/ConsentCaptured" } }
+    ConsentPurposeState:
+      type: object
+      required: [granted]
+      properties:
+        granted: { type: boolean }
+        noticeVersion: { type: [string, "null"] }
+        language: { type: [string, "null"] }
+        channel: { type: [string, "null"] }
+        capturedAt: { type: string, format: date-time }
+    PatientConsentState:
+      type: object
+      required: [purposes, needsReack, processable, needsConsent, emergencyTreatmentBasis, notices]
+      properties:
+        purposes: { type: object, additionalProperties: { $ref: "#/components/schemas/ConsentPurposeState" } }
+        needsReack: { type: boolean }
+        processable: { type: boolean }
+        needsConsent: { type: boolean }
+        emergencyTreatmentBasis: { type: boolean }
+        notices: { type: object, additionalProperties: { type: string }, description: "language -> current notice version, for the capture request" }
     PrivacyNoticeStatus:
       type: object
       required: [needsReAcknowledgement]

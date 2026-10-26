@@ -84,7 +84,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `clinical.allergy.changed.v1` | AllergyService add / correct / deactivate / no-known-allergies (subject = patient) | patientId, allergyId?, change, status |
 | `billing.invoice.paid.v1` | CheckoutService.recordPayment, when the invoice becomes paid | invoiceId, totalMinor, currency, status |
 | `billing.payment.recorded.v1` | CheckoutService.recordPayment (converted from the FIN-001 event; same keys) | invoiceId, paymentId, method, amountMinor, currency, balanceMinor, status |
-| `consent.changed.v1` | PatientService.withdrawConsent, guardian consent grant / withdraw | patientId, consentType, status |
+| `consent.changed.v1` | PatientService.withdrawConsent, guardian consent grant / withdraw, ConsentCaptureService (IDC-004 desk and assisted capture) | patientId, consentType, status, noticeVersion?, guardianRef? |
 | `organization.config.changed.v1` | SetupService.updatePolicy, updateProfile (key only, never the value) | configKey, status |
 | `organization.tenant.region_pinned.v1` | ProvisioningStepRunner.goLive (OPS-061; the region is immutable from here). Consumer: the Control Plane cell-routing record, **needs external action** (the control-plane service is not in this repo) | regionCode, cell |
 | `organization.privacy_notice.published.v1` | NoticeService.publish and the first seed when the clinic saves its consent contact (IDC-003). Re-acknowledgement is derived at read time from the patient's latest consent, so core needs no projection. Consumer patient-edge: **needs external action** (service not in this tree) | noticeVersion, languages |
