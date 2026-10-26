@@ -56,8 +56,8 @@ test("a burst after a save starts a fresh 30 s window; cancel drops a pending sa
   a.touch(); a.cancel(); f.advance(1000); assert.equal(saves, 1);
 });
 
-test("the consult page uses the debounce and no 10 s interval", () => {
-  const s = readFileSync("app/consult/page.tsx", "utf8");
+test("the consult note editor (split out of the consult page by FEF-030) uses the debounce and no 10 s interval", () => {
+  const s = readFileSync("app/components/consult/note/useNoteEditor.ts", "utf8");
   assert.match(s, /createAutosave/);
   assert.doesNotMatch(s, /AUTOSAVE_MS|setInterval\(\(\) => \{\s*if \(dirtyRef/);
 });

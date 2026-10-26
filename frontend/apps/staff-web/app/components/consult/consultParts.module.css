@@ -108,3 +108,5 @@
 .myM { margin-block: var(--nb-space-12); }
 .iconPlain, .iconFilled { display: inline-flex; }
 .iconFilled svg { fill: currentColor; fill-opacity: 0.3; }
+.viewerFrame { inline-size: 100%; block-size: 70vh; border: 0; }
+.viewerImg { max-inline-size: 100%; }

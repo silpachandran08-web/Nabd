@@ -56,7 +56,14 @@
     "priority": "प्राथमिकता",
     "rowLabel": "{name} का विवरण खोलें, टोकन {token}",
     "waitShort": "{n} मि.",
-    "waitLong": "{n} मिनट"
+    "waitLong": "{n} मिनट",
+    "why": {
+      "priority": "प्राथमिकता",
+      "booked_on_time": "बुक किया हुआ",
+      "interleave": "वॉक-इन की बारी",
+      "reserved_slot": "आरक्षित वॉक-इन स्लॉट"
+    },
+    "nextWhy": "अगला {position} · {reason}{range, select, none {} other { · {range}}}"
   },
   "visit": {
     "appointment": "अपॉइंटमेंट",
@@ -320,5 +327,34 @@
       "back": "वापस जाएँ / बंद करें",
       "help": "यह सूची दिखाएँ"
     }
+  },
+  "doctorBoard": {
+    "hint": "प्रतीक्षा कर रहे मरीज़ को दूसरे डॉक्टर तक खींचें, या कार्ड पर फ़ोकस करके M दबाएँ, फिर कॉलम नंबर। P प्राथमिकता चिह्नित करता है।",
+    "colLabel": "{name}, कॉलम {number}",
+    "state": {
+      "in": "उपस्थित",
+      "paused": "रुके हुए",
+      "out": "अनुपस्थित"
+    },
+    "nowServing": "अभी T-{token}",
+    "late": "{minutes} मिनट देरी से",
+    "noPatients": "कोई मरीज़ नहीं",
+    "cardLabel": "{token}, {name}, {stage}{priority, select, true {, प्राथमिकता} other {}}",
+    "priority": "प्राथमिकता",
+    "allergy": "एलर्जी",
+    "dialogTitle": "मरीज़ को स्थानांतरित करें",
+    "confirm": "{token} ({name}) को {from} से {to} के पास भेजें? मरीज़ को {to} का अगला टोकन मिलेगा।",
+    "reason": "कारण",
+    "cancel": "रद्द करें",
+    "move": "स्थानांतरित करें",
+    "moving": "स्थानांतरित हो रहा है...",
+    "moved": "स्थानांतरित हो गया। नया टोकन T-{token}, पहले T-{previous} था।",
+    "moveFail": "इस मरीज़ को स्थानांतरित नहीं किया जा सका।",
+    "movingNote": "{token} को स्थानांतरित कर रहे हैं। कॉलम नंबर दबाएँ, या Escape।",
+    "pickOther": "किसी दूसरे डॉक्टर का कॉलम नंबर चुनें।",
+    "loading": "डॉक्टर बोर्ड लोड हो रहा है",
+    "loadFail": "डॉक्टर बोर्ड लोड नहीं हो सका।",
+    "emptyTitle": "बोर्ड पर कोई डॉक्टर नहीं",
+    "emptyHint": "कार्य-समय वाले या आज मरीज़ वाले डॉक्टर यहाँ दिखते हैं।"
   }
 }

@@ -1,7 +1,7 @@
 // ADM-018: tile arithmetic and the two row predicates.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-const { staffKpis, needsMfaReminder, isSeatLimit } = await import("../../app/staff/staffKpis.ts");
+const { staffKpis, needsMfaReminder, isSeatLimit } = await import("../../app/(clinic)/staff/staffKpis.ts");
 
 const a = (loginMethod, status = "active", loginFactors = []) => ({ status, loginMethod, loginFactors });
 test("counts active, pending and MFA coverage over people who need or have an authenticator", () => {

@@ -31,8 +31,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { skip, input, role, roles, items, owner, tenantId } = useShellNav();
-  const { badges } = useNavBadges(skip ? null : role, input.perms, pathname);
+  const { input, role, roles, items, owner, tenantId } = useShellNav();
+  const { badges } = useNavBadges(role, input.perms, pathname);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [sessionLabel, setSessionLabel] = useState("—");
@@ -55,12 +55,12 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // Hydration-safe: read the identity after mount, never during render.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIdentity(skip ? null : getIdentity());
-  }, [pathname, skip, input.perms]);
+    setIdentity(getIdentity());
+  }, [pathname, input.perms]);
 
   // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
   useEffect(() => {
-    if (skip || !owner || !input.perms.includes("setup:view")) return;
+    if (!owner || !input.perms.includes("setup:view")) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
     const ctrl = new AbortController();
@@ -73,12 +73,11 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       })
       .catch(() => {});
     return () => { cancelled = true; ctrl.abort(); };
-  }, [skip, owner, input.perms]);
+  }, [owner, input.perms]);
 
-  if (skip || input.perms.length === 0 || items.length === 0) return null;
+  const pharmacyCaps = usePharmacyCapabilities(input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
+  if (input.perms.length === 0 || items.length === 0) return null;
   const currentTab = searchParams.get("tab");
-
-  const pharmacyCaps = usePharmacyCapabilities(pathname, input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
   const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined }));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4): 4 items + "More" when there are more.
   const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;

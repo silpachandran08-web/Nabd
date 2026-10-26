@@ -1,6 +1,7 @@
 "use client";
 
 import AccessGate from "../../components/ui/AccessGate";
+import RequestsCard from "../../components/requests/RequestsCard";
 import MyDay from "../../components/myday/MyDay";
 
 // DOC-002: the doctor's home. Every read behind it (GET /queue, /appointments, /doctors/{id}/delay,
@@ -9,7 +10,7 @@ import MyDay from "../../components/myday/MyDay";
 export default function MyDayPage() {
   return (
     <AccessGate permission="queue:view" surface="My Day">
-      <MyDay />
+      <MyDay requestsSlot={<RequestsCard />} />
     </AccessGate>
   );
 }

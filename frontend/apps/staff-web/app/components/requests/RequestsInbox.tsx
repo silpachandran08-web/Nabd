@@ -22,19 +22,18 @@ export default function RequestsInbox() {
   const r = useBookingRequests();
   const tz = useClinicTimeZone();
   const now = useNow(15_000);
-  const [sel, setSel] = useState(0);
+  const [selRaw, setSel] = useState(0);
   const [dialog, setDialog] = useState<{ kind: "suggest" | "decline"; item: RequestItem } | null>(null);
   const rows = useRef<(HTMLLIElement | null)[]>([]);
   const items = r.items ?? [];
-
-  useEffect(() => { if (sel > 0 && sel >= items.length) setSel(Math.max(0, items.length - 1)); }, [items.length, sel]);
+  const sel = Math.min(selRaw, Math.max(0, items.length - 1)); // the list can shrink under the cursor
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const act = keyAction(e as unknown as Parameters<typeof keyAction>[0], dialog !== null);
       if (!act) return;
       const cur = items[sel];
-      if (act === "next") setSel((i) => Math.min(items.length - 1, i + 1));
-      else if (act === "prev") setSel((i) => Math.max(0, i - 1));
+      if (act === "next") setSel(Math.min(items.length - 1, sel + 1));
+      else if (act === "prev") setSel(Math.max(0, sel - 1));
       else if (!cur) return;
       else if (act === "accept") void r.accept(cur.appointmentId);
       else setDialog({ kind: act, item: cur });
