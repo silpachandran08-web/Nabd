@@ -123,6 +123,7 @@ class S11QaPlt016PresetEscalationTest extends ApiTestBase {
     @Test
     void ac5_newClinicOwner_tokenAndApiRefuseClinicalCreateEditApprove_butViewWorks() {
         UUID tenantId = provisionTenant("q3o" + UUID.randomUUID().toString().substring(0, 8));
+        new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).update("UPDATE tenants SET consent_default_deny = false WHERE id = ?", tenantId); // IDC-006: provisioned clinics default-deny; this test is about roles, not consent
         SeededTenant t = tenantRef(tenantId, jdbc.queryForObject("SELECT slug FROM tenants WHERE id = ?", String.class, tenantId));
         UUID ownerRole = inTenantTx(tenantId, () -> jdbc.queryForObject("SELECT id FROM roles WHERE preset_code = 'owner'", UUID.class));
         UUID doctorRole = inTenantTx(tenantId, () -> jdbc.queryForObject("SELECT id FROM roles WHERE preset_code = 'doctor'", UUID.class));
