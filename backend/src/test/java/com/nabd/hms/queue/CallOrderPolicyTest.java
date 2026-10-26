@@ -112,12 +112,12 @@ class CallOrderPolicyTest {
         int booked = 10 + rnd.nextInt(8);
         for (int i = 0; i < booked; i++) { // slots every 15 min, arrivals -10..+12 min around the slot
             int slot = i * 15, arr = Math.max(0, slot - 10 + rnd.nextInt(23));
-            Candidate c = new Candidate(UUID.randomUUID(), at(arr), at(slot), false, null, false);
+            Candidate c = new Candidate(new UUID(rnd.nextLong(), rnd.nextLong()), at(arr), at(slot), false, null, false);
             all.add(c);
         }
         int walkins = 1 + rnd.nextInt(5);
         for (int i = 0; i < walkins; i++) {
-            all.add(new Candidate(UUID.randomUUID(), at(rnd.nextInt(booked * 15)), null, false, null, false));
+            all.add(new Candidate(new UUID(rnd.nextLong(), rnd.nextLong()), at(rnd.nextInt(booked * 15)), null, false, null, false));
         }
         Set<UUID> walk = new java.util.HashSet<>();
         all.stream().filter(c -> c.slotStart() == null).forEach(c -> walk.add(c.id()));
