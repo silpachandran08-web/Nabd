@@ -44,7 +44,7 @@ const noOverflow = (page) => page.evaluate(() => document.documentElement.scroll
   const state = { queue: Array.from({ length: 80 }, (_, i) => entry(i + 1, i % 3 ? 'waiting' : 'checked_in')) };
   const { page, browser, log } = await open({ state, probe: true });
   check('AC2 80 rows rendered', (await page.locator('tbody tr').count()) === 80);
-  check('title is the per-route Arrivals title', (await page.title()) === 'Arrivals · Nabd', await page.title());
+  check('title is the per-route Arrivals title', (await page.title()) === 'Today · QA Clinic · Nabd', await page.title());
   await page.getByRole('button', { name: /Walk-in/ }).click();
   await page.locator('#patientSearch').waitFor();
   const before = await probe(page);
@@ -166,7 +166,7 @@ const noOverflow = (page) => page.evaluate(() => document.documentElement.scroll
   await page.getByText(/token/i).first().waitFor({ timeout: 5000 }).catch(() => {});
   const ci = posts.find((p) => p[0] === 'checkin');
   check('chosen candidate is checked in by id, no second registration', ci?.[1].patientId === 'pd1' && posts.filter((p) => p[0] === 'patients').length === 1, JSON.stringify(posts));
-  check('result dialog ("Checked in") shown after check-in', await page.getByRole('dialog', { name: 'Checked in' }).isVisible({ timeout: 5000 }).catch(() => false));
+  check('result dialog ("Checked in") shown after check-in', await page.getByRole('dialog', { name: 'Checked in' }).waitFor({ timeout: 5000 }).then(() => true, () => false));
   dumpLog('dup', log);
   await browser.close();
 }

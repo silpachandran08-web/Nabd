@@ -313,7 +313,7 @@ async function nursing(count, perms = ['queue:view', 'queue:edit', 'nursing:view
 for (const count of [40, 100]) {
   const { page, browser, net, log } = await nursing(count);
   const total = net.length;
-  check(`AC6 Nursing ${count} entries: <= 8 API requests on load (network level)`, total <= 8, `${total}: ${net.map((r) => r.path).join(', ')}`);
+  check(`AC6 Nursing ${count} entries: <= 9 API requests (8 + PLT-059 /me/entitlements) on load (network level)`, total <= 9, `${total}: ${net.map((r) => r.path).join(', ')}`);
   check(`AC6 Nursing ${count}: no per-row /patients or /clinical/vitals requests`, n(net, /^\/(patients|clinical\/vitals)\//) === 0);
   check(`AC6 Nursing ${count}: rows rendered`, (await page.getByText(/^Patient \d+$/).count()) > 0, `${await page.getByText(/^Patient \d+$/).count()}`);
   const t = Date.now(); await refocus(page); await sleep(1500);
