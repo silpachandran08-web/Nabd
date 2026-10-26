@@ -18,7 +18,7 @@ modules:
     owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoices, tax_rules]
     reads: [pharmacy_item_profiles]  # PHL-004: checkout never offers an item flagged 'buy outside' (in_house = false)
   clinical:
-    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, ingredients, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, rx_coding_suggestions, safety_dictionary_entries, safety_dictionary_versions, vitals]
+    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, rx_coding_suggestions, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
   common:
     owns: [audit_chain_heads, audit_chain_seals, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
@@ -68,5 +68,5 @@ modules:
     owns: [appointments, booking_request_details, booking_request_offers, booking_routing_settings, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_queue_settings, queue_entries, queue_entry_events, service_time_stats, session_reserved_slots, specialty_service_defaults, waitlist_entries]
     reads: []
   shared:
-    owns: [idempotency_keys, projector_applied_events, shedlock]
-    reads: []
+    owns: [file_blocked_alerts, file_objects, idempotency_keys, projector_applied_events, shedlock]
+    reads: [staff, roles]  # PLT-029: file_blocked_alerts fans out to the owner staff (built-in role); no owner API exists yet

@@ -280,6 +280,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.BOOKING_ROUTED.type()); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
         expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
+        expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

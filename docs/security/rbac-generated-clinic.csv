@@ -56,6 +56,7 @@ owner,GET /v1/clinical/rx-sets,clinical:view,allow
 owner,GET /v1/clinical/safety-dictionary,clinical:view,allow
 owner,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 owner,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+owner,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 owner,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 owner,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
 owner,GET /v1/compliance/health,setup:view,allow
@@ -69,6 +70,7 @@ owner,GET /v1/doctors/{id}/delay,queue:view,allow
 owner,GET /v1/doctors/{id}/leave,queue:view,allow
 owner,GET /v1/doctors/{id}/session,queue:view,allow
 owner,GET /v1/doctors/{id}/working-hours,queue:view,allow
+owner,GET /v1/files/{id},clinical:view,allow
 owner,GET /v1/nursing/activity/today,nursing:view,allow
 owner,GET /v1/nursing/administration-orders/today,nursing:view,allow
 owner,GET /v1/nursing/procedure-orders/today,nursing:view,allow
@@ -230,6 +232,7 @@ owner,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,d
 owner,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 owner,POST /v1/clinical/rx-sets,clinical:edit,deny-403
 owner,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
+owner,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-403
 owner,POST /v1/departments,departments:create,allow
 owner,POST /v1/departments/transfers,departments:edit,allow
 owner,POST /v1/departments/{id}/workflow,departments:edit,allow
@@ -238,6 +241,9 @@ owner,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 owner,POST /v1/doctors/{id}/leave,queue:edit,allow
 owner,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,allow
 owner,POST /v1/doctors/{id}/working-hours,setup:edit,allow
+owner,POST /v1/files/uploads,clinical:create,deny-403
+owner,POST /v1/files/uploads/{id}/complete,clinical:create,deny-403
+owner,POST /v1/files/{id}/download-url,clinical:view,allow
 owner,POST /v1/nursing/administration-orders,nursing:create,allow
 owner,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,allow
 owner,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,allow
@@ -381,6 +387,7 @@ owner_doctor,GET /v1/clinical/rx-sets,clinical:view,allow
 owner_doctor,GET /v1/clinical/safety-dictionary,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+owner_doctor,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 owner_doctor,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 owner_doctor,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
 owner_doctor,GET /v1/compliance/health,setup:view,allow
@@ -394,6 +401,7 @@ owner_doctor,GET /v1/doctors/{id}/delay,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/leave,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/session,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
+owner_doctor,GET /v1/files/{id},clinical:view,allow
 owner_doctor,GET /v1/nursing/activity/today,nursing:view,allow
 owner_doctor,GET /v1/nursing/administration-orders/today,nursing:view,allow
 owner_doctor,GET /v1/nursing/procedure-orders/today,nursing:view,allow
@@ -555,6 +563,7 @@ owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical
 owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 owner_doctor,POST /v1/clinical/rx-sets,clinical:edit,allow
 owner_doctor,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
+owner_doctor,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,allow
 owner_doctor,POST /v1/departments,departments:create,allow
 owner_doctor,POST /v1/departments/transfers,departments:edit,allow
 owner_doctor,POST /v1/departments/{id}/workflow,departments:edit,allow
@@ -563,6 +572,9 @@ owner_doctor,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 owner_doctor,POST /v1/doctors/{id}/leave,queue:edit,allow
 owner_doctor,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,allow
 owner_doctor,POST /v1/doctors/{id}/working-hours,setup:edit,allow
+owner_doctor,POST /v1/files/uploads,clinical:create,allow
+owner_doctor,POST /v1/files/uploads/{id}/complete,clinical:create,allow
+owner_doctor,POST /v1/files/{id}/download-url,clinical:view,allow
 owner_doctor,POST /v1/nursing/administration-orders,nursing:create,allow
 owner_doctor,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,allow
 owner_doctor,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,allow
@@ -706,6 +718,7 @@ doctor,GET /v1/clinical/rx-sets,clinical:view,allow
 doctor,GET /v1/clinical/safety-dictionary,clinical:view,allow
 doctor,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 doctor,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+doctor,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 doctor,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 doctor,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
 doctor,GET /v1/compliance/health,setup:view,deny-403
@@ -719,6 +732,7 @@ doctor,GET /v1/doctors/{id}/delay,queue:view,allow
 doctor,GET /v1/doctors/{id}/leave,queue:view,allow
 doctor,GET /v1/doctors/{id}/session,queue:view,allow
 doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
+doctor,GET /v1/files/{id},clinical:view,allow
 doctor,GET /v1/nursing/activity/today,nursing:view,allow
 doctor,GET /v1/nursing/administration-orders/today,nursing:view,allow
 doctor,GET /v1/nursing/procedure-orders/today,nursing:view,allow
@@ -880,6 +894,7 @@ doctor,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,
 doctor,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 doctor,POST /v1/clinical/rx-sets,clinical:edit,allow
 doctor,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
+doctor,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,allow
 doctor,POST /v1/departments,departments:create,deny-403
 doctor,POST /v1/departments/transfers,departments:edit,deny-403
 doctor,POST /v1/departments/{id}/workflow,departments:edit,deny-403
@@ -888,6 +903,9 @@ doctor,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 doctor,POST /v1/doctors/{id}/leave,queue:edit,allow
 doctor,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 doctor,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+doctor,POST /v1/files/uploads,clinical:create,allow
+doctor,POST /v1/files/uploads/{id}/complete,clinical:create,allow
+doctor,POST /v1/files/{id}/download-url,clinical:view,allow
 doctor,POST /v1/nursing/administration-orders,nursing:create,allow
 doctor,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-403
 doctor,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-403
@@ -1031,6 +1049,7 @@ nurse,GET /v1/clinical/rx-sets,clinical:view,allow
 nurse,GET /v1/clinical/safety-dictionary,clinical:view,allow
 nurse,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 nurse,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+nurse,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 nurse,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 nurse,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
 nurse,GET /v1/compliance/health,setup:view,deny-403
@@ -1044,6 +1063,7 @@ nurse,GET /v1/doctors/{id}/delay,queue:view,allow
 nurse,GET /v1/doctors/{id}/leave,queue:view,allow
 nurse,GET /v1/doctors/{id}/session,queue:view,allow
 nurse,GET /v1/doctors/{id}/working-hours,queue:view,allow
+nurse,GET /v1/files/{id},clinical:view,allow
 nurse,GET /v1/nursing/activity/today,nursing:view,allow
 nurse,GET /v1/nursing/administration-orders/today,nursing:view,allow
 nurse,GET /v1/nursing/procedure-orders/today,nursing:view,allow
@@ -1205,6 +1225,7 @@ nurse,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,a
 nurse,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 nurse,POST /v1/clinical/rx-sets,clinical:edit,allow
 nurse,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
+nurse,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,allow
 nurse,POST /v1/departments,departments:create,deny-403
 nurse,POST /v1/departments/transfers,departments:edit,deny-403
 nurse,POST /v1/departments/{id}/workflow,departments:edit,deny-403
@@ -1213,6 +1234,9 @@ nurse,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 nurse,POST /v1/doctors/{id}/leave,queue:edit,allow
 nurse,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 nurse,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+nurse,POST /v1/files/uploads,clinical:create,allow
+nurse,POST /v1/files/uploads/{id}/complete,clinical:create,allow
+nurse,POST /v1/files/{id}/download-url,clinical:view,allow
 nurse,POST /v1/nursing/administration-orders,nursing:create,allow
 nurse,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,allow
 nurse,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,allow
@@ -1356,6 +1380,7 @@ receptionist,GET /v1/clinical/rx-sets,clinical:view,deny-403
 receptionist,GET /v1/clinical/safety-dictionary,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-403
+receptionist,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-403
 receptionist,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-403
 receptionist,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-403
 receptionist,GET /v1/compliance/health,setup:view,deny-403
@@ -1369,6 +1394,7 @@ receptionist,GET /v1/doctors/{id}/delay,queue:view,allow
 receptionist,GET /v1/doctors/{id}/leave,queue:view,allow
 receptionist,GET /v1/doctors/{id}/session,queue:view,allow
 receptionist,GET /v1/doctors/{id}/working-hours,queue:view,allow
+receptionist,GET /v1/files/{id},clinical:view,deny-403
 receptionist,GET /v1/nursing/activity/today,nursing:view,deny-403
 receptionist,GET /v1/nursing/administration-orders/today,nursing:view,deny-403
 receptionist,GET /v1/nursing/procedure-orders/today,nursing:view,deny-403
@@ -1530,6 +1556,7 @@ receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical
 receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-403
 receptionist,POST /v1/clinical/rx-sets,clinical:edit,deny-403
 receptionist,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
+receptionist,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-403
 receptionist,POST /v1/departments,departments:create,deny-403
 receptionist,POST /v1/departments/transfers,departments:edit,deny-403
 receptionist,POST /v1/departments/{id}/workflow,departments:edit,deny-403
@@ -1538,6 +1565,9 @@ receptionist,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 receptionist,POST /v1/doctors/{id}/leave,queue:edit,allow
 receptionist,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 receptionist,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+receptionist,POST /v1/files/uploads,clinical:create,deny-403
+receptionist,POST /v1/files/uploads/{id}/complete,clinical:create,deny-403
+receptionist,POST /v1/files/{id}/download-url,clinical:view,deny-403
 receptionist,POST /v1/nursing/administration-orders,nursing:create,deny-403
 receptionist,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-403
 receptionist,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-403
@@ -1681,6 +1711,7 @@ frontdesk_vitals,GET /v1/clinical/rx-sets,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/safety-dictionary,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+frontdesk_vitals,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
 frontdesk_vitals,GET /v1/compliance/health,setup:view,deny-403
@@ -1694,6 +1725,7 @@ frontdesk_vitals,GET /v1/doctors/{id}/delay,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/leave,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/session,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/working-hours,queue:view,allow
+frontdesk_vitals,GET /v1/files/{id},clinical:view,allow
 frontdesk_vitals,GET /v1/nursing/activity/today,nursing:view,deny-403
 frontdesk_vitals,GET /v1/nursing/administration-orders/today,nursing:view,deny-403
 frontdesk_vitals,GET /v1/nursing/procedure-orders/today,nursing:view,deny-403
@@ -1855,6 +1887,7 @@ frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clin
 frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 frontdesk_vitals,POST /v1/clinical/rx-sets,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
+frontdesk_vitals,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/departments,departments:create,deny-403
 frontdesk_vitals,POST /v1/departments/transfers,departments:edit,deny-403
 frontdesk_vitals,POST /v1/departments/{id}/workflow,departments:edit,deny-403
@@ -1863,6 +1896,9 @@ frontdesk_vitals,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 frontdesk_vitals,POST /v1/doctors/{id}/leave,queue:edit,allow
 frontdesk_vitals,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 frontdesk_vitals,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+frontdesk_vitals,POST /v1/files/uploads,clinical:create,allow
+frontdesk_vitals,POST /v1/files/uploads/{id}/complete,clinical:create,allow
+frontdesk_vitals,POST /v1/files/{id}/download-url,clinical:view,allow
 frontdesk_vitals,POST /v1/nursing/administration-orders,nursing:create,deny-403
 frontdesk_vitals,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-403
 frontdesk_vitals,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-403

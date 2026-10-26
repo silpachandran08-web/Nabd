@@ -33,6 +33,8 @@ export const AppointmentPageSchema = z.object({ data: z.array(AppointmentRespons
 export const AppointmentWriteRequestSchema = z.object({ doctorId: z.string(), followUpOrDefault: z.boolean().optional(), isFollowUp: z.boolean().optional(), patientId: z.string(), startTime: z.string() });
 export const ApproveRefundRequestSchema = z.object({ expectedAmount: z.number().optional() });
 export const ApproveRequestSchema = z.object({ approvedBy: z.string().min(0).max(200), csoApprovalRef: z.string().min(0).max(200) });
+export const AttachmentCreateRequestSchema = z.object({ fileId: z.string(), kind: z.string(), note: z.string().min(0).max(500).optional() });
+export const AttachmentCreateResponseSchema = z.object({ attachmentId: z.string().optional() });
 export const JsonNodeSchema = z.record(z.string(), z.unknown());
 export const AuditEntryResponseSchema = z.object({ action: z.string().optional(), actorId: z.string().optional(), actorName: z.string().optional(), actorRole: z.string().optional(), actorType: z.string().optional(), after: JsonNodeSchema.optional(), before: JsonNodeSchema.optional(), createdAt: z.string().optional(), entityId: z.string().optional(), entityType: z.string().optional(), id: z.number().int().optional(), ipAddress: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional() });
 export const AuditLogPageSchema = z.object({ data: z.array(AuditEntryResponseSchema).optional(), page: PageMetaSchema.optional() });
@@ -176,6 +178,12 @@ export const PrescriptionItemRequestSchema = z.object({ brandName: z.string().mi
 export const FavouriteRxSetRequestSchema = z.object({ items: z.array(PrescriptionItemRequestSchema), name: z.string().min(0).max(120), scope: z.string().optional() });
 export const FavouriteRxSetResponseSchema = z.object({ canEdit: z.boolean().optional(), createdAt: z.string().optional(), doctorId: z.string().optional(), id: z.string().optional(), items: z.array(FavouriteRxSetItemResponseSchema).optional(), lastUsedAt: z.string().optional(), name: z.string().optional(), ownerName: z.string().optional(), scope: z.string().optional(), shared: z.boolean().optional(), staleCheckAvailable: z.boolean().optional(), staleItemCount: z.number().int().optional(), updatedAt: z.string().optional() });
 export const FavouriteRxSetUpdateRequestSchema = z.object({ items: z.array(PrescriptionItemRequestSchema).optional(), name: z.string().min(1).max(120).optional(), scope: z.string().optional() });
+export const FileDownloadUrlResponseSchema = z.object({ expiresAt: z.string().optional(), patientId: z.string().optional(), url: z.string().optional() });
+export const FileStatusResponseSchema = z.object({ contentType: z.string().optional(), createdAt: z.string().optional(), fileId: z.string().optional(), sizeBytes: z.number().int().optional(), status: z.string().optional() });
+export const FileUploadCompleteRequestSchema = z.object({ sha256: z.string().optional() });
+export const FileUploadCompleteResponseSchema = z.object({ fileId: z.string().optional(), status: z.string().optional() });
+export const FileUploadInitRequestSchema = z.object({ contentType: z.string().min(1), purpose: z.string().min(1), sizeBytes: z.number().int() });
+export const FileUploadInitResponseSchema = z.object({ maxBytes: z.number().int().optional(), putUrl: z.string().optional(), uploadId: z.string().optional() });
 export const TenantSummaryResponseSchema = z.object({ brandName: z.string().optional(), createdAt: z.string().optional(), id: z.string().optional(), name: z.string().optional(), ownerEmail: z.string().optional(), ownerName: z.string().optional(), privilegedMfaEnrolled: z.number().int().optional(), privilegedMfaPercent: z.number().int().optional(), privilegedUsers: z.number().int().optional(), region: z.string().optional(), slug: z.string().optional(), status: z.string().optional() });
 export const FleetPageSchema = z.object({ data: z.array(TenantSummaryResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const FleetSummaryResponseSchema = z.object({ byStatus: z.record(z.string(), z.number().int()).optional(), live: z.number().int().optional(), regions: z.array(z.string()).optional(), total: z.number().int().optional(), trialing: z.number().int().optional() });
@@ -435,6 +443,8 @@ export const UnlockRequestSchema = z.object({ pin: z.string().min(1) });
 export const UpdateRequestSchema = z.object({ assessment: z.string().optional(), favourite: z.boolean().optional(), name: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), subjective: z.string().optional(), tags: z.array(z.string()).optional() });
 export const VaccineRecordRequestSchema = z.object({ dose: z.string().min(0).max(100), expiryDate: z.string().optional(), lotNumber: z.string().min(0).max(100).optional(), notes: z.string().min(0).max(1000).optional(), patientId: z.string(), queueEntryId: z.string().optional(), route: z.string(), site: z.string().min(0).max(100).optional(), vaccineName: z.string().min(0).max(200) });
 export const VaccineRecordResponseSchema = z.object({ administeredAt: z.string().optional(), dose: z.string().optional(), expiryDate: z.string().optional(), id: z.string().optional(), lotNumber: z.string().optional(), notes: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), queueEntryId: z.string().optional(), recordedByName: z.string().optional(), route: z.string().optional(), site: z.string().optional(), vaccineName: z.string().optional() });
+export const VisitAttachmentItemSchema = z.object({ attachmentId: z.string().optional(), contentType: z.string().optional(), createdAt: z.string().optional(), fileId: z.string().optional(), kind: z.string().optional(), note: z.string().optional(), patientId: z.string().optional() });
+export const VisitAttachmentListSchema = z.object({ items: z.array(VisitAttachmentItemSchema).optional() });
 export const VitalsResponseSchema = z.object({ abnormalFlags: z.array(z.string()).optional(), bloodSugar: z.number().optional(), bpDiastolic: z.number().int().optional(), bpSystolic: z.number().int().optional(), heightCm: z.number().optional(), id: z.string().optional(), painScore: z.number().int().optional(), patientId: z.string().optional(), pulseBpm: z.number().int().optional(), queueEntryId: z.string().optional(), recordedAt: z.string().optional(), recordedBy: z.string().optional(), spo2Percent: z.number().int().optional(), tempCelsius: z.number().optional(), weightKg: z.number().optional() });
 export const VitalsHistoryResponseSchema = z.object({ items: z.array(VitalsResponseSchema).optional() });
 export const VitalsWriteRequestSchema = z.object({ bloodSugar: z.number().gt(0).lte(9999.99).optional(), bpDiastolic: z.number().int().gte(10).lte(200).optional(), bpSystolic: z.number().int().gte(20).lte(300).optional(), heightCm: z.number().gte(20).lte(250).optional(), painScore: z.number().int().gte(0).lte(10).optional(), pulseBpm: z.number().int().gte(20).lte(300).optional(), spo2Percent: z.number().int().gte(1).lte(100).optional(), tempCelsius: z.number().gte(20).lte(45).optional(), weightKg: z.number().gte(0.2).lte(400).optional() });
@@ -455,6 +465,8 @@ export const operationSchemas = {
   JwksController_jwks: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   JwksController_jwksFor: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   AbdmCallbackController_callback: {  },
+  BlobController_get: { response: z.string() },
+  BlobController_put: { body: z.string() },
   ConsentExportController_export: { response: PageSchema },
   DrugMasterImportController_start: { body: DrugMasterImportRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   DrugMasterImportController_status: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
@@ -573,6 +585,8 @@ export const operationSchemas = {
   ClinicalDocumentController_listForVisit: { response: z.array(DocumentResponseSchema) },
   ClinicalDocumentController_create: { body: CreateRequestSchema, response: DocumentResponseSchema },
   ClinicalDocumentController_summaryPrefill: { response: SummaryPrefillResponseSchema },
+  AttachmentController_list: { response: VisitAttachmentListSchema },
+  AttachmentController_attach: { body: AttachmentCreateRequestSchema, response: AttachmentCreateResponseSchema },
   VitalsController_previous: { response: VitalsHistoryResponseSchema },
   VitalsController_get: { response: VitalsResponseSchema },
   VitalsController_record: { body: VitalsWriteRequestSchema, response: VitalsResponseSchema },
@@ -601,6 +615,10 @@ export const operationSchemas = {
   ScheduleController_updateWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_deleteWorkingHours: {  },
   EventsController_stream: { response: SseEmitterSchema },
+  FileController_init: { body: FileUploadInitRequestSchema, response: FileUploadInitResponseSchema },
+  FileController_complete: { body: FileUploadCompleteRequestSchema, response: FileUploadCompleteResponseSchema },
+  FileController_get: { response: FileStatusResponseSchema },
+  AttachmentController_downloadUrl: { response: FileDownloadUrlResponseSchema },
   MeEntitlementsController_get: { response: MeEntitlementsSchema },
   MePreferencesController_get: { response: UiPreferencesReadSchema },
   MePreferencesController_put: { body: UiPreferencesWriteSchema, response: UiPreferencesSchema },

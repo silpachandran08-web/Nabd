@@ -147,6 +147,40 @@ schemas:
       created_at: operational
       updated_at: operational
       data_visibility_scope: operational
+    file_objects:
+      id: operational
+      tenant_id: operational
+      purpose: operational
+      storage_key: operational
+      quarantine_key: operational
+      declared_type: operational
+      detected_type: operational
+      size_bytes: operational
+      sha256: operational
+      status: operational
+      scan_engine: operational
+      scanned_at: operational
+      uploaded_by: operational
+      patient_id: pii
+      visit_id: operational
+      created_at: operational
+    file_blocked_alerts:
+      id: operational
+      tenant_id: operational
+      file_id: operational
+      owner_staff_id: operational
+      reason: operational
+      created_at: operational
+    visit_attachments:
+      id: operational
+      tenant_id: operational
+      visit_id: operational
+      patient_id: pii
+      file_id: operational
+      kind: operational
+      note: phi
+      attached_by: operational
+      created_at: operational
     break_glass_alerts:
       id: operational
       tenant_id: operational
