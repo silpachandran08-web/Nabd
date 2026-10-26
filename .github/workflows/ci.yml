@@ -82,6 +82,8 @@ jobs:
         run: python3 scripts/ci/events.py check && python3 scripts/ci/test_events.py
       - name: Golden tax pack sign-off (FIN-010) - fails with 'golden pack not re-signed' when tax rules or cases changed unsigned; the gate's own tests
         run: python3 scripts/ci/golden_pack.py check && python3 -m unittest scripts/ci/test_golden_pack.py
+      - name: No brand-visibility widening (PLT-021) - new migrations and Java must not use the removed visible/accessible tenant-id GUCs; the gate's own tests
+        run: python3 scripts/ci/brand_visibility_gate.py && python3 scripts/ci/test_brand_visibility_gate.py
       - name: No cache value in logs or metrics (OPS-020 static scan) and the scan's own tests
         run: python3 scripts/ci/cache_values.py check && python3 scripts/ci/test_cache_values.py
 
