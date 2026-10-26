@@ -36,7 +36,7 @@ check('pseudo cookie is ignored unless NABD_PSEUDO=1 on the server', PSEUDO ? /l
 await visit('hi', { cookies: [['nabd_locale', 'hi']], viewport: { width: 390, height: 800 } }, base(), async ({ page, bytes }) => {
   const text = await page.locator('body').innerText();
   check('hi: top bar status is in Hindi', /ऑनलाइन|लाइव/.test(text), text.slice(0, 120));
-  check('hi: no literal English status left in the top bar', !/\b(Online|Live|Offline)\b/.test(await page.getByRole('status').first().innerText()));
+  check('hi: no literal English status left in the top bar', !/\b(Online|Live|Offline)\b/.test(await page.getByRole('status').filter({ has: page.locator('[class*=syncDot]') }).innerText()));
   check('hi: extra font bytes <= 120 KB', bytes.font > 0 && bytes.font <= 120 * 1024, `${bytes.font} bytes`);
   const faces = await page.evaluate(() => [...document.styleSheets].flatMap((sh) => { try { return [...sh.cssRules]; } catch { return []; } }).filter((r) => r.constructor.name === 'CSSFontFaceRule').map((r) => [r.style.getPropertyValue('font-family'), r.style.getPropertyValue('font-display')]));
   check('hi: every @font-face uses font-display swap', faces.length > 0 && faces.every(([, d]) => d === 'swap'), JSON.stringify(faces.filter(([, d]) => d !== 'swap')) + ` of ${faces.length}`);
@@ -47,7 +47,7 @@ await visit('en', {}, base(), async ({ page, bytes }) => {
   const lang = await page.evaluate(() => [document.documentElement.lang, document.documentElement.dir]);
   check('en: lang en dir ltr', lang.join() === 'en,ltr');
   check('en: no Devanagari/Kannada/Telugu/Arabic font downloaded', bytes.font < 40 * 1024 || true, `${bytes.font} bytes (Poppins is mocked offline)`);
-  check('en: top bar keeps its English words', /Online|Live/.test(await page.getByRole('status').first().innerText()));
+  check('en: top bar keeps its English words', /Online|Live/.test(await page.getByRole('status').filter({ has: page.locator('[class*=syncDot]') }).innerText()));
 });
 
 // 3. picker: PUT /me/preferences, then the page re-renders in the new language
@@ -67,7 +67,7 @@ await visit('picker error', {}, base([['PUT', /^\/me\/preferences$/, { status: 5
 if (PSEUDO) for (const [mode, vw] of [['pseudo', 1280], ['pseudo-rtl', 1280], ['pseudo', 390]]) {
   await visit(`${mode} ${vw}`, { cookies: [['nabd_locale', mode]], viewport: { width: vw, height: 800 } }, base(), async ({ page }) => {
     const bar = await page.locator('body').innerText();
-    check(`${mode} ${vw}: shell text is pseudo-localised (no plain English literal)`, /\[.*[àéîöûñ].*\]/s.test(bar) && !/\bOnline\b|\bLive\b/.test(await page.getByRole('status').first().innerText()));
+    check(`${mode} ${vw}: shell text is pseudo-localised (no plain English literal)`, /\[.*[àéîöûñ].*\]/s.test(bar) && !/\bOnline\b|\bLive\b/.test(await page.getByRole('status').filter({ has: page.locator('[class*=syncDot]') }).innerText()));
     check(`${mode} ${vw}: dir`, (await page.evaluate(() => document.documentElement.dir)) === (mode === 'pseudo-rtl' ? 'rtl' : 'ltr'));
     const clipped = await page.evaluate(() => [...document.querySelectorAll('button, [role=status], label, select, input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible'); }).map((e) => e.tagName + ':' + (e.textContent || '').slice(0, 20)));
     check(`${mode} ${vw}: nothing clipped`, clipped.length === 0, JSON.stringify(clipped));
