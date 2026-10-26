@@ -23,7 +23,7 @@ class Fin012DocumentTextTest {
         var taxes = interState ? List.of(new LineItemResponse.TaxPart("IGST", new BigDecimal("18"), 9000L))
                 : List.of(new LineItemResponse.TaxPart("CGST", new BigDecimal("9"), 4500L), new LineItemResponse.TaxPart("SGST", new BigDecimal("9"), 4500L));
         var line = new LineItemResponse("XRAY", "Digital X-ray chest PA view with report", "Procedure", 1, new BigDecimal("500.00"), new BigDecimal("18"),
-                new BigDecimal("590.00"), new BigDecimal("500.00"), null, null, 50000L, taxes);
+                new BigDecimal("590.00"), new BigDecimal("500.00"), null, null, 50000L, taxes, null);
         return new InvoiceResponse(UUID.randomUUID(), "INV-000123", null, UUID.randomUUID(), "Asha Verma Of A Very Long Patient Name Indeed", null, "Dr X", "INR",
                 new BigDecimal("500.00"), BigDecimal.ZERO, new BigDecimal("90.00"), new BigDecimal("0.00"), new BigDecimal("590.00"), new BigDecimal("590.00"),
                 BigDecimal.ZERO, "paid", List.of(line), List.of(new PaymentResponse(UUID.randomUUID(), "cash", new BigDecimal("590.00"), Instant.parse("2026-10-26T08:30:00Z"), null)),
