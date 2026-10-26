@@ -52,21 +52,21 @@ try {
     check('External: no GET /pharmacy/items or dispensing-queue was made', !s.log.requests.some((r) => /^\/pharmacy\/(items|dispensing-queue)/.test(r.path)), JSON.stringify(s.log.requests.map((r) => r.path)));
     await page.waitForTimeout(500);
     check('External: Pharmacy absent from the nav (not disabled)', (await navLink(page).count()) === 0);
-    check('External: no inventory table', (await page.locator('table').count()) === 0);
+    check('External: no inventory table (the mode comparison table is not inventory)', (await page.locator('table', { hasText: 'Code' }).count()) === 0 && (await page.locator('table', { hasText: 'Fixture' }).count()) === 0);
     check('External: no console/page errors', noise(s.log).length === 0, noise(s.log).join('|'));
     dumpLog('external', s.log); await s.browser.close();
   }
   // 2. Hybrid: nav shows, class + register + buy-outside badges, class select in the editor sends scheduleClass.
   {
     const s = await open('/pharmacy', EDIT, { mode: 'hybrid' }); const { page } = s;
-    await page.getByRole('cell', { name: 'Fixture h1' }).waitFor();
+    await page.getByRole('cell', { name: 'Fixture h1', exact: true }).waitFor();
     check('Hybrid: Pharmacy in the nav', (await navLink(page).count()) >= 1);
     const row = (n) => page.getByRole('row').filter({ hasText: n });
     check('class badge OTC on the plain item', (await row('Fixture otc').innerText()).includes('OTC'));
     check('class badge H1 + register badge on the H1 item', /H1/.test(await row('Fixture h1').innerText()) && /Register · H1/.test(await row('Fixture h1').innerText()));
     check('"Buy outside" on the item not dispensed here', (await row('Fixture away').innerText()).includes('Buy outside'));
     await row('Fixture otc').getByRole('button', { name: 'Edit' }).click();
-    await page.getByLabel('Schedule class').selectOption('IN_H');
+    await page.getByRole('dialog').getByLabel('Schedule class').selectOption('IN_H');
     await page.getByRole('button', { name: 'Save item' }).click();
     await page.waitForTimeout(300);
     check('editing sends scheduleClass IN_H and inHouse', s.st.itemPatches[0]?.scheduleClass === 'IN_H' && s.st.itemPatches[0]?.inHouse === true, JSON.stringify(s.st.itemPatches));
@@ -104,7 +104,7 @@ try {
   // 5. View-only: no mode cards, no edit controls.
   {
     const s = await open('/pharmacy', VIEW, { mode: 'hybrid' }); const { page } = s;
-    await page.getByRole('cell', { name: 'Fixture h1' }).waitFor();
+    await page.getByRole('cell', { name: 'Fixture h1', exact: true }).waitFor();
     check('view-only: mode cards absent', (await page.locator('[data-testid^="mode-card-"]').count()) === 0);
     check('view-only: Edit buttons absent', (await page.getByRole('button', { name: 'Edit' }).count()) === 0);
     check('view-only: mode shown as information', (await page.getByText('Pharmacy mode:').count()) === 1);
@@ -120,7 +120,7 @@ try {
   // 7. 390 px: no horizontal page scroll.
   {
     const s = await open('/pharmacy', EDIT, { mode: 'hybrid' }, { width: 390, height: 800 }); const { page } = s;
-    await page.getByRole('cell', { name: 'Fixture h1' }).waitFor();
+    await page.getByRole('cell', { name: 'Fixture h1', exact: true }).waitFor();
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     check('390px: no horizontal page scroll', over <= 0, `overflow ${over}px`);
     check('390px: no console/page errors', noise(s.log).length === 0, noise(s.log).join('|'));

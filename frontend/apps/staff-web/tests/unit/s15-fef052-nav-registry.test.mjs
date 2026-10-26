@@ -17,10 +17,10 @@ test("reception order, all modules entitled", () => {
   assert.deepEqual(labels(n).slice(0, 8), ["arrivals", "requests", "calendar", "patients", "checkin", "display", "messages", "billing"]);
 });
 
-test("planned screens are absent without the module or with unknown entitlements; live screens stay", () => {
+test("planned screens are absent without the module or with unknown entitlements; live screens (incl. ACC-010 booking requests) stay", () => {
   const none = navFor({ perms: RECEPTION, owner: false, ent: all(["billing"]) });
-  assert.deepEqual(labels(none), ["arrivals", "calendar", "patients", "billing", "account"]);
-  assert.deepEqual(labels(navFor({ perms: RECEPTION, owner: false, ent: null })), ["arrivals", "calendar", "patients", "billing", "account"]);
+  assert.deepEqual(labels(none), ["arrivals", "requests", "calendar", "patients", "billing", "account"]);
+  assert.deepEqual(labels(navFor({ perms: RECEPTION, owner: false, ent: null })), ["arrivals", "requests", "calendar", "patients", "billing", "account"]);
 });
 
 test("a lacking permission removes the item", () => {

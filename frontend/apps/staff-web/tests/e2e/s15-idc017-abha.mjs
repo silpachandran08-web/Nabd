@@ -5,6 +5,9 @@ const base = (statusEnabled, abha) => [
   ['GET', /^\/abha\/status/, { body: { enabled: statusEnabled } }],
   ['GET', /^\/patients(\?.*)?$/, { body: { data: [], page: { nextCursor: null, limit: 25 } } }],
   ['POST', /^\/patients$/, { status: 201, body: { id: 'p9' } }],
+  // IDC-004: registration records the itemised consent (patients:edit) before the ABHA step
+  ['GET', /^\/patients\/p9\/consents/, { body: { purposes: {}, needsReack: false, processable: false, needsConsent: true, emergencyTreatmentBasis: false, notices: { en: 'v1' } } }],
+  ['POST', /^\/patients\/p9\/consents/, { status: 200, body: {} }],
   ...abha,
 ];
 async function run(tag, perms, handlers, fn, viewport) {
