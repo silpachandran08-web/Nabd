@@ -88,34 +88,34 @@ paths:
       parameters:
       - in: query
         name: m
-        required: true
+        required: false
         schema:
           type: string
       - in: query
         name: b
-        required: true
+        required: false
         schema:
           type: string
       - in: query
         name: k
-        required: true
+        required: false
         schema:
           type: string
       - in: query
         name: e
-        required: true
+        required: false
         schema:
           type: integer
           format: int64
       - in: query
         name: x
-        required: true
+        required: false
         schema:
           type: integer
           format: int64
       - in: query
         name: s
-        required: true
+        required: false
         schema:
           type: string
       responses:
@@ -140,34 +140,34 @@ paths:
       parameters:
       - in: query
         name: m
-        required: true
+        required: false
         schema:
           type: string
       - in: query
         name: b
-        required: true
+        required: false
         schema:
           type: string
       - in: query
         name: k
-        required: true
+        required: false
         schema:
           type: string
       - in: query
         name: e
-        required: true
+        required: false
         schema:
           type: integer
           format: int64
       - in: query
         name: x
-        required: true
+        required: false
         schema:
           type: integer
           format: int64
       - in: query
         name: s
-        required: true
+        required: false
         schema:
           type: string
       requestBody:
@@ -176,7 +176,6 @@ paths:
             schema:
               type: string
               format: byte
-        required: true
       responses:
         "200":
           description: OK
