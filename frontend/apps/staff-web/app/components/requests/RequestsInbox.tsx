@@ -30,7 +30,7 @@ export default function RequestsInbox() {
   useEffect(() => { if (sel > 0 && sel >= items.length) setSel(Math.max(0, items.length - 1)); }, [items.length, sel]);
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const act = keyAction(e, dialog !== null);
+      const act = keyAction(e as unknown as Parameters<typeof keyAction>[0], dialog !== null);
       if (!act) return;
       const cur = items[sel];
       if (act === "next") setSel((i) => Math.min(items.length - 1, i + 1));

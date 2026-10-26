@@ -12,7 +12,7 @@ export function useShellNav() {
   const pathname = usePathname();
   const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const { permissions } = usePermissions();
-  const ent = useEntitlements(pathname);
+  const ent = useEntitlements();
   const override = useRoleOverride();
   const [claims, setClaims] = useState<{ owner: boolean; specialty: string | null; tenantId: string | null }>({ owner: false, specialty: null, tenantId: null });
   useEffect(() => {
