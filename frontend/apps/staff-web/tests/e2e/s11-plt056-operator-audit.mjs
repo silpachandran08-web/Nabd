@@ -23,7 +23,7 @@ const AUDIT_PERMS = ['command_centre:view', 'audit_compliance:view'];
 {
   const s = await launch({ viewport: { width: 390, height: 800 } });
   await seedPlatform(s.page);
-  await mockApi(s.page, s.log, [me('compliance_dpo', AUDIT_PERMS), tenants, ['GET', /^\/platform\/audit-log\?/, auditPage]]);
+  await mockApi(s.page, s.log, [me('compliance_dpo', [...AUDIT_PERMS, 'audit_compliance:values']), tenants, ['GET', /^\/platform\/audit-log\?/, auditPage]]);
   await s.page.goto(`${APP}/platform/audit`, { waitUntil: 'networkidle' });
   const first = new URL('http://x' + auditReqs(s)[0].path).searchParams;
   check('1 first search limit=50, no includeValues', first.get('limit') === '50' && !first.has('includeValues'));

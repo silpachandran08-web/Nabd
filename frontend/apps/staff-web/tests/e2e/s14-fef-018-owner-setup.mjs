@@ -138,7 +138,7 @@ const staffHandlers = (state) => [
   await sleep(400);
   check('AC2 Cancel: no second suspend request', state.suspends.length === 1, `calls=${state.suspends.length}`);
   check('AC2 Cancel: dialog closed', await page.getByLabel('Authentication code').count() === 0);
-  check('AC2 Cancel: no error banner', await page.locator('[role=alert]').count() === 0, (await page.locator('[role=alert]').allInnerTexts()).join(' | '));
+  check('AC2 Cancel: no error banner', await page.locator('[role=alert]:not(#__next-route-announcer__)').count() === 0, (await page.locator('[role=alert]:not(#__next-route-announcer__)').allInnerTexts()).join(' | '));
   await page.getByRole('button', { name: 'Reset authenticator' }).click();
   await page.getByLabel('Authentication code').waitFor({ timeout: 5000 });
   await page.getByLabel('Authentication code').fill('123456');
@@ -198,7 +198,7 @@ const me = { id: 'op1', name: 'Op', email: 'op@x.test', role: 'super_admin', per
 const platformBase = (state) => [
   ['GET', /^\/platform\/auth\/me$/, (route) => json(route, me)],
   ['POST', /^\/platform\/auth\/refresh$/, (route, req) => { state.refreshBodies.push(JSON.parse(req.postData())); return state.refreshOk ? json(route, { accessToken: 'pa2', refreshToken: 'pr2' }) : json(route, { title: 'x', detail: 'x' }, 401); }],
-  ['GET', /^\/platform\/tenants\/summary$/, (route) => json(route, {})],
+  ['GET', /^\/platform\/tenants\/summary$/, (route) => json(route, { total: 0, byStatus: {}, regions: [] })],
   ['GET', /^\/platform\/support-access\/grants$/, (route) => json(route, [])],
   ['GET', /^\/platform\/tenants\?/, (route, req) => { state.tenantAuth.push(req.headers()['authorization']); return req.headers()['authorization'] === 'Bearer pa2' ? json(route, { data: [], page: { nextCursor: null, limit: 50 } }) : json(route, { title: 'expired', detail: 'x' }, 401); }],
   ['POST', /^\/auth\/refresh$/, (route) => json(route, {}, 401)],
@@ -270,7 +270,7 @@ const platformBase = (state) => [
 {
   const jobs = [];
   const op = await open('/platform/provisioning', [
-    ['GET', /^\/platform\/auth\/me$/, (route) => json(route, { ...me, permissions: ['provisioning:view'] })],
+    ['GET', /^\/platform\/auth\/me$/, (route) => json(route, { ...me, permissions: ['onboarding_provisioning:view'] })],
     ['GET', /^\/platform\/regions$/, (route) => json(route, { items: [] })],
     ['GET', /^\/platform\/provisioning-jobs$/, (route) => json(route, jobs)],
     ['POST', /^\/platform\/provisioning-jobs$/, (route, req) => { const b = JSON.parse(req.postData()); jobs.push({ id: 'j1', tenantSlug: b.tenantSlug, tenantName: b.tenantName, region: b.region, status: 'queued', path: b.path, approvedAt: null, createdTenantId: null, steps: [], ownerInviteToken: null, ownerAccountInviteToken: null }); return json(route, jobs[0], 201); }],
@@ -279,6 +279,7 @@ const platformBase = (state) => [
   await op.page.getByRole('button', { name: '+ New tenant' }).click();
   await op.page.fill('#tenantSlug', 'glow');
   await op.page.fill('#tenantName', 'Glow Clinic');
+  await op.page.fill('#brandName', 'Glow');
   await op.page.fill('#ownerName', 'Olivia Owner');
   await op.page.fill('#ownerEmail', 'olivia@glow.test');
   await op.page.fill('#ownerMobile', '+919999999999');

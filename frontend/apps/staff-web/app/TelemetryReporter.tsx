@@ -7,6 +7,7 @@ import { errorReport, vitalReport, type TelemetryReport } from "./lib/telemetryS
 
 function send(r: TelemetryReport) {
   if (!localStorage.getItem("nabd_access_token")) return; // endpoint needs a session; never queue reports for later
+  if (location.pathname.startsWith("/platform")) return; // operator pages run on the operator session; never send a clinic token there
   api.post("/client-telemetry", r).catch(() => {}); // best effort: telemetry must never raise its own error
 }
 
