@@ -1,0 +1,23 @@
+.chip { display: inline-flex; align-items: center; gap: var(--nb-space-8); min-height: 44px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-primary); font-size: 13px; font-weight: 600; cursor: pointer; }
+.iconBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-secondary); cursor: pointer; }
+.wrap { position: relative; }
+.backdrop { position: fixed; inset: 0; z-index: 50; }
+.menu { position: absolute; inset-block-start: calc(100% + 6px); inset-inline-end: 0; z-index: 60; width: 260px; max-width: calc(100vw - 32px); padding: var(--nb-space-8); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-1, var(--nb-surface-2)); display: flex; flex-direction: column; gap: var(--nb-space-4); }
+.menuHead { padding: var(--nb-space-8); font-size: 12px; color: var(--nb-text-tertiary); }
+.menuItem { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-8); min-height: 44px; padding-inline: var(--nb-space-12); border: 0; border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-primary); font-size: 13px; text-align: start; cursor: pointer; }
+.menuItem:hover, .menuItem[aria-checked="true"] { background: var(--nb-surface-2); }
+.overlay { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-start; justify-content: center; padding: 12vh var(--nb-space-16) 0; background: rgb(0 0 0 / 0.5); }
+.palette { width: 100%; max-width: 100%; border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-bg-canvas); overflow: hidden; }
+.paletteInput { width: 100%; min-height: 48px; padding-inline: var(--nb-space-16); border: 0; border-block-end: 1px solid var(--nb-border-subtle); background: transparent; color: var(--nb-text-primary); font-size: 15px; }
+.results { margin: 0; padding: var(--nb-space-4); list-style: none; max-height: 50vh; overflow-y: auto; }
+.result { display: flex; align-items: center; gap: var(--nb-space-12); min-height: 44px; padding-inline: var(--nb-space-12); border-radius: var(--nb-radius-md); color: var(--nb-text-primary); font-size: 14px; cursor: pointer; }
+.result[aria-selected="true"] { background: var(--nb-surface-2); }
+.resultSub { margin-inline-start: auto; font-size: 12px; color: var(--nb-text-tertiary); }
+.empty { padding: var(--nb-space-16); color: var(--nb-text-secondary); font-size: 13px; }
+.planned { padding: var(--nb-space-24); }
+/* Phone top bar is already full (search, language, connection): theme lives in the user menu width, the role chip drops its icon. */
+@media (max-width: 543px) {
+  .themeBtn { display: none; }
+  .chip { padding-inline: var(--nb-space-8); }
+  .chipIcon { display: none; }
+}

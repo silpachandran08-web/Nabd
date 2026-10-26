@@ -15,6 +15,7 @@ type AccessTokenClaims = {
   staffName?: string;
   roleName?: string;
   owner?: boolean;
+  specialty?: string; // T-298 specialty profile; the Specialty workspace nav item follows it
   pinChange?: boolean;
   exp?: number;
 };

@@ -9,6 +9,8 @@ import type { AppPermission } from "@nabd/api-client/types";
 import { useLiveStatus } from "./lib/live";
 import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
+import ShellUserMenu from "./shell/ShellUserMenu";
+import ThemeToggle from "./shell/ThemeToggle";
 import { formatClinicTime } from "./lib/clinicTime";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
 
@@ -81,9 +83,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-      const isShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k";
       const isSlash = e.key === "/" && !typing;
-      if ((isShortcut || isSlash) && can("patients:view")) {
+      if (isSlash && can("patients:view")) {
         e.preventDefault();
         document.getElementById(SEARCH_INPUT_ID)?.focus();
       }
@@ -147,6 +148,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
       </>}
       <div className={styles.spacer} />
       <LanguagePicker />
+      <ThemeToggle />
       {primaryAction && (
         <button type="button" className={styles.primaryAction} onClick={() => router.push(primaryAction.href)}>
           {t(primaryAction.label)}
@@ -159,6 +161,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
         <span className={styles.syncTime}>{!pillWarn && lastSync ? `· ${lastSync}` : ""}</span>
         <span className={styles.srOnly}>{[pillHint, lastSyncText].filter(Boolean).join(" ")}</span>
       </div>
+      <ShellUserMenu />
     </div>
   );
 }

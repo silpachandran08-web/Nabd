@@ -6,7 +6,9 @@ const PAGES: [prefix: string, name: string][] = [
   ["/my-day", "My Day"], ["/solo", "Today"], ["/my-schedule", "My Schedule"], ["/prescriptions", "Prescriptions"], ["/encounters", "Encounters"],
   ["/follow-ups", "Follow-ups"], ["/nursing", "Nursing"], ["/overview", "Overview"], ["/compliance", "Support access"],
   ["/documents", "Documents"], ["/security", "Security"], ["/login", "Sign in"], ["/accept-invite", "Accept invitation"],
-  ["/requests", "Booking requests"], ["/owner", "Workspaces"], ["/platform", "Platform console"],
+  ["/requests", "Booking requests"], ["/checkin", "Self check-in"], ["/display", "Display"], ["/messages", "WhatsApp inbox"], ["/results", "Results"],
+  ["/inpatients", "Ward rounds"], ["/records", "Record requests"], ["/specialty", "Specialty workspace"], ["/recalls", "Recalls"], ["/tele", "Teleconsult"],
+  ["/owner", "Workspaces"], ["/platform", "Platform console"],
 ];
 
 export function pageName(pathname: string | null): string {
