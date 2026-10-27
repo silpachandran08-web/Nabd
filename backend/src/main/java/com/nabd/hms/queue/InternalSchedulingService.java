@@ -50,10 +50,11 @@ class InternalSchedulingService {
     private final ClinicPolicies policies;
     private final AuditService audit;
     private final ClinicClock clock;
+    private final PatientConfirmationRepository confirmations;
 
     InternalSchedulingService(TenantScope tenantScope, AppointmentService appointments, AppointmentRepository appointmentRepo,
                               ScheduleRepository scheduleRepo, PatientRefs patientRefs, ClinicPolicies policies, AuditService audit,
-                              ClinicClock clock) {
+                              ClinicClock clock, PatientConfirmationRepository confirmations) {
         this.tenantScope = tenantScope;
         this.appointments = appointments;
         this.appointmentRepo = appointmentRepo;
@@ -62,6 +63,7 @@ class InternalSchedulingService {
         this.policies = policies;
         this.audit = audit;
         this.clock = clock;
+        this.confirmations = confirmations;
     }
 
     @Schema(name = "InternalSession")
@@ -130,7 +132,7 @@ class InternalSchedulingService {
     }
 
     Map<String, Object> act(UUID tid, ServiceIdentity edge, UUID id, String action, String patientRef, Instant newStartTime, String reasonCode) {
-        if (!Set.of("confirm", "reschedule", "cancel").contains(action)) {
+        if (!Set.of("confirm", "reschedule", "cancel", "call-me").contains(action)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
         }
         if ("cancel".equals(action) && (reasonCode == null || !reasonCode.matches("[a-z0-9_]{3,40}"))) {
@@ -150,6 +152,16 @@ class InternalSchedulingService {
             }
             UUID resultId = id;
             String status = "scheduled";
+            if ("call-me".equals(action)) { // ACC-041: the patient asks the desk to ring instead of changing inside the window
+                confirmations.callMe(tid, id);
+                record(tid, edge, "appointment.call_me_requested_via_edge", id, patientRef);
+                return Map.of("appointmentId", id, "status", status, "deskException", "open");
+            }
+            if ("confirm".equals(action)) { // ACC-041: single owner of appointments.patient_confirmed_at
+                Instant at = confirmations.confirm(tid, id);
+                record(tid, edge, "appointment.confirmed_via_edge", id, patientRef);
+                return Map.of("appointmentId", id, "status", status, "patientConfirmedAt", at);
+            }
             if (!"confirm".equals(action)) {
                 requireOutsideWindow(tid, a.startTime());
                 if ("cancel".equals(action)) {
@@ -164,18 +176,33 @@ class InternalSchedulingService {
         });
     }
 
-    private void requireOutsideWindow(UUID tid, Instant start) {
-        long hours = policies.policyValue(tid, "cancellation_window_hours").map(v -> {
+    /** ACC-041: what the Edge needs to offer a reschedule or explain the cancellation window; the patient must own the appointment. */
+    Map<String, Object> detail(UUID tid, UUID id, String patientRef) {
+        return tenantScope.run(tid, () -> {
+            UUID patientId = patientRefs.patientIdFor(patientRef).orElseThrow(InternalSchedulingService::notOwner);
+            AppointmentRow a = appointmentRepo.findById(tid, id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));
+            if (!a.patientId().equals(patientId)) throw notOwner();
+            return Map.of("appointmentId", id, "doctorId", a.doctorId(), "startTime", a.startTime(), "status", a.status(),
+                    "zone", clock.zone(tid).getId(), "windowHours", windowHours(tid));
+        });
+    }
+
+    private long windowHours(UUID tid) {
+        return policies.policyValue(tid, "cancellation_window_hours").map(v -> {
             try {
                 return Long.parseLong(v.trim());
             } catch (NumberFormatException e) {
                 return 0L;
             }
         }).orElse(0L);
+    }
+
+    private void requireOutsideWindow(UUID tid, Instant start) {
+        long hours = windowHours(tid);
         if (hours > 0 && Duration.between(clock.now(), start).compareTo(Duration.ofHours(hours)) < 0) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "inside-cancellation-window", "Inside the cancellation window",
                     "This appointment starts within the clinic's cancellation window; the clinic must be asked directly.",
-                    Map.of("code", "INSIDE_CANCELLATION_WINDOW"));
+                    Map.of("code", "INSIDE_CANCELLATION_WINDOW", "windowHours", hours));
         }
     }
 

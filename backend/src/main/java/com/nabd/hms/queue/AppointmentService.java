@@ -267,7 +267,7 @@ public class AppointmentService {
 
     private AppointmentResponse toResponse(AppointmentRow row) {
         return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(),
-                row.status(), row.isFollowUp(), row.cancelReason(), row.decisionSource(), row.channel(), row.bookingKind(), row.sessionToken(), expectedRange(row));
+                row.status(), row.isFollowUp(), row.cancelReason(), row.decisionSource(), row.channel(), row.bookingKind(), row.sessionToken(), expectedRange(row), row.patientConfirmedAt());
     }
 
     /** ACC-011: a token booking shows an expected range from the average consult time, never a fixed time. */

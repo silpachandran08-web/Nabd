@@ -35,15 +35,17 @@ public class ConversationEngine {
     private final ButtonTokens buttons;
     private final MeterRegistry meters;
     private final Map<State, FlowHandler> handlers = new EnumMap<>(State.class);
+    private final java.util.List<Intent> intents;
 
     ConversationEngine(ConversationStore store, RateLimiter limiter, CommsClient comms, ButtonTokens buttons, MeterRegistry meters,
-                       ObjectProvider<FlowHandler> flows) {
+                       ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents) {
         this.store = store;
         this.limiter = limiter;
         this.comms = comms;
         this.buttons = buttons;
         this.meters = meters;
         flows.orderedStream().forEach(h -> handlers.put(h.state(), h));
+        this.intents = intents.orderedStream().toList();
     }
 
     /** contactHash may be null when the event does not carry it; it then comes from the fetched message. */
@@ -82,7 +84,8 @@ public class ConversationEngine {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             Conversation c = store.load(tenantId, channel, contact);
             FlowHandler h = handlers.get(c.state());
-            Outcome o = h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg);
+            Outcome o = intents.stream().map(i -> i.handle(c, msg)).flatMap(Optional::stream).findFirst()
+                    .orElseGet(() -> h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg));
             checkContext(o);
             switch (store.commit(c, o, messageId)) {
                 case DUPLICATE -> {

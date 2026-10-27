@@ -66,6 +66,14 @@ schemas:
       decided_at: operational
       session_token: operational
       working_hours_id: operational
+      patient_confirmed_at: operational
+    appointment_desk_exceptions:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      kind: operational
+      status: operational
+      created_at: operational
     booking_policy_versions:
       id: operational
       tenant_id: operational

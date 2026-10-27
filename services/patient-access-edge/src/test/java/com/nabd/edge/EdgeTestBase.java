@@ -76,6 +76,8 @@ abstract class EdgeTestBase {
         UP.coreCalls.set(0);
         UP.relayed.clear();
         UP.consentStatus = 201;
+        UP.coreHook = null;
+        UP.coreLog.clear();
         UP.noticeVersion = "v1";
         counting.invocations.set(0);
         valkey.keys("edge:avail:*").forEach(valkey::delete);

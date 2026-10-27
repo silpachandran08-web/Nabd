@@ -19,7 +19,7 @@ import static com.nabd.hms.queue.QueueModels.CallbackEntryRow;
 class AppointmentRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel, booking_kind, session_token ";
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel, booking_kind, session_token, patient_confirmed_at ";
 
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.organization.api.BookingRules bookingRules;
@@ -123,7 +123,8 @@ class AppointmentRepository {
                 rs.getBoolean("is_follow_up"),
                 rs.getString("cancel_reason"), rs.getString("decision_source"), rs.getString("channel"),
                 rs.getString("booking_kind"),
-                (Integer) rs.getObject("session_token"));
+                (Integer) rs.getObject("session_token"),
+                rs.getTimestamp("patient_confirmed_at") == null ? null : rs.getTimestamp("patient_confirmed_at").toInstant());
     }
 
     /** ACC-011: a token booking takes the whole session window and a reserved number (no overlap constraint, V312). */
