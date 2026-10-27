@@ -6,6 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
 import RegionalCalendar, { type CalHoliday } from "../../components/setup/RegionalCalendar";
 import WhatsAppTemplates from "./WhatsAppTemplates";
+import PricingPanel from "../../components/setup/PricingPanel";
+import PaymentsCard from "../../components/setup/PaymentsCard";
+import WhatsAppHealth from "../../components/setup/WhatsAppHealth";
 import DisplayDevices from "./DisplayDevices";
 import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../../components/setup/PharmacyPanel";
@@ -66,7 +69,7 @@ const isSetupTab = (t: string | null): t is string => TABS.some((x) => x.key ===
 
 // Each tab loads only its own data, so one tab's missing grant or failing endpoint can't blank the others.
 const TAB_DATA: Record<string, string[]> = {
-  checklist: ["checklist"], profile: ["profile"], charges: ["charges"], policies: ["policies"], consent: ["consent"],
+  checklist: ["checklist"], profile: ["profile"], charges: ["charges", "policies"], policies: ["policies"], consent: ["consent"],
   holidays: ["holidays"], shifts: ["shifts", "staff"], subscription: ["subscription"], data: ["importJobs", "exportJobs"],
   licences: ["licences", "staff"], payroll: [],
 };
@@ -339,7 +342,7 @@ function SetupPageInner() {
 
   const renderContent = () => {
     if (tab === "privacy") return <PrivacyNoticePanel />;
-    if (tab === "integrations") return <AbdmCard />;
+    if (tab === "integrations") return <><PaymentsCard /><AbdmCard /></>;
     if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel /> : null;
     if (loading && (TAB_DATA[tab]?.length ?? 0) > 0) return <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>;
     if (error) return <div className={styles.card}><ErrorState message={error} onRetry={loadAll} /></div>;
@@ -455,6 +458,7 @@ function SetupPageInner() {
         );
       case "charges":
         return (
+          <>
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Charge head / price master</h2>
             <form onSubmit={addCharge}>
@@ -505,6 +509,8 @@ function SetupPageInner() {
               </table>
             </div>
           </div>
+          <PricingPanel charges={charges} policies={policies} />
+          </>
         );
       case "policies":
         return (
@@ -812,7 +818,7 @@ function SetupPageInner() {
           </div>
         );
       case "whatsapp":
-        return <WhatsAppTemplates />;
+        return <><WhatsAppHealth /><WhatsAppTemplates /></>;
       case "display":
         return <DisplayDevices />;
       default:

@@ -51,10 +51,6 @@ import static com.nabd.hms.billing.CheckoutModels.QueueEntryContext;
 public class CheckoutService {
 
     private static final Logger log = LoggerFactory.getLogger(CheckoutService.class);
-    // ponytail: fixed 14-day window, matching the wireframe's stated follow-up rule — promote to a
-    // clinic policy (alongside cancellation_window_hours etc.) if clinics ever need to vary it.
-    private static final int FOLLOW_UP_WINDOW_DAYS = 14;
-
     private static final Set<String> BILLING_CHECKPOINT_STATUSES = Set.of("billing_pending", "checkout_pending");
 
     private final CheckoutRepository repo;
@@ -76,14 +72,16 @@ public class CheckoutService {
     private final SeriesAllocator series;
     private final com.nabd.hms.billing.tax.TaxService tax;
     private final PaymentActedBy paymentActedBy; // IDC-011
+    private final com.nabd.hms.organization.api.ClinicPolicies policies;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
-                     com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy) {
+                     com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies) {
         this.paymentActedBy = paymentActedBy;
+        this.policies = policies;
         this.tax = tax;
         this.regions = regions;
         this.series = series;
@@ -107,8 +105,8 @@ public class CheckoutService {
         QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(this::notFound);
         String patientName = repo.findPatientName(tenantId, ctx.patientId()).orElse("Unknown patient");
         String doctorName = repo.findStaffName(tenantId, ctx.doctorId()).orElse("Unknown doctor");
-        boolean followUpEligible = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
-                clock.clinicDate(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
+        ConsultationTier.Context tierCtx = tierContext(tenantId, queueEntryId, ctx);
+        boolean followUpEligible = tierCtx.followUpEligible();
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
         List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
                 .map(this::toChargeResponse).toList();
@@ -119,11 +117,30 @@ public class CheckoutService {
         return new CheckoutContextResponse(queueEntryId, patientName, doctorName,
                 ctx.hasAppointment() ? "Appointment" : "Walk-in", followUpEligible, currencyFor(tenantId), charges,
                 pendingProcedures, prescribedItems, ctx.departmentId(), ctx.queueStatus(),
-                charges.stream().filter(c -> "Consultation".equals(c.category()))
-                        .map(c -> followUpEligible && c.followUpAmount() != null
-                                ? new CheckoutContextResponse.SuggestedLine(c.code(), c.name(), "follow_up", c.followUpAmount())
-                                : new CheckoutContextResponse.SuggestedLine(c.code(), c.name(), "normal", c.baseAmount()))
-                        .toList());
+                suggestedLines(tenantId, charges, tierCtx));
+    }
+
+    /** FIN-015/016: the follow-up window comes from the clinic policy (default 7 days), the anchor from the last full-price visit, the urgent flag from the check-in. */
+    private ConsultationTier.Context tierContext(UUID tenantId, UUID queueEntryId, QueueEntryContext ctx) {
+        int window = policies.policyValue(tenantId, "follow_up_window_days").map(String::trim).filter(v -> v.matches("\\d{1,2}"))
+                .map(Integer::parseInt).orElse(ConsultationTier.DEFAULT_WINDOW_DAYS);
+        java.time.LocalDate last = repo.lastFullPriceVisit(tenantId, ctx.patientId(), ctx.doctorId());
+        Integer days = last == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(last, clock.today(tenantId));
+        return new ConsultationTier.Context(ctx.doctorId(), days, window, repo.isUrgent(tenantId, queueEntryId));
+    }
+
+    private List<CheckoutContextResponse.SuggestedLine> suggestedLines(UUID tenantId, List<ChargeResponse> charges, ConsultationTier.Context tc) {
+        List<CheckoutContextResponse.SuggestedLine> out = new java.util.ArrayList<>();
+        var heads = repo.findCatalogueCharges(tenantId, charges.stream().filter(c -> ConsultationTier.isConsultation(c.category())).map(ChargeResponse::code).toList());
+        for (ChargeResponse c : charges) {
+            if (!ConsultationTier.isConsultation(c.category())) continue;
+            BigDecimal emergency = heads.get(c.code()).emergencyAmount();
+            BigDecimal fee = repo.findDoctorFee(tenantId, c.id(), tc.doctorId());
+            var pick = ConsultationTier.suggest(c.category(), c.baseAmount(), fee, c.followUpAmount(), emergency, tc);
+            out.add(new CheckoutContextResponse.SuggestedLine(c.code(), c.name(), pick.tier(), pick.price(), pick.reason(),
+                    fee != null ? fee : c.baseAmount(), tc.followUpEligible() ? c.followUpAmount() : null, emergency));
+        }
+        return out;
     }
 
     @Transactional
@@ -155,10 +172,9 @@ public class CheckoutService {
                     "This visit isn't at a billing stop yet — its status is " + ctx.queueStatus() + ".");
         }
 
-        boolean followUp = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
-                clock.clinicDate(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
+        ConsultationTier.Context tierCtx = tierContext(tenantId, queueEntryId, ctx);
         if (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty()) BillingPricing.requireDiscountRight(canDiscount);
-        List<LineItemInput> lineItems = pricing.resolveLines(tenantId, req.lineItems(), followUp, canDiscount, false, staffId);
+        List<LineItemInput> lineItems = pricing.resolveLines(tenantId, req.lineItems(), tierCtx, canDiscount, false, staffId);
         rxGate.check(tenantId, ctx.patientId(), rxLines(lineItems), staffId, ip); // PHL-001: before anything is written
         Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
         existing.ifPresent(CheckoutService::rejectVoid);
@@ -247,7 +263,7 @@ public class CheckoutService {
                     "Add at least one charge before checking out.");
         }
         if (!trusted && (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty())) BillingPricing.requireDiscountRight(canDiscount);
-        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), false, canDiscount, trusted, staffId);
+        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), ConsultationTier.Context.NONE, canDiscount, trusted, staffId);
         // H-04: a free-text line has no is_rx flag, so an Rx-only drug typed in by name would skip the gate. The counter sells catalogue items only.
         if (!trusted && items.stream().anyMatch(i -> i.catalogueId() == null)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "free-text-not-allowed", "Only price-list items at the counter",
@@ -322,7 +338,7 @@ public class CheckoutService {
     public com.nabd.hms.billing.dto.QuoteResponse quote(UUID staffId, boolean canDiscount, CheckoutRequest req) {
         UUID tenantId = tenantContext.current();
         if (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty()) BillingPricing.requireDiscountRight(canDiscount);
-        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), false, canDiscount, false, staffId);
+        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), ConsultationTier.Context.NONE, canDiscount, false, staffId);
         if (items.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge", "Add at least one charge to get a quote.");
         }

@@ -36,6 +36,16 @@ class FleetRepository {
                 mapper(), Timestamp.from(afterCreatedAt), afterId, limit);
     }
 
+    /** COM-022: display names for a page of senders (tenants carry no RLS). */
+    java.util.Map<UUID, String> tenantNames(java.util.Collection<UUID> ids) {
+        java.util.Map<UUID, String> out = new java.util.HashMap<>();
+        if (ids.isEmpty()) return out;
+        jdbc.query("SELECT id, name FROM tenants WHERE id = ANY (?)", rs -> {
+            out.put(rs.getObject(1, UUID.class), rs.getString(2));
+        }, (Object) ids.toArray(UUID[]::new));
+        return out;
+    }
+
     /** Status+region only — the Fleet KPI grid's counts, cheaper than paging through every column. */
     List<String[]> listStatusesAndRegions() {
         return jdbc.query("SELECT status, region_code AS region FROM tenants", (rs, i) -> new String[]{rs.getString("status"), rs.getString("region")});

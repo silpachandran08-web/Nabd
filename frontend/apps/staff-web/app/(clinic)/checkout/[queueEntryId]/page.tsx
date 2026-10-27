@@ -19,6 +19,8 @@ import { PRICE_REASONS, reasonLabel } from "../../../components/checkout/priceRe
 import { FieldError, useFormErrors } from "../../../lib/formErrors";
 import { useFormValidation, useUnsavedGuard } from "../../../lib/formValidation";
 import { discountSchema } from "../../../lib/formSchemas";
+import TierControl from "../../../components/checkout/TierControl";
+import { tierPrice, tierToSend, type TierLine, type TierName } from "../../../lib/pricingTier";
 
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
@@ -73,6 +75,7 @@ export default function CheckoutPage() {
   const [ovReason, setOvReason] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [tierPicks, setTierPicks] = useState<Record<string, TierName>>({}); // FIN-016: chargeCode -> the receptionist's tier pick
 
   const [tenders, setTenders] = useState<Tender[]>([{ id: 1, method: "cash", amount: "" }]);
   const [recording, setRecording] = useState(false);
@@ -115,7 +118,19 @@ export default function CheckoutPage() {
     void Promise.resolve().then(load);
   }, [load]);
 
+  const tierLines = (context?.suggestedLines ?? []) as unknown as TierLine[]; // FIN-015/016 fields arrive with the next client regeneration
+  const tierLineOf = (code: string) => tierLines.find((t) => t.chargeCode === code);
+
+  function pickTier(code: string, tier: TierName) {
+    const tl = tierLineOf(code);
+    if (!tl) return;
+    setTierPicks((prev) => ({ ...prev, [code]: tier }));
+    setItems((prev) => prev.map((i) => (i.chargeCode === code && !i.override ? { ...i, unitPrice: tierPrice(tl, tier) } : i)));
+  }
+
   function effectivePrice(charge: Charge): number {
+    const suggested = charge.category === "Consultation" ? tierLineOf(charge.code) : undefined;
+    if (suggested) return suggested.unitPrice; // the server's pick: doctor fee, follow-up or (urgent check-in) emergency
     const useFollowUp = context?.followUpEligible && charge.category === "Consultation" && charge.followUpAmount != null;
     return useFollowUp ? charge.followUpAmount! : charge.baseAmount;
   }
@@ -181,6 +196,7 @@ export default function CheckoutPage() {
       const body = {
         // codes only: the server prices every line from the catalogue (FIN-003)
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}),
+          ...(() => { const tl = tierLineOf(i.chargeCode); const t = tl ? tierToSend(tl, tierPicks[i.chargeCode]) : undefined; return t ? { tier: t } : {}; })(),
           ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
         ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
       };
@@ -367,6 +383,10 @@ export default function CheckoutPage() {
                   </td>
                   <td>
                     {formatMoney(i.unitPrice, context.currency)}
+                    {i.category === "Consultation" && tierLineOf(i.chargeCode) && (
+                      <TierControl line={tierLineOf(i.chargeCode)!} picked={tierPicks[i.chargeCode] ?? tierLineOf(i.chargeCode)!.tier} currency={context.currency}
+                        onPick={(t) => pickTier(i.chargeCode, t)} />
+                    )}
                     {i.override && <div className={styles.muted}>Override: {reasonLabel(i.override.reasonCode)}</div>}
                     {canDiscount && editing !== i.chargeCode && (
                       <button type="button" className={styles.removeBtn} onClick={() => { setEditing(i.chargeCode); setOvPrice(String(i.unitPrice)); setOvReason(i.override?.reasonCode ?? ""); }}>Override price</button>
@@ -459,7 +479,7 @@ export default function CheckoutPage() {
       {context.followUpEligible && !invoice && (
         <div className={styles.banner}>
           Follow-up pricing available
-          <span className={styles.bannerSub}>Same doctor, a completed visit within the last 14 days.</span>
+          <span className={styles.bannerSub}>Same doctor, a full-price visit within the clinic&apos;s follow-up window.</span>
         </div>
       )}
 

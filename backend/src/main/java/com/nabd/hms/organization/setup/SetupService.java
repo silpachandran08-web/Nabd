@@ -66,14 +66,16 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final com.nabd.hms.patient.api.PrivacyNotices privacyNotices;
     private final CalendarService calendar;
     private final com.nabd.hms.organization.licence.LicenceLifecycleService licences;
+    private final PriceChangeLog pricingLog;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
                  com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
                  CalendarService calendar,
-                 com.nabd.hms.organization.licence.LicenceLifecycleService licences) {
+                 com.nabd.hms.organization.licence.LicenceLifecycleService licences, PriceChangeLog pricingLog) {
         this.calendar = calendar;
         this.licences = licences;
+        this.pricingLog = pricingLog;
         this.actors = actors;
         this.entitlements = entitlements;
         this.privacyNotices = privacyNotices;
@@ -155,8 +157,9 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public ChargeHeadResponse updateCharge(UUID tenantId, UUID callerStaffId, UUID id, ChargeHeadWriteRequest req) {
         tenantContext.set(tenantId);
-        repo.findCharge(tenantId, id)
+        ChargeHeadRow before = repo.findCharge(tenantId, id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "charge-not-found", "Charge not found", "Charge not found"));
+        pricingLog.logChargeUpdate(id, before, req, callerStaffId); // FIN-016: same transaction as the update
         repo.updateCharge(tenantId, id, req);
         log.info("charge head {} updated for tenant {} by {}", id, tenantId, callerStaffId);
         catalogueChanged(tenantId, id, "updated");
@@ -186,6 +189,9 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         tenantContext.set(tenantId);
         if ("session.idle_lock_minutes".equals(policyKey) && !req.value().matches("^(?:[2-9]|[12][0-9]|30)$")) { // FEF-005
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Idle lock must be a whole number of minutes from 2 to 30");
+        }
+        if ("follow_up_window_days".equals(policyKey) && !req.value().matches("^(?:[1-9]|[1-8][0-9]|90)$")) { // FIN-015
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "The follow-up window is a whole number of days from 1 to 90.");
         }
         if ("cash_variance_tolerance".equals(policyKey) && !req.value().matches("^\\d{1,9}$")) { // FIN-005: minor units
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
