@@ -283,6 +283,7 @@ owner,POST /v1/patients,patients:create,allow
 owner,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,allow
 owner,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
 owner,POST /v1/patients/{id}/abha/verify,patients:edit,allow
+owner,POST /v1/patients/{id}/complete-in-chat,patients:edit,allow
 owner,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner,POST /v1/patients/{id}/consents,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -637,6 +638,7 @@ owner_doctor,POST /v1/patients,patients:create,allow
 owner_doctor,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,allow
 owner_doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
 owner_doctor,POST /v1/patients/{id}/abha/verify,patients:edit,allow
+owner_doctor,POST /v1/patients/{id}/complete-in-chat,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -991,6 +993,7 @@ doctor,POST /v1/patients,patients:create,allow
 doctor,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 doctor,POST /v1/patients/{id}/abha/verify,patients:edit,allow
+doctor,POST /v1/patients/{id}/complete-in-chat,patients:edit,allow
 doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -1345,6 +1348,7 @@ nurse,POST /v1/patients,patients:create,deny-403
 nurse,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 nurse,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 nurse,POST /v1/patients/{id}/abha/verify,patients:edit,allow
+nurse,POST /v1/patients/{id}/complete-in-chat,patients:edit,allow
 nurse,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 nurse,POST /v1/patients/{id}/consents,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -1699,6 +1703,7 @@ receptionist,POST /v1/patients,patients:create,allow
 receptionist,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 receptionist,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 receptionist,POST /v1/patients/{id}/abha/verify,patients:edit,allow
+receptionist,POST /v1/patients/{id}/complete-in-chat,patients:edit,allow
 receptionist,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 receptionist,POST /v1/patients/{id}/consents,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -2053,6 +2058,7 @@ frontdesk_vitals,POST /v1/patients,patients:create,allow
 frontdesk_vitals,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 frontdesk_vitals,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 frontdesk_vitals,POST /v1/patients/{id}/abha/verify,patients:edit,allow
+frontdesk_vitals,POST /v1/patients/{id}/complete-in-chat,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/consents,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow

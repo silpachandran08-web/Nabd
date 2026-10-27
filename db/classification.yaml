@@ -44,6 +44,8 @@ schemas:
       refuse_reason: phi
       recorded_at: operational
     appointments:
+      acted_by_patient_id: pii
+      acted_by_relation: pii
       id: operational
       tenant_id: operational
       patient_id: pii
@@ -684,6 +686,8 @@ schemas:
       tax_minor: financial
       taxes: financial
     invoice_payments:
+      acted_by_patient_id: pii
+      acted_by_relation: pii
       id: operational
       tenant_id: operational
       invoice_id: operational
@@ -1060,6 +1064,11 @@ schemas:
       change_seq: operational
       updated_at: operational
     patients:
+      registration_source: operational
+      profile_completed_at: operational
+      chat_completion_requested_at: operational
+      email: pii
+      preferred_language: operational
       legacy_record_no: pii
       is_synthetic: operational
       id: operational
@@ -1213,6 +1222,30 @@ schemas:
       verified_at: operational
       updated_by: operational
       updated_at: operational
+    patient_proxies:
+      id: operational
+      tenant_id: operational
+      proxy_patient_id: pii
+      subject_patient_id: pii
+      relation: pii
+      scope: operational
+      status: operational
+      invited_at: operational
+      accepted_at: operational
+      revoked_at: operational
+      revoked_by: operational
+      evidence: pii
+      notice_version: operational
+    proxy_invites:
+      token_hash: pii
+      tenant_id: operational
+      proxy_id: operational
+      expires_at: operational
+      used_at: operational
+      otp_hash: pii
+      otp_expires_at: operational
+      otp_attempts: operational
+      otp_challenge_id: operational
     chat_consents:
       id: operational
       tenant_id: operational
@@ -1303,6 +1336,8 @@ schemas:
       last_event_id: operational
       updated_at: operational
     queue_entries:
+      acted_by_patient_id: pii
+      acted_by_relation: pii
       id: operational
       tenant_id: operational
       appointment_id: operational
