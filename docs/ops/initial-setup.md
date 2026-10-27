@@ -102,6 +102,13 @@ Do these in order; each is one line of work.
 - Nightly load tests and the residency/egress checks are GitHub workflows (`nightly-load.yml`, `residency*.yml`) that have not had a first run.
 - Five browser scripts need their own builds: see `kanban/CONTEXT.md` (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`).
 
+## After upgrading to Sprint 15 (S6) code
+
+- Migrations V2410-V2619 (see `db/migrations/VERSIONS`, including V2604 and V2619 clinic policy keys union) and Comms Gateway V6-V17. Flyway applies them on start; no manual step.
+- New env: `APP_TRIAL_HASH_PEPPER` (free-trial sign-up, set a random secret per environment). Other new keys are optional and blank by default.
+- Staff pages moved into the `(clinic)` route group; no URL changes.
+- Five browser scripts still need their own builds (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`); the patient-links script needs a patient-web build.
+
 ## Errors seen and what they mean
 
 | Error | Cause | Fix |
