@@ -28,7 +28,7 @@ public class TrialConversionWorker {
     private static final Logger log = LoggerFactory.getLogger(TrialConversionWorker.class);
     static final int CHUNK = 1000;
 
-    private final TrialRepository repo;
+    private final ClinicTrialRepository repo;
     private final SyntheticPatients synthetic;
     private final TenantScope scope;
     private final AuditService audit;
@@ -39,7 +39,7 @@ public class TrialConversionWorker {
         return t;
     });
 
-    TrialConversionWorker(TrialRepository repo, SyntheticPatients synthetic, TenantScope scope, AuditService audit, EventPublisher events) {
+    TrialConversionWorker(ClinicTrialRepository repo, SyntheticPatients synthetic, TenantScope scope, AuditService audit, EventPublisher events) {
         this.repo = repo;
         this.synthetic = synthetic;
         this.scope = scope;

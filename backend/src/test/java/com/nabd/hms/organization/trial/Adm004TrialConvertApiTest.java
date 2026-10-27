@@ -46,8 +46,8 @@ class Adm004TrialConvertApiTest extends ApiTestBase {
     }
 
     private UUID demoPatient(String token, String name, String phone) {
-        ResponseEntity<Map> r = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of("name", name, "phone", phone,
-                "dob", "1990-01-01", "gender", "female", "synthetic", true)), Map.class);
+        ResponseEntity<Map> r = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of("name", name, "phone", "+9197" + (10000000 + (int) (Math.random() * 89999999)),
+                "dob", "1990-01-01", "gender", "female", "synthetic", true, "confirmedNotDuplicate", true)), Map.class);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return UUID.fromString((String) r.getBody().get("id"));
     }
@@ -57,10 +57,10 @@ class Adm004TrialConvertApiTest extends ApiTestBase {
         UUID tid = c.tenant().id();
         UUID queueEntry = UUID.randomUUID();
         UUID invoice = UUID.randomUUID();
-        Instant start = Instant.now().plus(5, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant start = Instant.now().plus(5, ChronoUnit.DAYS).plus(1 + (int) (Math.random() * 20000), ChronoUnit.HOURS).truncatedTo(ChronoUnit.HOURS); // distinct per patient: one doctor cannot overlap
         inTenantTx(tid, () -> {
             jdbc.update("INSERT INTO queue_entries (id, tenant_id, patient_id, doctor_id, department_id, queue_date, token_number, status) " +
-                    "VALUES (?,?,?,?,(SELECT id FROM departments WHERE tenant_id = ? AND is_default),CURRENT_DATE,1,'waiting')", queueEntry, tid, patient, c.doctor().id(), tid);
+                    "VALUES (?,?,?,?,(SELECT id FROM departments WHERE tenant_id = ? AND is_default),CURRENT_DATE,?,'waiting')", queueEntry, tid, patient, c.doctor().id(), tid, 1 + (int) (Math.random() * 1_000_000));
             jdbc.update("INSERT INTO invoices (id, tenant_id, queue_entry_id, patient_id, doctor_id, subtotal, tax, total, created_by) VALUES (?,?,?,?,?,100,0,100,?)",
                     invoice, tid, queueEntry, patient, c.doctor().id(), c.doctor().id());
             jdbc.update("INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, quantity, unit_price, tax_rate_percent, line_total, is_rx) " +
@@ -77,6 +77,7 @@ class Adm004TrialConvertApiTest extends ApiTestBase {
     }
 
     private UUID challenge(Clinic c, String code) {
+        su.update("DELETE FROM otp_send_counters WHERE tenant_id = ?", c.tenant().id()); // the 60 s resend gap would otherwise refuse a second code
         ResponseEntity<Map> r = exchange("/v1/setup/trial/convert/otp", HttpMethod.POST, authedJsonBody(c.token(), Map.of()), Map.class);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         su.update("UPDATE staff SET whatsapp_otp_hash = ? WHERE id = ?", OpaqueTokens.sha256Hex(code), c.owner().id());
@@ -114,7 +115,7 @@ class Adm004TrialConvertApiTest extends ApiTestBase {
         dependants(c, p2);
         demoPatient(other.token(), "Other Demo", "+919800000199");
         su.update("INSERT INTO patients (tenant_id, name, phone, dob, gender) VALUES (?, 'Real One', '+919800000555', '1980-01-01', 'male')", tid);
-        exchange("/v1/setup/policies", HttpMethod.GET, authed(c.token()), Map.class); // seeds the policy defaults
+        exchange("/v1/setup/policies", HttpMethod.GET, authed(c.token()), java.util.List.class); // seeds the policy defaults
         long policies = count(tid, "SELECT count(*) FROM clinic_policies");
         assertThat(count(tid, "SELECT count(*) FROM queue_entries")).isEqualTo(2);
 

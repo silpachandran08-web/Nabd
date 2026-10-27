@@ -20,15 +20,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** ADM-004. Converting needs setup:edit AND the clinic's Owner role (403 NOT_OWNER, checked in TrialService). */
+/** ADM-004. Converting needs setup:edit AND the clinic's Owner role (403 NOT_OWNER, checked in ClinicTrialService). */
 @RestController
 @RequestMapping("/v1/setup/trial")
-class TrialController {
+class ClinicTrialController {
 
-    private final TrialService service;
+    private final ClinicTrialService service;
     private final TrialConversionWorker worker;
 
-    TrialController(TrialService service, TrialConversionWorker worker) {
+    ClinicTrialController(ClinicTrialService service, TrialConversionWorker worker) {
         this.service = service;
         this.worker = worker;
     }

@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-class TrialRepository {
+class ClinicTrialRepository {
 
     record Job(UUID id, UUID requestedBy, String status, long rowsDeleted) {
     }
@@ -17,7 +17,7 @@ class TrialRepository {
     private final JdbcTemplate jdbc;
     private final TenantContext tenant;
 
-    TrialRepository(JdbcTemplate jdbc, TenantContext tenant) {
+    ClinicTrialRepository(JdbcTemplate jdbc, TenantContext tenant) {
         this.jdbc = jdbc;
         this.tenant = tenant;
     }

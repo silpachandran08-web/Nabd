@@ -27,9 +27,9 @@ import java.util.UUID;
  * a new purpose would rewrite the shared otp_requests CHECK another story may also be changing.
  */
 @Service
-public class TrialService {
+public class ClinicTrialService {
 
-    private final TrialRepository repo;
+    private final ClinicTrialRepository repo;
     private final TenantContext tenantContext;
     private final ClinicClock clinicClock;
     private final ActorDirectory actors;
@@ -37,7 +37,7 @@ public class TrialService {
     private final AuditService audit;
     private final TrialSubscriptions subscriptions;
 
-    TrialService(TrialRepository repo, TenantContext tenantContext, ClinicClock clinicClock, ActorDirectory actors, StepUpOtp otp, AuditService audit,
+    ClinicTrialService(ClinicTrialRepository repo, TenantContext tenantContext, ClinicClock clinicClock, ActorDirectory actors, StepUpOtp otp, AuditService audit,
                  TrialSubscriptions subscriptions) {
         this.subscriptions = subscriptions;
         this.repo = repo;

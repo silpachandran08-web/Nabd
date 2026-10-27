@@ -24,7 +24,20 @@ class Adm011GoLiveApiTest extends ApiTestBase {
 
     /** A trialing clinic that satisfies every blocker except the ones named in skip (doctor_schedule, price_list, whatsapp_sender, dpa_signed). */
     private Clinic clinic(Set<String> skip) {
-        SeededTenant t = seedTenant();
+        return clinic(skip, "IN");
+    }
+
+    /** Region cannot change after insert (OPS-061), so a non-IN clinic is inserted in its region. */
+    private SeededTenant tenantIn(String region) {
+        UUID id = UUID.randomUUID();
+        String slug = "t" + id.toString().replace("-", "").substring(0, 12);
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone, data_gate, consent_default_deny) VALUES (?,?,?,?,'active','UTC','live',false)", id, slug, "Test Clinic " + slug, region);
+        inTenantTx(id, () -> jdbc.update("INSERT INTO departments (tenant_id, name, is_default) VALUES (?,'General',true)", id));
+        return tenantHandle(id, slug);
+    }
+
+    private Clinic clinic(Set<String> skip, String region) {
+        SeededTenant t = "IN".equals(region) ? seedTenant() : tenantIn(region);
         su.update("UPDATE tenants SET status = 'trialing', tax_id = NULL, whatsapp_number = ? WHERE id = ?", skip.contains("whatsapp_sender") ? null : "+919800009999", t.id());
         UUID role = seedFullAccessRole(t.id());
         SeededStaff owner = seedStaff(t, role, "own" + UUID.randomUUID() + "@a.com", "+9198" + (10000000 + (int) (Math.random() * 89999999)), false);
@@ -77,7 +90,7 @@ class Adm011GoLiveApiTest extends ApiTestBase {
     @Test
     void pendingInvitesAndEverythingElseAreGoodToHave_goLiveSucceedsAndTenantIsActive() {
         Clinic c = clinic(Set.of());
-        UUID role = seedFullAccessRole(c.tenant().id());
+        UUID role = inTenantTx(c.tenant().id(), () -> jdbc.queryForObject("SELECT id FROM roles WHERE tenant_id = ? LIMIT 1", UUID.class, c.tenant().id()));
         inTenantTx(c.tenant().id(), () -> {
             for (int i = 0; i < 4; i++) {
                 jdbc.update("INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, status) VALUES (?,?,?,?,?,?,'invited')",
@@ -125,8 +138,7 @@ class Adm011GoLiveApiTest extends ApiTestBase {
 
     @Test
     void ksaClinicWithoutZatcaPhase2_isGoodToHaveWithANote_andDoesNotBlock() {
-        Clinic c = clinic(Set.of());
-        su.update("UPDATE tenants SET region_code = 'SA', region = 'SA', tax_id = NULL WHERE id = ?", c.tenant().id());
+        Clinic c = clinic(Set.of(), "SA");
         Map<?, ?> r = checks(c);
         Map<?, ?> zatca = find(r.get("niceToHave"), "einvoice_phase2");
         assertThat(zatca.get("ok")).isEqualTo(false);
