@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
@@ -22,6 +23,7 @@ export default function DoseCalculator({
   /** clinical:edit (PATCH /clinical/vitals/{id}); the Record weight action is absent without it. */
   canRecordWeight: boolean; onWeightRecorded?: () => void;
 }) {
+  const tx = useTranslations("consult.doseCalculator");
   const [rate, setRate] = useState("");
   const [result, setResult] = useState<DoseResult | null>(null);
   const [noWeight, setNoWeight] = useState(false);
@@ -46,7 +48,7 @@ export default function DoseCalculator({
       const res = await authedFetch(`/clinical/patients/${patientId}/dose-calculator?mgPerKg=${encodeURIComponent(rateText.trim())}`);
       if (!res) return;
       if (!res.ok) {
-        const pr: ProblemWithType = await res.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
+        const pr: ProblemWithType = await res.json().catch(() => ({ title: "Error", detail: tx("couldnTCalculateDose") }));
         setResult(null);
         if (res.status === 422 && pr.type?.endsWith("adult-patient")) {
           setAdult(true); // mg/kg dosing is out of scope for adults: the helper disappears
@@ -54,7 +56,7 @@ export default function DoseCalculator({
           setNoWeight(true);
         } else {
           setNoWeight(false);
-          setError(pr.detail || "Couldn't calculate dose.");
+          setError(pr.detail || tx("couldnTCalculateDose"));
         }
         return;
       }
@@ -63,7 +65,7 @@ export default function DoseCalculator({
       setResult(await res.json());
     } catch {
       setResult(null);
-      setError("Couldn't calculate dose. Check the connection and try again.");
+      setError(tx("couldnTCalculateDoseCheck"));
     } finally {
       setBusy(false);
     }
@@ -79,8 +81,8 @@ export default function DoseCalculator({
       const res = await authedFetch(`/clinical/vitals/${queueEntryId}`, { method: "PATCH", body: JSON.stringify({ weightKg: Number(weightText.trim()) }) });
       if (!res) return;
       if (!res.ok) {
-        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save the weight." }));
-        setWeightErr(pr.detail || "Couldn't save the weight.");
+        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: tx("couldnTSaveTheWeight") }));
+        setWeightErr(pr.detail || tx("couldnTSaveTheWeight"));
         return;
       }
       setRecording(false);
@@ -95,7 +97,7 @@ export default function DoseCalculator({
         setRecorded(true);
       }
     } catch {
-      setWeightErr("Couldn't save the weight. Check the connection and try again.");
+      setWeightErr(tx("couldnTSaveTheWeight2"));
     } finally {
       setSaving(false);
     }
@@ -108,22 +110,22 @@ export default function DoseCalculator({
 
   const recordAction = canRecordWeight && !recording && (
     <button type="button" className={s.btn} onClick={() => { setRecording(true); setWeightErr(null); }}>
-      <Icon name="plus" size={14} />Record weight
+      <Icon name="plus" size={14} />{tx("recordWeight")}
     </button>
   );
 
   return (
-    <div className={d.wrap} aria-label="Weight-based dose calculator">
+    <div className={d.wrap} aria-label={tx("weightBasedDoseCalculator")}>
       <div className={d.head}>
-        <span className={d.title}>Weight-based dose calculator</span>
-        <StatusPill tone="info" icon="info" label="Decision support" />
+        <span className={d.title}>{tx("weightBasedDoseCalculator")}</span>
+        <StatusPill tone="info" icon="info" label={tx("decisionSupport")} />
       </div>
-      <p className={d.note}>Suggestion only, not a prescription. It does not change the prescription; you set the final dose, and the prescriber remains responsible for it.</p>
+      <p className={d.note}>{tx("suggestionOnlyNotAPrescription")}</p>
 
       <div className={s.row}>
-        <input className={s.input} aria-label="mg per kg" inputMode="decimal" placeholder="mg/kg" value={rate} onChange={(e) => setRate(e.target.value)}
+        <input className={s.input} aria-label={tx("mgPerKg")} inputMode="decimal" placeholder="mg/kg" value={rate} onChange={(e) => setRate(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") void calculate(); }} />
-        <button type="button" className={s.btn} onClick={() => void calculate()} disabled={busy || rate.trim() === ""}>{busy ? "Calculating…" : "Calculate"}</button>
+        <button type="button" className={s.btn} onClick={() => void calculate()} disabled={busy || rate.trim() === ""}>{busy ? tx("calculating") : tx("calculate")}</button>
       </div>
       {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert"><Icon name="alert" size={16} /><span>{error}</span></div>}
 
@@ -131,8 +133,8 @@ export default function DoseCalculator({
         <div className={`${s.notice} ${s.noticeDanger}`} role="alert">
           <Icon name="alert" size={16} />
           <div>
-            <strong>No weight recorded.</strong> The automatic suggestion is blocked. A weight is never estimated or assumed; record an actual measured weight to see a suggestion.
-            {!canRecordWeight && <div className={d.hint}>Ask nursing to record the weight.</div>}
+            <strong>{tx("noWeightRecorded")}</strong>{" "}{tx("theAutomaticSuggestionIsBlocked")}
+            {!canRecordWeight && <div className={d.hint}>{tx("askNursingToRecordThe")}</div>}
           </div>
         </div>
       )}
@@ -142,39 +144,39 @@ export default function DoseCalculator({
           {stale && age && age.state !== "unknown" && (
             <div className={`${s.notice} ${s.noticeWarn}`} role="alert">
               <Icon name="alert" size={16} />
-              <span><strong>Re-weigh.</strong> The weight was recorded {fmtDate(age.date)} and is out of date for this patient. Record a current weight before relying on this suggestion; the old weight is not used silently.</span>
+              <span><strong>{tx("reWeigh")}</strong>{" "}{tx("weightOutOfDate", { date: fmtDate(age.date) })}</span>
             </div>
           )}
           {age?.state === "unknown" && (
             <div className={`${s.notice} ${s.noticeWarn}`} role="alert">
               <Icon name="alert" size={16} />
-              <span><strong>Weight date unknown.</strong> The system cannot say when this weight was recorded. Confirm a current weight before relying on this suggestion.</span>
+              <span><strong>{tx("weightDateUnknown")}</strong>{" "}{tx("theSystemCannotSayWhen")}</span>
             </div>
           )}
           <dl className={d.facts}>
-            <div><dt>Suggested total</dt><dd className={d.big}>{result.totalDoseMg} mg</dd></div>
-            <div><dt>Calculation</dt><dd>{result.weightKg} kg × {result.mgPerKg} mg/kg</dd></div>
-            <div><dt>Weight recorded</dt><dd>{age?.state === "unknown" || !age ? "Date unknown" : `${fmtDate(age.date)}${stale ? " (out of date)" : ""}`}</dd></div>
-            <div><dt>Rule source</dt><dd>{result.ruleSource}</dd></div>
-            <div><dt>Maximum dose</dt><dd>Not defined by this rule. No per-dose or daily limit is applied or checked here; check the drug reference before prescribing.</dd></div>
+            <div><dt>{tx("suggestedTotal")}</dt><dd className={d.big}>{tx("mg", { totalDoseMg: result.totalDoseMg })}</dd></div>
+            <div><dt>{tx("calculation")}</dt><dd>{tx("kgMgKg", { weightKg: result.weightKg, mgPerKg: result.mgPerKg })}</dd></div>
+            <div><dt>{tx("weightRecorded")}</dt><dd>{age?.state === "unknown" || !age ? tx("dateUnknown") : stale ? tx("dateOutOfDate", { date: fmtDate(age.date) }) : fmtDate(age.date)}</dd></div>
+            <div><dt>{tx("ruleSource")}</dt><dd>{result.ruleSource}</dd></div>
+            <div><dt>{tx("maximumDose")}</dt><dd>{tx("notDefinedByThisRule")}</dd></div>
           </dl>
         </div>
       )}
-      {recorded && !recording && !noWeight && <div className={`${s.notice} ${s.noticeOk}`} role="status"><Icon name="check" size={16} /><span>Weight recorded. {result ? "Suggestion refreshed with the new weight." : "Enter a mg/kg rate and calculate."}</span></div>}
+      {recorded && !recording && !noWeight && <div className={`${s.notice} ${s.noticeOk}`} role="status"><Icon name="check" size={16} /><span>{tx("weightRecorded2")}{" "}{result ? tx("suggestionRefreshedWithTheNew") : tx("enterAMgKgRate")}</span></div>}
 
       {(noWeight || stale || age?.state === "unknown") && recordAction}
       {recording && (
         <form className={d.record} onSubmit={(e) => { e.preventDefault(); void saveWeight(); }}>
           <label className={d.label}>
-            Measured weight (kg)
+            {tx("measuredWeightKg")}
             <input className={s.input} inputMode="decimal" value={weightText} onChange={(e) => setWeightText(e.target.value)} aria-invalid={weightErr ? true : undefined} autoFocus />
           </label>
           {weightErr && <div className={`${s.notice} ${s.noticeDanger}`} role="alert"><Icon name="alert" size={16} /><span>{weightErr}</span></div>}
           <div className={s.row}>
-            <button type="submit" className={s.btnPrimary} disabled={saving}>{saving ? "Saving…" : "Save weight"}</button>
-            <button type="button" className={s.btn} onClick={() => { setRecording(false); setWeightErr(null); }} disabled={saving}>Cancel</button>
+            <button type="submit" className={s.btnPrimary} disabled={saving}>{saving ? tx("saving") : tx("saveWeight")}</button>
+            <button type="button" className={s.btn} onClick={() => { setRecording(false); setWeightErr(null); }} disabled={saving}>{tx("cancel")}</button>
           </div>
-          <span className={d.hint}>Saved to this visit&apos;s vitals with the time it was recorded.</span>
+          <span className={d.hint}>{tx("savedToThisVisitS")}</span>
         </form>
       )}
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
@@ -7,19 +8,17 @@ import StatusPill from "../ui/StatusPill";
 import { rxItemLine, type PrescriptionItem, type RxWarning } from "./shared";
 import s from "./consultParts.module.css";
 
-export const WARNING_TITLE: Record<RxWarning["kind"], string> = {
-  allergy: "Allergy warning",
-  pregnancy: "Pregnancy / lactation warning",
-  controlled: "Controlled substance",
+/** Glossary ids (packages/i18n/glossary): the warning title is a clinical term, so every screen shows the same reviewed wording. */
+export const WARNING_TITLE_ID: Record<RxWarning["kind"], string> = {
+  allergy: "allergy.warning.title",
+  pregnancy: "pregnancy.warning.title",
+  controlled: "controlled.warning.title",
 };
 
-const WARNING_BODY: Record<RxWarning["kind"], (w: RxWarning) => string> = {
-  allergy: (w) => `Conflicts with a recorded allergy: ${w.message}.`,
-  pregnancy: (w) => w.message,
-  controlled: (w) => w.message,
-};
-
-const SEVERITY_LABEL: Record<string, string> = { mild: "Mild", moderate: "Moderate", severe: "Severe" };
+type Glossary = ReturnType<typeof useTranslations>;
+/** The server's own text for pregnancy and controlled warnings; the allergy one is the glossary sentence around the matched allergy. */
+const warningBody = (g: Glossary, w: RxWarning) => (w.kind === "allergy" ? g("allergy.warning.conflict", { message: w.message }) : w.message);
+const SEVERITIES = ["mild", "moderate", "severe"];
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -36,6 +35,8 @@ export default function RxWarnings({
   /** Absent for someone who may not record a decision (not the visit's doctor, no clinical:approve): the button is then not rendered. */
   onOverride?: (w: RxWarning) => void; onChangeMedicine: () => void; onRemove?: () => void;
 }) {
+  const t = useTranslations("consult.rxWarnings");
+  const g = useTranslations("glossary");
   const warnings = item.warnings ?? [];
   if (warnings.length === 0) return null;
   return (
@@ -46,30 +47,30 @@ export default function RxWarnings({
           <div key={w.kind} className={`${s.notice} ${open ? s.noticeDanger : w.requiresDecision ? s.noticeInfo : s.noticeWarn} ${s.warnCard}`} role={open ? "alert" : "status"}>
             <Icon name="alert" size={16} />
             <div className={s.warnBody}>
-              <strong>{WARNING_TITLE[w.kind]}{w.kind === "allergy" && SEVERITY_LABEL[w.severity] ? ` · ${SEVERITY_LABEL[w.severity]}` : ""}{w.requiresDecision ? "" : " (advisory)"}</strong>
-              <span>{WARNING_BODY[w.kind](w)}</span>
-              {source !== undefined && <span className={s.muted}>{source ?? "Source: safety dictionary version unavailable"}</span>}
+              <strong>{g(WARNING_TITLE_ID[w.kind])}{w.kind === "allergy" && SEVERITIES.includes(w.severity) && <> · {g(`allergy.severity.${w.severity}`)}</>}{!w.requiresDecision && <> {g("warning.advisory")}</>}</strong>
+              <span>{warningBody(g, w)}</span>
+              {source !== undefined && <span className={s.muted}>{source ?? t("sourceSafetyDictionaryVersionUnavailable")}</span>}
               {w.decision && (
                 <span>
-                  <StatusPill tone="info" icon="check" label="Decision recorded" />{" "}
+                  <StatusPill tone="info" icon="check" label={g("warning.decisionRecorded")} />{" "}
                   {w.decision.reasonLabel ?? w.decision.reasonCode}{w.decision.note ? ` — ${w.decision.note}` : ""}
                   {w.decision.byName ? ` · ${w.decision.byName}` : ""}{w.decision.at ? ` · ${fmt(w.decision.at)}` : ""}
                 </span>
               )}
-              {open && !locked && onOverride && <span className={s.muted}>An override logs the warning, your name, the time, your reason and the final item.</span>}
+              {open && !locked && onOverride && <span className={s.muted}>{t("anOverrideLogsTheWarning")}</span>}
               {open && !locked && (
                 <span className={s.row}>
-                  <button type="button" className={s.btn} onClick={onChangeMedicine}>Change medicine</button>
+                  <button type="button" className={s.btn} onClick={onChangeMedicine}>{t("changeMedicine")}</button>
                   {onOverride && (
                     <button type="button" className={s.btn} onClick={() => onOverride(w)}>
-                      {w.kind === "controlled" ? "Record acknowledgement" : "Override with a clinical reason"}
+                      {w.kind === "controlled" ? t("recordAcknowledgement") : t("overrideWithAClinicalReason")}
                     </button>
                   )}
-                  {onRemove && <button type="button" className={s.btn} onClick={onRemove}>Remove medicine</button>}
+                  {onRemove && <button type="button" className={s.btn} onClick={onRemove}>{t("removeMedicine")}</button>}
                 </span>
               )}
               {w.decision && !locked && onOverride && (
-                <span><button type="button" className={s.linkBtn} onClick={() => onOverride(w)}>Change reason</button></span>
+                <span><button type="button" className={s.linkBtn} onClick={() => onOverride(w)}>{t("changeReason")}</button></span>
               )}
             </div>
           </div>
@@ -87,6 +88,8 @@ export function OverrideDialog({
   item: PrescriptionItem; warning: RxWarning; doctorName: string; busy: boolean; error: string | null;
   onConfirm: (reasonCode: string, note: string) => void; onClose: () => void;
 }) {
+  const t = useTranslations("consult.rxWarnings");
+  const g = useTranslations("glossary");
   const [code, setCode] = useState(warning.decision?.reasonCode ?? "");
   const [note, setNote] = useState(warning.decision?.note ?? "");
   const [at] = useState(() => new Date());
@@ -95,14 +98,14 @@ export function OverrideDialog({
   const name = `overrideReason-${warning.kind}`;
 
   return (
-    <Dialog title={warning.kind === "controlled" ? "Acknowledge a controlled substance" : "Override a clinical warning"} onClose={onClose}>
+    <Dialog title={warning.kind === "controlled" ? t("acknowledgeControlled") : t("overrideWarning")} onClose={onClose}>
       <div className={s.stack}>
         <div className={`${s.notice} ${s.noticeDanger}`}>
           <Icon name="alert" size={16} />
-          <span><strong>{WARNING_TITLE[warning.kind]}.</strong> {WARNING_BODY[warning.kind](warning)} <br />Medicine: {rxItemLine(item)}</span>
+          <span><strong>{g(WARNING_TITLE_ID[warning.kind])}.</strong> {warningBody(g, warning)} <br />{t("medicine")}{" "}{rxItemLine(item)}</span>
         </div>
         <fieldset className={s.fieldset}>
-          <legend className={s.legend}>Clinical reason (mandatory)</legend>
+          <legend className={s.legend}>{t("clinicalReasonMandatory")}</legend>
           {warning.reasonOptions.map((o) => (
             <label key={o.code} className={s.check}>
               <input type="radio" name={name} value={o.code} checked={code === o.code} onChange={() => setCode(o.code)} />
@@ -111,27 +114,27 @@ export function OverrideDialog({
           ))}
         </fieldset>
         <label className={`${s.check} ${s.colGap4}`}>
-          <span className={s.muted}>Note (optional)</span>
+          <span className={s.muted}>{t("noteOptional")}</span>
           <textarea className={s.textarea} value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
         </label>
         {reason && (
-          <section className={s.card} aria-label="What gets logged">
-            <h3 className={s.cardTitle}>What gets logged</h3>
+          <section className={s.card} aria-label={t("whatGetsLogged")}>
+            <h3 className={s.cardTitle}>{t("whatGetsLogged")}</h3>
             <ul className={s.list}>
-              <li>Warning: {WARNING_TITLE[warning.kind]} · {warning.matched}</li>
-              <li>Doctor acknowledgement: {doctorName || "You"}</li>
-              <li>Date and time: {at.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</li>
-              <li>Reason: {reason.label}{note.trim() ? ` — ${note.trim()}` : ""}</li>
-              <li>Final prescribed item: {rxItemLine(item)}</li>
+              <li>{t("warning")}{" "}{g(WARNING_TITLE_ID[warning.kind])} · {warning.matched}</li>
+              <li>{t("doctorAcknowledgement")}{" "}{doctorName || t("you")}</li>
+              <li>{t("dateAndTime")}{" "}{at.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</li>
+              <li>{t("reason", { label: reason.label })}{note.trim() ? ` — ${note.trim()}` : ""}</li>
+              <li>{t("finalPrescribedItem")}{" "}{rxItemLine(item)}</li>
             </ul>
           </section>
         )}
         {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert">{error}</div>}
       </div>
       <div className={s.dialogActions}>
-        <button type="button" className={s.btn} onClick={onClose}>Cancel</button>
+        <button type="button" className={s.btn} onClick={onClose}>{t("cancel")}</button>
         <button type="button" className={s.btnPrimary} disabled={!code || busy} onClick={() => onConfirm(code, note.trim())}>
-          {busy ? "Saving…" : !code ? "Choose a reason" : single ? "Record and save" : "Override and save"}
+          {busy ? t("saving") : !code ? t("chooseReason") : single ? t("recordAndSave") : t("overrideAndSave")}
         </button>
       </div>
     </Dialog>

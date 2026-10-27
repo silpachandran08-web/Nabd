@@ -22,3 +22,7 @@
 
 # CLN-007 safety-report test fixtures mirror docs/clinical-safety, so they need the CSO team too
 /scripts/ci/fixtures/safety-report/ @nabd/clinical-safety
+
+# FEF-039: clinical glossary (term ids, definitions, approved translations). A term or a translation changes only with a clinician's approval (ADR-11: never machine-translated).
+/frontend/packages/i18n/glossary/                  @nabd/clinical-owners
+/frontend/packages/i18n/messages/*/glossary.json   @nabd/clinical-owners

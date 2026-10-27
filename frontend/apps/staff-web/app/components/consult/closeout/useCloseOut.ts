@@ -1,6 +1,7 @@
 "use client";
 
 // FEF-030 (DOC-029): sign the note and hand the patient to checkout, moved out of consult/page.tsx.
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { moveBody } from "../../../lib/queueMove";
 import type { AuthedFetch, Problem, Row } from "../shared";
@@ -10,6 +11,7 @@ import type { Note } from "../visit/types";
 type Editor = ReturnType<typeof useNoteEditor>;
 
 export function useCloseOut(authedFetch: AuthedFetch, entry: Row, n: Editor, handoffPending: boolean, setShellError: (e: string | null) => void, setNotice: (s: string | null) => void, setEntryStatus: (status: string) => void) {
+  const t = useTranslations("consult.useCloseOut");
   const [completing, setCompleting] = useState(false);
 
   async function completeConsultation() {
@@ -22,14 +24,14 @@ export function useCloseOut(authedFetch: AuthedFetch, entry: Row, n: Editor, han
         n.ctl.flushCheck();
         const saveRes = await n.saveNote();
         if (!saveRes?.ok) {
-          setShellError(n.ctl.conflictNow() ? "The note changed on the server. Resolve the differences before closing." : (navigator.onLine ? "Couldn't save the note. Try again before completing." : "You're offline. The note is kept on this device; it can be signed once you reconnect."));
+          setShellError(n.ctl.conflictNow() ? t("noteChanged") : (navigator.onLine ? t("saveFailed") : t("offline")));
           return;
         }
         const signRes = await authedFetch(`/clinical/notes/${entry.id}/sign`, { method: "POST" });
         // CLN-006: 409 means an earlier attempt already signed it; carry on to the checkout handoff.
         if (!signRes?.ok && signRes?.status !== 409) {
-          const pr: Problem = await signRes?.json().catch(() => ({ title: "Error", detail: "Couldn't sign the note." }));
-          setShellError(pr?.detail || "Couldn't sign the note.");
+          const pr: Problem = await signRes?.json().catch(() => ({ title: "Error", detail: t("signFailed") }));
+          setShellError(pr?.detail || t("signFailed"));
           return;
         }
         n.setNoteStatus("signed");
@@ -39,16 +41,16 @@ export function useCloseOut(authedFetch: AuthedFetch, entry: Row, n: Editor, han
       const statusRes = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: moveBody("checkout_pending", entry.status) });
       if (!statusRes?.ok) {
         const pr: Problem | null = await statusRes?.json().catch(() => null);
-        setShellError(`Note signed, but couldn't move the patient to checkout${pr?.detail ? ` (${pr.detail})` : ""}. Use “Retry checkout handoff”.`);
+        setShellError(pr?.detail ? t("handoffFailedDetail", { detail: pr.detail }) : t("handoffFailed"));
         return;
       }
       setEntryStatus("checkout_pending");
-      setNotice("Sent to checkout. Reception can see this visit now.");
+      setNotice(t("sentToCheckout"));
       // Stay in the workspace (don't auto-close): follow-up and amendments remain reachable.
     } catch {
       setShellError(n.noteStatus === "signed" || handoffPending
-        ? "Couldn't reach the server. Retry the checkout handoff when you're back online."
-        : "Couldn't reach the server. The note was not signed; try again.");
+        ? t("unreachableHandoff")
+        : t("unreachableSign"));
     } finally {
       setCompleting(false);
     }

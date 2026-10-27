@@ -3,6 +3,7 @@
 // FEF-030: the prescription card of the Plan step (pad, warnings, favourites, dose calculator, previous medicines)
 // and its two dialogs (sign confirmation, warning decision). Mounted inside a PanelBoundary: a failure here
 // leaves the note editor working.
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import Dialog from "../../ui/Dialog";
 import Icon from "../../ui/Icon";
@@ -15,7 +16,7 @@ import DoseCalculator from "../DoseCalculator";
 import FavouriteRxSetsPanel from "../FavouriteRxSetsPanel";
 import MedicinesList from "../MedicinesList";
 import RxPad from "../RxPad";
-import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../RxWarnings";
+import RxWarnings, { OverrideDialog, WARNING_TITLE_ID } from "../RxWarnings";
 import { rxItemLine } from "../shared";
 import { openWarningCount } from "./rxLogic";
 import type { RxPad as Pad } from "./useRxPad";
@@ -29,6 +30,8 @@ type Props = {
 };
 
 export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, pad, signing, mayDecideRx, signBlocked, rxSource, drugKb }: Props) {
+  const tx = useTranslations("consult.rxPanel");
+  const g = useTranslations("glossary");
   const { rxItems, rxStatus, rxSaving, rxError, rxDirty } = pad;
   const signed = rxStatus === "signed";
   const openWarnings = openWarningCount(rxItems);
@@ -43,37 +46,37 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
     <>
       <div className={`${styles.card} ${styles.cardPad24}`}>
         <div className={styles.rxHeader}>
-          <h3 className={styles.rxTitle}>Prescription {signed && <StatusPill tone="ok" label="Signed" />}</h3>
+          <h3 className={styles.rxTitle}>{g("rx.prescription")}{" "}{signed && <StatusPill tone="ok" label={tx("signed")} />}</h3>
           {signed && can("clinical:view") && (
             <div className={styles.rxHeaderActions}>
-              <Link className={`${styles.backBtn} ${styles.anchorBtn}`} href={`/consult/rx/${entry.id}/print`}>Print prescription</Link>
+              <Link className={`${styles.backBtn} ${styles.anchorBtn}`} href={`/consult/rx/${entry.id}/print`}>{tx("printPrescription")}</Link>
             </div>
           )}
           {!signed && (
             <div className={styles.rxHeaderActions}>
-              <button className={styles.backBtn} onClick={() => void pad.saveRx()} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
+              <button className={styles.backBtn} onClick={() => void pad.saveRx()} disabled={rxSaving}>{rxSaving ? tx("saving") : tx("save")}</button>
               {mayDecideRx && (
                 <button className={styles.completeBtn} onClick={signing.reviewAndSign} disabled={rxSaving || (openWarnings > 0 && !rxDirty)}>
-                  {openWarnings > 0 && !rxDirty ? "Resolve the warning first" : "Review and sign"}
+                  {openWarnings > 0 && !rxDirty ? tx("resolveTheWarningFirst") : tx("reviewAndSign")}
                 </button>
               )}
             </div>
           )}
         </div>
-        {!signed && signBlocked && <p className={p.muted} role="status" data-testid="rx-sign-blocked">{signBlocked}</p>}
-        {!signed && <p className={p.muted}>The allergy check matches drug names and common drug classes only. It is not a drug database, so confirm against the patient&apos;s record.</p>}
+        {!signed && signBlocked && <p className={p.muted} role="status" data-testid="rx-sign-blocked">{tx(`signBlock.${signBlocked}`)}</p>}
+        {!signed && <p className={p.muted}>{tx("theAllergyCheckMatchesDrug")}</p>}
         {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
         {openWarnings > 0 && !signed && (
           <div className={`${p.notice} ${p.noticeDanger} ${p.mbM}`} role="alert">
             <Icon name="alert" size={16} />
-            <span>{openWarnings} safety warning{openWarnings === 1 ? "" : "s"} need{openWarnings === 1 ? "s" : ""} a decision before this prescription can be signed.</span>
+            <span>{tx("safetyWarning", { openWarnings })}{openWarnings === 1 ? "" : "s"} {" "}{tx("need")}{openWarnings === 1 ? "s" : ""} {" "}{tx("aDecisionBeforeThisPrescription")}</span>
           </div>
         )}
         {rxItems.map((item, i) => (
           <div key={i}>
             <RxPad item={item} index={i} locked={signed} authedFetch={authedFetch} onChange={(patch) => pad.patchRxItem(i, patch)}>
               {!signed && rxItems.length > 1 && (
-                <button type="button" className={styles.removeBtn} onClick={() => pad.removeRxItem(i)} aria-label="Remove">×</button>
+                <button type="button" className={styles.removeBtn} onClick={() => pad.removeRxItem(i)} aria-label={tx("remove")}>×</button>
               )}
             </RxPad>
             <RxWarnings
@@ -86,7 +89,7 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
             />
           </div>
         ))}
-        {!signed && <button type="button" className={styles.backBtn} onClick={pad.addRxItem}>+ Add drug</button>}
+        {!signed && <button type="button" className={styles.backBtn} onClick={pad.addRxItem}>{tx("addDrug")}</button>}
         {drugKb && <p data-testid="drug-kb-attribution" className={p.kbNote}>{drugKb}</p>}
 
         {!(patient && age(patient.dob) >= 18) && <div className={styles.previousMeds}>
@@ -94,7 +97,7 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
         </div>}
 
         <div className={styles.previousMeds}>
-          <div className={`${styles.rxTitle} ${styles.rxTitleSm}`}>Favourite Rx sets</div>
+          <div className={`${styles.rxTitle} ${styles.rxTitleSm}`}>{tx("favouriteRxSets")}</div>
           <FavouriteRxSetsPanel
             authedFetch={authedFetch} entryId={entry.id} locked={signed} items={rxItems}
             onError={pad.setRxError}
@@ -103,14 +106,14 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
         </div>
 
         <div className={styles.previousMeds}>
-          <div className={`${styles.rxTitle} ${styles.rxTitleSmGap}`}>Previous medicines</div>
+          <div className={`${styles.rxTitle} ${styles.rxTitleSmGap}`}>{tx("previousMedicines")}</div>
           <MedicinesList prescriptions={ctx.prescriptions} onRetry={reloadCtx} />
         </div>
       </div>
 
       {signing.showSignConfirm && (
-        <Dialog title="Sign prescription" onClose={() => signing.setShowSignConfirm(false)}>
-          <p className={p.muted}>Signing locks this prescription and can&apos;t be undone.</p>
+        <Dialog title={tx("signPrescription")} onClose={() => signing.setShowSignConfirm(false)}>
+          <p className={p.muted}>{tx("signingLocksThisPrescriptionAnd")}</p>
           <ul className={`${p.list} ${p.mtM}`}>
             {rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}{i.instructions ? ` — ${i.instructions}` : ""}</li>)}
           </ul>
@@ -118,10 +121,10 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
             <div className={`${p.notice} ${p.noticeInfo} ${p.mtM}`} role="status">
               <Icon name="info" size={16} />
               <span>
-                Decisions recorded on this prescription:
+                {tx("decisionsRecordedOnThisPrescription")}
                 <ul className={p.noticeList}>
                   {rxItems.flatMap((i) => (i.warnings ?? []).filter((w) => w.decision).map((w) => (
-                    <li key={`${i.drugName}-${w.kind}`}>{i.drugName}: {WARNING_TITLE[w.kind]} — {w.decision?.reasonLabel ?? w.decision?.reasonCode}{w.decision?.byName ? ` (${w.decision.byName})` : ""}</li>
+                    <li key={`${i.drugName}-${w.kind}`}>{i.drugName}: {g(WARNING_TITLE_ID[w.kind])} — {w.decision?.reasonLabel ?? w.decision?.reasonCode}{w.decision?.byName ? ` (${w.decision.byName})` : ""}</li>
                   )))}
                 </ul>
               </span>
@@ -131,24 +134,24 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
             <div className={`${p.notice} ${p.noticeWarn} ${p.mtM}`} role="alert">
               <Icon name="alert" size={16} />
               <span>
-                Advisory warnings on this prescription:
+                {tx("advisoryWarningsOnThisPrescription")}
                 <ul className={p.noticeList}>
                   {advisoryItems.map((i, n) => (
-                    <li key={n}>{i.drugName}: {(i.warnings ?? []).filter((w) => !w.requiresDecision).map((w) => `${WARNING_TITLE[w.kind].toLowerCase()} — ${w.message}`).join("; ")}</li>
+                    <li key={n}>{i.drugName}: {(i.warnings ?? []).filter((w) => !w.requiresDecision).map((w) => `${g(WARNING_TITLE_ID[w.kind]).toLowerCase()} — ${w.message}`).join("; ")}</li>
                   ))}
                 </ul>
                 <label className={`${p.check} ${p.mtS}`}>
                   <input type="checkbox" checked={signing.signAck} onChange={(e) => signing.setSignAck(e.target.checked)} />
-                  I have reviewed these warnings.
+                  {tx("iHaveReviewedTheseWarnings")}
                 </label>
               </span>
             </div>
           )}
           {signing.signError && <div className={`${p.notice} ${p.noticeDanger} ${p.mtM}`} role="alert">{signing.signError}</div>}
           <div className={p.dialogActions}>
-            <button type="button" className={p.btn} onClick={() => signing.setShowSignConfirm(false)}>Cancel</button>
+            <button type="button" className={p.btn} onClick={() => signing.setShowSignConfirm(false)}>{tx("cancel")}</button>
             <button type="button" className={p.btnPrimary} onClick={signing.confirmSignRx} disabled={signing.signing || (advisoryItems.length > 0 && !signing.signAck)}>
-              {signing.signing ? "Signing…" : "Sign prescription"}
+              {signing.signing ? tx("signing") : tx("signPrescription")}
             </button>
           </div>
         </Dialog>

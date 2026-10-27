@@ -3,6 +3,7 @@
 // FEF-030: one open visit: patient banner, note editor, step panels, side column, action bar. Mounted per visit (keyed by the queue
 // entry), so everything below starts fresh when the doctor opens another one. The panels that can fail on their own (prescription,
 // timeline, close-out, side column) sit in PanelBoundary; the banner and the note fields do not, so they survive a panel failure.
+import { useTranslations } from "next-intl";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { nextPatient } from "@nabd/domain";
 import { can } from "../../../lib/permissions";
@@ -12,7 +13,7 @@ import { useClinicalContext } from "../clinical";
 import ConflictDialog from "../ConflictDialog";
 import DentalDrawer from "../DentalDrawer";
 import SafetyStrip from "../SafetyStrip";
-import { signBlockMessage } from "../signAuthority";
+import { signBlockCode } from "../signAuthority";
 import { AmendForm, AmendHistory, SignedBanner } from "../amend/AmendPanel";
 import { useAmendments } from "../amend/useAmendments";
 import ActionBar from "../closeout/ActionBar";
@@ -51,6 +52,8 @@ export type WorkspaceProps = {
 };
 
 export default function VisitWorkspace(w: WorkspaceProps) {
+  const tx = useTranslations("consult.visitWorkspace");
+  const tb = useTranslations("consult.saveBadge");
   const { authedFetch, selfId } = w;
   const [entry, setEntry] = useState<Row>(w.row);
   const [patient, setPatient] = useState<PatientDetail | null>(w.row.patient);
@@ -91,10 +94,10 @@ export default function VisitWorkspace(w: WorkspaceProps) {
     }
     return true;
   }
-  const close = async () => { if (await saveThen("Couldn't save the note. It is kept on this device; stay on this page and try again.")) w.onClose(); };
+  const close = async () => { if (await saveThen(tx("saveFailedStay"))) w.onClose(); };
   const switchTo = async (r: Row) => {
     if (r.id === entry.id) return;
-    if (await saveThen("Couldn't save the note, so the patient was not switched. Your changes are kept on this device; try again.")) w.onSwitch(r);
+    if (await saveThen(tx("saveFailedSwitch"))) w.onSwitch(r);
   };
   const transfer = useTransfer(authedFetch, entry, () => void close());
 
@@ -103,12 +106,12 @@ export default function VisitWorkspace(w: WorkspaceProps) {
       <main className={`${styles.page} ${styles.pageWide}`}>
         <div className={styles.strip}>
           <div className={styles.stripIdentity}>
-            <button className={styles.backBtn} onClick={() => void close()}>Queue</button>
+            <button className={styles.backBtn} onClick={() => void close()}>{tx("queue")}</button>
           </div>
         </div>
         <div className={`${p.notice} ${p.noticeInfo}`} role="alert">
           <Icon name="info" size={16} />
-          <span>Record not available.</span>
+          <span>{tx("recordNotAvailable")}</span>
         </div>
       </main>
     );
@@ -123,9 +126,9 @@ export default function VisitWorkspace(w: WorkspaceProps) {
   const mayDecideRx = (entry.doctorId === selfId || can("clinical:approve")) && sa !== null && sa !== "error" && sa.canSign;
   // CLN-006: signing and amending are the visit doctor's (or a clinical:approve holder's); others see the note read-only.
   const mayAmendNote = canEditNote && mayDecideRx;
-  const badge = saveBadge({ conflict: n.conflict, online: n.online, saveState: n.saveState, dirty: n.dirty, lastSavedAt: n.lastSavedAt });
+  const badge = saveBadge(tb, { conflict: n.conflict, online: n.online, saveState: n.saveState, dirty: n.dirty, lastSavedAt: n.lastSavedAt });
   const next = view.closedOut ? nextPatient(w.rows, entry.id, selfId, w.canStartRow) : null;
-  const primaryLabel = closeOut.completing ? "Working…" : view.handoffPending ? "Retry checkout handoff" : view.closedOut ? "Sent to checkout" : "Sign note and send to checkout";
+  const primaryLabel = closeOut.completing ? tx("working") : view.handoffPending ? tx("retryHandoff") : view.closedOut ? tx("sentToCheckout") : tx("signAndSend");
   const field = { note: n.note, disabled: fieldsDisabled, onChange: n.updateField };
 
   return (
@@ -158,7 +161,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
               <PlanField {...field} />
               <PanelBoundary panel="rx">
                 <RxPanel entry={entry} patient={patient} authedFetch={authedFetch} ctx={ctx} reloadCtx={reloadCtx} pad={pad} signing={signing}
-                  mayDecideRx={mayDecideRx} signBlocked={signBlockMessage(pad.signAuthority)} rxSource={w.rxSource} drugKb={w.drugKb} />
+                  mayDecideRx={mayDecideRx} signBlocked={signBlockCode(pad.signAuthority)} rxSource={w.rxSource} drugKb={w.drugKb} />
               </PanelBoundary>
             </>
           )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { can } from "../../lib/permissions";
 import Dialog from "../ui/Dialog";
@@ -17,6 +18,7 @@ import s from "./consultParts.module.css";
 // NursingController: create = nursing:create, list = nursing:view, consent/ready = nursing:edit.
 // No permission, no control (absent, not disabled).
 export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetch: AuthedFetch; queueEntryId: string }) {
+  const tx = useTranslations("consult.doctorOrders");
   const mayCreate = can("nursing:create");
   const mayList = can("nursing:view");
   const mayEdit = can("nursing:edit");
@@ -60,12 +62,12 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
       if (!res) return;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "" }));
-        setRowError(p.detail || "Couldn't mark the procedure ready.");
+        setRowError(p.detail || tx("couldnTMarkTheProcedure"));
         return;
       }
       replaceProc((await res.json()) as ProcOrder);
     } catch {
-      setRowError("Couldn't reach the server. The procedure was not changed.");
+      setRowError(tx("couldnTReachTheServer"));
     } finally {
       setReadyBusy(null);
     }
@@ -76,32 +78,32 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
   const empty = (admin?.length ?? 0) + (procs?.length ?? 0) === 0;
 
   return (
-    <section className={s.card} aria-label="Doctor orders, nurse records">
+    <section className={s.card} aria-label={tx("doctorOrdersNurseRecords")}>
       <h3 className={s.cardTitle}>
-        Doctor orders, nurse records
-        <StatusPill tone="info" icon="syringe" label="You order · nurse records" />
+        {tx("doctorOrdersNurseRecords")}
+        <StatusPill tone="info" icon="syringe" label={tx("youOrderNurseRecords")} />
       </h3>
-      <p className={s.muted}>The nurse cannot change what you order. Outcomes are recorded by nursing.</p>
+      <p className={s.muted}>{tx("theNurseCannotChangeWhat")}</p>
 
       {mayCreate && (
         <div className={`${s.row} ${s.myM}`}>
-          <button type="button" className={s.btn} onClick={() => setForm("admin")}><Icon name="syringe" size={14} /> Vaccine or injection</button>
-          <button type="button" className={s.btn} onClick={() => setForm("proc")}><Icon name="plus" size={14} /> Procedure</button>
+          <button type="button" className={s.btn} onClick={() => setForm("admin")}><Icon name="syringe" size={14} /> {" "}{tx("vaccineOrInjection")}</button>
+          <button type="button" className={s.btn} onClick={() => setForm("proc")}><Icon name="plus" size={14} /> {" "}{tx("procedure")}</button>
         </div>
       )}
 
-      {loading && <Skeleton rows={2} label="Loading orders" />}
+      {loading && <Skeleton rows={2} label={tx("loadingOrders")} />}
       {loadError && (
         <div className={`${s.notice} ${s.noticeDanger}`} role="alert">
           <Icon name="alert" size={16} />
-          <span>Couldn&apos;t load this visit&apos;s orders. <button type="button" className={s.linkBtn} onClick={() => void load()}>Retry</button></span>
+          <span>{tx("couldnTLoadThisVisit")}{" "}<button type="button" className={s.linkBtn} onClick={() => void load()}>{tx("retry")}</button></span>
         </div>
       )}
-      {!mayList && <p className={s.muted}>Your role can place orders but not list them, so only orders placed in this session appear below.</p>}
-      {!loading && !loadError && empty && <p className={s.muted}>No orders for this visit.</p>}
+      {!mayList && <p className={s.muted}>{tx("yourRoleCanPlaceOrders")}</p>}
+      {!loading && !loadError && empty && <p className={s.muted}>{tx("noOrdersForThisVisit")}</p>}
 
       {(admin?.length ?? 0) > 0 && (
-        <ul className={s.list} aria-label="Vaccine and injection orders">
+        <ul className={s.list} aria-label={tx("vaccineAndInjectionOrders")}>
           {admin!.map((o) => {
             const st = adminStatus(o);
             return (
@@ -116,7 +118,7 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
       )}
 
       {(procs?.length ?? 0) > 0 && (
-        <ul className={`${s.list} ${s.mtM}`} aria-label="Procedure orders">
+        <ul className={`${s.list} ${s.mtM}`} aria-label={tx("procedureOrders")}>
           {procs!.map((o) => (
             <li key={o.id} className={s.orderRow}>
               <div className={s.listRow}>
@@ -124,16 +126,16 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
                 <StatusPill tone={o.status === "completed" ? "ok" : o.status === "cancelled" ? "neutral" : o.status === "prepped" ? "info" : "warn"} label={procStatusLabel(o.status)} />
               </div>
               {o.status !== "cancelled" && (hasConsent(o)
-                ? <StatusPill tone="ok" label={`Consent recorded${o.consentSignedName ? ` · ${o.consentSignedName}` : ""}`} />
-                : <StatusPill tone="danger" label="Consent required before performance" />)}
-              {hasConsent(o) && o.consentRecordedByName && <span className={s.muted}>Recorded by {o.consentRecordedByName}</span>}
+                ? <StatusPill tone="ok" label={o.consentSignedName ? tx("consentRecordedBy", { name: o.consentSignedName }) : tx("consentRecorded")} />
+                : <StatusPill tone="danger" label={tx("consentRequiredBeforePerformance")} />)}
+              {hasConsent(o) && o.consentRecordedByName && <span className={s.muted}>{tx("recordedBy", { consentRecordedByName: o.consentRecordedByName })}</span>}
               {o.status === "ordered" && !hasConsent(o) && (
                 mayEdit
-                  ? <div><button type="button" className={s.btn} onClick={() => setConsentFor(o)}>Record consent</button></div>
-                  : <span className={s.muted}>Consent is recorded by nursing before the procedure can be marked ready.</span>
+                  ? <div><button type="button" className={s.btn} onClick={() => setConsentFor(o)}>{tx("recordConsent")}</button></div>
+                  : <span className={s.muted}>{tx("consentIsRecordedByNursing")}</span>
               )}
               {o.status === "ordered" && hasConsent(o) && mayEdit && (
-                <div><button type="button" className={s.btn} disabled={readyBusy === o.id} onClick={() => void markReady(o)}>{readyBusy === o.id ? "Saving…" : "Mark ready"}</button></div>
+                <div><button type="button" className={s.btn} disabled={readyBusy === o.id} onClick={() => void markReady(o)}>{readyBusy === o.id ? tx("saving") : tx("markReady")}</button></div>
               )}
             </li>
           ))}
@@ -141,10 +143,10 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
       )}
       {rowError && <div className={`${s.notice} ${s.noticeDanger} ${s.mtS}`} role="alert"><Icon name="alert" size={16} /><span>{rowError}</span></div>}
 
-      <ul className={`${s.list} ${s.mtM}`} aria-label="Not available yet">
-        <li className={s.listRow}><strong>External diagnostic request</strong><StatusPill tone="neutral" icon="clock" label="Not available yet" /></li>
-        <li className={s.listRow}><strong>Clinical photo consent</strong><StatusPill tone="neutral" icon="clock" label="Not available yet" /></li>
-        <li className={s.listRow}><strong>Package consent</strong><StatusPill tone="neutral" icon="clock" label="Not available yet" /></li>
+      <ul className={`${s.list} ${s.mtM}`} aria-label={tx("notAvailableYet")}>
+        <li className={s.listRow}><strong>{tx("externalDiagnosticRequest")}</strong><StatusPill tone="neutral" icon="clock" label={tx("notAvailableYet")} /></li>
+        <li className={s.listRow}><strong>{tx("clinicalPhotoConsent")}</strong><StatusPill tone="neutral" icon="clock" label={tx("notAvailableYet")} /></li>
+        <li className={s.listRow}><strong>{tx("packageConsent")}</strong><StatusPill tone="neutral" icon="clock" label={tx("notAvailableYet")} /></li>
       </ul>
 
       {form === "admin" && (

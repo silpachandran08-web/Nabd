@@ -1,6 +1,7 @@
 "use client";
 
 // FEF-030: the prescription pad's draft (lines, status, who may sign) and its save call, moved out of consult/page.tsx.
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import type { AuthedFetch, Prescription, PrescriptionItem, Problem } from "../shared";
 import type { SignAuthority } from "../signAuthority";
@@ -9,6 +10,7 @@ import { BLANK_RX_ITEM, padItems } from "./rxLogic";
 export type RxOverrideInput = { index: number; kind: string; reasonCode: string; note: string };
 
 export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
+  const t = useTranslations("consult.useRxPad");
   const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
   const [rxStatus, setRxStatus] = useState<"draft" | "signed">("draft");
   const [signAuthority, setSignAuthority] = useState<SignAuthority | null | "error">(null); // CLN-005
@@ -33,7 +35,7 @@ export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
   // one is passed in `overrides` (keyed by item index).
   async function saveRx(overrides?: RxOverrideInput): Promise<Prescription | null> {
     if (!navigator.onLine) {
-      setRxError("You're offline. The prescription can't be saved, checked or signed until you reconnect; your changes stay on this screen.");
+      setRxError(t("offline"));
       return null;
     }
     setRxSaving(true);
@@ -50,15 +52,15 @@ export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
         }));
       const res = await authedFetch(`/clinical/prescriptions/${entryId}`, { method: "PATCH", body: JSON.stringify({ items }) });
       if (!res?.ok) {
-        const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't save prescription." }));
-        setRxError(pr?.detail || "Couldn't save prescription.");
+        const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: t("saveFailed") }));
+        setRxError(pr?.detail || t("saveFailed"));
         return null;
       }
       const rx: Prescription = await res.json();
       applySaved(rx);
       return rx;
     } catch {
-      setRxError("Couldn't reach the server. Check your connection and try again.");
+      setRxError(t("unreachable"));
       return null;
     } finally {
       setRxSaving(false);

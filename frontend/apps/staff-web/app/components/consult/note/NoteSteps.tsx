@@ -1,6 +1,7 @@
 "use client";
 
 // FEF-030: the note fields of the Reason / Examine / Assess / Plan steps. Each is a small component over the note editor's state.
+import { useTranslations } from "next-intl";
 import { NOTE_FIELD_LABEL, NOTE_TITLE } from "@nabd/domain";
 import { can } from "../../../lib/permissions";
 import type { AuthedFetch, PatientDetail, Row } from "../shared";
@@ -17,16 +18,18 @@ type Field = keyof NoteDraft;
 export type NoteFieldProps = { note: NoteDraft; disabled: boolean; onChange: (field: Field, value: string) => void };
 
 export function ReasonStep({ entry, ctx, onRetry, onNext }: { entry: Row; ctx: ClinicalContext; onRetry: () => void; onNext: () => void }) {
+  const t = useTranslations("consult.noteSteps");
+  const g = useTranslations("glossary");
   return (
     <>
-      <section className={p.card} aria-label="Presenting complaint">
-        <h3 className={p.cardTitle}>Presenting complaint</h3>
+      <section className={p.card} aria-label={g("soap.presentingComplaint")}>
+        <h3 className={p.cardTitle}>{g("soap.presentingComplaint")}</h3>
         {entry.presentingComplaint?.trim()
           ? <p className={p.complaint}>{entry.presentingComplaint}</p>
-          : <p className={p.muted}>No reason was recorded at check-in. Ask the patient.</p>}
+          : <p className={p.muted}>{t("noReasonWasRecordedAt")}</p>}
       </section>
       <VitalsCard vitals={ctx.vitals} onRetry={onRetry} />
-      <div><button type="button" className={p.btn} onClick={onNext}>Continue to Examine</button></div>
+      <div><button type="button" className={p.btn} onClick={onNext}>{t("continueToExamine")}</button></div>
     </>
   );
 }

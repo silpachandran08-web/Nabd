@@ -1,0 +1,78 @@
+{
+  "allergy": {
+    "label": "Allergy",
+    "plural": "Allergies",
+    "nkaDocumented": "No known allergies (documented)",
+    "notYetAsked": "None recorded · not yet asked",
+    "warning": {
+      "title": "Allergy warning",
+      "conflict": "Conflicts with a recorded allergy: {message}."
+    },
+    "severity": {
+      "mild": "Mild",
+      "moderate": "Moderate",
+      "severe": "Severe"
+    }
+  },
+  "pregnancy": {
+    "label": "Pregnancy / lactation",
+    "warning": {
+      "title": "Pregnancy / lactation warning"
+    },
+    "status": {
+      "pregnant": "Pregnant",
+      "lactating": "Lactating",
+      "notPregnant": "Not pregnant",
+      "unknown": "Unknown / patient unsure"
+    }
+  },
+  "controlled": {
+    "warning": {
+      "title": "Controlled substance"
+    }
+  },
+  "warning": {
+    "advisory": "(advisory)",
+    "decisionRecorded": "Decision recorded"
+  },
+  "soap": {
+    "reason": "Reason",
+    "examine": "Examine",
+    "assess": "Assess",
+    "plan": "Plan",
+    "presentingComplaint": "Presenting complaint"
+  },
+  "rx": {
+    "prescription": "Prescription",
+    "medicines": "Medicines",
+    "sig": "Sig",
+    "route": "Route",
+    "dosage": "Dosage",
+    "dose": "Dose",
+    "frequency": "Frequency",
+    "duration": "Duration",
+    "quantity": "Quantity",
+    "instructions": "Instructions",
+    "safetyChecks": "Safety checks",
+    "slot": {
+      "morning": "Morning",
+      "noon": "Noon",
+      "night": "Night"
+    }
+  },
+  "vitals": {
+    "label": "Vitals",
+    "bp": "BP",
+    "pulse": "Pulse",
+    "temp": "Temp",
+    "spo2": "SpO₂",
+    "weight": "Weight",
+    "height": "Height"
+  },
+  "diagnosis": {
+    "label": "Diagnosis"
+  },
+  "condition": {
+    "chronic": "Chronic"
+  }
+}

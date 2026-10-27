@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Icon, { type IconName } from "../ui/Icon";
 import type { TimelineEvent, TimelineKind } from "@nabd/domain";
 import s from "./consultParts.module.css";
@@ -10,9 +11,10 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: 
 
 /** Visit timeline (DOC-025): pinned in the workspace on every step, built by buildTimeline(). */
 export default function VisitTimeline({ events }: { events: TimelineEvent[] }) {
+  const t = useTranslations("consult.visitTimeline");
   return (
-    <section className={s.card} aria-label="Visit timeline">
-      <h3 className={s.cardTitle}><Icon name="clock" size={14} /> Visit timeline</h3>
+    <section className={s.card} aria-label={t("visitTimeline")}>
+      <h3 className={s.cardTitle}><Icon name="clock" size={14} /> {" "}{t("visitTimeline")}</h3>
       <ol className={s.timeline}>
         {events.map((e) => (
           <li key={e.id}>

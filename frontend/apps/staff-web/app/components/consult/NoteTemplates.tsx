@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import Icon from "../ui/Icon";
 import { Skeleton } from "../ui/StateViews";
@@ -33,6 +34,7 @@ export default function NoteTemplates({
   authedFetch: AuthedFetch; patientId: string; entryId: string; note: NoteFields;
   onSetField: (field: keyof NoteFields, value: string) => void;
 }) {
+  const tx = useTranslations("consult.noteTemplates");
   const [templates, setTemplates] = useState<NoteTemplate[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [tick, setTick] = useState(0);
@@ -73,21 +75,21 @@ export default function NoteTemplates({
     setMessage(null);
     try {
       const tl = await authedFetch(`/clinical/patients/${patientId}/timeline?limit=5`);
-      if (!tl?.ok) { setMessage({ kind: "warn", text: "Couldn't load this patient's previous visits. Nothing was changed." }); return; }
+      if (!tl?.ok) { setMessage({ kind: "warn", text: tx("couldnTLoadThisPatient") }); return; }
       const encounters = ((await tl.json()) as { data?: { queueEntryId: string; occurredAt: string }[] }).data ?? [];
       const prev = encounters.find((e) => e.queueEntryId !== entryId);
-      if (!prev) { setMessage({ kind: "warn", text: "This patient has no previous completed visit to repeat." }); return; }
+      if (!prev) { setMessage({ kind: "warn", text: tx("thisPatientHasNoPrevious") }); return; }
       const nr = await authedFetch(`/clinical/notes/${prev.queueEntryId}`);
-      if (!nr?.ok) { setMessage({ kind: "warn", text: nr?.status === 404 ? "The previous visit has no written note to repeat." : "Couldn't load the previous note. Nothing was changed." }); return; }
+      if (!nr?.ok) { setMessage({ kind: "warn", text: nr?.status === 404 ? tx("thePreviousVisitHasNo") : tx("couldnTLoadThePrevious") }); return; }
       const n = (await nr.json()) as Record<string, string | null>;
       const prevSections: Sections = { subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "" };
-      if (!hasSectionText(prevSections)) { setMessage({ kind: "warn", text: "The previous note is empty, so there is nothing to repeat." }); return; }
+      if (!hasSectionText(prevSections)) { setMessage({ kind: "warn", text: tx("thePreviousNoteIsEmpty") }); return; }
       const merged = mergeSections(note, prevSections);
       for (const k of SECTION_KEYS) if (merged[k] !== note[k]) onSetField(k, merged[k]);
       const when = new Date(prev.occurredAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
       setMessage({ kind: "ok", text: `Added the four sections from this patient's note of ${when}. Review and edit them; the diagnosis is not copied.` });
     } catch {
-      setMessage({ kind: "warn", text: "Couldn't reach the server. Nothing was changed." });
+      setMessage({ kind: "warn", text: tx("couldnTReachTheServer") });
     } finally {
       setRepeating(false);
     }
@@ -96,21 +98,21 @@ export default function NoteTemplates({
   async function submitForm() {
     if (!form) return;
     const name = form.name.trim();
-    if (!name) { setMessage({ kind: "warn", text: "Give the template a name." }); return; }
+    if (!name) { setMessage({ kind: "warn", text: tx("giveTheTemplateAName") }); return; }
     const current = sectionsOf(note);
-    if (form.id === null && !hasSectionText(current)) { setMessage({ kind: "warn", text: "The note is empty, so there is nothing to save as a template yet." }); return; }
+    if (form.id === null && !hasSectionText(current)) { setMessage({ kind: "warn", text: tx("theNoteIsEmptySo") }); return; }
     setBusy(true);
     setMessage(null);
     try {
       const body: Record<string, unknown> = { name, tags: addTag(form.tags, form.tagInput) };
       if (form.id === null || form.replaceText) Object.assign(body, current);
       const res = await authedFetch(form.id === null ? "/clinical/note-templates" : `/clinical/note-templates/${form.id}`, { method: form.id === null ? "POST" : "PATCH", body: JSON.stringify(body) });
-      if (!res?.ok) { setMessage({ kind: "warn", text: await problemText(res, "Couldn't save the template. Try again.") }); return; }
+      if (!res?.ok) { setMessage({ kind: "warn", text: await problemText(res, tx("couldnTSaveTheTemplate")) }); return; }
       setForm(null);
       setMessage({ kind: "ok", text: form.id === null ? `Saved "${name}" as a template.` : `Updated "${name}".` });
       reload();
     } catch {
-      setMessage({ kind: "warn", text: "Couldn't reach the server. The template was not saved." });
+      setMessage({ kind: "warn", text: tx("couldnTReachTheServer2") });
     } finally {
       setBusy(false);
     }
@@ -120,10 +122,10 @@ export default function NoteTemplates({
     setBusy(true);
     try {
       const res = await authedFetch(`/clinical/note-templates/${t.id}`, { method: "PATCH", body: JSON.stringify({ favourite: !t.favourite }) });
-      if (!res?.ok) { setMessage({ kind: "warn", text: await problemText(res, "Couldn't update the favourite. Try again.") }); return; }
+      if (!res?.ok) { setMessage({ kind: "warn", text: await problemText(res, tx("couldnTUpdateTheFavourite")) }); return; }
       reload();
     } catch {
-      setMessage({ kind: "warn", text: "Couldn't reach the server." });
+      setMessage({ kind: "warn", text: tx("couldnTReachTheServer3") });
     } finally {
       setBusy(false);
     }
@@ -133,12 +135,12 @@ export default function NoteTemplates({
     setBusy(true);
     try {
       const res = await authedFetch(`/clinical/note-templates/${t.id}`, { method: "DELETE" });
-      if (!res?.ok) { setMessage({ kind: "warn", text: await problemText(res, "Couldn't delete the template. Try again.") }); return; }
+      if (!res?.ok) { setMessage({ kind: "warn", text: await problemText(res, tx("couldnTDeleteTheTemplate")) }); return; }
       setConfirmDelete(null);
       setMessage({ kind: "ok", text: `Deleted "${t.name}". Notes already written from it are unchanged.` });
       reload();
     } catch {
-      setMessage({ kind: "warn", text: "Couldn't reach the server." });
+      setMessage({ kind: "warn", text: tx("couldnTReachTheServer3") });
     } finally {
       setBusy(false);
     }
@@ -149,21 +151,21 @@ export default function NoteTemplates({
   const shown = (templates ?? []).filter((t) => tagFilter === null || t.tags.includes(tagFilter));
 
   return (
-    <section className={`${p.card} ${s.panel}`} aria-label="Note templates">
+    <section className={`${p.card} ${s.panel}`} aria-label={tx("noteTemplates")}>
       <div className={s.head}>
-        <h3 className={s.title}>Note templates</h3>
+        <h3 className={s.title}>{tx("noteTemplates")}</h3>
         <div className={s.actions}>
           <button type="button" className={p.btn} onClick={() => void repeatPrevious()} disabled={repeating}>
-            <Icon name="refresh" size={14} /> {repeating ? "Looking…" : "Repeat previous"}
+            <Icon name="refresh" size={14} /> {repeating ? tx("looking") : tx("repeatPrevious")}
           </button>
           {!form && (
             <button type="button" className={p.btn} onClick={() => setForm({ id: null, name: "", tags: [], tagInput: "", replaceText: false })}>
-              <Icon name="plus" size={14} /> Save note as template
+              <Icon name="plus" size={14} /> {" "}{tx("saveNoteAsTemplate")}
             </button>
           )}
         </div>
       </div>
-      <p className={s.scope}>Templates are your own: only you can see them, and you write them. Voice dictation is not available.</p>
+      <p className={s.scope}>{tx("templatesAreYourOwnOnly")}</p>
 
       {message && (
         <div className={`${p.notice} ${message.kind === "ok" ? p.noticeOk : p.noticeWarn}`} role="status">
@@ -173,59 +175,59 @@ export default function NoteTemplates({
       )}
 
       {form && (
-        <div className={s.form} role="group" aria-label={form.id === null ? "Save note as template" : "Edit template"}>
+        <div className={s.form} role="group" aria-label={form.id === null ? tx("saveNoteAsTemplate") : tx("editTemplate")}>
           <label className={s.fieldLabel}>
-            Template name
+            {tx("templateName")}
             <input className={p.input} value={form.name} maxLength={MAX_NAME_LEN} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </label>
           <div className={s.fieldLabel}>
-            <span>Tags (your own labels, up to {MAX_TAGS})</span>
+            <span>{tx("tagsYourOwnLabelsUp", { MAX_TAGS })}</span>
             <div className={s.chips}>
               {form.tags.map((t) => (
                 <span key={t} className={s.tagChip}>
                   {t}
-                  <button type="button" className={p.linkBtn} aria-label={`Remove tag ${t}`} onClick={() => setForm({ ...form, tags: form.tags.filter((x) => x !== t) })}><Icon name="x" size={12} /></button>
+                  <button type="button" className={p.linkBtn} aria-label={tx("removeTag", { tag: t })} onClick={() => setForm({ ...form, tags: form.tags.filter((x) => x !== t) })}><Icon name="x" size={12} /></button>
                 </span>
               ))}
             </div>
             <div className={s.formRow}>
               <input
-                className={`${p.input} ${s.grow}`} aria-label="New tag" value={form.tagInput} maxLength={MAX_TAG_LEN} placeholder="Add a tag"
+                className={`${p.input} ${s.grow}`} aria-label={tx("newTag")} value={form.tagInput} maxLength={MAX_TAG_LEN} placeholder={tx("addATag")}
                 onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setForm({ ...form, tags: addTag(form.tags, form.tagInput), tagInput: "" }); } }}
               />
-              <button type="button" className={p.btn} disabled={form.tagInput.trim() === "" || form.tags.length >= MAX_TAGS} onClick={() => setForm({ ...form, tags: addTag(form.tags, form.tagInput), tagInput: "" })}>Add tag</button>
+              <button type="button" className={p.btn} disabled={form.tagInput.trim() === "" || form.tags.length >= MAX_TAGS} onClick={() => setForm({ ...form, tags: addTag(form.tags, form.tagInput), tagInput: "" })}>{tx("addTag")}</button>
             </div>
           </div>
           {form.id === null ? (
-            <span className={p.muted}>Saves the four sections exactly as they are written in the note now (the diagnosis is not part of a template).</span>
+            <span className={p.muted}>{tx("savesTheFourSectionsExactly")}</span>
           ) : (
             <label className={p.check}>
               <input type="checkbox" checked={form.replaceText} onChange={(e) => setForm({ ...form, replaceText: e.target.checked })} />
-              <span>Replace this template&apos;s text with the note as written now</span>
+              <span>{tx("replaceThisTemplateSText")}</span>
             </label>
           )}
           <div className={s.actions}>
-            <button type="button" className={p.btnPrimary} disabled={busy} onClick={() => void submitForm()}>{busy ? "Saving…" : form.id === null ? "Save template" : "Save changes"}</button>
-            <button type="button" className={p.btn} disabled={busy} onClick={() => setForm(null)}>Cancel</button>
+            <button type="button" className={p.btnPrimary} disabled={busy} onClick={() => void submitForm()}>{busy ? tx("saving") : form.id === null ? tx("saveTemplate") : tx("saveChanges")}</button>
+            <button type="button" className={p.btn} disabled={busy} onClick={() => setForm(null)}>{tx("cancel")}</button>
           </div>
         </div>
       )}
 
-      {templates === null && !loadError && <Skeleton rows={2} label="Loading your templates" />}
+      {templates === null && !loadError && <Skeleton rows={2} label={tx("loadingYourTemplates")} />}
       {loadError && (
         <div className={`${p.notice} ${p.noticeWarn}`} role="alert">
           <Icon name="alert" size={16} />
-          <span>Couldn&apos;t load your templates. <button type="button" className={p.linkBtn} onClick={reload}>Retry</button></span>
+          <span>{tx("couldnTLoadYourTemplates")}{" "}<button type="button" className={p.linkBtn} onClick={reload}>{tx("retry")}</button></span>
         </div>
       )}
       {templates !== null && templates.length === 0 && (
-        <p className={p.muted}>No templates yet. Write a note, then use &ldquo;Save note as template&rdquo; to keep it for next time.</p>
+        <p className={p.muted}>{tx("noTemplatesYetWriteA")}</p>
       )}
 
       {favourites.length > 0 && (
         <div>
-          <div className={s.title}>Favourites</div>
+          <div className={s.title}>{tx("favourites")}</div>
           <div className={`${s.chips} ${p.mtS}`}>
             {favourites.map((t) => (
               <button key={t.id} type="button" className={`${p.chip} ${p.chipOn}`} onClick={() => apply(t)}>
@@ -237,8 +239,8 @@ export default function NoteTemplates({
       )}
 
       {allTags.length > 0 && (
-        <div className={s.chips} role="group" aria-label="Filter by tag">
-          <button type="button" aria-pressed={tagFilter === null} className={`${s.tagChip} ${tagFilter === null ? s.tagChipOn : ""}`} onClick={() => setTagFilter(null)}>All</button>
+        <div className={s.chips} role="group" aria-label={tx("filterByTag")}>
+          <button type="button" aria-pressed={tagFilter === null} className={`${s.tagChip} ${tagFilter === null ? s.tagChipOn : ""}`} onClick={() => setTagFilter(null)}>{tx("all")}</button>
           {allTags.map((t) => (
             <button key={t} type="button" aria-pressed={tagFilter === t} className={`${s.tagChip} ${tagFilter === t ? s.tagChipOn : ""}`} onClick={() => setTagFilter(tagFilter === t ? null : t)}>{t}</button>
           ))}
@@ -252,32 +254,32 @@ export default function NoteTemplates({
               <div className={s.tplTop}>
                 <span className={s.tplName}>{t.name}</span>
                 <div className={s.actions}>
-                  <button type="button" className={p.btnPrimary} onClick={() => apply(t)}>Use template</button>
+                  <button type="button" className={p.btnPrimary} onClick={() => apply(t)}>{tx("useTemplate")}</button>
                   {(
                     <>
                       <button type="button" className={p.btn} aria-pressed={t.favourite} disabled={busy} onClick={() => void toggleFavourite(t)}>
-                        {t.favourite ? <><Icon name="check" size={14} /> Favourite</> : "Add to favourites"}
+                        {t.favourite ? <><Icon name="check" size={14} /> {" "}{tx("favourite")}</> : tx("addToFavourites")}
                       </button>
-                      <button type="button" className={p.btn} onClick={() => setForm({ id: t.id, name: t.name, tags: t.tags, tagInput: "", replaceText: false })}>Edit</button>
+                      <button type="button" className={p.btn} onClick={() => setForm({ id: t.id, name: t.name, tags: t.tags, tagInput: "", replaceText: false })}>{tx("edit")}</button>
                       {confirmDelete === t.id ? (
                         <>
-                          <button type="button" className={p.btn} disabled={busy} onClick={() => void remove(t)}>Confirm delete</button>
-                          <button type="button" className={p.btn} onClick={() => setConfirmDelete(null)}>Keep</button>
+                          <button type="button" className={p.btn} disabled={busy} onClick={() => void remove(t)}>{tx("confirmDelete")}</button>
+                          <button type="button" className={p.btn} onClick={() => setConfirmDelete(null)}>{tx("keep")}</button>
                         </>
                       ) : (
-                        <button type="button" className={p.btn} onClick={() => setConfirmDelete(t.id)}>Delete</button>
+                        <button type="button" className={p.btn} onClick={() => setConfirmDelete(t.id)}>{tx("delete")}</button>
                       )}
                     </>
                   )}
                 </div>
               </div>
               {t.tags.length > 0 && <div className={s.chips}>{t.tags.map((x) => <span key={x} className={s.tagChip}>{x}</span>)}</div>}
-              <p className={s.tplPreview}>{SECTION_KEYS.map((k) => t[k].trim()).filter(Boolean).join(" · ") || "No text saved in this template."}</p>
+              <p className={s.tplPreview}>{SECTION_KEYS.map((k) => t[k].trim()).filter(Boolean).join(" · ") || tx("noTextSavedInThis")}</p>
             </li>
           ))}
         </ul>
       )}
-      {templates !== null && templates.length > 0 && shown.length === 0 && <p className={p.muted}>No templates carry the tag &ldquo;{tagFilter}&rdquo;.</p>}
+      {templates !== null && templates.length > 0 && shown.length === 0 && <p className={p.muted}>{tx("noTemplatesCarryTheTag", { tagFilter: tagFilter ?? "" })}</p>}
     </section>
   );
 }

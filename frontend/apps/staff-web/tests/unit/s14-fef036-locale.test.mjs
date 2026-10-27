@@ -1,7 +1,7 @@
 // FEF-036: locale resolution order, ICU plurals (en, hi, ar and the pseudo-locales), pseudo-localisation, catalogue parity.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createTranslator } from "next-intl";
 import { resolveLocale, matchAcceptLanguage, dirOf, isLocale, pseudoMessage, loadMessages, LOCALES } from "@nabd/i18n";
 
@@ -64,7 +64,11 @@ test("pseudo-localisation expands at least 35% and keeps ICU arguments", () => {
 
 test("catalogues: hi has no key en lacks, and every {placeholder} of en survives in hi", () => {
   const dir = new URL("../../../../packages/i18n/messages/", import.meta.url);
+  // FEF-039 / ADR-11: consult.json and glossary.json hold clinical wording that is translated only after clinician review, so hi may lack the whole file
+  // (English fallback); once a hi file exists the full parity checks below apply to it.
+  const PENDING_CLINICAL_REVIEW = ["consult.json", "glossary.json"];
   for (const f of readdirSync(new URL("en/", dir))) {
+    if (PENDING_CLINICAL_REVIEW.includes(f) && !existsSync(new URL(`hi/${f}`, dir))) continue;
     // FEF-038: catalogues may nest (login.signIn.title, arrivals.walkIn.title); compare the flattened key paths.
     const flat = (o, p = "") => Object.fromEntries(Object.entries(o).flatMap(([k, v]) => (v && typeof v === "object" ? Object.entries(flat(v, `${p}${k}.`)) : [[`${p}${k}`, v]])));
     const en = flat(JSON.parse(readFileSync(new URL(`en/${f}`, dir), "utf8")));

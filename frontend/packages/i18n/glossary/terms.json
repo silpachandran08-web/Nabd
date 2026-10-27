@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "note": "Clinical glossary (FEF-039, ADR-11). Every term has one id; screens, Rx print and message templates reference the id. 'approved' lists the languages whose text in messages/<lang>/glossary.json a clinician has reviewed. Never machine-translate a term; add a language here only after clinical review. This file and messages/*/glossary.json need CODEOWNERS approval from the clinical reviewers.",
+  "terms": {
+    "allergy.label": {
+      "definition": "Name of the allergy section and column; a recorded hypersensitivity to a substance.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.plural": {
+      "definition": "Heading for the list of a patient's recorded allergies.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.nkaDocumented": {
+      "definition": "A clinician asked and documented that the patient has no known allergies. Different from 'none recorded'.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.notYetAsked": {
+      "definition": "Nobody has documented the patient's allergies yet. Must never read as 'no known allergies'.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.warning.title": {
+      "definition": "Title of a prescription warning raised when a medicine matches a recorded allergy.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.warning.conflict": {
+      "definition": "Body of the allergy warning; {message} names the matched allergy.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.severity.mild": {
+      "definition": "Allergy severity: mild reaction.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.severity.moderate": {
+      "definition": "Allergy severity: moderate reaction.",
+      "approved": [
+        "en"
+      ]
+    },
+    "allergy.severity.severe": {
+      "definition": "Allergy severity: severe reaction. A severe allergy blocks signing until a clinician decides.",
+      "approved": [
+        "en"
+      ]
+    },
+    "pregnancy.label": {
+      "definition": "Name of the pregnancy and lactation status of the patient.",
+      "approved": [
+        "en"
+      ]
+    },
+    "pregnancy.warning.title": {
+      "definition": "Title of a prescription warning raised for a medicine flagged for pregnancy or lactation.",
+      "approved": [
+        "en"
+      ]
+    },
+    "pregnancy.status.pregnant": {
+      "definition": "Recorded pregnancy status: pregnant.",
+      "approved": [
+        "en"
+      ]
+    },
+    "pregnancy.status.lactating": {
+      "definition": "Recorded status: breastfeeding.",
+      "approved": [
+        "en"
+      ]
+    },
+    "pregnancy.status.notPregnant": {
+      "definition": "Recorded pregnancy status: not pregnant.",
+      "approved": [
+        "en"
+      ]
+    },
+    "pregnancy.status.unknown": {
+      "definition": "Recorded pregnancy status: the patient is unsure.",
+      "approved": [
+        "en"
+      ]
+    },
+    "controlled.warning.title": {
+      "definition": "Title of the warning for a controlled (scheduled) medicine.",
+      "approved": [
+        "en"
+      ]
+    },
+    "warning.advisory": {
+      "definition": "Marks a warning that is shown but does not block signing.",
+      "approved": [
+        "en"
+      ]
+    },
+    "warning.decisionRecorded": {
+      "definition": "A clinician's override or acknowledgement of a warning has been recorded.",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.reason": {
+      "definition": "Consultation step 1: why the patient came (subjective).",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.examine": {
+      "definition": "Consultation step 2: examination findings (objective).",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.assess": {
+      "definition": "Consultation step 3: assessment and diagnosis.",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.plan": {
+      "definition": "Consultation step 4: plan, prescription, orders and follow-up.",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.presentingComplaint": {
+      "definition": "The main problem the patient reports at this visit.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.prescription": {
+      "definition": "A prescription: the signed list of medicines for a visit.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.medicines": {
+      "definition": "The medicine lines of a prescription.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.sig": {
+      "definition": "Directions for taking a medicine, such as 1-0-1 after food.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.route": {
+      "definition": "How a medicine is given (for example oral).",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.dosage": {
+      "definition": "Strength per dose, as typed by the prescriber.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.dose": {
+      "definition": "Amount of a medicine taken at one time.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.frequency": {
+      "definition": "How often the medicine is taken.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.duration": {
+      "definition": "For how long the medicine is taken.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.quantity": {
+      "definition": "Amount of the medicine to dispense.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.instructions": {
+      "definition": "Free-text directions for the patient or pharmacist.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.safetyChecks": {
+      "definition": "The allergy, pregnancy and controlled-substance checks run on a prescription.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.slot.morning": {
+      "definition": "Morning dose slot of a 1-0-1 style sig.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.slot.noon": {
+      "definition": "Noon dose slot of a 1-0-1 style sig.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.slot.night": {
+      "definition": "Night dose slot of a 1-0-1 style sig.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.label": {
+      "definition": "Measured vital signs of the visit.",
+      "approved": [
+        "en"
+      ]
+    },
+    "diagnosis.label": {
+      "definition": "The clinician's diagnosis for the visit.",
+      "approved": [
+        "en"
+      ]
+    },
+    "condition.chronic": {
+      "definition": "Chronic conditions recorded for the patient.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.bp": {
+      "definition": "Blood pressure.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.pulse": {
+      "definition": "Pulse rate.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.temp": {
+      "definition": "Body temperature.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.spo2": {
+      "definition": "Blood oxygen saturation.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.weight": {
+      "definition": "Measured body weight; never estimated.",
+      "approved": [
+        "en"
+      ]
+    },
+    "vitals.height": {
+      "definition": "Measured body height.",
+      "approved": [
+        "en"
+      ]
+    }
+  }
+}

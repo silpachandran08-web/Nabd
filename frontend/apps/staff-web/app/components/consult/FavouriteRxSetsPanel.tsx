@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import { can } from "../../lib/permissions";
@@ -16,6 +17,7 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
   authedFetch: AuthedFetch; entryId: string | null; locked: boolean; items: PrescriptionItem[];
   onApplied: (rx: Prescription) => void; onError: (message: string | null) => void;
 }) {
+  const tx = useTranslations("consult.favouriteRxSetsPanel");
   const { sets, error, reload, create, update, remove } = useRxSets(authedFetch);
   const [name, setName] = useState("");
   const [scope, setScope] = useState<RxSetScope>("mine");
@@ -45,7 +47,7 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
       void reload(); // lastUsedAt moved
     } else {
       const pr: Problem | null = await res?.json().catch(() => null) ?? null;
-      onError(pr?.detail || "Couldn't apply set.");
+      onError(pr?.detail || tx("couldnTApplySet"));
     }
   }
 
@@ -53,14 +55,14 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
     <div data-testid="rx-sets-panel">
       {error ? (
         <div className={styles.error} role="alert">
-          {error} <button type="button" className={styles.btn} onClick={() => void reload()}>Retry</button>
+          {error} <button type="button" className={styles.btn} onClick={() => void reload()}>{tx("retry")}</button>
         </div>
       ) : sets === null ? (
-        <p className={styles.quiet} role="status">Loading saved sets…</p>
+        <p className={styles.quiet} role="status">{tx("loadingSavedSets")}</p>
       ) : sets.length === 0 ? (
-        <p className={styles.quiet}>No saved sets yet.</p>
+        <p className={styles.quiet}>{tx("noSavedSetsYet")}</p>
       ) : (
-        <ul className={`${styles.list} ${styles.listScroll}`} tabIndex={0} aria-label="Saved prescription sets">
+        <ul className={`${styles.list} ${styles.listScroll}`} tabIndex={0} aria-label={tx("savedPrescriptionSets")}>
           {sets.map((s) => (
             <RxSetCard key={s.id} set={s} compact
               onApply={locked ? undefined : () => (filled.length > 0 ? setConfirmApply(s) : void apply(s))}
@@ -71,14 +73,14 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
       {!locked && (
         <>
           <div className={styles.saveRow}>
-            <input className={styles.field} aria-label="New set name" placeholder="Save current items as set…" value={name} maxLength={120}
+            <input className={styles.field} aria-label={tx("newSetName")} placeholder={tx("saveCurrentItemsAsSet")} value={name} maxLength={120}
               onChange={(e) => setName(e.target.value)} />
-            <select className={`${styles.field} ${styles.fieldScope}`} aria-label="Who can use the new set" value={scope} onChange={(e) => setScope(e.target.value as RxSetScope)}>
+            <select className={`${styles.field} ${styles.fieldScope}`} aria-label={tx("whoCanUseTheNew")} value={scope} onChange={(e) => setScope(e.target.value as RxSetScope)}>
               <option value="mine">{SCOPE_LABEL.mine}</option>
               <option value="shared">{SCOPE_LABEL.shared}</option>
               {canStandard && <option value="standard">{SCOPE_LABEL.standard}</option>}
             </select>
-            <button type="button" className={styles.btn} onClick={() => void save()} disabled={!name.trim() || filled.length === 0}>Save set</button>
+            <button type="button" className={styles.btn} onClick={() => void save()} disabled={!name.trim() || filled.length === 0}>{tx("saveSet")}</button>
           </div>
           {saveErr && <p className={styles.error} role="alert">{saveErr}</p>}
         </>
@@ -88,14 +90,13 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
       )}
       {deleting && <RxSetDeleteDialog set={deleting} onDelete={() => remove(deleting.id)} onClose={() => setDeleting(null)} />}
       {confirmApply && (
-        <Dialog title="Replace the medicines on the pad?" onClose={() => setConfirmApply(null)}>
+        <Dialog title={tx("replaceTheMedicinesOnThe")} onClose={() => setConfirmApply(null)}>
           <p>
-            Applying <strong>{confirmApply.name}</strong> replaces the {filled.length} {filled.length === 1 ? "medicine" : "medicines"} now on the
-            pad, including unsaved edits. Allergy, pregnancy and controlled-substance checks run again on every applied line.
+            {tx("applying")}{" "}<strong>{confirmApply.name}</strong>{" "}{tx("replacesThe", { length: filled.length })} {filled.length === 1 ? "medicine" : "medicines"} {" "}{tx("nowOnThePadIncluding")}
           </p>
           <div className={styles.dialogActions}>
-            <button type="button" className={styles.btn} onClick={() => setConfirmApply(null)}>Cancel</button>
-            <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => void apply(confirmApply)}>Replace and apply</button>
+            <button type="button" className={styles.btn} onClick={() => setConfirmApply(null)}>{tx("cancel")}</button>
+            <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => void apply(confirmApply)}>{tx("replaceAndApply")}</button>
           </div>
         </Dialog>
       )}

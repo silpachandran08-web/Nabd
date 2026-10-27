@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { queueStatusLabel } from "@nabd/domain";
 import StatusPill, { type PillTone } from "../../ui/StatusPill";
 
@@ -15,6 +16,7 @@ const STATUS_TONE: Record<string, { tone: PillTone; icon?: Parameters<typeof Sta
 };
 
 export default function StatusBadge({ status }: { status: string }) {
+  const tx = useTranslations("consult.statusBadge");
   const t = STATUS_TONE[status] ?? { tone: "neutral" as PillTone };
-  return <StatusPill tone={t.tone} icon={t.icon} label={queueStatusLabel(status)} />;
+  return <StatusPill tone={t.tone} icon={t.icon} label={status in STATUS_TONE ? tx(status) : queueStatusLabel(status)} />;
 }

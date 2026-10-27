@@ -4,12 +4,18 @@
 // "This panel failed" with a Retry; the patient banner, the note editor and every other panel keep working.
 // The report carries the panel name, error class, route shape and build id only (see boundaryReport).
 import { Component, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { send } from "../../../TelemetryReporter";
 import { boundaryReport } from "../../../lib/telemetryScrub";
 import { ErrorState } from "../../ui/StateViews";
 
 type Props = { panel: string; children: ReactNode };
 type State = { failed: boolean };
+
+function PanelFailed({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations("consult.panelBoundary");
+  return <ErrorState message={t("thisPanelFailed")} onRetry={onRetry} />;
+}
 
 export default class PanelBoundary extends Component<Props, State> {
   state: State = { failed: false };
@@ -21,7 +27,7 @@ export default class PanelBoundary extends Component<Props, State> {
     if (!this.state.failed) return this.props.children;
     return (
       <div data-testid={`panel-error-${this.props.panel}`}>
-        <ErrorState message="This panel failed" onRetry={() => this.setState({ failed: false })} />
+        <PanelFailed onRetry={() => this.setState({ failed: false })} />
       </div>
     );
   }

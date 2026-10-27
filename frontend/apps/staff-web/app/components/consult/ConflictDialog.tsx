@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import { NOTE_FIELD_LABEL } from "@nabd/domain";
@@ -14,6 +15,7 @@ const FIELDS: (keyof NoteFields)[] = ["subjective", "objective", "assessment", "
 export default function ConflictDialog({ mine, server, onResolve, onClose }: {
   mine: NoteFields; server: NoteFields; onResolve: (merged: NoteFields) => void; onClose: () => void;
 }) {
+  const tx = useTranslations("consult.conflictDialog");
   const differing = FIELDS.filter((f) => mine[f] !== server[f]);
   const [choice, setChoice] = useState<Partial<Record<keyof NoteFields, Choice>>>({});
   const allChosen = differing.every((f) => choice[f]);
@@ -29,19 +31,19 @@ export default function ConflictDialog({ mine, server, onResolve, onClose }: {
   }
 
   return (
-    <Dialog title="Note changed on the server" onClose={onClose} size="lg">
-      <p className={s.muted}>Your unsaved local draft and the saved note both changed. Choose what to keep for each section; nothing is overwritten until you confirm.</p>
+    <Dialog title={tx("noteChangedOnTheServer")} onClose={onClose} size="lg">
+      <p className={s.muted}>{tx("yourUnsavedLocalDraftAnd")}</p>
       <div className={`${s.stack} ${s.mtM}`}>
         {differing.map((f) => (
           <fieldset key={f} className={`${s.card} ${s.m0}`}>
             <legend className={s.cardTitle}>{NOTE_FIELD_LABEL[f]}</legend>
-            <p className={s.muted}><strong>Mine (this device):</strong> {mine[f] || "(empty)"}</p>
-            <p className={s.muted}><strong>Server:</strong> {server[f] || "(empty)"}</p>
+            <p className={s.muted}><strong>{tx("mineThisDevice")}</strong> {mine[f] || tx("empty")}</p>
+            <p className={s.muted}><strong>{tx("server")}</strong> {server[f] || tx("empty")}</p>
             <div className={s.row}>
               {(["mine", "server", "merge"] as Choice[]).map((c) => (
                 <label key={c} className={s.check}>
                   <input type="radio" name={`c-${f}`} checked={choice[f] === c} onChange={() => setChoice((p) => ({ ...p, [f]: c }))} />
-                  {c === "mine" ? "Keep mine" : c === "server" ? "Keep server" : "Merge (server, then mine)"}
+                  {c === "mine" ? tx("keepMine") : c === "server" ? tx("keepServer") : tx("mergeServerThenMine")}
                 </label>
               ))}
             </div>
@@ -49,8 +51,8 @@ export default function ConflictDialog({ mine, server, onResolve, onClose }: {
         ))}
       </div>
       <div className={s.dialogActions}>
-        <button type="button" className={s.btn} onClick={onClose}>Decide later</button>
-        <button type="button" className={s.btnPrimary} onClick={apply} disabled={!allChosen}>Apply choices</button>
+        <button type="button" className={s.btn} onClick={onClose}>{tx("decideLater")}</button>
+        <button type="button" className={s.btnPrimary} onClick={apply} disabled={!allChosen}>{tx("applyChoices")}</button>
       </div>
     </Dialog>
   );
