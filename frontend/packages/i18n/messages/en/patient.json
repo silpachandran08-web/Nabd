@@ -56,5 +56,16 @@
  "purpose_referral": "A referral",
  "purpose_second_opinion": "A second opinion",
  "purpose_insurance_claim": "An insurance claim",
- "purpose_personal_record": "Your own records"
+ "purpose_personal_record": "Your own records",
+ "proxyTitle": "Allow {name} to help with your care",
+ "proxyIntro": "{name} ({relation}) asked to help with your visits at {clinic}. Choose what they may do.",
+ "proxyScopeLabel": "What may they do?",
+ "proxyScopeBook": "Book visits only",
+ "proxyScopeBookHint": "They can book and change your appointments. They cannot see your medical records.",
+ "proxyScopeRecords": "Book visits and see my records",
+ "proxyScopeRecordsHint": "They can also see your prescriptions and reports.",
+ "proxyScopeFull": "Full help",
+ "proxyScopeFullHint": "Everything above, plus payments and forms.",
+ "proxyAccept": "Confirm",
+ "proxyDone": "Thank you. {name} can now help with your visits."
 }

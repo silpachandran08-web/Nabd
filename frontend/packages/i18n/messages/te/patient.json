@@ -56,5 +56,16 @@
  "purpose_referral": "రిఫరల్",
  "purpose_second_opinion": "రెండవ అభిప్రాయం",
  "purpose_insurance_claim": "బీమా క్లెయిమ్",
- "purpose_personal_record": "మీ స్వంత రికార్డులు"
+ "purpose_personal_record": "మీ స్వంత రికార్డులు",
+ "proxyTitle": "మీ సంరక్షణలో సహాయం చేయడానికి {name} కు అనుమతి ఇవ్వండి",
+ "proxyIntro": "{name} ({relation}) {clinic} లో మీ సందర్శనలకు సహాయం చేయమని అడిగారు. వారు ఏమి చేయవచ్చో ఎంచుకోండి.",
+ "proxyScopeLabel": "వారు ఏమి చేయవచ్చు?",
+ "proxyScopeBook": "అపాయింట్‌మెంట్ బుక్ చేయడం మాత్రమే",
+ "proxyScopeBookHint": "వారు మీ అపాయింట్‌మెంట్లను బుక్ చేయవచ్చు, మార్చవచ్చు. మీ వైద్య రికార్డులను చూడలేరు.",
+ "proxyScopeRecords": "బుక్ చేయడం, నా రికార్డులు చూడటం",
+ "proxyScopeRecordsHint": "వారు మీ ప్రిస్క్రిప్షన్లు, రిపోర్టులను కూడా చూడవచ్చు.",
+ "proxyScopeFull": "పూర్తి సహాయం",
+ "proxyScopeFullHint": "పైవన్నీ, అలాగే చెల్లింపులు, ఫారాలు.",
+ "proxyAccept": "నిర్ధారించండి",
+ "proxyDone": "ధన్యవాదాలు. {name} ఇప్పుడు మీ సందర్శనలకు సహాయం చేయగలరు."
 }
