@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { VisitSummary } from "@nabd/api-client/generated";
+import type { VisitSummaryResponse as VisitSummary } from "@nabd/api-client/generated";
 import styles from "./solo.module.css";
 import StatusPill from "../ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";

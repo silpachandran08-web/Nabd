@@ -1,6 +1,6 @@
 "use client";
 
-import type { VisitSummary } from "@nabd/api-client/generated";
+import type { VisitSummaryResponse as VisitSummary } from "@nabd/api-client/generated";
 import styles from "./solo.module.css";
 import Icon from "../ui/Icon";
 

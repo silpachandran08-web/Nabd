@@ -492,7 +492,15 @@ export const VaccineRecordResponseSchema = z.object({ administeredAt: z.string()
 export const VerifyRequestSchema = z.object({ otp: z.string().optional() });
 export const VisitAttachmentItemSchema = z.object({ attachmentId: z.string().optional(), contentType: z.string().optional(), createdAt: z.string().optional(), fileId: z.string().optional(), kind: z.string().optional(), note: z.string().optional(), patientId: z.string().optional() });
 export const VisitAttachmentListSchema = z.object({ items: z.array(VisitAttachmentItemSchema).optional() });
+export const VisitSummaryAllergySchema = z.object({ reaction: z.string().optional(), severity: z.string().optional(), substance: z.string().optional() });
+export const VisitSummaryConditionSchema = z.object({ condition: z.string().optional(), reviewDueDate: z.string().optional() });
+export const VisitSummaryIntakeSchema = z.object({ paymentMode: z.string().optional(), presentingComplaint: z.string().optional() });
+export const VisitSummaryMedicineSchema = z.object({ dosage: z.string().optional(), drugName: z.string().optional(), duration: z.string().optional(), frequency: z.string().optional() });
+export const VisitSummaryPatientSchema = z.object({ ageText: z.string().optional(), id: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), queueEntryId: z.string().optional(), queueStatus: z.string().optional(), sex: z.string().optional() });
+export const VisitSummaryPregnancySchema = z.object({ expectedDeliveryDate: z.string().optional(), status: z.string().optional() });
+export const VisitSummarySafetySchema = z.object({ allergies: z.array(VisitSummaryAllergySchema).optional(), allergyState: z.string().optional(), pregnancy: VisitSummaryPregnancySchema.optional() });
 export const VitalsResponseSchema = z.object({ abnormalFlags: z.array(z.string()).optional(), bloodSugar: z.number().optional(), bpDiastolic: z.number().int().optional(), bpSystolic: z.number().int().optional(), heightCm: z.number().optional(), id: z.string().optional(), painScore: z.number().int().optional(), patientId: z.string().optional(), pulseBpm: z.number().int().optional(), queueEntryId: z.string().optional(), recordedAt: z.string().optional(), recordedBy: z.string().optional(), spo2Percent: z.number().int().optional(), tempCelsius: z.number().optional(), weightKg: z.number().optional() });
+export const VisitSummaryResponseSchema = z.object({ activeMeds: z.array(VisitSummaryMedicineSchema).optional(), attachmentsCount: z.number().int().optional(), conditions: z.array(VisitSummaryConditionSchema).optional(), intake: VisitSummaryIntakeSchema.optional(), lastVisits: z.array(EncounterResponseSchema).optional(), patient: VisitSummaryPatientSchema.optional(), safety: VisitSummarySafetySchema.optional(), vitals: VitalsResponseSchema.optional() });
 export const VitalsHistoryResponseSchema = z.object({ items: z.array(VitalsResponseSchema).optional() });
 export const VitalsWriteRequestSchema = z.object({ bloodSugar: z.number().gt(0).lte(9999.99).optional(), bpDiastolic: z.number().int().gte(10).lte(200).optional(), bpSystolic: z.number().int().gte(20).lte(300).optional(), heightCm: z.number().gte(20).lte(250).optional(), painScore: z.number().int().gte(0).lte(10).optional(), pulseBpm: z.number().int().gte(20).lte(300).optional(), spo2Percent: z.number().int().gte(1).lte(100).optional(), tempCelsius: z.number().gte(20).lte(45).optional(), weightKg: z.number().gte(0.2).lte(400).optional() });
 export const VoidInvoiceRequestSchema = z.object({ reason: z.string().min(1) });
@@ -645,6 +653,7 @@ export const operationSchemas = {
   ClinicalDocumentController_listForVisit: { response: z.array(DocumentResponseSchema) },
   ClinicalDocumentController_create: { body: CreateRequestSchema, response: DocumentResponseSchema },
   ClinicalDocumentController_summaryPrefill: { response: SummaryPrefillResponseSchema },
+  VisitSummaryController_get: { response: VisitSummaryResponseSchema },
   AttachmentController_list: { response: VisitAttachmentListSchema },
   AttachmentController_attach: { body: AttachmentCreateRequestSchema, response: AttachmentCreateResponseSchema },
   VitalsController_previous: { response: VitalsHistoryResponseSchema },

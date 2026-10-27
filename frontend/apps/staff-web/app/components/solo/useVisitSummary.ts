@@ -1,7 +1,7 @@
 "use client";
 
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import type { VisitSummary } from "@nabd/api-client/generated";
+import type { VisitSummaryResponse as VisitSummary } from "@nabd/api-client/generated";
 import { getter, key } from "../../lib/query";
 
 /** GET /clinical/visits/{id}/summary: one call for the whole consult card stack (CLN-008). Shared by prefetch and the screen. */
