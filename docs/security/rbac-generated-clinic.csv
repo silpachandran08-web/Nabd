@@ -60,6 +60,7 @@ owner,GET /v1/clinical/rx-sets,clinical:view,allow
 owner,GET /v1/clinical/safety-dictionary,clinical:view,allow
 owner,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 owner,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+owner,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,allow
 owner,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 owner,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 owner,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
@@ -429,6 +430,7 @@ owner_doctor,GET /v1/clinical/rx-sets,clinical:view,allow
 owner_doctor,GET /v1/clinical/safety-dictionary,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+owner_doctor,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 owner_doctor,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 owner_doctor,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
@@ -798,6 +800,7 @@ doctor,GET /v1/clinical/rx-sets,clinical:view,allow
 doctor,GET /v1/clinical/safety-dictionary,clinical:view,allow
 doctor,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 doctor,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+doctor,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,allow
 doctor,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 doctor,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 doctor,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
@@ -1167,6 +1170,7 @@ nurse,GET /v1/clinical/rx-sets,clinical:view,allow
 nurse,GET /v1/clinical/safety-dictionary,clinical:view,allow
 nurse,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 nurse,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+nurse,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,allow
 nurse,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 nurse,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 nurse,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow
@@ -1536,6 +1540,7 @@ receptionist,GET /v1/clinical/rx-sets,clinical:view,deny-403
 receptionist,GET /v1/clinical/safety-dictionary,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-403
+receptionist,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-403
 receptionist,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-403
 receptionist,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-403
@@ -1905,6 +1910,7 @@ frontdesk_vitals,GET /v1/clinical/rx-sets,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/safety-dictionary,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
+frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/vitals/{queueEntryId},clinical:view,allow

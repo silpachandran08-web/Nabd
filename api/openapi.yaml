@@ -4669,6 +4669,22 @@ paths:
                         contentType: { type: string }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /clinical/visits/{queueEntryId}/summary:
+    get:
+      tags: [Clinical]
+      summary: >
+        CLN-008 - the pre-consult summary of a visit in one read: patient banner, allergy statement and pregnancy
+        (safety), active conditions, the last 3 completed visits, the medicines of the last 3 signed prescriptions
+        (de-duplicated, at most 20), the visit's vitals, intake details and the attachment count. Same gate as the
+        other clinical reads (consent and own-patients scope, PHI read logged): a visit that is missing, withdrawn
+        or outside the caller's scope is the same 404 patient-not-found. allergyState "not_assessed" and pregnancy
+        "not_documented" mean nobody has asked; they are never "none" / "not pregnant".
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/VisitSummary" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /clinical/vitals/{queueEntryId}:
     get:
       tags: [Clinical]
@@ -6708,6 +6724,61 @@ components:
               entry: { $ref: "#/components/schemas/QueueEntry" }
               patient: { oneOf: [{ $ref: "#/components/schemas/PatientDetail" }, { type: "null" }] }
               vitals: { oneOf: [{ $ref: "#/components/schemas/Vitals" }, { type: "null" }] }
+    VisitSummary:
+      type: object
+      properties:
+        patient:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            queueEntryId: { type: string, format: uuid }
+            name: { type: string }
+            ageText: { type: string, description: 'e.g. "41 y", "8 m", "12 d"; empty when the date of birth is unknown' }
+            sex: { type: string }
+            mrn: { type: string }
+            queueStatus: { type: string }
+        safety:
+          type: object
+          properties:
+            allergyState: { type: string, enum: [recorded, none_documented, not_assessed] }
+            allergies:
+              type: array
+              items:
+                type: object
+                properties: { substance: { type: string }, severity: { type: string }, reaction: { type: string, nullable: true } }
+            pregnancy:
+              type: object
+              properties:
+                status: { type: string, enum: [not_documented, not_pregnant, pregnant, lactating, unknown] }
+                expectedDeliveryDate: { type: string, format: date, nullable: true }
+        conditions:
+          type: array
+          items:
+            type: object
+            properties: { condition: { type: string }, reviewDueDate: { type: string, format: date, nullable: true } }
+        lastVisits:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            properties:
+              queueEntryId: { type: string, format: uuid }
+              occurredAt: { type: string, format: date-time }
+              doctorId: { type: string, format: uuid }
+              diagnosis: { type: string, nullable: true, description: "left out when the caller's field grants exclude diagnosis" }
+              assessment: { type: string, nullable: true }
+              medications: { type: string, nullable: true }
+        activeMeds:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            properties: { drugName: { type: string }, dosage: { type: string, nullable: true }, frequency: { type: string, nullable: true }, duration: { type: string, nullable: true } }
+        vitals: { allOf: [{ $ref: "#/components/schemas/Vitals" }], nullable: true }
+        intake:
+          type: object
+          properties: { presentingComplaint: { type: string, nullable: true }, paymentMode: { type: string, nullable: true } }
+        attachmentsCount: { type: integer }
     Vitals:
       type: object
       properties:

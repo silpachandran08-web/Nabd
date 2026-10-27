@@ -10,6 +10,8 @@ const files = [
     return readdirSync(dir).filter((f) => /\.tsx?$/.test(f)).map((f) => `(clinic)/${d}/${f}`);
   }),
   "components/setup/PharmacyPanel.tsx",
+  // FEF-031: the patients page is split into registry/ and drawer/ subfolders.
+  ...["registry", "drawer"].flatMap((d) => readdirSync(app("(clinic)/patients/" + d + "/")).filter((f) => /\.tsx?$/.test(f)).map((f) => `(clinic)/patients/${d}/${f}`)),
 ];
 const src = Object.fromEntries(files.map((f) => [f, readFileSync(app(f), "utf8")]));
 
@@ -22,7 +24,7 @@ test("0 authedFetch and 0 API_BASE on patients, schedule, billing, pharmacy and 
 test("0 hand-written API types: response shapes come from the generated client", () => {
   const banned = /^(export )?type (Patient|PatientDetail|Allergy|AllergyStatus|Condition|Prescription|PrescriptionItem|Encounter|Tooth|ToothHistoryEntry|TodayVisit|Registry|RegistryRow|Booking|Cell|Session|Doctor|Day|Week|Summary|HistoryItem|PackageT|PackageItem|InstanceT|InstanceItem|InstanceEvent|RefundT|ExpiringT|LiabilityT|SettingsT|StaffOption|PatientOption|WaitlistEntry|SoldInvoice|PharmacySettings|PharmacyItem|DispensingQueueEntry|Due|Item) = \{/m;
   for (const [f, s] of Object.entries(src)) assert.doesNotMatch(s, banned, f);
-  for (const f of ["(clinic)/patients/page.tsx", "(clinic)/schedule/page.tsx", "(clinic)/billing/page.tsx", "(clinic)/packages/page.tsx"]) assert.match(src[f], /from "@nabd\/api-client\/generated"/, f);
+  for (const f of ["(clinic)/patients/patientsModel.ts", "(clinic)/schedule/page.tsx", "(clinic)/billing/page.tsx", "(clinic)/packages/page.tsx"]) assert.match(src[f], /from "@nabd\/api-client\/generated"/, f);
 });
 
 test("no useEffect fetches: server state goes through useQuery", () => {
@@ -43,7 +45,7 @@ test("AC4: the waitlist panel has no 1 s interval of its own; the Countdown cell
 
 test("AC1: the registry has no 'first 200' wording and pages by cursor", () => {
   assert.doesNotMatch(src["(clinic)/patients/page.tsx"], /first 200|showing first/i);
-  assert.match(src["(clinic)/patients/page.tsx"], /cursor/);
+  assert.match(src["(clinic)/patients/registry/useRegistry.ts"], /cursor/); // FEF-031: paging moved into the registry hook
 });
 
 test("AC3: every migrated dialog shows failures through the shared form errors", () => {

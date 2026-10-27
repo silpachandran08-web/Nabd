@@ -60,6 +60,7 @@ super_admin,GET /v1/clinical/rx-sets,clinical:view,deny-401
 super_admin,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+super_admin,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 super_admin,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 super_admin,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
@@ -429,6 +430,7 @@ implementation,GET /v1/clinical/rx-sets,clinical:view,deny-401
 implementation,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+implementation,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 implementation,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 implementation,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
@@ -798,6 +800,7 @@ support_engineer,GET /v1/clinical/rx-sets,clinical:view,deny-401
 support_engineer,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+support_engineer,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 support_engineer,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 support_engineer,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
@@ -1167,6 +1170,7 @@ billing,GET /v1/clinical/rx-sets,clinical:view,deny-401
 billing,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+billing,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 billing,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 billing,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
@@ -1536,6 +1540,7 @@ sre,GET /v1/clinical/rx-sets,clinical:view,deny-401
 sre,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+sre,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 sre,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 sre,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
@@ -1905,6 +1910,7 @@ commercial,GET /v1/clinical/rx-sets,clinical:view,deny-401
 commercial,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+commercial,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 commercial,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 commercial,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
@@ -2274,6 +2280,7 @@ compliance_dpo,GET /v1/clinical/rx-sets,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/summary,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401

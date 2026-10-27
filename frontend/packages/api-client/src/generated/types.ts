@@ -522,6 +522,14 @@ export type VaccineRecordResponse = { administeredAt?: string; dose?: string; ex
 export type VerifyRequest = { otp?: string; };
 export type VisitAttachmentItem = { attachmentId?: string; contentType?: string; createdAt?: string; fileId?: string; kind?: string; note?: string; patientId?: string; };
 export type VisitAttachmentList = { items?: Array<VisitAttachmentItem>; };
+export type VisitSummaryAllergy = { reaction?: string; severity?: string; substance?: string; };
+export type VisitSummaryCondition = { condition?: string; reviewDueDate?: string; };
+export type VisitSummaryIntake = { paymentMode?: string; presentingComplaint?: string; };
+export type VisitSummaryMedicine = { dosage?: string; drugName?: string; duration?: string; frequency?: string; };
+export type VisitSummaryPatient = { ageText?: string; id?: string; mrn?: string; name?: string; queueEntryId?: string; queueStatus?: string; sex?: string; };
+export type VisitSummaryPregnancy = { expectedDeliveryDate?: string; status?: string; };
+export type VisitSummaryResponse = { activeMeds?: Array<VisitSummaryMedicine>; attachmentsCount?: number; conditions?: Array<VisitSummaryCondition>; intake?: VisitSummaryIntake; lastVisits?: Array<EncounterResponse>; patient?: VisitSummaryPatient; safety?: VisitSummarySafety; vitals?: VitalsResponse; };
+export type VisitSummarySafety = { allergies?: Array<VisitSummaryAllergy>; allergyState?: string; pregnancy?: VisitSummaryPregnancy; };
 export type Visits = { completed?: number; inFlow?: number; total?: number; };
 export type VitalsHistoryResponse = { items?: Array<VitalsResponse>; };
 export type VitalsResponse = { abnormalFlags?: Array<string>; bloodSugar?: number; bpDiastolic?: number; bpSystolic?: number; heightCm?: number; id?: string; painScore?: number; patientId?: string; pulseBpm?: number; queueEntryId?: string; recordedAt?: string; recordedBy?: string; spo2Percent?: number; tempCelsius?: number; weightKg?: number; };
@@ -683,6 +691,7 @@ export type Operations = {
   ClinicalDocumentController_listForVisit: { method: "get"; path: "/v1/clinical/visits/{queueEntryId}/documents"; permission: "clinical:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: Array<DocumentResponse> };
   ClinicalDocumentController_create: { method: "post"; path: "/v1/clinical/visits/{queueEntryId}/documents"; permission: "clinical:edit"; pathParams: { queueEntryId: string; }; query: never; body: CreateRequest; response: DocumentResponse };
   ClinicalDocumentController_summaryPrefill: { method: "get"; path: "/v1/clinical/visits/{queueEntryId}/documents/summary-prefill"; permission: "clinical:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: SummaryPrefillResponse };
+  VisitSummaryController_get: { method: "get"; path: "/v1/clinical/visits/{queueEntryId}/summary"; permission: "clinical:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: VisitSummaryResponse };
   AttachmentController_list: { method: "get"; path: "/v1/clinical/visits/{visitId}/attachments"; permission: "clinical:view"; pathParams: { visitId: string; }; query: never; body: never; response: VisitAttachmentList };
   AttachmentController_attach: { method: "post"; path: "/v1/clinical/visits/{visitId}/attachments"; permission: "clinical:edit"; pathParams: { visitId: string; }; query: never; body: AttachmentCreateRequest; response: AttachmentCreateResponse };
   VitalsController_previous: { method: "get"; path: "/v1/clinical/vitals/patient/{patientId}/previous"; permission: "clinical:view"; pathParams: { patientId: string; }; query: { limit?: number; }; body: never; response: VitalsHistoryResponse };

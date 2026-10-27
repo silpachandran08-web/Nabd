@@ -5638,6 +5638,44 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:view
+  /v1/clinical/visits/{queueEntryId}/summary:
+    get:
+      operationId: VisitSummaryController_get
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VisitSummaryResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:view
   /v1/clinical/visits/{visitId}/attachments:
     get:
       operationId: AttachmentController_list
@@ -26193,6 +26231,105 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/VisitAttachmentItem"
+    VisitSummaryAllergy:
+      type: object
+      properties:
+        reaction:
+          type: string
+        severity:
+          type: string
+        substance:
+          type: string
+    VisitSummaryCondition:
+      type: object
+      properties:
+        condition:
+          type: string
+        reviewDueDate:
+          type: string
+          format: date
+    VisitSummaryIntake:
+      type: object
+      properties:
+        paymentMode:
+          type: string
+        presentingComplaint:
+          type: string
+    VisitSummaryMedicine:
+      type: object
+      properties:
+        dosage:
+          type: string
+        drugName:
+          type: string
+        duration:
+          type: string
+        frequency:
+          type: string
+    VisitSummaryPatient:
+      type: object
+      properties:
+        ageText:
+          type: string
+        id:
+          type: string
+          format: uuid
+        mrn:
+          type: string
+        name:
+          type: string
+        queueEntryId:
+          type: string
+          format: uuid
+        queueStatus:
+          type: string
+        sex:
+          type: string
+    VisitSummaryPregnancy:
+      type: object
+      properties:
+        expectedDeliveryDate:
+          type: string
+          format: date
+        status:
+          type: string
+    VisitSummaryResponse:
+      type: object
+      properties:
+        activeMeds:
+          type: array
+          items:
+            $ref: "#/components/schemas/VisitSummaryMedicine"
+        attachmentsCount:
+          type: integer
+          format: int32
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/VisitSummaryCondition"
+        intake:
+          $ref: "#/components/schemas/VisitSummaryIntake"
+        lastVisits:
+          type: array
+          items:
+            $ref: "#/components/schemas/EncounterResponse"
+        patient:
+          $ref: "#/components/schemas/VisitSummaryPatient"
+        safety:
+          $ref: "#/components/schemas/VisitSummarySafety"
+        vitals:
+          $ref: "#/components/schemas/VitalsResponse"
+    VisitSummarySafety:
+      type: object
+      properties:
+        allergies:
+          type: array
+          items:
+            $ref: "#/components/schemas/VisitSummaryAllergy"
+        allergyState:
+          type: string
+        pregnancy:
+          $ref: "#/components/schemas/VisitSummaryPregnancy"
     Visits:
       type: object
       properties:

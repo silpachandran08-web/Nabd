@@ -4,7 +4,7 @@
   "app/(auth)/login/page.tsx",
   "app/(clinic)/consult/page.tsx",
   "app/(clinic)/documents/[id]/print/page.tsx",
-  "app/(clinic)/nursing/page.tsx",
+  "app/components/nursing/NursingWorklist.tsx",
   "app/ClinicNav.tsx",
   "app/IdleLockGuard.tsx",
   "app/TopBar.tsx",
