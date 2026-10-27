@@ -92,6 +92,7 @@ class InternalSchedulingService {
                 for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
                     if (scheduleRepo.isClinicHoliday(tid, day) || scheduleRepo.isOnLeave(d, day)) continue;
                     Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(d, day.atStartOfDay(zone).toInstant(), day.plusDays(1).atStartOfDay(zone).toInstant()));
+                    var shortDay = scheduleRepo.shortWindows(tid, day); // ADM-028
                     for (WorkingHoursRow wh : scheduleRepo.findForDay(d, day.getDayOfWeek().getValue() % 7)) {
                         String id = wh.id() + "@" + day;
                         if (wh.maxPatients() != null && !SessionModes.HYBRID.equals(SessionModes.modeOn(wh, day))) {
@@ -108,7 +109,9 @@ class InternalSchedulingService {
                         Instant start = day.atTime(wh.startTime()).atZone(zone).toInstant();
                         Instant end = day.atTime(wh.endTime()).atZone(zone).toInstant();
                         for (; !start.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end); start = start.plus(wh.slotMinutes(), ChronoUnit.MINUTES)) {
+                            var local = start.atZone(zone).toLocalTime();
                             if (start.isAfter(now) && !booked.contains(start)
+                                    && ScheduleRepository.inWindows(shortDay, local, local.plusMinutes(wh.slotMinutes()))
                                     && !reserved.contains(ScheduleGrid.minuteOf(start.atZone(zone).toLocalTime()))) slots.add(start);
                         }
                         sessions.add(new Session(id, day, "slots", slots, null));

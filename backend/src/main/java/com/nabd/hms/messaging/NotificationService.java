@@ -51,10 +51,13 @@ public class NotificationService implements NotificationPort {
     private final TenantScope tenantScope;
     private final TransactionTemplate tx;
     private final CommsCutover cutover;
+    private final com.nabd.hms.organization.api.QuietHours quietHours;
 
     NotificationService(NotificationRequestRepository repo, WhatsAppTemplateRepository templates, WhatsAppMessageService whatsApp,
                         EventPublisher publisher, TenantContext tenantContext, FieldCipher cipher, ObjectMapper json, ClinicClock clock,
-                        TenantScope tenantScope, PlatformTransactionManager txManager, CommsCutover cutover) {
+                        TenantScope tenantScope, PlatformTransactionManager txManager, CommsCutover cutover,
+                        com.nabd.hms.organization.api.QuietHours quietHours) {
+        this.quietHours = quietHours;
         this.cutover = cutover;
         this.tenantScope = tenantScope;
         this.tx = new TransactionTemplate(txManager);
@@ -86,8 +89,9 @@ public class NotificationService implements NotificationPort {
         String status = consented ? "requested" : "blocked";
         UUID id = UUID.randomUUID();
         var priority = r.priority() == null ? purpose.defaultPriority() : r.priority();
+        Instant notBefore = QuietHoursRule.releaseAt(quietHours.window(tenantId).orElse(null), clock.zone(tenantId), clock.now(), r.notBefore(), priority); // ADM-028
         boolean inserted = repo.insert(id, tenantId, purpose.code(), r.subjectType(), r.subjectId(), r.recipientPatientId(),
-                seal(tenantId, id, r), language, priority.name(), purpose.channelPolicy().name(), r.notBefore(), r.notAfter(),
+                seal(tenantId, id, r), language, priority.name(), purpose.channelPolicy().name(), notBefore, r.notAfter(),
                 r.dedupeKey(), status);
         if (!inserted) {
             var existing = repo.byDedupeKey(tenantId, r.dedupeKey());
@@ -99,7 +103,7 @@ public class NotificationService implements NotificationPort {
             data.put("purpose", purpose.code());
             data.put("priority", priority.name());
             data.put("channelPolicy", purpose.channelPolicy().name());
-            if (r.notBefore() != null) data.put("notBefore", r.notBefore());
+            if (notBefore != null) data.put("notBefore", notBefore);
             if (r.notAfter() != null) data.put("notAfter", r.notAfter());
             publisher.publish(tenantId, DomainEventType.NOTIFICATION_REQUESTED, id, data);
         }

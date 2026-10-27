@@ -41,13 +41,15 @@ class SlotAlternatives {
         for (LocalDate day = first; day.isBefore(first.plusDays(HORIZON_DAYS)); day = day.plusDays(1)) {
             if (scheduleRepo.isClinicHoliday(tenantId, day) || scheduleRepo.isOnLeave(doctorId, day)) continue;
             Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(doctorId, day.atStartOfDay(zone).toInstant(), day.plusDays(1).atStartOfDay(zone).toInstant()));
+            var shortDay = scheduleRepo.shortWindows(tenantId, day); // ADM-028
             for (WorkingHoursRow wh : scheduleRepo.findForDay(doctorId, day.getDayOfWeek().getValue() % 7).stream()
                     .sorted(Comparator.comparing(WorkingHoursRow::startTime)).toList()) {
                 if (wh.maxPatients() != null && scheduleRepo.countSessionOccupancy(tenantId, doctorId, day, wh.startTime(), wh.endTime(), zone) >= wh.maxPatients()) continue;
                 Instant end = day.atTime(wh.endTime()).atZone(zone).toInstant();
                 for (Instant s = day.atTime(wh.startTime()).atZone(zone).toInstant(); !s.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end);
                      s = s.plus(wh.slotMinutes(), ChronoUnit.MINUTES)) {
-                    if (s.isAfter(from) && !booked.contains(s)) return Optional.of(s);
+                    var local = s.atZone(zone).toLocalTime();
+                    if (s.isAfter(from) && !booked.contains(s) && ScheduleRepository.inWindows(shortDay, local, local.plusMinutes(wh.slotMinutes()))) return Optional.of(s);
                 }
             }
         }

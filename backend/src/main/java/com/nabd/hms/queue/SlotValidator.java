@@ -78,6 +78,9 @@ class SlotValidator {
         if (scheduleRepo.isClinicHoliday(tenantId, date)) {
             throw refuse("clinic-closed", "CLINIC_CLOSED", "Clinic closed", "The clinic is closed on " + date + ".");
         }
+        if (!ScheduleRepository.inWindows(scheduleRepo.shortWindows(tenantId, date), time, time.plusMinutes(block.slotMinutes()))) { // ADM-028
+            throw refuse("clinic-closed", "CLINIC_CLOSED", "Clinic closed", "The clinic has short hours on " + date + " and is closed at that time.");
+        }
         if (scheduleRepo.reservedMinutes(block.id()).contains(ScheduleGrid.minuteOf(time))) { // ACC-012
             throw refuse("reserved-for-walkin", "RESERVED_FOR_WALKIN", "Reserved for walk-ins",
                     "This slot is kept for walk-in patients; check the patient in at the desk instead.");

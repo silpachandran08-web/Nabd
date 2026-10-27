@@ -42,7 +42,7 @@ class ScheduleBoardRepository {
     /** Same match rules as ScheduleRepository.isClinicHoliday (recurring = same month and day). */
     Optional<String> holidayName(UUID tenantId, LocalDate date) {
         return jdbc.query("""
-                SELECT name FROM clinic_holidays WHERE tenant_id = ? AND (
+                SELECT name FROM clinic_holidays WHERE tenant_id = ? AND effect = 'closed' AND (
                   (NOT recurring AND holiday_date = ?) OR
                   (recurring AND EXTRACT(MONTH FROM holiday_date) = ? AND EXTRACT(DAY FROM holiday_date) = ?))
                 ORDER BY name LIMIT 1

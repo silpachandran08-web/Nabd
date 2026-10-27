@@ -6309,6 +6309,100 @@ paths:
       tags:
       - queue
       x-required-permission: queue:edit
+  /v1/doctors/{id}/delay/{delayId}:
+    patch:
+      operationId: ScheduleController_changeDelay
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: delayId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DelayChangeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DoctorDelayResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:edit
+  /v1/doctors/{id}/delay/{delayId}/responses:
+    get:
+      operationId: ScheduleController_delayResponses
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: delayId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DelayResponsesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
   /v1/doctors/{id}/leave:
     get:
       operationId: ScheduleController_listLeave
@@ -13634,6 +13728,156 @@ paths:
       tags:
       - patient
       x-required-permission: setup:edit
+  /v1/setup/calendar/quiet-hours:
+    get:
+      operationId: CalendarController_quietHours
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QuietHoursResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+    put:
+      operationId: CalendarController_putQuietHours
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuietHoursRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QuietHoursResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/calendar/templates:
+    get:
+      operationId: CalendarController_templates
+      parameters:
+      - in: query
+        name: market
+        required: false
+        schema:
+          type: string
+          default: IN
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HolidayTemplateResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/setup/calendar/templates/{code}/apply:
+    post:
+      operationId: CalendarController_apply
+      parameters:
+      - in: path
+        name: code
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyTemplateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApplyTemplateResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
   /v1/setup/charges:
     get:
       operationId: SetupController_charges
@@ -14288,6 +14532,49 @@ paths:
           format: uuid
       responses:
         "200":
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+    patch:
+      operationId: CalendarController_setEffect
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HolidayEffectRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClinicHolidayResponse"
           description: OK
         "401":
           content:
@@ -16879,6 +17166,25 @@ components:
           type: string
         outcome:
           type: string
+    ApplyTemplateRequest:
+      type: object
+      properties:
+        year:
+          type: integer
+          format: int32
+          maximum: 2100
+          minimum: 2000
+      required:
+      - year
+    ApplyTemplateResponse:
+      type: object
+      properties:
+        added:
+          type: integer
+          format: int32
+        skipped:
+          type: integer
+          format: int32
     AppointmentPage:
       type: object
       properties:
@@ -17685,15 +17991,26 @@ components:
     ClinicHolidayResponse:
       type: object
       properties:
+        bookingsToMove:
+          type: integer
+          format: int32
+        effect:
+          type: string
         holidayDate:
           type: string
           format: date
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/HolidayWindow"
         id:
           type: string
         name:
           type: string
         recurring:
           type: boolean
+        source:
+          type: string
     ClinicHolidayWriteRequest:
       type: object
       properties:
@@ -18260,6 +18577,8 @@ components:
     DelayAnnounceRequest:
       type: object
       properties:
+        broadcast:
+          type: boolean
         delayMinutes:
           type: integer
           format: int32
@@ -18269,8 +18588,52 @@ components:
           type: string
           maxLength: 200
           minLength: 0
+        reasonCode:
+          type: string
+          maxLength: 40
+          minLength: 0
       required:
       - delayMinutes
+    DelayChangeRequest:
+      type: object
+      properties:
+        minutes:
+          type: integer
+          format: int32
+          maximum: 240
+          minimum: 1
+      required:
+      - minutes
+    DelayResponseItem:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        deliveredAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        respondedAt:
+          type: string
+          format: date-time
+        response:
+          type: string
+        status:
+          type: string
+    DelayResponsesResponse:
+      type: object
+      properties:
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DelayResponseItem"
     DelegationRequest:
       type: object
       properties:
@@ -18599,17 +18962,26 @@ components:
         clinicDate:
           type: string
           format: date
+        delayId:
+          type: string
+          format: uuid
         delayMinutes:
           type: integer
           format: int32
         doctorId:
           type: string
           format: uuid
+        expiresAt:
+          type: string
+          format: date-time
         id:
           type: string
           format: uuid
         reason:
           type: string
+        recipients:
+          type: integer
+          format: int32
     DoctorLeaveResponse:
       type: object
       properties:
@@ -19533,6 +19905,36 @@ components:
           type: string
           format: uuid
         patientName:
+          type: string
+    HolidayEffectRequest:
+      type: object
+      properties:
+        effect:
+          type: string
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/HolidayWindow"
+      required:
+      - effect
+    HolidayTemplateResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        source:
+          type: string
+        year:
+          type: integer
+          format: int32
+    HolidayWindow:
+      type: object
+      properties:
+        from:
+          type: string
+        to:
           type: string
     HouseholdMember:
       type: object
@@ -22583,6 +22985,28 @@ components:
           minLength: 1
       required:
       - status
+    QuietHoursRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        from:
+          type: string
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+        to:
+          type: string
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+      required:
+      - enabled
+    QuietHoursResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        from:
+          type: string
+        to:
+          type: string
     QuoteRequest:
       type: object
       properties:

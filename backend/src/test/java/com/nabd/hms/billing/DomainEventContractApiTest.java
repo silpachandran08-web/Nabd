@@ -247,6 +247,9 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         call(e, HttpMethod.POST, "/v1/doctors/" + doctor + "/delay", Map.of("delayMinutes", 20, "reason", "surgery overran"));
         assertThat(exchange("/v1/doctors/" + doctor + "/delay/clear", HttpMethod.POST, authed(e.token()), Void.class).getStatusCode().is2xxSuccessful()).isTrue();
 
+        // organization.calendar.changed (ADM-028: a holiday added)
+        call(e, HttpMethod.POST, "/v1/setup/holidays", Map.of("holidayDate", "2031-01-02", "name", "Contract day", "recurring", false));
+
         // organization.config.changed, billing.catalogue.changed
         call(e, HttpMethod.PATCH, "/v1/setup/policies/session.idle_lock_minutes", Map.of("value", "10"));
         Map<String, Object> charge = new HashMap<>(Map.of("code", "ECG", "name", "ECG", "category", "Procedure", "baseAmount", 300,

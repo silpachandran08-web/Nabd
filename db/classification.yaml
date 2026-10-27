@@ -249,6 +249,25 @@ schemas:
       recurring: operational
       created_at: operational
       updated_at: operational
+      effect: operational
+      short_hours: operational
+      source_template: operational
+    clinic_quiet_hours:
+      tenant_id: operational
+      enabled: operational
+      from_time: operational
+      to_time: operational
+      updated_at: operational
+    holiday_templates:
+      code: operational
+      market: operational
+      region_code: operational
+      year: operational
+      holiday_date: operational
+      name: operational
+      kind: operational
+      source: operational
+      template_name: operational
     clinic_policies:
       id: operational
       tenant_id: operational
@@ -487,6 +506,24 @@ schemas:
       cleared_by: operational
       cleared_at: operational
       clinic_date: operational
+      expires_at: operational
+      broadcast: operational
+      reason_code: operational
+    delay_broadcast_recipients:
+      id: operational
+      tenant_id: operational
+      doctor_id: operational
+      delay_id: operational
+      pause_id: operational
+      appointment_id: operational
+      queue_entry_id: operational
+      patient_id: pii
+      message_ref: operational
+      expected_at: operational
+      status: operational
+      response: operational
+      responded_at: operational
+      created_at: operational
     doctor_leave:
       id: operational
       tenant_id: operational

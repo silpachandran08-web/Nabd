@@ -79,6 +79,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `visit.queue_entry.created.v1` | QueueService.checkIn, transfer (new leg) | entryId, doctorId, queueDate, status |
 | `visit.queue_entry.changed.v1` | every status move (CAS), priority reorder, consult extend (ACC-015, stands in for `visit.consult.extended.v1`), call-next (ACC-012), doctor reassign (ACC-022) | entryId, doctorId, queueDate, status, fromStatus?, priority?, extendedMinutes?, orderReason?, fromDoctorId?, newToken?, previousToken? (ACC-022 reassign) |
 | `visit.completed.v1` | the checkout move to completed (subject = encounter) | encounterId, entryId, doctorId, queueDate, status |
+| `organization.calendar.changed.v1` | CalendarService (ADM-028): a template applied, a holiday's effect set (closed, short with hours, open), a holiday added or removed. Dates and effects only; slot generation reads the calendar live, so the event is for caches and the move-bookings job | dates[{date, effect, hours?}] |
 | `scheduling.doctor_delay.changed.v1` | ScheduleService.announceDelay / clearDelay | doctorId, delayId, delayMinutes, status |
 | `scheduling.doctor_status.changed.v1` | DoctorSessionService start / pause / resume / end, implicit start at the first in_consult (ACC-015). Status in, paused, out. Replaces the story's `scheduling.doctor_session.changed.v1` | doctorId, status |
 | `clinical.rx.signed.v1` | PrescriptionService.sign | prescriptionId, queueEntryId, signedBy, status |
