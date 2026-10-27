@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
-import styles from "../../(clinic)/nursing/nursing.module.css";
+import styles from "./nursing.module.css";
 import type { QueueEntry } from "@nabd/domain";
 
 // NUR-B2. Record-only vaccine log. There is NO immunisation schedule anywhere in the product, so
@@ -25,14 +25,11 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: 
 export function RecordVaccineDialog({ authedFetch, visits, onClose, onRecorded }: {
   authedFetch: Fetcher; visits: VaccineVisit[]; onClose: () => void; onRecorded: () => void;
 }) {
-  const [visitId, setVisitId] = useState("");
-  const [name, setName] = useState("");
-  const [dose, setDose] = useState("");
-  const [route, setRoute] = useState<string>("IM");
-  const [site, setSite] = useState("");
-  const [lot, setLot] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [notes, setNotes] = useState("");
+  // FEF-031: the eight form fields live in one state object (a component keeps at most 8 useState hooks).
+  const [f, setF] = useState({ visitId: "", name: "", dose: "", route: "IM", site: "", lot: "", expiry: "", notes: "" });
+  const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }));
+  const { visitId, name, dose, route, site, lot, expiry, notes } = f;
+  const setVisitId = set("visitId"), setName = set("name"), setDose = set("dose"), setRoute = set("route"), setSite = set("site"), setLot = set("lot"), setExpiry = set("expiry"), setNotes = set("notes");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const visit = visits.find((v) => v.queueEntryId === visitId);

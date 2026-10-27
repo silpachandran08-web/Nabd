@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSlices } from "./useSlices";
 import styles from "./patients.module.css";
 import StatusPill from "../../components/ui/StatusPill";
 import Dialog from "../../components/ui/Dialog";
@@ -42,24 +43,28 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
   onClose: () => void; onRegistered: (id: string) => void; onOpenExisting: (id: string) => void;
 }) {
   const [form, setForm] = useState({ name: "", phone: "", dob: "", gender: "", address: "", nationalId: "" });
-  const [guardianQuery, setGuardianQuery] = useState("");
-  const [guardianResults, setGuardianResults] = useState<{ id: string; name: string; phone: string }[]>([]);
-  const [guardian, setGuardian] = useState<{ id: string; name: string } | null>(null);
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
-  const [consent, setConsent] = useState(false);
-  const [channel, setChannel] = useState("");
+  // FEF-031: related fields share one useState each (a component keeps at most 8 hooks): guardian search, consent capture, registration result.
+  const gs = useSlices({ guardianQuery: "", guardianResults: [] as { id: string; name: string; phone: string }[], guardian: null as { id: string; name: string } | null, candidates: null as Candidate[] | null });
+  const [guardianQuery, setGuardianQuery] = gs("guardianQuery");
+  const [guardianResults, setGuardianResults] = gs("guardianResults");
+  const [guardian, setGuardian] = gs("guardian");
+  const [candidates, setCandidates] = gs("candidates");
+  const cs = useSlices({ consent: false, channel: "", toggles: NO_CONSENT as Toggles, emergency: false, assisted: null as { language: string; witness: string } | null, assistedOpen: false });
+  const [consent, setConsent] = cs("consent");
+  const [channel, setChannel] = cs("channel");
   // IDC-004/007: itemised consent captured with the registration (only for staff who may record it, patients:edit)
   const canConsent = can("patients:edit");
-  const [toggles, setToggles] = useState<Toggles>(NO_CONSENT);
-  const [emergency, setEmergency] = useState(false);
-  const [assisted, setAssisted] = useState<{ language: string; witness: string } | null>(null);
-  const [assistedOpen, setAssistedOpen] = useState(false);
-  const [registeredId, setRegisteredId] = useState<string | null>(null); // registered, consent not saved yet: retry only the consent
+  const [toggles, setToggles] = cs("toggles");
+  const [emergency, setEmergency] = cs("emergency");
+  const [assisted, setAssisted] = cs("assisted");
+  const [assistedOpen, setAssistedOpen] = cs("assistedOpen");
+  const rs = useSlices({ registeredId: null as string | null, abhaOn: false, createdId: null as string | null, qr: "" });
+  const [registeredId, setRegisteredId] = rs("registeredId"); // registered, consent not saved yet: retry only the consent
   const fe = useFormErrors("reg", REGISTER_LABELS);
   const [saving, setSaving] = useState(false);
-  const [abhaOn, setAbhaOn] = useState(false); // IDC-017: GET /abha/status; the panel is absent unless ABDM is on and the user has patients:edit
-  const [createdId, setCreatedId] = useState<string | null>(null);
-  const [qr, setQr] = useState("");
+  const [abhaOn, setAbhaOn] = rs("abhaOn"); // IDC-017: GET /abha/status; the panel is absent unless ABDM is on and the user has patients:edit
+  const [createdId, setCreatedId] = rs("createdId");
+  const [qr, setQr] = rs("qr");
   const keys = useRef(intentKeys()); // one Idempotency-Key per registration intent, reused when the same request is re-sent
 
   const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
