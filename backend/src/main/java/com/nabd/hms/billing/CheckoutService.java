@@ -75,13 +75,15 @@ public class CheckoutService {
     private final com.nabd.hms.organization.api.RegionRules regions;
     private final SeriesAllocator series;
     private final com.nabd.hms.billing.tax.TaxService tax;
+    private final PaymentActedBy paymentActedBy; // IDC-011
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
-                     com.nabd.hms.billing.tax.TaxService tax) {
+                     com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy) {
+        this.paymentActedBy = paymentActedBy;
         this.tax = tax;
         this.regions = regions;
         this.series = series;
@@ -402,6 +404,7 @@ public class CheckoutService {
         String reference = req.reference() == null || req.reference().isBlank() ? null : req.reference().trim();
         UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey,
                 series.allocate(SeriesAllocator.Kind.RECEIPT).formatted());
+        paymentActedBy.stamp(tenantId, paymentId, invoice.patientId(), req); // IDC-011
         BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
         String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
         repo.syncInvoicePaid(tenantId, invoiceId, newStatus);

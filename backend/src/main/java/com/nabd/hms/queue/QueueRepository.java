@@ -115,6 +115,11 @@ class QueueRepository {
         return id;
     }
 
+    /** IDC-011: who checked the patient in on their behalf. */
+    void stampActedBy(UUID tenantId, UUID id, UUID actorPatientId, String relation) {
+        jdbc.update("UPDATE queue_entries SET acted_by_patient_id = ?, acted_by_relation = ? WHERE tenant_id = ? AND id = ?", actorPatientId, relation, tenantId, id);
+    }
+
     boolean patientExists(UUID tenantId, UUID patientId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, patientId));

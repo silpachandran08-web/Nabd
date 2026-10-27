@@ -67,6 +67,9 @@ function formatDay(iso: string, opts: Intl.DateTimeFormatOptions): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { ...opts, timeZone: "UTC" });
 }
 
+/** IDC-011: a family member booked or checked in on the patient's behalf (the server sends the relation, never the member's name). */
+const bookedBy = (relation: string) => `Booked by ${relation.replace(/_/g, " ")}`;
+
 function bookingClass(b: Booking): string {
   if (b.status === "no_show") return styles.bookedMissed;
   if (b.status === "scheduled") return styles.bookedPending; // booked, patient not here yet
@@ -296,6 +299,7 @@ export default function SchedulePage() {
             ["Visit type", VISIT_LABELS[dialog.booking.visitType]],
             ["Token", dialog.booking.token != null ? `T-${dialog.booking.token}` : "Not checked in yet"],
             ["Status", statusLabel(dialog.booking.status)],
+            ...(dialog.booking.actedByRelation ? [["Booked by", bookedBy(dialog.booking.actedByRelation).replace("Booked by ", "")] as [string, string]] : []),
           ]}
           action={day.today ? { label: "Open live queue", href: "/arrivals" } : undefined}
           extra={canEdit && dialog.booking.appointmentId && dialog.booking.status === "scheduled" ? (
@@ -349,7 +353,7 @@ function RowCells({ time, cells, doctors, visitFilter, canBook, onBooking, onCel
                     style={cell.bookings.length > 1 ? { minHeight: 36, marginBottom: 4 } : undefined}
                     onClick={() => onBooking(b, doctor)}>
                     <span className={styles.slotName}>{b.status === "scheduled" ? "◷" : b.status === "no_show" ? "✕" : "✓"} {b.patientName}</span>
-                    <span className={styles.slotSub}>{VISIT_LABELS[b.visitType]} · {b.token != null ? `T-${b.token}` : b.time}</span>
+                    <span className={styles.slotSub}>{VISIT_LABELS[b.visitType]} · {b.token != null ? `T-${b.token}` : b.time}{b.actedByRelation ? ` · ${bookedBy(b.actedByRelation)}` : ""}</span>
                   </button>
                 ))}
                 {cell.bookings.length > 2 && <div className={styles.more}>+{cell.bookings.length - 2} more</div>}

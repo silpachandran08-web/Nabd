@@ -7,9 +7,12 @@ import java.util.UUID;
 
 /** source is NB-079's one-tag-per-visit acquisition channel — null/blank defaults to "walk_in".
  * presentingComplaint/paymentMode are optional intake details reception captures for a walk-in;
- * paymentMode reuses invoice_payments' own method vocabulary (V45). */
+ * paymentMode reuses invoice_payments' own method vocabulary (V45).
+ * IDC-011: actedByPatientId / actedByRelation (both or neither) say who checked the patient in on their behalf ("on behalf of" at the desk,
+ * a proxy's self check-in through the Edge). */
 public record CheckInRequest(UUID appointmentId, @NotNull UUID patientId, @NotNull UUID doctorId,
                               @Pattern(regexp = "walk_in|referral|online|social_media|returning|other") String source,
                               String presentingComplaint,
-                              @Pattern(regexp = "cash|card|upi|other") String paymentMode) {
+                              @Pattern(regexp = "cash|card|upi|other") String paymentMode,
+                              UUID actedByPatientId, @Pattern(regexp = "^[a-z_]{2,20}$") String actedByRelation) {
 }

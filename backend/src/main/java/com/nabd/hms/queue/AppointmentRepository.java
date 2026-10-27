@@ -45,6 +45,11 @@ class AppointmentRepository {
         return id;
     }
 
+    /** IDC-011: who booked on the patient's behalf (null columns = the patient or the desk acted for themselves). */
+    void stampActedBy(UUID tenantId, UUID id, UUID actorPatientId, String relation) {
+        jdbc.update("UPDATE appointments SET acted_by_patient_id = ?, acted_by_relation = ? WHERE tenant_id = ? AND id = ?", actorPatientId, relation, tenantId, id);
+    }
+
     /** NB-116: no_show is an immediate miss; a still-scheduled follow-up 15+ days past start was never rebooked. */
     List<CallbackEntryRow> listCallbackList(UUID tenantId) {
         return jdbc.query(

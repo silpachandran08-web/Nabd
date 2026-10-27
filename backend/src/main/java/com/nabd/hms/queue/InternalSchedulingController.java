@@ -28,11 +28,11 @@ import java.util.UUID;
 class InternalSchedulingController {
 
     @Schema(name = "InternalBookRequest")
-    record BookRequest(@NotBlank String patientRef, @NotNull UUID doctorId, @NotNull Instant startTime) {
+    record BookRequest(@NotBlank String patientRef, @NotNull UUID doctorId, @NotNull Instant startTime, @jakarta.validation.constraints.Size(max = 64) String actedByRef) {
     }
 
     @Schema(name = "InternalAppointmentActionRequest")
-    record ActionRequest(@NotBlank String patientRef, Instant newStartTime, String reasonCode) {
+    record ActionRequest(@NotBlank String patientRef, Instant newStartTime, String reasonCode, @jakarta.validation.constraints.Size(max = 64) String actedByRef) {
     }
 
     private final InternalSchedulingService service;
@@ -53,13 +53,13 @@ class InternalSchedulingController {
     @Idempotent
     @PostMapping("/internal/v1/tenants/{tid}/appointments")
     ResponseEntity<Map<String, Object>> book(@PathVariable UUID tid, @Valid @RequestBody BookRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.book(tid, caller(tid), req.patientRef(), req.doctorId(), req.startTime()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.book(tid, caller(tid), req.patientRef(), req.doctorId(), req.startTime(), req.actedByRef()));
     }
 
     @Idempotent
     @PostMapping("/internal/v1/tenants/{tid}/appointments/{id}/{action}")
     Map<String, Object> act(@PathVariable UUID tid, @PathVariable UUID id, @PathVariable String action, @Valid @RequestBody ActionRequest req) {
-        return service.act(tid, caller(tid), id, action, req.patientRef(), req.newStartTime(), req.reasonCode());
+        return service.act(tid, caller(tid), id, action, req.patientRef(), req.newStartTime(), req.reasonCode(), req.actedByRef());
     }
 
     /** Second line behind InternalCallerFilter: only a service identity, and only for a clinic its token names. */
