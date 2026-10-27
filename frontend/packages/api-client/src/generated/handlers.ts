@@ -31,6 +31,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/internal/v1/tenants/:tid/availability`, () => HttpResponse.json({"doctors":[{"doctorId":"00000000-0000-7000-8000-000000000000","sessions":[]}],"v":0}, { status: 200 })), // InternalSchedulingController_availability
     http.post(`${baseUrl}/internal/v1/tenants/:tid/booking-offers/:offerId/choose`, () => HttpResponse.json({}, { status: 200 })), // InternalBookingRequestController_choose
     http.post(`${baseUrl}/internal/v1/tenants/:tid/booking-requests`, () => HttpResponse.json({}, { status: 200 })), // InternalBookingRequestController_route
+    http.post(`${baseUrl}/internal/v1/tenants/:tid/check-ins`, () => HttpResponse.json({"expectedRange":"string","position":0,"queueEntryId":"00000000-0000-7000-8000-000000000000","token":0}, { status: 200 })), // InternalCheckInController_checkIn
+    http.get(`${baseUrl}/internal/v1/tenants/:tid/check-ins/context`, () => HttpResponse.json({"candidates":[{"appointmentId":"00000000-0000-7000-8000-000000000000","checkedIn":false,"firstName":"string","patientRef":"string"}],"facilityCode":"string","geofenceRequired":false,"radiusM":0,"walkinAllowed":false}, { status: 200 })), // InternalCheckInController_context
     http.get(`${baseUrl}/internal/v1/tenants/:tid/eta/appointments/:appointmentId`, () => HttpResponse.json({"display":{},"p50At":"2026-01-01T00:00:00Z","p80At":"2026-01-01T00:00:00Z","position":0,"v":0}, { status: 200 })), // EtaController_one
     http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash`, () => HttpResponse.json({}, { status: 200 })), // InternalHouseholdController_household
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients/consents`, () => HttpResponse.json({"consentIds":["00000000-0000-7000-8000-000000000000"]}, { status: 201 })), // InternalChatConsentController_capture
@@ -184,10 +186,16 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.put(`${baseUrl}/v1/doctors/:id/working-hours/:hoursId`, () => HttpResponse.json({"dayOfWeek":0,"effectiveFrom":"2026-01-01","endTime":"string","id":"00000000-0000-7000-8000-000000000000","label":"string","lateGraceMinutes":0,"maxPatients":0,"onlineCap":0,"reservedWalkInTimes":["string"],"sessionMode":"string","slotMinutes":0,"startTime":"string","walkInMode":"string","walkInRatio":0}, { status: 200 })), // ScheduleController_updateWorkingHours
     http.delete(`${baseUrl}/v1/doctors/:id/working-hours/:hoursId`, () => new HttpResponse(null, { status: 200 })), // ScheduleController_deleteWorkingHours
     http.get(`${baseUrl}/v1/events`, () => HttpResponse.json({"timeout":0}, { status: 200 })), // EventsController_stream
+    http.get(`${baseUrl}/v1/facility/checkin-attempts`, () => HttpResponse.json([{"appointmentId":"00000000-0000-7000-8000-000000000000","channel":"string","createdAt":"2026-01-01T00:00:00Z","distanceM":0,"id":"00000000-0000-7000-8000-000000000000","outcome":"string"}], { status: 200 })), // FacilityCheckInController_attempts
+    http.get(`${baseUrl}/v1/facility/checkin-config`, () => HttpResponse.json({"checkinCode":"string","geofenceRadiusM":0,"geofenceRequired":false,"lat":0,"lng":0,"walkinAllowed":false,"whatsappNumber":"string"}, { status: 200 })), // FacilityCheckInController_config
+    http.put(`${baseUrl}/v1/facility/checkin-config`, () => HttpResponse.json({"checkinCode":"string","geofenceRadiusM":0,"geofenceRequired":false,"lat":0,"lng":0,"walkinAllowed":false,"whatsappNumber":"string"}, { status: 200 })), // FacilityCheckInController_save
+    http.get(`${baseUrl}/v1/facility/checkin-qr`, () => HttpResponse.json("AA==", { status: 200 })), // FacilityCheckInController_poster
     http.post(`${baseUrl}/v1/files/uploads`, () => HttpResponse.json({"maxBytes":0,"putUrl":"string","uploadId":"00000000-0000-7000-8000-000000000000"}, { status: 201 })), // FileController_init
     http.post(`${baseUrl}/v1/files/uploads/:id/complete`, () => HttpResponse.json({"fileId":"00000000-0000-7000-8000-000000000000","status":"string"}, { status: 202 })), // FileController_complete
     http.get(`${baseUrl}/v1/files/:id`, () => HttpResponse.json({"contentType":"string","createdAt":"2026-01-01T00:00:00Z","fileId":"00000000-0000-7000-8000-000000000000","sizeBytes":0,"status":"string"}, { status: 200 })), // FileController_get
     http.post(`${baseUrl}/v1/files/:id/download-url`, () => HttpResponse.json({"expiresAt":"2026-01-01T00:00:00Z","patientId":"00000000-0000-7000-8000-000000000000","url":"string"}, { status: 200 })), // AttachmentController_downloadUrl
+    http.get(`${baseUrl}/v1/front-desk/exceptions`, () => HttpResponse.json({"items":[{"actions":[],"createdAt":"2026-01-01T00:00:00Z","id":"00000000-0000-7000-8000-000000000000","kind":"string","params":{},"refId":"00000000-0000-7000-8000-000000000000","refType":"string","severity":"string","summary":"string"}],"nextCursor":"string"}, { status: 200 })), // DeskExceptionController_list
+    http.post(`${baseUrl}/v1/front-desk/exceptions/:id/:action`, () => HttpResponse.json({"id":"00000000-0000-7000-8000-000000000000","status":"string"}, { status: 200 })), // DeskExceptionController_act
     http.get(`${baseUrl}/v1/me/entitlements`, () => HttpResponse.json({"killedFeatures":["string"],"modules":[{"code":"string","enabled":false}],"seatLimit":0}, { status: 200 })), // MeEntitlementsController_get
     http.get(`${baseUrl}/v1/me/preferences`, () => HttpResponse.json({"clinicDefaultLocale":"string","digitStyle":"string","uiLocale":"string","uiTheme":"string"}, { status: 200 })), // MePreferencesController_get
     http.put(`${baseUrl}/v1/me/preferences`, () => HttpResponse.json({"digitStyle":"string","uiLocale":"string","uiTheme":"string"}, { status: 200 })), // MePreferencesController_put
@@ -440,4 +448,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 426;
+export const operationCount = 434;

@@ -66,6 +66,7 @@ schemas:
       decided_at: operational
       session_token: operational
       working_hours_id: operational
+      confirmed_at: operational
     booking_policy_versions:
       id: operational
       tenant_id: operational
@@ -77,6 +78,37 @@ schemas:
       published_by: operational
       published_at: operational
       updated_at: operational
+    desk_exceptions:
+      id: operational
+      tenant_id: operational
+      kind: operational
+      severity: operational
+      ref_type: operational
+      ref_id: operational
+      summary_params: operational
+      created_at: operational
+      resolved_at: operational
+      resolved_by: operational
+      resolution: operational
+      snoozed_until: operational
+    facility_checkin_settings:
+      tenant_id: operational
+      checkin_code: operational
+      geo_lat: operational
+      geo_lng: operational
+      geofence_required: operational
+      geofence_radius_m: operational
+      walkin_allowed: operational
+      wa_number: operational
+      updated_at: operational
+    checkin_attempts:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      channel: operational
+      distance_m: operational
+      outcome: operational
+      created_at: operational
     booking_request_details:
       appointment_id: operational
       tenant_id: operational

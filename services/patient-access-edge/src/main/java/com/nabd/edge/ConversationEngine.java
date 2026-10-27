@@ -81,7 +81,7 @@ public class ConversationEngine {
         Message msg = new Message(in.kind(), in.text(), action, messageId);
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             Conversation c = store.load(tenantId, channel, contact);
-            FlowHandler h = handlers.get(c.state());
+            FlowHandler h = handlers.get(CheckInFlow.claims(msg) ? State.CHECKIN : c.state()); // ACC-033: CHECKIN <code> and "I'm here" win in any state
             Outcome o = h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg);
             checkContext(o);
             switch (store.commit(c, o, messageId)) {

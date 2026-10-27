@@ -75,6 +75,8 @@ abstract class EdgeTestBase {
         UP.coreDelayMs = 0;
         UP.coreCalls.set(0);
         UP.relayed.clear();
+        UP.checkIns.clear();
+        UP.checkInReplies.clear();
         UP.consentStatus = 201;
         UP.noticeVersion = "v1";
         counting.invocations.set(0);

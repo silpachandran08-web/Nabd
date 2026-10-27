@@ -2516,6 +2516,65 @@ paths:
         "400": { description: "Problem `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours` or `off-grid` (each also carries code IN_PAST, CLINIC_CLOSED, DOCTOR_ON_LEAVE, OUTSIDE_HOURS, OFF_GRID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "Problem `slot-taken` (code SLOT_TAKEN; overlapping range, DB exclusion constraint) or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /front-desk/exceptions:
+    get:
+      tags: [Queue]
+      summary: "ACC-032. The front desk's exceptions inbox: open items that need a human, oldest first (snoozed items are hidden until their time). Each item: id, kind (checkin_failed, unconfirmed_booking, request_sla, checkout_unpaid, handoff), severity, refType, refId, summary (the template key), params (ids and codes only, no free text), actions, createdAt. Items close by themselves when the underlying state changes. Live: topic `exceptions` on GET /events."
+      x-required-permission: queue:view
+      parameters:
+        - { name: kind, in: query, required: false, schema: { type: string, enum: [checkin_failed, unconfirmed_booking, request_sla, checkout_unpaid, handoff] } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { description: "{ items, nextCursor }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /front-desk/exceptions/{id}/{action}:
+    post:
+      tags: [Queue]
+      summary: "ACC-032. Resolve or snooze an exception (action = resolve | snooze). Body { note?, snoozeMinutes? } (note is not stored; snoozeMinutes 1 to 480, default 30). Audited. Needs an Idempotency-Key."
+      x-required-permission: queue:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [resolve, snooze] } }
+      responses:
+        "200": { description: "{ id, status } (resolved | snoozed)", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `already-resolved` (code ALREADY_RESOLVED): someone resolved it first.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /facility/checkin-config:
+    get:
+      tags: [Queue]
+      summary: "ACC-033. The clinic's self check-in settings: checkinCode (null until first saved), lat/lng, geofenceRequired, geofenceRadiusM (default 200), walkinAllowed, whatsappNumber. The story names scheduling:configure; no such authority exists, setup:edit is used."
+      x-required-permission: setup:edit
+      responses:
+        "200": { description: "The settings", content: { application/json: { schema: { type: object } } } }
+    put:
+      tags: [Queue]
+      summary: "ACC-033. Save the self check-in settings (creates the clinic's check-in code on first save and keeps it afterwards). geofenceRequired needs lat and lng; geofenceRadiusM 20 to 5000; whatsappNumber 8 to 15 digits. Audited."
+      x-required-permission: setup:edit
+      responses:
+        "200": { description: "The saved settings", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /facility/checkin-qr:
+    get:
+      tags: [Queue]
+      summary: "ACC-033. The door poster: a QR whose text is the wa.me deep link with a prefilled 'CHECKIN <code>'. format=png (default) or pdf (A4)."
+      x-required-permission: setup:edit
+      parameters:
+        - { name: format, in: query, required: false, schema: { type: string, enum: [png, pdf], default: png } }
+      responses:
+        "200": { description: "The poster", content: { image/png: { schema: { type: string, format: binary } }, application/pdf: { schema: { type: string, format: binary } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: "Problem `checkin-not-configured` (code CHECKIN_NOT_CONFIGURED): no WhatsApp number saved yet.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /facility/checkin-attempts:
+    get:
+      tags: [Queue]
+      summary: "ACC-033. Recent self check-in attempts, newest first: id, appointmentId, channel, distanceM (the only trace of a shared location), outcome (checked_in, outside_geofence, no_appointment, duplicate), createdAt."
+      x-required-permission: queue:view
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { description: "Array of attempts", content: { application/json: { schema: { type: array, items: { type: object } } } } }
   /booking-requests:
     get:
       tags: [Queue]
@@ -3432,6 +3491,33 @@ paths:
         "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { description: "SUBJECT_GONE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/check-ins:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-033. Self check-in from the Edge. Same rules as the desk (arrived status, date check, token, one token per appointment). Body { appointmentId?, walkIn?: { doctorId }, patientRef, channel: qr|whatsapp|geofence, location?: { lat, lng, accuracyM } } (no appointmentId and no walkIn = the patient's appointment today). When the clinic requires the geofence the location must be within geofenceRadiusM (default 200 m; the fix's accuracy, capped at 100 m, is allowed for); outside, or no appointment today, nothing is issued and an item goes to the desk exceptions inbox. The location is never stored, only the distance in metres. Needs an Idempotency-Key."
+      x-required-permission: authenticated
+      responses:
+        "201": { description: "{ queueEntryId, token, position, expectedRange }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this identity, or the reference is not the patient's (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "ALREADY_CHECKED_IN (extra token, queueEntryId; no second token) or APPOINTMENT_NOT_TODAY", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "OUTSIDE_GEOFENCE, LOCATION_REQUIRED (share location first) or WALKIN_NOT_ALLOWED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/check-ins/context:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: query, required: false, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Queue]
+      summary: "ACC-033. What the Edge needs to start a check-in: { facilityCode, geofenceRequired, radiusM, walkinAllowed, candidates: [{ patientRef, firstName, appointmentId, checkedIn }] } for the household members of that phone who have an appointment today."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "The context", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/availability:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]

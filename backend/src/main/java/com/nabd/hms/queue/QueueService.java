@@ -83,12 +83,14 @@ public class QueueService {
     private final DoctorSessionService sessions;
     private final EtaService eta;
     private final ServiceTimeService serviceTimes;
+    private final DeskExceptions desk;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, OrganizationConfig departmentService, TenantContext tenantContext, ClinicClock clock,
                  com.nabd.hms.common.AuditService auditService,
                  com.nabd.hms.common.EventPublisher events, ActorDirectory actors,
-                 QueueEventRepository eventRepo, DoctorSessionService sessions, EtaService eta, ServiceTimeService serviceTimes) {
+                 QueueEventRepository eventRepo, DoctorSessionService sessions, EtaService eta, ServiceTimeService serviceTimes, DeskExceptions desk) {
+        this.desk = desk;
         this.eta = eta;
         this.serviceTimes = serviceTimes;
         this.eventRepo = eventRepo;
@@ -181,9 +183,12 @@ public class QueueService {
         if (req.appointmentId() != null) {
             events.publish(tenantId, DomainEventType.APPOINTMENT_ARRIVED, req.appointmentId(), java.util.Map.of(
                     "appointmentId", req.appointmentId(), "doctorId", req.doctorId(), "queueEntryId", id, "status", "arrived"));
+            desk.resolveRef(tenantId, req.appointmentId(), DeskExceptions.CHECKIN_FAILED, DeskExceptions.UNCONFIRMED); // ACC-032: the desk (or the patient) got them in
         }
-        var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
-        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+        // ACC-033: callerStaffId == null is the patient's own check-in through the Edge (same rules, other actor)
+        var actor = callerStaffId == null ? new ActorDirectory.Actor(null, InternalSchedulingService.ACTOR, "patient-access-edge", false)
+                : actors.findActor(tenantId, callerStaffId).orElseThrow();
+        auditService.record(tenantId, callerStaffId == null ? "system" : "staff", callerStaffId, actor.name(), actor.role(), null,
                 "queue.check_in", "queue_entry", id, null,
                 java.util.Map.of("doctorId", req.doctorId(), "tokenNumber", token, "source", source,
                         "appointmentId", req.appointmentId() == null ? "" : req.appointmentId().toString()));
@@ -382,7 +387,7 @@ public class QueueService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private void recordEvent(UUID tenantId, UUID entryId, String from, String to, String kind, Integer minutes, UUID callerStaffId, UUID doctorId) {
         eventRepo.record(tenantId, entryId, from, to, kind, minutes, clock.now(), callerStaffId,
-                callerStaffId.equals(doctorId) ? "doctor" : "desk");
+                callerStaffId == null ? "patient" : callerStaffId.equals(doctorId) ? "doctor" : "desk");
     }
 
     /** NB-143: the "alerts the doctor" half of the AC — a doctor (or anyone with queue:edit)
