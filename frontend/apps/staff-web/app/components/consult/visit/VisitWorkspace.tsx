@@ -98,6 +98,19 @@ export default function VisitWorkspace(w: WorkspaceProps) {
   };
   const transfer = useTransfer(authedFetch, entry, () => void close());
 
+  // FEF-034: Ctrl/Cmd+S = "Save draft" (same conditions as the button; the browser's own save-page is always suppressed here).
+  const canSaveNow = useRef(false);
+  useEffect(() => { canSaveNow.current = n.noteStatus !== "signed" && can("clinical:edit") && n.noteLoad === "ok" && n.saveState !== "saving" && !n.conflict && (n.dirty || n.saveState === "error"); });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();
+      if (canSaveNow.current) void n.saveNote();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }); // re-bound each render so saveNote is never a render old
+
   if (unavailable) {
     return (
       <main className={`${styles.page} ${styles.pageWide}`}>

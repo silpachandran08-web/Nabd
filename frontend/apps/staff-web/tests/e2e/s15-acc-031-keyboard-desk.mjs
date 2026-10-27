@@ -2,7 +2,7 @@
 // appointment < 15 s; tab order of the minimum dataset; shortcut sheet in the user's language; smart defaults; permission-absent;
 // no layout shift on token issue; 1366x768 and 390px; axe; zero console errors. The mouse is never used (mousedown counter must stay 0).
 // Needs `next start` (NABD_PSEUDO=1 not required). Run: NODE_PATH=/home/claude/ws/qa/node_modules APP=http://localhost:3808 node tests/e2e/s15-acc-031-keyboard-desk.mjs
-import { launch, seedClinic, mockApi, check, results, sleep, dumpLog, APP } from './qa-lib.mjs';
+import { launch, seedClinic, mockApi, check, results, sleep, dumpLog, APP, CORS } from './qa-lib.mjs';
 import { axeStep } from './smoke/harness.mjs';
 
 const DOC1 = '33333333-3333-3333-3333-333333333331', DOC2 = '33333333-3333-3333-3333-333333333332';
@@ -166,6 +166,8 @@ try {
   await s.page.keyboard.press('F2'); await s.page.waitForFunction(() => document.activeElement?.id === 'newName');
   check('E1 next walk-in starts with the last-used doctor and payment mode', (await s.page.locator('#doctor').inputValue()) === DOC2 && (await s.page.locator('#checkin-payment').inputValue()) === 'card', `${await s.page.locator('#doctor').inputValue()} / ${await s.page.locator('#checkin-payment').inputValue()}`);
   await s.page.evaluate(() => localStorage.setItem('nabd.desk.lastDoctor', 'someone-from-another-clinic'));
+  // FEF-034: with wait estimates loaded the desk now defaults to the shortest wait; this check is about the stale value, so there are none here.
+  await s.page.route(/\/v1\/queue\/wait-estimate/, (r) => r.fulfill({ status: 404, headers: CORS, contentType: 'application/problem+json', body: '{}' }));
   await s.page.keyboard.press('Escape'); await s.page.reload(); await s.page.waitForLoadState('networkidle').catch(() => {}); await sleep(600);
   await s.page.keyboard.press('F2'); await s.page.waitForFunction(() => document.activeElement?.id === 'newName');
   check('E2 a stored doctor that is not on the roster is ignored', (await s.page.locator('#doctor').inputValue()) === '');

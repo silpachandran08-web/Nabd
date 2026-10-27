@@ -154,3 +154,7 @@
 @media (max-width: 767px) {
   .kbd, .syncTime, .spacer, .iconBtn { display: none; } /* iconBtn = sidebar collapse: no sidebar below 768 */
 }
+
+.kbdBtn { font-family: inherit; cursor: pointer; }
+/* Phone and tablet reach walk-in from the nav / Ctrl+K; the bar has no room for a second action there. */
+@media (max-width: 767px) { .walkInBtn { display: none; } }

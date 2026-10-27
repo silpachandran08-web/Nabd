@@ -115,10 +115,12 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", d
     try {
       let patientId = s.selected?.id ?? registeredRef.current?.id ?? null;
       let patientName = s.selected?.name ?? registeredRef.current?.name ?? "";
-      const fields = { name: s.name, phone: s.phone, dob: s.dob, gender: s.gender };
-      if (!patientId && !v.submit(registerSchema(country, clinicToday()), fields, formRef.current)) return;
-      if (!v.submit(checkInSchema, { doctorId: s.doctorId }, formRef.current)) return;
+      // FEF-033: field errors on the fields (new patient + doctor together); the first problem also stays as the banner it always was.
+      const schema = patientId ? checkInSchema : registerSchema(country, clinicToday()).and(checkInSchema);
+      const values = patientId ? { doctorId: s.doctorId } : { name: s.name, phone: s.phone, dob: s.dob, gender: s.gender, doctorId: s.doctorId };
+      const fieldsOk = v.submit(schema, values, formRef.current);
       const problem = walkInProblem(s, !!patientId, minor);
+      if (!fieldsOk && !problem) return;
       if (problem) { dispatch({ type: "error", message: w(problem) }); return; }
       if (!patientId) {
         const regBody = registerBody({ ...s, phone: e164(s.phone, country) }, minor, confirmedNotDuplicate); // FEF-033: stored as E.164
