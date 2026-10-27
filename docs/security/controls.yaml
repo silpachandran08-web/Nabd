@@ -183,7 +183,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [Plt045TenantKeysApiTest]
     evidence: []
   - id: SC-19
     domain: "Cryptography"
@@ -305,7 +305,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
+    tests: [Idc004ConsentCaptureApiTest]
     evidence: []
   - id: SC-31
     domain: "Messaging"
