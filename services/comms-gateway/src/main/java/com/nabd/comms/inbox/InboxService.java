@@ -37,11 +37,13 @@ public class InboxService {
     public record Window(String state, Instant closesAt) {}
 
     public record ThreadItem(UUID id, UUID patientRef, List<UUID> familyPatientRefs, String displayName, String lastMessagePreview, int unread,
-                             long waitingMinutes, Window window, String mode, UUID assignedTo, boolean optedOut) {}
+                             long waitingMinutes, Window window, String mode, UUID assignedTo, boolean optedOut,
+                             boolean clinical, boolean clinicalSuggested) {}
 
     public record ThreadPage(List<ThreadItem> items, String nextCursor) {}
 
-    public record MessageItem(UUID id, String direction, String author, String text, String templateName, UUID mediaRef, String status, Instant at) {}
+    public record MessageItem(UUID id, String direction, String author, String text, String templateName, UUID mediaRef, String status, Instant at,
+                              UUID authorStaffRef) {}
 
     public record MessagePage(List<MessageItem> items, String nextCursor) {}
 
@@ -116,8 +118,9 @@ public class InboxService {
             }
             jdbc.update("""
                     UPDATE inbox_threads SET last_inbound_at = GREATEST(coalesce(last_inbound_at, '-infinity'), ?), unread_count = unread_count + 1,
-                      waiting_since = COALESCE(waiting_since, ?), state = 'open' WHERE id = ?""",
-                    Timestamp.from(m.receivedAt()), Timestamp.from(m.receivedAt()), threadId);
+                      waiting_since = COALESCE(waiting_since, ?), state = 'open',
+                      clinical_suggested = clinical_suggested OR (? AND NOT 'clinical' = ANY(tags)) WHERE id = ?""", // COM-032: a keyword only suggests the tag
+                    Timestamp.from(m.receivedAt()), Timestamp.from(m.receivedAt()), ClinicalText.suggestsClinical(m.text()), threadId);
             Map<String, Object> d = new LinkedHashMap<>();
             d.put("tenantId", tenantId.toString());
             d.put("inboundId", seq.get(0));
@@ -196,6 +199,7 @@ public class InboxService {
             case "unread" -> where.append(" AND t.unread_count > 0");
             case "needs_reply" -> where.append(" AND t.last_inbound_at IS NOT NULL AND (t.last_outbound_at IS NULL OR t.last_outbound_at < t.last_inbound_at)");
             case "bot" -> where.append(" AND t.mode = 'bot'");
+            case "clinical" -> where.append(" AND 'clinical' = ANY(t.tags)"); // COM-032: the nurse inbox's list
             case "closing" -> {
                 where.append(" AND t.window_expires_at > ? AND t.window_expires_at <= ?");
                 args.add(Timestamp.from(now));
@@ -212,7 +216,7 @@ public class InboxService {
         args.add(lim + 1);
         String sql = """
                 SELECT s.id, s.patient_ref, s.family_patient_refs, s.phone_enc, s.unread_count, s.waiting_since, s.window_expires_at, s.mode,
-                       s.assigned_staff_ref, s.opted_out, s.sk, p.kind, p.text_enc
+                       s.assigned_staff_ref, s.opted_out, s.sk, p.kind, p.text_enc, 'clinical' = ANY(s.tags), s.clinical_suggested
                 FROM (SELECT t.*, coalesce(t.waiting_since, 'infinity'::timestamptz)::text AS sk FROM inbox_threads t WHERE %s
                       ORDER BY coalesce(t.waiting_since, 'infinity'::timestamptz), t.id LIMIT ?) s
                 LEFT JOIN LATERAL (SELECT kind, text_enc FROM inbound_messages m WHERE m.thread_id = s.id ORDER BY received_at DESC LIMIT 1) p ON true
@@ -223,11 +227,13 @@ public class InboxService {
             return jdbc.query(sql, (rs, i) -> {
                 Timestamp waiting = rs.getTimestamp(6);
                 int unread = rs.getInt(5);
-                String preview = rs.getBytes(13) != null ? truncate(crypto.decrypt(rs.getBytes(13))) : rs.getString(12) == null ? "" : "[" + rs.getString(12) + "]";
+                boolean clinical = rs.getBoolean(14);
+                // lock-screen safe: a clinical thread never shows its text in the list
+                String preview = clinical ? "Clinical message" : rs.getBytes(13) != null ? truncate(crypto.decrypt(rs.getBytes(13))) : rs.getString(12) == null ? "" : "[" + rs.getString(12) + "]";
                 UUID[] fam = uuids(rs.getArray(3));
                 return new Raw(new ThreadItem(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), List.of(fam), mask(crypto.decrypt(rs.getBytes(4))), preview, unread,
                         waiting == null ? 0 : Math.max(0, Duration.between(waiting.toInstant(), now).toMinutes()), window(rs.getTimestamp(7), now),
-                        rs.getString(8), rs.getObject(9, UUID.class), rs.getBoolean(10)), rs.getString(11));
+                        rs.getString(8), rs.getObject(9, UUID.class), rs.getBoolean(10), clinical, rs.getBoolean(15)), rs.getString(11));
             }, args.toArray());
         });
         boolean more = rows.size() > lim;
@@ -248,10 +254,10 @@ public class InboxService {
         }
         args.add(lim + 1);
         String sql = """
-                SELECT m.id, m.dir, m.kind, m.text_enc, m.template_name, m.media_ref, m.status, m.at, m.at::text FROM (
-                  SELECT id, 'in' dir, kind, text_enc, NULL::text template_name, media_ref, NULL::text status, received_at at FROM inbound_messages WHERE thread_id = ?
+                SELECT m.id, m.dir, m.kind, m.text_enc, m.template_name, m.media_ref, m.status, m.at, m.at::text, m.staff FROM (
+                  SELECT id, 'in' dir, kind, text_enc, NULL::text template_name, media_ref, NULL::text status, received_at at, NULL::uuid staff FROM inbound_messages WHERE thread_id = ?
                   UNION ALL
-                  SELECT id, 'out', NULL, NULL, template_name, NULL::uuid, status, created_at FROM outbound_messages WHERE thread_id = ?) m
+                  SELECT id, 'out', NULL, free_text_enc, template_name, NULL::uuid, status, created_at, author_staff_ref FROM outbound_messages WHERE thread_id = ?) m
                 %s ORDER BY m.at DESC, m.id DESC LIMIT ?""".formatted(after);
         record Raw(MessageItem item, String at) {}
         List<Raw> rows = tx.execute(s -> {
@@ -262,8 +268,9 @@ public class InboxService {
             return jdbc.query(sql, (rs, i) -> {
                 boolean in = "in".equals(rs.getString(2));
                 String text = rs.getBytes(4) == null ? null : crypto.decrypt(rs.getBytes(4));
-                return new Raw(new MessageItem(rs.getObject(1, UUID.class), in ? "in" : "out", in ? "patient" : "template", text, rs.getString(5),
-                        rs.getObject(6, UUID.class), rs.getString(7), rs.getTimestamp(8).toInstant()), rs.getString(9));
+                UUID staff = rs.getObject(10, UUID.class);
+                return new Raw(new MessageItem(rs.getObject(1, UUID.class), in ? "in" : "out", in ? "patient" : staff != null ? "staff" : "template", text, rs.getString(5),
+                        rs.getObject(6, UUID.class), rs.getString(7), rs.getTimestamp(8).toInstant(), staff), rs.getString(9));
             }, args.toArray());
         });
         boolean more = rows.size() > lim;
@@ -302,7 +309,7 @@ public class InboxService {
     }
 
     private static String truncate(String t) {
-        return t.length() <= 80 ? t : t.substring(0, 80);
+        return t.length() <= 60 ? t : t.substring(0, 60);
     }
 
     private static String encode(String at, UUID id) {

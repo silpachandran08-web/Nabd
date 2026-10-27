@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Problem+JSON with a stable "code" (e.g. SESSION_WINDOW_CLOSED); no request values in the body. */
-@RestControllerAdvice(assignableTypes = InboxInternalController.class)
+@RestControllerAdvice(assignableTypes = {InboxInternalController.class, InboxActionsController.class})
 @ConditionalOnProperty("comms.field-key")
 class InboxErrors {
     @ExceptionHandler(InboxException.class)
