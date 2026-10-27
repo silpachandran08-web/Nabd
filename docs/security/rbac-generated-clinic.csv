@@ -74,6 +74,7 @@ owner,GET /v1/doctors/{id}/availability,queue:view,allow
 owner,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 owner,GET /v1/doctors/{id}/delay,queue:view,allow
 owner,GET /v1/doctors/{id}/leave,queue:view,allow
+owner,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allow
 owner,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner,GET /v1/doctors/{id}/session,queue:view,allow
 owner,GET /v1/doctors/{id}/working-hours,queue:view,allow
@@ -219,6 +220,7 @@ owner,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_prov
 owner,POST /v1/abha/enrol,patients:edit,allow
 owner,POST /v1/appointments,queue:create,allow
 owner,POST /v1/appointments/{id}/cancel,queue:edit,allow
+owner,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 owner,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 owner,POST /v1/auth/break-glass/activate,clinical:breakGlass,allow
 owner,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
@@ -340,6 +342,7 @@ owner,POST /v1/support-access/requests/{id}/decision,compliance:approve,allow
 owner,POST /v1/waitlist,queue:create,allow
 owner,POST /v1/waitlist/{id}/accept,queue:edit,allow
 owner,PUT /v1/booking-policy/draft,setup:edit,allow
+owner,PUT /v1/clinic/settings/day-start,setup:edit,allow
 owner,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
 owner,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 owner,PUT /v1/doctors/{id}/queue-settings,setup:edit,allow
@@ -428,6 +431,7 @@ owner_doctor,GET /v1/doctors/{id}/availability,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/delay,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/leave,queue:view,allow
+owner_doctor,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/session,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
@@ -573,6 +577,7 @@ owner_doctor,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboardi
 owner_doctor,POST /v1/abha/enrol,patients:edit,allow
 owner_doctor,POST /v1/appointments,queue:create,allow
 owner_doctor,POST /v1/appointments/{id}/cancel,queue:edit,allow
+owner_doctor,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 owner_doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 owner_doctor,POST /v1/auth/break-glass/activate,clinical:breakGlass,allow
 owner_doctor,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
@@ -694,6 +699,7 @@ owner_doctor,POST /v1/support-access/requests/{id}/decision,compliance:approve,a
 owner_doctor,POST /v1/waitlist,queue:create,allow
 owner_doctor,POST /v1/waitlist/{id}/accept,queue:edit,allow
 owner_doctor,PUT /v1/booking-policy/draft,setup:edit,allow
+owner_doctor,PUT /v1/clinic/settings/day-start,setup:edit,allow
 owner_doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 owner_doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 owner_doctor,PUT /v1/doctors/{id}/queue-settings,setup:edit,allow
@@ -782,6 +788,7 @@ doctor,GET /v1/doctors/{id}/availability,queue:view,allow
 doctor,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 doctor,GET /v1/doctors/{id}/delay,queue:view,allow
 doctor,GET /v1/doctors/{id}/leave,queue:view,allow
+doctor,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allow
 doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 doctor,GET /v1/doctors/{id}/session,queue:view,allow
 doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
@@ -927,6 +934,7 @@ doctor,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_pro
 doctor,POST /v1/abha/enrol,patients:edit,allow
 doctor,POST /v1/appointments,queue:create,deny-403
 doctor,POST /v1/appointments/{id}/cancel,queue:edit,allow
+doctor,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 doctor,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 doctor,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-403
@@ -1048,6 +1056,7 @@ doctor,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-40
 doctor,POST /v1/waitlist,queue:create,deny-403
 doctor,POST /v1/waitlist/{id}/accept,queue:edit,allow
 doctor,PUT /v1/booking-policy/draft,setup:edit,deny-403
+doctor,PUT /v1/clinic/settings/day-start,setup:edit,deny-403
 doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 doctor,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
@@ -1136,6 +1145,7 @@ nurse,GET /v1/doctors/{id}/availability,queue:view,allow
 nurse,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 nurse,GET /v1/doctors/{id}/delay,queue:view,allow
 nurse,GET /v1/doctors/{id}/leave,queue:view,allow
+nurse,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allow
 nurse,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 nurse,GET /v1/doctors/{id}/session,queue:view,allow
 nurse,GET /v1/doctors/{id}/working-hours,queue:view,allow
@@ -1281,6 +1291,7 @@ nurse,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_prov
 nurse,POST /v1/abha/enrol,patients:edit,allow
 nurse,POST /v1/appointments,queue:create,deny-403
 nurse,POST /v1/appointments/{id}/cancel,queue:edit,allow
+nurse,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 nurse,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 nurse,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 nurse,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-403
@@ -1402,6 +1413,7 @@ nurse,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-403
 nurse,POST /v1/waitlist,queue:create,deny-403
 nurse,POST /v1/waitlist/{id}/accept,queue:edit,allow
 nurse,PUT /v1/booking-policy/draft,setup:edit,deny-403
+nurse,PUT /v1/clinic/settings/day-start,setup:edit,deny-403
 nurse,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 nurse,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
@@ -1490,6 +1502,7 @@ receptionist,GET /v1/doctors/{id}/availability,queue:view,allow
 receptionist,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 receptionist,GET /v1/doctors/{id}/delay,queue:view,allow
 receptionist,GET /v1/doctors/{id}/leave,queue:view,allow
+receptionist,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allow
 receptionist,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 receptionist,GET /v1/doctors/{id}/session,queue:view,allow
 receptionist,GET /v1/doctors/{id}/working-hours,queue:view,allow
@@ -1635,6 +1648,7 @@ receptionist,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboardi
 receptionist,POST /v1/abha/enrol,patients:edit,allow
 receptionist,POST /v1/appointments,queue:create,allow
 receptionist,POST /v1/appointments/{id}/cancel,queue:edit,allow
+receptionist,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 receptionist,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 receptionist,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 receptionist,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
@@ -1756,6 +1770,7 @@ receptionist,POST /v1/support-access/requests/{id}/decision,compliance:approve,d
 receptionist,POST /v1/waitlist,queue:create,allow
 receptionist,POST /v1/waitlist/{id}/accept,queue:edit,allow
 receptionist,PUT /v1/booking-policy/draft,setup:edit,deny-403
+receptionist,PUT /v1/clinic/settings/day-start,setup:edit,deny-403
 receptionist,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
 receptionist,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 receptionist,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
@@ -1844,6 +1859,7 @@ frontdesk_vitals,GET /v1/doctors/{id}/availability,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/delay,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/leave,queue:view,allow
+frontdesk_vitals,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/session,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/working-hours,queue:view,allow
@@ -1989,6 +2005,7 @@ frontdesk_vitals,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onbo
 frontdesk_vitals,POST /v1/abha/enrol,patients:edit,allow
 frontdesk_vitals,POST /v1/appointments,queue:create,allow
 frontdesk_vitals,POST /v1/appointments/{id}/cancel,queue:edit,allow
+frontdesk_vitals,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 frontdesk_vitals,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 frontdesk_vitals,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 frontdesk_vitals,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
@@ -2110,6 +2127,7 @@ frontdesk_vitals,POST /v1/support-access/requests/{id}/decision,compliance:appro
 frontdesk_vitals,POST /v1/waitlist,queue:create,allow
 frontdesk_vitals,POST /v1/waitlist/{id}/accept,queue:edit,allow
 frontdesk_vitals,PUT /v1/booking-policy/draft,setup:edit,deny-403
+frontdesk_vitals,PUT /v1/clinic/settings/day-start,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 frontdesk_vitals,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403

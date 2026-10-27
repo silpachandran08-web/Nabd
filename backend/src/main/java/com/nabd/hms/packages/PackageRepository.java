@@ -118,7 +118,7 @@ class PackageRepository {
                         "JOIN staff s ON s.id = ed.doctor_id " +
                         "JOIN doctor_leave dl ON dl.doctor_id = ed.doctor_id " +
                         "WHERE p.tenant_id = ? AND ed.package_id = ? AND dl.tenant_id = ? " +
-                        "AND ?::date BETWEEN dl.date_from AND dl.date_to LIMIT 1",
+                        "AND ?::date BETWEEN dl.date_from AND dl.date_to AND dl.start_time IS NULL LIMIT 1", // ACC-005: a part-day leave does not block the whole day
                 (rs, i) -> rs.getString("name"), tenantId, packageId, tenantId, java.sql.Date.valueOf(clock.today(tenantId))).stream().findFirst();
     }
 

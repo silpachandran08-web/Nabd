@@ -43,7 +43,7 @@ public class DoctorSessionService {
             throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found", "That doctor doesn't exist in this clinic.");
         }
         Instant now = clock.now();
-        LocalDate day = clock.today(tenantId);
+        LocalDate day = clock.clinicDate(tenantId);
         var open = repo.lockOpen(tenantId, doctorId, day);
         switch (action) {
             case "start" -> {
@@ -74,7 +74,7 @@ public class DoctorSessionService {
 
     @Transactional
     public DoctorSessionResponse today(UUID tenantId, UUID doctorId) {
-        return repo.latest(tenantId, doctorId, clock.today(tenantId))
+        return repo.latest(tenantId, doctorId, clock.clinicDate(tenantId))
                 .map(s -> new DoctorSessionResponse(s.id(), s.state(), s.since()))
                 .orElse(new DoctorSessionResponse(null, "out", null));
     }
@@ -82,7 +82,7 @@ public class DoctorSessionService {
     /** The first in_consult of the day starts the session if the doctor forgot. Runs in the move's transaction. */
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     void startIfNone(UUID tenantId, UUID doctorId, Instant at) {
-        LocalDate day = clock.today(tenantId);
+        LocalDate day = clock.clinicDate(tenantId);
         if (repo.open(tenantId, doctorId, day, at)) publish(tenantId, doctorId, "in");
     }
 

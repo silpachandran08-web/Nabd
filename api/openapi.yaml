@@ -1347,6 +1347,21 @@ paths:
                             nsnLength: { type: array, items: { type: integer } }
                         cell: { type: string }
 
+  /clinic/settings/day-start:
+    put:
+      tags: [Setup]
+      summary: "ACC-005. Set when the clinic day starts (00:00 to 05:59, default 04:00); a session after midnight before this time stays on the previous clinic day. Needs a fresh step-up token (X-Step-Up-Token). 409 SESSIONS_CONFLICT when an overnight block would end after the new start."
+      x-required-permission: setup:edit
+      parameters:
+        - { name: X-Step-Up-Token, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [dayStart], properties: { dayStart: { type: string, pattern: "^[0-5][0-9]:[0-5][0-9]$", example: "04:00" } } } } }
+      responses:
+        "200": { description: "{ dayStart, effectiveFromClinicDate }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: "SESSIONS_CONFLICT (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/profile:
     get:
       tags: [Setup]
@@ -2354,6 +2369,18 @@ paths:
       responses:
         "201": { description: "Leave recorded", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorLeave" } } } }
 
+  /doctors/{id}/leave/{leaveId}/affected-appointments:
+    get:
+      tags: [Queue]
+      summary: "ACC-006. The confirmed bookings a leave block covers, each with the three nearest valid free times (same doctor), whether the patient agreed to messages (channelConsent), and the newest offer's status (sent, accepted, expired, superseded; null = none). patientRef is the Edge's opaque reference; patientId only links to the patient page. shortcut: same-doctor alternatives only."
+      x-required-permission: queue:view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: leaveId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "{ items: [{ appointmentId, patientId, patientRef, start, channelConsent, alternatives, offerStatus }] }", content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /doctors/{id}/delay:
     get:
       tags: [Queue]
@@ -2583,6 +2610,23 @@ paths:
         "200": { description: "Appointment (ETag header W/\"<change_seq>\", OPS-006)", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "304": { description: "Unchanged since the If-None-Match tag; no body" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /appointments/{id}/offer-alternatives:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-006. One tap: send the patient up to three other times for a confirmed booking (slots omitted = the nearest three). The offer lasts 2 hours and replaces any open offer for the booking. The desk types no text. The patient's tap arrives through the internal change-offers accept call."
+      x-required-permission: queue:edit
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { slots: { type: array, minItems: 1, maxItems: 3, items: { type: string, format: date-time } } } } } }
+      responses:
+        "202": { description: "{ offerId, slots, expiresAt }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "APPOINTMENT_NOT_SCHEDULED, NO_ALTERNATIVES or SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "NO_MESSAGING_CONSENT: call the patient instead (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}/cancel:
     post:
@@ -3547,6 +3591,26 @@ paths:
         "403": { description: "Tenant not allowed, or not this patient's request (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "ALREADY_DECIDED (offer closed, expired or request decided) or SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/change-offers/{offerId}/accept:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: offerId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Queue]
+      summary: "ACC-006. The patient picked one of the offered times: books it, cancels the old booking with reason clinic_initiated and closes the offer. A repeated tap returns the same answer. 409 SLOT_TAKEN carries nextAlternative when the time went meanwhile. Idempotency-Key required."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [slotStart], properties: { slotStart: { type: string, format: date-time } } } } }
+      responses:
+        "200": { description: "{ newAppointmentId, status: CONFIRMED }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "SLOT_TAKEN (may carry nextAlternative) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "410": { description: "OFFER_EXPIRED: expired, superseded or the booking is no longer scheduled (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /tenants/{tid}/appointments/{id}/{action}:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters:
@@ -6694,7 +6758,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/WorkingHoursWrite"
         - type: object
-          properties: { id: { type: string, format: uuid } }
+          properties: { id: { type: string, format: uuid }, endsNextDay: { type: boolean, description: "ACC-005: endTime is on the next calendar day (shown as +1); it must be at or before the clinic day start" } }
 
     DoctorLeaveWrite:
       type: object
@@ -6703,12 +6767,16 @@ components:
         dateFrom: { type: string, format: date }
         dateTo: { type: string, format: date }
         reason: { type: string }
+        startTime: { type: string, format: time, description: "ACC-005: with endTime, part-day leave inside one clinic day (dateFrom = dateTo); omit both for whole days" }
+        endTime: { type: string, format: time }
 
     DoctorLeave:
       allOf:
         - $ref: "#/components/schemas/DoctorLeaveWrite"
         - type: object
-          properties: { id: { type: string, format: uuid } }
+          properties:
+            id: { type: string, format: uuid }
+            affectedAppointments: { type: array, description: "ACC-006: set when the leave is added; the live bookings it covers", items: { type: object, properties: { id: { type: string, format: uuid }, start: { type: string, format: date-time } } } }
 
     AppointmentWrite:
       type: object

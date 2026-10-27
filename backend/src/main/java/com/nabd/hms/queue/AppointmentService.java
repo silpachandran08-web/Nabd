@@ -48,11 +48,13 @@ public class AppointmentService {
     private final SlotValidator slotValidator;
     private final EventPublisher events;
     private final com.nabd.hms.shared.notify.NotificationPort notifications;
+    private final AppointmentChangeNotifier changeNotifier;
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
                         SlotValidator slotValidator, EventPublisher events,
-                        com.nabd.hms.shared.notify.NotificationPort notifications) {
+                        com.nabd.hms.shared.notify.NotificationPort notifications, AppointmentChangeNotifier changeNotifier) {
+        this.changeNotifier = changeNotifier;
         this.events = events;
         this.notifications = notifications;
         this.slotValidator = slotValidator;
@@ -70,9 +72,9 @@ public class AppointmentService {
         tenantContext.set(tenantId);
         requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
         ZoneId zone = clock.zone(tenantId);
-        LocalDate day = req.startTime().atZone(zone).toLocalDate();
-        Optional<WorkingHoursRow> tokenBlock = scheduleRepo.findBlockCovering(req.doctorId(), day.getDayOfWeek().getValue() % 7,
-                req.startTime().atZone(zone).toLocalTime()).filter(b -> SessionModes.TOKEN.equals(SessionModes.modeOn(b, day)));
+        LocalDate day = clock.clinicDate(tenantId, req.startTime()); // ACC-005
+        Optional<WorkingHoursRow> tokenBlock = scheduleRepo.blockAt(tenantId, req.doctorId(), req.startTime())
+                .filter(b -> SessionModes.TOKEN.equals(SessionModes.modeOn(b, day)));
         if (tokenBlock.isPresent()) {
             return bookToken(tenantId, callerStaffId, req, tokenBlock.get(), day, zone);
         }
@@ -96,8 +98,8 @@ public class AppointmentService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private AppointmentResponse bookToken(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req, WorkingHoursRow block,
                                           LocalDate day, ZoneId zone) {
-        Instant start = day.atTime(block.startTime()).atZone(zone).toInstant();
-        Instant end = day.atTime(block.endTime()).atZone(zone).toInstant();
+        Instant start = clock.atSecond(tenantId, day, block.startSecond());
+        Instant end = clock.atSecond(tenantId, day, block.endSecond());
         slotValidator.validateToken(tenantId, req.doctorId(), block, day, end, clock.now());
         queueRepo.lockDoctorDay(tenantId, req.doctorId(), day);
         enforceCapacity(tenantId, req.doctorId(), day, block, zone);
@@ -113,7 +115,8 @@ public class AppointmentService {
     public AppointmentPage list(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date, int limit, String cursor) {
         tenantContext.set(tenantId);
         Cursor after = cursor == null ? null : Cursor.decode(cursor);
-        List<AppointmentRow> rows = repo.listPage(tenantId, doctorId, patientId, date, clock.zone(tenantId), limit + 1,
+        List<AppointmentRow> rows = repo.listPage(tenantId, doctorId, patientId, date == null ? null : clock.dayStart(tenantId, date),
+                date == null ? null : clock.dayStart(tenantId, date.plusDays(1)), limit + 1,
                 after == null ? null : after.createdAt(), after == null ? null : after.id());
 
         boolean hasMore = rows.size() > limit;
@@ -143,9 +146,30 @@ public class AppointmentService {
         repo.cancel(tenantId, id, req.reason());
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED); // COM-004: reminders about it are void
         log.info("appointment {} cancelled by {}", id, callerStaffId);
-        published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled", Map.of());
+        published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled",
+                Map.of("by", callerStaffId == null ? "system" : "staff", "reasonCode", reasonCode(req.reason())));
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
+        if (callerStaffId != null) {
+            changeNotifier.cancelled(tenantId, id, current.patientId(), current.startTime()); // ACC-006
+        }
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** ACC-006: the old booking after the patient took an offered alternative. No notice: the patient just chose the new time. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    void cancelClinicInitiated(UUID tenantId, AppointmentRow current) {
+        repo.cancel(tenantId, current.id(), "clinic_initiated");
+        notifications.cancelBySubject("appointment", current.id(), com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED);
+        published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, current.id(), current.doctorId(), current.startTime(), "cancelled",
+                Map.of("by", "system", "reasonCode", "clinic_initiated"));
+        waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
+    }
+
+    /** The free-text desk reason as an event code ([a-z0-9_]{3,40}); shortcut: the code is derived, not picked, until the desk sends coded reasons. */
+    static String reasonCode(String reason) {
+        String c = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        c = c.length() > 40 ? c.substring(0, 40).replaceAll("_+$", "") : c;
+        return c.length() < 3 ? "other" : c;
     }
 
     @Transactional
@@ -163,8 +187,12 @@ public class AppointmentService {
             UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp(), callerStaffId == null ? "system" : "staff");
             log.info("appointment {} rescheduled to {} (new id {}) by {}", id, req.newStartTime(), newId, callerStaffId);
             published(tenantId, DomainEventType.APPOINTMENT_RESCHEDULED, newId, current.doctorId(), req.newStartTime(), "scheduled",
-                    Map.of("previousAppointmentId", id, "previousStartTime", current.startTime()));
+                    Map.of("previousAppointmentId", id, "previousStartTime", current.startTime(),
+                            "by", callerStaffId == null ? "system" : "staff", "reasonCode", "rescheduled"));
             waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
+            if (callerStaffId != null) {
+                changeNotifier.moved(tenantId, newId, current.patientId(), req.newStartTime()); // ACC-006
+            }
             return toResponse(repo.findById(tenantId, newId).orElseThrow());
         } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
             // rolls back the cancel too — no reason to leave the old slot released if the new one failed
@@ -219,11 +247,8 @@ public class AppointmentService {
      */
     void enforceSessionCapacity(UUID tenantId, UUID doctorId, Instant start) {
         ZoneId zone = clock.zone(tenantId);
-        LocalDate date = start.atZone(zone).toLocalDate();
-        int dayOfWeek = date.getDayOfWeek().getValue() % 7;
-        LocalTime time = start.atZone(zone).toLocalTime();
-
-        Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time);
+        LocalDate date = clock.clinicDate(tenantId, start);
+        Optional<WorkingHoursRow> block = scheduleRepo.blockAt(tenantId, doctorId, start);
         if (block.isEmpty() || (block.get().maxPatients() == null && block.get().onlineCap() == null)) {
             return;
         }
@@ -235,14 +260,14 @@ public class AppointmentService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private void enforceCapacity(UUID tenantId, UUID doctorId, LocalDate date, WorkingHoursRow block, ZoneId zone) {
         if (block.onlineCap() != null
-                && scheduleRepo.countSessionBookings(tenantId, doctorId, date, block.startTime(), block.endTime(), zone) >= block.onlineCap()) {
+                && scheduleRepo.countSessionBookings(tenantId, doctorId, date, block) >= block.onlineCap()) {
             log.warn("online cap reached: doctor {} on {} (cap {})", doctorId, date, block.onlineCap());
             throw sessionFull(true);
         }
         if (block.maxPatients() == null) {
             return;
         }
-        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.startTime(), block.endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block);
         if (occupancy >= block.maxPatients()) {
             log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.maxPatients());
             throw sessionFull(false);

@@ -59,7 +59,7 @@ public class EtaController {
     public Response get(@RequestParam UUID doctorId,
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         UUID tid = tenantContext.current();
-        EtaService.Day d = eta.day(doctorId, date != null ? date : clock.today(tid));
+        EtaService.Day d = eta.day(doctorId, date != null ? date : clock.clinicDate(tid));
         return new Response(d.v(), d.results().stream()
                 .map(r -> new Item(r.entryId(), r.appointmentId(), r.position(), r.p50At(), r.p80At(), eta.label(r))).toList());
     }
@@ -73,7 +73,7 @@ public class EtaController {
         }
         return tenantScope.run(tid, () -> {
             var appt = appointments.findById(tid, appointmentId).orElseThrow(EtaController::notFound);
-            LocalDate day = appt.startTime().atZone(clock.zone(tid)).toLocalDate();
+            LocalDate day = clock.clinicDate(tid, appt.startTime());
             EtaService.Day d = eta.day(appt.doctorId(), day);
             Result r = d.results().stream().filter(x -> appointmentId.equals(x.appointmentId())).findFirst().orElseThrow(EtaController::notFound);
             String label = eta.label(r);

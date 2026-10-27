@@ -91,7 +91,7 @@ public class ClinicClock {
         }
         String[] row = load(tenantId);
         if (row == null) {
-            return new String[2]; // unknown tenant: never cached
+            return new String[3]; // unknown tenant: never cached
         }
         if (key != null) {
             // shortcut: a load racing an eviction can put the old row back until the TTL; a version check if that ever matters
@@ -103,8 +103,8 @@ public class ClinicClock {
     private String[] load(UUID tenantId) {
         // a list of String[] because a null timezone in a List<String> made findFirst() throw (500 on /schedule/day)
         // timezone is NOT NULL (V1991); the region default is the safety net for a row written with triggers off
-        return jdbc.query("SELECT COALESCE(t.timezone, r.default_timezone), t.region_code FROM tenants t LEFT JOIN regions r ON r.code = t.region_code WHERE t.id = ?",
-                (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, tenantId).stream().findFirst().orElse(null);
+        return jdbc.query("SELECT COALESCE(t.timezone, r.default_timezone), t.region_code, t.day_start_minute::text FROM tenants t LEFT JOIN regions r ON r.code = t.region_code WHERE t.id = ?",
+                (rs, i) -> new String[] {rs.getString(1), rs.getString(2), rs.getString(3)}, tenantId).stream().findFirst().orElse(null);
     }
 
     /** Built by CacheKeyPolicy: tenants.timezone/region are operational, so this never refuses (ADR-04 gate). */
@@ -114,6 +114,36 @@ public class ClinicClock {
 
     public LocalDate today(UUID tenantId) {
         return today(zone(tenantId));
+    }
+
+    /** ACC-005: minutes after local midnight at which the clinic day starts (default 240 = 04:00). */
+    public int dayStartMinute(UUID tenantId) {
+        String m = tenantRow(tenantId)[2];
+        return m == null ? 0 : Integer.parseInt(m);
+    }
+
+    /** ACC-005: the clinic date of an instant = the local date of (instant - day start); 00:30 after an evening session is still yesterday. */
+    public LocalDate clinicDate(UUID tenantId, Instant at) {
+        return at.atZone(zone(tenantId)).minusMinutes(dayStartMinute(tenantId)).toLocalDate();
+    }
+
+    public LocalDate clinicDate(UUID tenantId) {
+        return clinicDate(tenantId, now());
+    }
+
+    /** First instant of a clinic date (its local midnight + the day start); the range is [dayStart(d), dayStart(d + 1 day)). */
+    public Instant dayStart(UUID tenantId, LocalDate clinicDate) {
+        return clinicDate.atStartOfDay().plusMinutes(dayStartMinute(tenantId)).atZone(zone(tenantId)).toInstant();
+    }
+
+    /** Seconds from the local midnight of the clinic date; 00:30 on the next calendar day is 88200 (minute 1470), as an overnight block counts it. */
+    public int secondOfClinicDay(UUID tenantId, LocalDate clinicDate, Instant at) {
+        return (int) java.time.temporal.ChronoUnit.SECONDS.between(clinicDate.atStartOfDay(), at.atZone(zone(tenantId)).toLocalDateTime());
+    }
+
+    /** The instant {@code second} seconds after the local midnight of a clinic date (may be >= 86400). */
+    public Instant atSecond(UUID tenantId, LocalDate clinicDate, int second) {
+        return clinicDate.atStartOfDay().plusSeconds(second).atZone(zone(tenantId)).toInstant();
     }
 
     public LocalDate today(ZoneId zone) {

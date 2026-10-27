@@ -104,7 +104,7 @@ public class WaitlistService {
             log.info("freed slot {} of doctor {} starts within {} min or is past: not offered", freedSlotStart, doctorId, minLeadMinutes);
             return;
         }
-        queueRepo.lockDoctorDay(tenantId, doctorId, freedSlotStart.atZone(clock.zone(tenantId)).toLocalDate()); // same lock as booking
+        queueRepo.lockDoctorDay(tenantId, doctorId, clock.clinicDate(tenantId, freedSlotStart)); // same lock as booking
         repo.findOldestWaiting(tenantId, doctorId).ifPresent(entry -> {
             Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
             repo.offer(tenantId, entry.id(), freedSlotStart, expiresAt);
@@ -254,15 +254,13 @@ public class WaitlistService {
 
     /** Same NB-098 rule and advisory lock as AppointmentService.enforceSessionCapacity(). */
     private void enforceSessionCapacity(UUID tenantId, UUID doctorId, Instant start, ZoneId zone) {
-        LocalDate date = start.atZone(zone).toLocalDate();
-        int dayOfWeek = date.getDayOfWeek().getValue() % 7;
-        LocalTime time = start.atZone(zone).toLocalTime();
-        Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time);
+        LocalDate date = clock.clinicDate(tenantId, start);
+        Optional<WorkingHoursRow> block = scheduleRepo.blockAt(tenantId, doctorId, start);
         if (block.isEmpty() || block.get().maxPatients() == null) {
             return;
         }
         queueRepo.lockDoctorDay(tenantId, doctorId, date);
-        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get());
         if (occupancy >= block.get().maxPatients()) {
             throw new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
                     "This session has reached its patient cap (walk-ins and bookings counted together).", Map.of("code", "SESSION_FULL"));
@@ -283,10 +281,7 @@ public class WaitlistService {
     }
 
     private int resolveSlotMinutes(UUID tenantId, UUID doctorId, Instant start) {
-        java.time.ZonedDateTime local = start.atZone(clock.zone(tenantId));
-        int dayOfWeek = local.getDayOfWeek().getValue() % 7;
-        LocalTime time = local.toLocalTime();
-        return scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time)
+        return scheduleRepo.blockAt(tenantId, doctorId, start)
                 .map(WorkingHoursRow::slotMinutes)
                 .orElse(DEFAULT_SLOT_MINUTES);
     }

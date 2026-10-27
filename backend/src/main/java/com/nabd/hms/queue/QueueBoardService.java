@@ -17,8 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -79,7 +77,7 @@ class QueueBoardService {
     @Transactional
     public Board board(LocalDate date, UUID departmentId) {
         UUID tenantId = tenantContext.current();
-        LocalDate day = date == null ? clock.today(tenantId) : date;
+        LocalDate day = date == null ? clock.clinicDate(tenantId) : date;
         var doctors = repo.doctors(tenantId, day, departmentId);
         var byDoctor = new LinkedHashMap<UUID, List<QueueBoardRepository.EntryRow>>();
         repo.entries(tenantId, day, departmentId).forEach(e -> byDoctor.computeIfAbsent(e.doctorId(), k -> new ArrayList<>()).add(e));
@@ -168,11 +166,9 @@ class QueueBoardService {
     /** Same session cap a walk-in check-in meets (NB-098), applied to the target doctor. */
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always inside the caller's tx
     private void enforceSessionCapacity(UUID tenantId, UUID doctorId, LocalDate today) {
-        ZoneId zone = clock.zone(tenantId);
-        LocalTime now = clock.now().atZone(zone).toLocalTime();
-        var block = scheduleRepo.findBlockCovering(doctorId, today.getDayOfWeek().getValue() % 7, now);
+        var block = scheduleRepo.blockAt(tenantId, doctorId, clock.now()); // ACC-005: today is the clinic date
         if (block.isPresent() && block.get().maxPatients() != null
-                && scheduleRepo.countSessionOccupancy(tenantId, doctorId, today, block.get().startTime(), block.get().endTime(), zone) >= block.get().maxPatients()) {
+                && scheduleRepo.countSessionOccupancy(tenantId, doctorId, today, block.get()) >= block.get().maxPatients()) {
             throw new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
                     "That doctor's session has reached its patient cap.", Map.of("code", "SESSION_FULL"));
         }

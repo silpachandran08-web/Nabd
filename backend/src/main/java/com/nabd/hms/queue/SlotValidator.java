@@ -42,7 +42,7 @@ class SlotValidator {
      */
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     void requireNoLiveOffer(UUID tenantId, UUID doctorId, Instant start, UUID exceptEntryId) {
-        queueRepo.lockDoctorDay(tenantId, doctorId, start.atZone(clock.zone(tenantId)).toLocalDate());
+        queueRepo.lockDoctorDay(tenantId, doctorId, clock.clinicDate(tenantId, start));
         waitlistRepo.liveOfferExpiry(tenantId, doctorId, start, exceptEntryId).ifPresent(expiresAt -> {
             throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
                     "This slot is currently offered to a patient on the waitlist.",
@@ -52,33 +52,34 @@ class SlotValidator {
 
     /** Returns the slot length in minutes, or throws the Problem naming the first broken rule. */
     int validate(UUID tenantId, UUID doctorId, Instant start, Instant now) {
-        ZoneId zone = clock.zone(tenantId);
-        ZonedDateTime local = start.atZone(zone);
-        LocalDate date = local.toLocalDate();
+        LocalDate date = clock.clinicDate(tenantId, start); // ACC-005: 00:30 after an evening session is still the session's day
         if (scheduleRepo.isOnLeave(doctorId, date)) {
             throw refuse("doctor-on-leave", "DOCTOR_ON_LEAVE", "Doctor on leave", "The doctor is on leave on " + date + ".");
         }
-        LocalTime time = local.toLocalTime();
-        WorkingHoursRow block = scheduleRepo.findBlockCovering(doctorId, local.getDayOfWeek().getValue() % 7, time)
+        WorkingHoursRow block = scheduleRepo.blockAt(tenantId, doctorId, start)
                 .orElseThrow(() -> refuse("outside-hours", "OUTSIDE_HOURS", "Outside working hours",
                         "The doctor does not work at that time."));
         if (SessionModes.TOKEN.equals(SessionModes.modeOn(block, date))) { // ACC-011: token sessions are booked by place (AppointmentService.bookToken)
             throw refuse("token-session", "TOKEN_SESSION", "Token session", "This session sells numbered places, not times.");
         }
-        int offset = ScheduleGrid.minuteOf(time) - ScheduleGrid.minuteOf(block.startTime());
-        boolean onGrid = time.getSecond() == 0 && time.getNano() == 0 && offset % block.slotMinutes() == 0;
+        int second = clock.secondOfClinicDay(tenantId, date, start);
+        int offset = second - block.startSecond();
+        boolean onGrid = start.getNano() == 0 && offset % (block.slotMinutes() * 60) == 0;
         if (!onGrid) {
             throw refuse("off-grid", "OFF_GRID", "Not on the slot grid",
                     "Slots start every " + block.slotMinutes() + " minutes from " + block.startTime() + ".");
         }
-        if (ScheduleGrid.minuteOf(time) + block.slotMinutes() > ScheduleGrid.minuteOf(block.endTime())) {
+        if (second + block.slotMinutes() * 60 > block.endSecond()) {
             throw refuse("outside-hours", "OUTSIDE_HOURS", "Outside working hours",
                     "A full slot does not fit before the session ends at " + block.endTime() + ".");
+        }
+        if (ScheduleRepository.overlapsLeave(scheduleRepo.partialLeaves(tenantId, doctorId, date), second, block.slotMinutes() * 60)) { // ACC-005
+            throw refuse("doctor-on-leave", "DOCTOR_ON_LEAVE", "Doctor on leave", "The doctor is on leave at that time on " + date + ".");
         }
         if (scheduleRepo.isClinicHoliday(tenantId, date)) {
             throw refuse("clinic-closed", "CLINIC_CLOSED", "Clinic closed", "The clinic is closed on " + date + ".");
         }
-        if (scheduleRepo.reservedMinutes(block.id()).contains(ScheduleGrid.minuteOf(time))) { // ACC-012
+        if (scheduleRepo.reservedMinutes(block.id()).contains(ScheduleGrid.minuteOf(start.atZone(clock.zone(tenantId)).toLocalTime()))) { // ACC-012
             throw refuse("reserved-for-walkin", "RESERVED_FOR_WALKIN", "Reserved for walk-ins",
                     "This slot is kept for walk-in patients; check the patient in at the desk instead.");
         }

@@ -57,8 +57,7 @@ public class CallOrderService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private List<CallOrderPolicy.Placed> order(UUID tenantId, UUID doctorId, LocalDate day, ZoneId zone) {
         Instant now = clock.now();
-        var local = now.atZone(zone);
-        CallOrderPolicy.Rules rules = scheduleRepo.findBlockCovering(doctorId, local.getDayOfWeek().getValue() % 7, local.toLocalTime())
+        CallOrderPolicy.Rules rules = scheduleRepo.blockAt(tenantId, doctorId, now)
                 .map(b -> rules(b)).orElse(CallOrderPolicy.Rules.defaults());
         return CallOrderPolicy.order(queueRepo.openCandidates(tenantId, doctorId, day), rules.withSince(queueRepo.bookedSinceWalkin(tenantId, doctorId, day)), zone);
     }
@@ -79,7 +78,7 @@ public class CallOrderService {
         if (!queueRepo.staffExists(tenantId, doctorId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found", "That doctor doesn't exist in this clinic.");
         }
-        LocalDate day = clock.today(tenantId);
+        LocalDate day = clock.clinicDate(tenantId);
         if (sessionRepo.latest(tenantId, doctorId, day).map(s -> "paused".equals(s.state())).orElse(false)) {
             throw conflict("queue-paused", "QUEUE_PAUSED", "Queue paused", "The doctor has paused the queue.");
         }

@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,11 +76,10 @@ public class DayCloseService {
     @Transactional(readOnly = true)
     public DayCloseSummaryResponse summary(UUID tenantId, LocalDate date) {
         tenantContext.set(tenantId);
-        ZoneId zone = clock.zone(tenantId);
-        LocalDate today = clock.today(zone);
+        LocalDate today = clock.clinicDate(tenantId); // ACC-005: the clinic day, not the calendar date
         LocalDate day = date != null ? date : today;
-        Instant start = day.atStartOfDay(zone).toInstant();
-        Instant end = day.plusDays(1).atStartOfDay(zone).toInstant();
+        Instant start = clock.dayStart(tenantId, day);
+        Instant end = clock.dayStart(tenantId, day.plusDays(1));
         String currency = currencyOf(tenantId);
         DayCloseSummaryResponse.Close close = repo.findClose(tenantId, day).map(c -> new DayCloseSummaryResponse.Close(
                 c.status(), c.expectedCash(), c.countedCash(), c.variance(), c.note(), c.closedByName(), c.closedAt(),
@@ -98,8 +96,7 @@ public class DayCloseService {
     @Transactional
     public DayCloseSummaryResponse close(UUID tenantId, UUID staffId, DayCloseRequest req) {
         tenantContext.set(tenantId);
-        ZoneId zone = clock.zone(tenantId);
-        LocalDate today = clock.today(zone);
+        LocalDate today = clock.clinicDate(tenantId); // ACC-005: the clinic day, not the calendar date
         LocalDate day = req.date() != null ? req.date() : today;
         if (day.isAfter(today)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "date-in-future", "Day hasn't happened yet",
@@ -116,8 +113,8 @@ public class DayCloseService {
                     unbilled.size() + (unbilled.size() == 1 ? " completed consultation still has" : " completed consultations still have")
                             + " no bill. Bill each one before the day can close.");
         }
-        Instant start = day.atStartOfDay(zone).toInstant();
-        Instant end = day.plusDays(1).atStartOfDay(zone).toInstant();
+        Instant start = clock.dayStart(tenantId, day);
+        Instant end = clock.dayStart(tenantId, day.plusDays(1));
         BigDecimal expected = repo.methods(tenantId, start, end).stream().filter(m -> "cash".equals(m.method()))
                 .findFirst().map(DayCloseSummaryResponse.Method::amount).orElse(BigDecimal.ZERO);
         BigDecimal variance = req.countedCash().subtract(expected);
@@ -142,7 +139,7 @@ public class DayCloseService {
     @Transactional
     public DayCloseSummaryResponse reopen(UUID tenantId, UUID staffId, LocalDate date, DayReopenRequest req) {
         tenantContext.set(tenantId);
-        LocalDate day = req.date() != null ? req.date() : date != null ? date : clock.today(tenantId);
+        LocalDate day = req.date() != null ? req.date() : date != null ? date : clock.clinicDate(tenantId);
         repo.lockDay(tenantId, day);
         DayCloseRepository.CloseRow row = repo.findClose(tenantId, day).filter(c -> "closed".equals(c.status()))
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "day-not-closed", "Day isn't closed",
@@ -159,7 +156,7 @@ public class DayCloseService {
     /** Close/reopen history for [from, to] (defaults: the last 31 days to today), newest first, keyset-paged. */
     @Transactional(readOnly = true)
     public DayCloseHistoryResponse history(UUID tenantId, LocalDate from, LocalDate to, String cursor, int limit) { // tenant bound at transaction start (PLT-019)
-        LocalDate end = to != null ? to : clock.today(tenantId);
+        LocalDate end = to != null ? to : clock.clinicDate(tenantId);
         LocalDate begin = from != null ? from : end.minusDays(HISTORY_DEFAULT_DAYS);
         if (begin.isAfter(end)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-range", "Invalid range", "from must be on or before to.");
@@ -189,7 +186,7 @@ public class DayCloseService {
      * tenant-day lock first, so a write racing a close either commits before the close counts it or sees it closed.
      * Callers: checkout, OTC and package sale, payment, void, package refund approval. */
     public void requireTodayOpen(UUID tenantId) {
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
         repo.lockDay(tenantId, today);
         if (repo.isClosed(tenantId, today)) {
             throw new ApiException(HttpStatus.CONFLICT, "day-closed", "Day is closed",

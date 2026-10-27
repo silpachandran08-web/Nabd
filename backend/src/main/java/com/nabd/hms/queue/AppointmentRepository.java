@@ -64,7 +64,7 @@ class AppointmentRepository {
                 mapper(), tenantId, id).stream().findFirst();
     }
 
-    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date, java.time.ZoneId zone,
+    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, Instant dayFrom, Instant dayTo,
                                    int limit, Instant afterCreatedAt, UUID afterId) {
         StringBuilder sql = new StringBuilder("SELECT " + COLUMNS + "FROM appointments WHERE tenant_id = ? ");
         List<Object> params = new ArrayList<>();
@@ -78,10 +78,10 @@ class AppointmentRepository {
             sql.append("AND patient_id = ? ");
             params.add(patientId);
         }
-        if (date != null) {
+        if (dayFrom != null) { // ACC-005: the bounds of one clinic day
             sql.append("AND start_time >= ? AND start_time < ? ");
-            params.add(Timestamp.from(date.atStartOfDay(zone).toInstant()));
-            params.add(Timestamp.from(date.plusDays(1).atStartOfDay(zone).toInstant()));
+            params.add(Timestamp.from(dayFrom));
+            params.add(Timestamp.from(dayTo));
         }
         if (afterCreatedAt != null) {
             sql.append("AND (created_at, id) > (?, ?) ");

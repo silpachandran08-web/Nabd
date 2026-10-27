@@ -851,6 +851,52 @@ paths:
       tags:
       - queue
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/change-offers/{offerId}/accept:
+    post:
+      operationId: ChangeOfferController_accept
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: offerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeOfferAccept"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/eta/appointments/{appointmentId}:
     get:
       operationId: EtaController_one
@@ -1330,6 +1376,51 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AppointmentResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:edit
+  /v1/appointments/{id}/offer-alternatives:
+    post:
+      operationId: ChangeOfferController_offer
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeOfferRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
           description: OK
         "401":
           content:
@@ -3337,6 +3428,49 @@ paths:
       tags:
       - shared
       x-required-permission: isAuthenticated()
+  /v1/clinic/settings/day-start:
+    put:
+      operationId: ClinicDayStartController_put
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicDayStartRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClinicDayStartResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
   /v1/clinical/allergies/{id}:
     patch:
       operationId: AllergyController_correct
@@ -6392,6 +6526,50 @@ paths:
       tags:
       - queue
       x-required-permission: queue:edit
+  /v1/doctors/{id}/leave/{leaveId}/affected-appointments:
+    get:
+      operationId: ChangeOfferController_affected
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: leaveId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AffectedAppointmentList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
   /v1/doctors/{id}/queue-settings:
     get:
       operationId: QueueSettingsController_get
@@ -16679,6 +16857,36 @@ components:
           type: string
         witnessedByName:
           type: string
+    AffectedAppointment:
+      type: object
+      properties:
+        alternatives:
+          type: array
+          items:
+            type: string
+            format: date-time
+        appointmentId:
+          type: string
+          format: uuid
+        channelConsent:
+          type: boolean
+        offerStatus:
+          type: string
+        patientId:
+          type: string
+          format: uuid
+        patientRef:
+          type: string
+        start:
+          type: string
+          format: date-time
+    AffectedAppointmentList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffectedAppointment"
     AlertItem:
       type: object
       properties:
@@ -17417,6 +17625,22 @@ components:
         slotStart:
           type: string
           format: date-time
+    ChangeOfferAccept:
+      type: object
+      properties:
+        slotStart:
+          type: string
+          format: date-time
+      required:
+      - slotStart
+    ChangeOfferRequest:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            type: string
+            format: date-time
     ChargeHeadResponse:
       type: object
       properties:
@@ -17682,6 +17906,20 @@ components:
             type: string
         id:
           type: string
+    ClinicDayStartRequest:
+      type: object
+      properties:
+        dayStart:
+          type: string
+          description: HH:mm between 00:00 and 05:59
+    ClinicDayStartResponse:
+      type: object
+      properties:
+        dayStart:
+          type: string
+        effectiveFromClinicDate:
+          type: string
+          format: date
     ClinicHolidayResponse:
       type: object
       properties:
@@ -18613,6 +18851,10 @@ components:
     DoctorLeaveResponse:
       type: object
       properties:
+        affectedAppointments:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaveAffectedAppointment"
         affectedPackagePatients:
           type: array
           items:
@@ -18623,11 +18865,17 @@ components:
         dateTo:
           type: string
           format: date
+        endTime:
+          type: string
+          format: time-local
         id:
           type: string
           format: uuid
         reason:
           type: string
+        startTime:
+          type: string
+          format: time-local
     DoctorLeaveWriteRequest:
       type: object
       properties:
@@ -18637,8 +18885,14 @@ components:
         dateTo:
           type: string
           format: date
+        endTime:
+          type: string
+          format: time-local
         reason:
           type: string
+        startTime:
+          type: string
+          format: time-local
       required:
       - dateFrom
       - dateTo
@@ -20091,6 +20345,15 @@ components:
           minLength: 0
       required:
       - reason
+    LeaveAffectedAppointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        start:
+          type: string
+          format: date-time
     LiabilityResponse:
       type: object
       properties:
@@ -24790,6 +25053,8 @@ components:
         endTime:
           type: string
           format: time-local
+        endsNextDay:
+          type: boolean
         id:
           type: string
           format: uuid

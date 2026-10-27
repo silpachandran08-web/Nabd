@@ -117,4 +117,35 @@ class ScheduleGridTest {
         assertThat(am.rows()).extracting(ScheduleDayResponse.Row::time).endsWith("11:30", "12:00");
         assertThat(kind(am, "12:00", 0)).isEqualTo("booked");
     }
+
+    // ACC-005: minutes are counted from the clinic date's midnight, so 00:30 after an evening session is minute 1470
+    @Test
+    void anOvernightSessionRunsPastMinute1440AndLabelsRowsPlusOne() {
+        var night = new ScheduleGrid.DoctorInput(A, "A", null, false, null, List.of(new ScheduleGrid.Block(m(20, 0), m(25, 0), 15)));
+        ScheduleDayResponse.Session s = ScheduleGrid.build(DAY, IST, BEFORE_DAY, false, List.of(night),
+                List.of(appt(A, 1470, 1485), walkIn(A, 1470 + 7))).get(0);
+        assertThat(ScheduleGrid.hhmm(1470)).isEqualTo("00:30 (+1)");
+        assertThat(ScheduleGrid.hhmm(1439)).isEqualTo("23:59");
+        assertThat(s.label()).isEqualTo("Evening");
+        assertThat(s.start()).isEqualTo("20:00");
+        assertThat(s.end()).isEqualTo("01:00 (+1)");
+        assertThat(s.rows()).hasSize(20);
+        assertThat(kind(s, "00:30 (+1)", 0)).isEqualTo("booked");
+        ScheduleDayResponse.Cell free = s.rows().stream().filter(r -> r.time().equals("00:45 (+1)")).findFirst().orElseThrow().cells().get(0);
+        assertThat(free.kind()).isEqualTo("available");
+        // the slot after midnight is the next calendar day's instant
+        assertThat(free.slotStart()).isEqualTo(DAY.plusDays(1).atTime(0, 45).atZone(IST).toInstant());
+    }
+
+    @Test
+    void aPartDayLeaveBlocksOnlyItsRowsInsideTheDoctorsHours() {
+        var d = new ScheduleGrid.DoctorInput(A, "A", null, false, null, List.of(new ScheduleGrid.Block(m(9, 0), m(18, 0), 30)),
+                List.<int[]>of(new int[]{m(14, 0), m(17, 0)}));
+        ScheduleDayResponse.Session s = ScheduleGrid.build(DAY, IST, BEFORE_DAY, false, List.of(d), List.of()).get(0);
+        assertThat(kind(s, "10:00", 0)).isEqualTo("available");
+        assertThat(kind(s, "13:30", 0)).isEqualTo("available");   // ends at 14:00, touches the window, not inside it
+        assertThat(kind(s, "14:00", 0)).isEqualTo("leave");
+        assertThat(kind(s, "16:30", 0)).isEqualTo("leave");
+        assertThat(kind(s, "17:00", 0)).isEqualTo("available");
+    }
 }

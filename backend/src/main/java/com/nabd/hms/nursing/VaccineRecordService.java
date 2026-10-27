@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,9 +65,8 @@ public class VaccineRecordService {
     public List<VaccineRecordResponse> listToday(ReadScope scope) {
         UUID tenantId = scope.tenantId();
         tenantContext.set(tenantId);
-        ZoneId zone = clock.zone(tenantId);
-        LocalDate today = clock.today(tenantId);
-        return repo.listVaccineRecords(scope, ClinicClock.startOf(today, zone), ClinicClock.startOf(today.plusDays(1), zone))
+        LocalDate today = clock.clinicDate(tenantId);
+        return repo.listVaccineRecords(scope, clock.dayStart(tenantId, today), clock.dayStart(tenantId, today.plusDays(1)))
                 .stream().map(r -> toResponse(tenantId, r)).toList();
     }
 

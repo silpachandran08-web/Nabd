@@ -191,7 +191,7 @@ public class DisplayService {
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     List<LobbyDoctor> lobby(Scope scope, Map<String, String> modeCache) {
         UUID tenantId = tenantContext.current();
-        LocalDate day = clock.today(tenantId);
+        LocalDate day = clock.clinicDate(tenantId);
         var zone = clock.zone(tenantId);
         var delays = board.activeDelays(tenantId, day);
         var entries = board.entries(tenantId, day, scope.departmentId());

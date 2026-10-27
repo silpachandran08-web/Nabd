@@ -20,9 +20,18 @@ class ScheduleBoardRepository {
     }
 
     record BlockRow(UUID doctorId, LocalTime start, LocalTime end, int slotMinutes) {
+        /** ACC-005: minutes from the clinic date's midnight; an overnight block ends after 1440. */
+        int startMinute() {
+            return start.toSecondOfDay() / 60;
+        }
+
+        int endMinute() {
+            return end.toSecondOfDay() / 60 + (end.isAfter(start) ? 0 : 1440);
+        }
     }
 
-    record LeaveRow(UUID doctorId, String reason) {
+    /** start/end both null = the whole day. */
+    record LeaveRow(UUID doctorId, String reason, LocalTime start, LocalTime end) {
     }
 
     record AppointmentRow(UUID id, UUID doctorId, UUID patientId, String patientName, Instant start, Instant end,
@@ -84,8 +93,10 @@ class ScheduleBoardRepository {
     }
 
     List<LeaveRow> leaveOn(UUID tenantId, LocalDate date) {
-        return jdbc.query("SELECT doctor_id, reason FROM doctor_leave WHERE tenant_id = ? AND ? BETWEEN date_from AND date_to",
-                (rs, i) -> new LeaveRow(rs.getObject("doctor_id", UUID.class), rs.getString("reason")),
+        return jdbc.query("SELECT doctor_id, reason, start_time, end_time FROM doctor_leave WHERE tenant_id = ? AND ? BETWEEN date_from AND date_to",
+                (rs, i) -> new LeaveRow(rs.getObject("doctor_id", UUID.class), rs.getString("reason"),
+                        rs.getTime("start_time") == null ? null : rs.getTime("start_time").toLocalTime(),
+                        rs.getTime("end_time") == null ? null : rs.getTime("end_time").toLocalTime()),
                 tenantId, Date.valueOf(date));
     }
 
