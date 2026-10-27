@@ -2,6 +2,8 @@
 
 export type AbdmSettings = { enabled?: boolean; hfrId?: string; hfrVerified?: boolean; };
 export type AbdmSettingsRequest = { enabled: boolean; hfrId?: string; };
+export type AbdmShareProfile = { abhaAddress?: string; abhaNumber?: string; dayOfBirth?: number; gender?: string; monthOfBirth?: number; name?: string; phoneNumber?: string; yearOfBirth?: number; };
+export type AbdmShareRequest = { counter?: string; hipId?: string; profile?: AbdmShareProfile; requestId?: string; };
 export type AbhaEnrolRequest = { aadhaarNumber?: string; mobile?: string; mode: string; otp?: string; patientId?: string; step: string; txnId?: string; };
 export type AbhaResult = { abhaAddress?: string; abhaLast4?: string; txnId?: string; verified?: boolean; };
 export type AbhaStatus = { enabled?: boolean; };
@@ -231,15 +233,18 @@ export type Item = { classId?: string; lang?: string; matchKind?: string; value?
 export type JsonNode = Record<string, unknown>;
 export type KillRequest = { active?: boolean; reason: string; };
 export type LiabilityResponse = { activePatientPackages?: number; expiringIn30Days?: number; inGracePeriod?: number; potentialExpiryLoss?: number; refundsAwaitingApproval?: number; remainingAllocatedValue?: number; remainingListValue?: number; sessionsOwed?: number; };
+export type LicenceOverrideRequest = { reason: string; until: string; };
 export type LicenceRequest = { isClinician: boolean; licenceExpiresOn?: string; };
 export type LicenceResponse = { hasRegistrationNo?: boolean; isClinician?: boolean; licenceExpiresOn?: string; licenceOverrideUntil?: string; staffId?: string; };
-export type LicenceWriteRequest = { expiryDate: string; holderId?: string; holderName?: string; issuingBody?: string; licenceType: string; number: string; region: string; };
+export type LicenceWriteRequest = { certificateUploadId?: string; expiryDate: string; holderId?: string; holderName?: string; issuingBody?: string; licenceType: string; number: string; region: string; };
 export type Licences = { expired?: number; expiringSoon?: number; total?: number; };
 export type LifecycleEventResponse = { changedAt?: string; changedBy?: string; fromStatus?: string; reason?: string; toStatus?: string; };
 export type Limits = { branches?: number; seats?: number; visitsPerMonth?: number; };
 export type Line = { chargeCode?: string; discountMinor?: number; taxableMinor?: number; taxes?: Array<Tax>; };
 export type LineItemRequest = { category?: string; chargeCode: string; chargeName?: string; override?: Override; prescriptionItemId?: string; quantity?: number; taxRatePercent?: number; unitPrice?: number; };
 export type LineItemResponse = { category?: string; chargeCode?: string; chargeName?: string; id?: string; lineTotal?: number; listUnitPrice?: number; overrideReason?: string; quantity?: number; taxRatePercent?: number; taxableMinor?: number; taxes?: Array<TaxPart>; tier?: string; unitPrice?: number; };
+export type LinkOpenItem = { at?: string; deviceFamily?: string; id?: number; ip?: string; linkId?: string; outcome?: string; patientId?: string; resourceId?: string; resourceType?: string; };
+export type LinkOpensResponse = { items?: Array<LinkOpenItem>; };
 export type LoginRequest = { email: string; pin: string; tenantSlug: string; };
 export type MeEntitlements = { killedFeatures?: Array<string>; modules?: Array<ModuleState>; seatLimit?: number; };
 export type Member = { age?: number; displayName?: string; guardianId?: string; lastVisitAt?: string; patientId?: string; relation?: string; sex?: string; };
@@ -511,6 +516,7 @@ export type Operations = {
   JwksController_jwks: { method: "get"; path: "/.well-known/jwks.json"; permission: "public"; pathParams: never; query: { population?: string; }; body: never; response: Record<string, Record<string, unknown>> };
   JwksController_jwksFor: { method: "get"; path: "/.well-known/jwks/{population}.json"; permission: "public"; pathParams: { population: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
   AbdmCallbackController_callback: { method: "post"; path: "/abdm/v3/callbacks/**"; permission: "public"; pathParams: never; query: never; body: never; response: void };
+  AbdmShareController_share: { method: "post"; path: "/abdm/v3/hip/patient/share"; permission: "public"; pathParams: never; query: never; body: AbdmShareRequest; response: void };
   BlobController_get: { method: "get"; path: "/files-blob/object"; permission: "public"; pathParams: never; query: { m?: string; b?: string; k?: string; e?: number; x?: number; s?: string; }; body: never; response: string };
   BlobController_put: { method: "put"; path: "/files-blob/object"; permission: "public"; pathParams: never; query: { m?: string; b?: string; k?: string; e?: number; x?: number; s?: string; }; body: string; response: void };
   ConsentExportController_export: { method: "get"; path: "/internal/v1/consents:export"; permission: "public"; pathParams: never; query: { tenantId: string; since?: string; cursor?: string; }; body: never; response: Page };
@@ -771,6 +777,7 @@ export type Operations = {
   PharmacyController_settings: { method: "get"; path: "/v1/pharmacy/settings"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: PharmacySettingsResponse };
   PharmacyController_updateSettings: { method: "patch"; path: "/v1/pharmacy/settings"; permission: "pharmacy:edit"; pathParams: never; query: never; body: PharmacySettingsWriteRequest; response: PharmacySettingsResponse };
   PhiReadAlertController_phiReadAlerts: { method: "get"; path: "/v1/phi-read/alerts"; permission: "authenticated"; pathParams: never; query: never; body: never; response: AlertsResponse };
+  LinkOpenController_linkOpens: { method: "get"; path: "/v1/phi-read/link-opens"; permission: "authenticated"; pathParams: never; query: { patientId?: string; limit?: number; }; body: never; response: LinkOpensResponse };
   PlanCatalogueController_catalogue: { method: "get"; path: "/v1/plans/catalogue"; permission: "public"; pathParams: never; query: { market?: string; }; body: never; response: Array<PlanCatalogueEntry> };
   AuditSearchController_search: { method: "get"; path: "/v1/platform/audit-log"; permission: "audit_compliance:view"; pathParams: never; query: { tenantId?: string; action?: string; entityType?: string; createdAfter?: string; createdBefore?: string; actorId?: string; actorType?: string; actorRole?: string; actorName?: string; limit?: number; cursor?: string; includeValues?: boolean; reason?: string; }; body: never; response: AuditLogPage };
   AuditSearchController_export: { method: "get"; path: "/v1/platform/audit-log/export"; permission: "audit_compliance:view"; pathParams: never; query: { tenantId?: string; action?: string; entityType?: string; createdAfter?: string; createdBefore?: string; actorId?: string; actorType?: string; actorRole?: string; actorName?: string; includeValues?: boolean; reason?: string; }; body: never; response: string };
@@ -887,9 +894,10 @@ export type Operations = {
   ImportController_errors: { method: "get"; path: "/v1/setup/import-jobs/{id}/errors.csv"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: never; response: string };
   ImportController_mapping: { method: "put"; path: "/v1/setup/import-jobs/{id}/mapping"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: ImportMappingRequest; response: ImportMappingResponse };
   ImportController_upload: { method: "post"; path: "/v1/setup/import-uploads"; permission: "setup:edit"; pathParams: never; query: { fileName: string; format: string; }; body: string; response: ImportUploadResponse };
-  SetupController_licences: { method: "get"; path: "/v1/setup/licences"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<LicenceResponse> };
+  SetupController_licences: { method: "get"; path: "/v1/setup/licences"; permission: "setup:view"; pathParams: never; query: { kind?: string; status?: string; }; body: never; response: Array<LicenceResponse> };
   SetupController_addLicence: { method: "post"; path: "/v1/setup/licences"; permission: "setup:edit"; pathParams: never; query: never; body: LicenceWriteRequest; response: LicenceResponse };
   SetupController_updateLicence: { method: "patch"; path: "/v1/setup/licences/{id}"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: LicenceWriteRequest; response: LicenceResponse };
+  LicenceOverrideController_override: { method: "post"; path: "/v1/setup/licences/{id}/override"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: LicenceOverrideRequest; response: LicenceResponse };
   SetupController_payrollExport: { method: "get"; path: "/v1/setup/payroll-export"; permission: "setup:view"; pathParams: never; query: { month?: string; }; body: never; response: Array<PayrollExportRowResponse> };
   SetupController_policies: { method: "get"; path: "/v1/setup/policies"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<PolicyResponse> };
   SetupController_updatePolicy: { method: "patch"; path: "/v1/setup/policies/{key}"; permission: "setup:edit"; pathParams: { key: string; }; query: never; body: PolicyWriteRequest; response: PolicyResponse };

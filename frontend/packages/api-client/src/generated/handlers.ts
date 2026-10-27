@@ -14,6 +14,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/.well-known/jwks.json`, () => HttpResponse.json({}, { status: 200 })), // JwksController_jwks
     http.get(`${baseUrl}/.well-known/jwks/:population.json`, () => HttpResponse.json({}, { status: 200 })), // JwksController_jwksFor
     http.post(`${baseUrl}/abdm/v3/callbacks/**`, () => new HttpResponse(null, { status: 200 })), // AbdmCallbackController_callback
+    http.post(`${baseUrl}/abdm/v3/hip/patient/share`, () => new HttpResponse(null, { status: 200 })), // AbdmShareController_share
     http.get(`${baseUrl}/files-blob/object`, () => HttpResponse.json("AA==", { status: 200 })), // BlobController_get
     http.put(`${baseUrl}/files-blob/object`, () => new HttpResponse(null, { status: 200 })), // BlobController_put
     http.get(`${baseUrl}/internal/v1/consents:export`, () => HttpResponse.json({"items":[{"classId":"string","lang":"string","matchKind":"string","value":"string"}],"nextCursor":"string"}, { status: 200 })), // ConsentExportController_export
@@ -274,6 +275,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/pharmacy/settings`, () => HttpResponse.json({"alertRecipientStaffId":"00000000-0000-7000-8000-000000000000","licenceNumbers":{},"mode":"string","modeChangedAt":"2026-01-01T00:00:00Z","pharmacistInChargeStaffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // PharmacyController_settings
     http.patch(`${baseUrl}/v1/pharmacy/settings`, () => HttpResponse.json({"alertRecipientStaffId":"00000000-0000-7000-8000-000000000000","licenceNumbers":{},"mode":"string","modeChangedAt":"2026-01-01T00:00:00Z","pharmacistInChargeStaffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // PharmacyController_updateSettings
     http.get(`${baseUrl}/v1/phi-read/alerts`, () => HttpResponse.json({"items":[{"actorId":"00000000-0000-7000-8000-000000000000","createdAt":"2026-01-01T00:00:00Z","distinctPatients":0,"id":"00000000-0000-7000-8000-000000000000","windowMinutes":0}]}, { status: 200 })), // PhiReadAlertController_phiReadAlerts
+    http.get(`${baseUrl}/v1/phi-read/link-opens`, () => HttpResponse.json({"items":[{"at":"2026-01-01T00:00:00Z","deviceFamily":"string","id":0,"ip":"string","linkId":"00000000-0000-7000-8000-000000000000","outcome":"string","patientId":"00000000-0000-7000-8000-000000000000","resourceId":"00000000-0000-7000-8000-000000000000","resourceType":"string"}]}, { status: 200 })), // LinkOpenController_linkOpens
     http.get(`${baseUrl}/v1/plans/catalogue`, () => HttpResponse.json([{"code":"string","currency":"string","limits":{"branches":1,"seats":1,"visitsPerMonth":1},"modules":["string"],"name":"string","priceMinor":0,"pricingBasis":"string"}], { status: 200 })), // PlanCatalogueController_catalogue
     http.get(`${baseUrl}/v1/platform/audit-log`, () => HttpResponse.json({"data":[{"action":"string","actorId":"00000000-0000-7000-8000-000000000000","actorName":"string","actorRole":"string","actorType":"string","after":{},"before":{},"createdAt":"2026-01-01T00:00:00Z","entityId":"00000000-0000-7000-8000-000000000000","entityType":"string","id":0,"ipAddress":"string","tenantId":"00000000-0000-7000-8000-000000000000","tenantName":"string","tenantSlug":"string"}],"page":{"limit":0,"nextCursor":"string"}}, { status: 200 })), // AuditSearchController_search
     http.get(`${baseUrl}/v1/platform/audit-log/export`, () => HttpResponse.json("string", { status: 200 })), // AuditSearchController_export
@@ -393,6 +395,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/setup/licences`, () => HttpResponse.json([{"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}], { status: 200 })), // SetupController_licences
     http.post(`${baseUrl}/v1/setup/licences`, () => HttpResponse.json({"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // SetupController_addLicence
     http.patch(`${baseUrl}/v1/setup/licences/:id`, () => HttpResponse.json({"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // SetupController_updateLicence
+    http.post(`${baseUrl}/v1/setup/licences/:id/override`, () => HttpResponse.json({"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // LicenceOverrideController_override
     http.get(`${baseUrl}/v1/setup/payroll-export`, () => HttpResponse.json([{"days":0,"hours":0,"notes":"string","role":"string","salary":0,"staffId":"string","staffName":"string"}], { status: 200 })), // SetupController_payrollExport
     http.get(`${baseUrl}/v1/setup/policies`, () => HttpResponse.json([{"id":"string","policyKey":"string","value":"string","version":0}], { status: 200 })), // SetupController_policies
     http.patch(`${baseUrl}/v1/setup/policies/:key`, () => HttpResponse.json({"id":"string","policyKey":"string","value":"string","version":0}, { status: 200 })), // SetupController_updatePolicy
@@ -440,4 +443,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 426;
+export const operationCount = 429;

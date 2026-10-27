@@ -1518,6 +1518,7 @@ schemas:
       status: operational
       scope: operational
       mfa_enabled: operational
+      bookable_online: operational
       mfa_secret_enc: pii
       invite_token_hash: pii
       invite_expires_at: operational

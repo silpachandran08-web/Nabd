@@ -326,6 +326,7 @@ super_admin,POST /v1/setup/import-jobs,setup:edit,deny-401
 super_admin,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 super_admin,POST /v1/setup/import-uploads,setup:edit,deny-401
 super_admin,POST /v1/setup/licences,setup:edit,deny-401
+super_admin,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 super_admin,POST /v1/setup/shifts,setup:edit,deny-401
 super_admin,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 super_admin,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
@@ -680,6 +681,7 @@ implementation,POST /v1/setup/import-jobs,setup:edit,deny-401
 implementation,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 implementation,POST /v1/setup/import-uploads,setup:edit,deny-401
 implementation,POST /v1/setup/licences,setup:edit,deny-401
+implementation,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 implementation,POST /v1/setup/shifts,setup:edit,deny-401
 implementation,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 implementation,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
@@ -1034,6 +1036,7 @@ support_engineer,POST /v1/setup/import-jobs,setup:edit,deny-401
 support_engineer,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 support_engineer,POST /v1/setup/import-uploads,setup:edit,deny-401
 support_engineer,POST /v1/setup/licences,setup:edit,deny-401
+support_engineer,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 support_engineer,POST /v1/setup/shifts,setup:edit,deny-401
 support_engineer,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 support_engineer,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
@@ -1388,6 +1391,7 @@ billing,POST /v1/setup/import-jobs,setup:edit,deny-401
 billing,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 billing,POST /v1/setup/import-uploads,setup:edit,deny-401
 billing,POST /v1/setup/licences,setup:edit,deny-401
+billing,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 billing,POST /v1/setup/shifts,setup:edit,deny-401
 billing,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 billing,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
@@ -1742,6 +1746,7 @@ sre,POST /v1/setup/import-jobs,setup:edit,deny-401
 sre,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 sre,POST /v1/setup/import-uploads,setup:edit,deny-401
 sre,POST /v1/setup/licences,setup:edit,deny-401
+sre,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 sre,POST /v1/setup/shifts,setup:edit,deny-401
 sre,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 sre,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
@@ -2096,6 +2101,7 @@ commercial,POST /v1/setup/import-jobs,setup:edit,deny-401
 commercial,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 commercial,POST /v1/setup/import-uploads,setup:edit,deny-401
 commercial,POST /v1/setup/licences,setup:edit,deny-401
+commercial,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 commercial,POST /v1/setup/shifts,setup:edit,deny-401
 commercial,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 commercial,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
@@ -2450,6 +2456,7 @@ compliance_dpo,POST /v1/setup/import-jobs,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/import-uploads,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/licences,setup:edit,deny-401
+compliance_dpo,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/shifts,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401

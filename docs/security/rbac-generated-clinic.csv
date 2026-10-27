@@ -326,6 +326,7 @@ owner,POST /v1/setup/import-jobs,setup:edit,allow
 owner,POST /v1/setup/import-jobs/{id}/commit,setup:edit,allow
 owner,POST /v1/setup/import-uploads,setup:edit,allow
 owner,POST /v1/setup/licences,setup:edit,allow
+owner,POST /v1/setup/licences/{id}/override,setup:edit,allow
 owner,POST /v1/setup/shifts,setup:edit,allow
 owner,POST /v1/setup/whatsapp-templates,setup:edit,allow
 owner,POST /v1/setup/whatsapp-templates:lint,setup:edit,allow
@@ -680,6 +681,7 @@ owner_doctor,POST /v1/setup/import-jobs,setup:edit,allow
 owner_doctor,POST /v1/setup/import-jobs/{id}/commit,setup:edit,allow
 owner_doctor,POST /v1/setup/import-uploads,setup:edit,allow
 owner_doctor,POST /v1/setup/licences,setup:edit,allow
+owner_doctor,POST /v1/setup/licences/{id}/override,setup:edit,allow
 owner_doctor,POST /v1/setup/shifts,setup:edit,allow
 owner_doctor,POST /v1/setup/whatsapp-templates,setup:edit,allow
 owner_doctor,POST /v1/setup/whatsapp-templates:lint,setup:edit,allow
@@ -1034,6 +1036,7 @@ doctor,POST /v1/setup/import-jobs,setup:edit,deny-403
 doctor,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-403
 doctor,POST /v1/setup/import-uploads,setup:edit,deny-403
 doctor,POST /v1/setup/licences,setup:edit,deny-403
+doctor,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 doctor,POST /v1/setup/shifts,setup:edit,deny-403
 doctor,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 doctor,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
@@ -1388,6 +1391,7 @@ nurse,POST /v1/setup/import-jobs,setup:edit,deny-403
 nurse,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-403
 nurse,POST /v1/setup/import-uploads,setup:edit,deny-403
 nurse,POST /v1/setup/licences,setup:edit,deny-403
+nurse,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 nurse,POST /v1/setup/shifts,setup:edit,deny-403
 nurse,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 nurse,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
@@ -1742,6 +1746,7 @@ receptionist,POST /v1/setup/import-jobs,setup:edit,deny-403
 receptionist,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-403
 receptionist,POST /v1/setup/import-uploads,setup:edit,deny-403
 receptionist,POST /v1/setup/licences,setup:edit,deny-403
+receptionist,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 receptionist,POST /v1/setup/shifts,setup:edit,deny-403
 receptionist,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 receptionist,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
@@ -2096,6 +2101,7 @@ frontdesk_vitals,POST /v1/setup/import-jobs,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/import-jobs/{id}/commit,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/import-uploads,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/licences,setup:edit,deny-403
+frontdesk_vitals,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/shifts,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
