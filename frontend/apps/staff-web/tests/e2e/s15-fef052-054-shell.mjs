@@ -59,7 +59,7 @@ async function open(perms, extra, handlers, path, viewport) {
   const hrefs = await navLinks(s.page);
   check('unentitled planned items absent from nav', !hrefs.includes('/requests') && !hrefs.includes('/checkin') && !hrefs.includes('/messages'), hrefs.join(' '));
   check('no billing link without billing:view', !hrefs.includes('/billing'));
-  check('direct URL of unentitled screen shows no-access', (await s.page.getByText(/You do not have access to Requests/).count()) === 1);
+  check('direct URL of unentitled screen shows no-access', (await s.page.getByText(/You do not have access to Booking requests/).count()) === 1);
   await s.page.goto(`${APP}/messages`, { waitUntil: 'networkidle' });
   check('direct URL without the module shows no-access (messages)', (await s.page.getByText(/You do not have access to WhatsApp inbox/).count()) === 1);
   check('gating no console errors', calm(s)); dumpLog('gating', s.log);
