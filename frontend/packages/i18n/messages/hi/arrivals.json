@@ -54,6 +54,7 @@
     "status": "स्थिति",
     "actions": "कार्रवाइयाँ",
     "priority": "प्राथमिकता",
+    "viaAbha": "ABHA से",
     "rowLabel": "{name} का विवरण खोलें, टोकन {token}",
     "waitShort": "{n} मि.",
     "waitLong": "{n} मिनट",
@@ -75,7 +76,8 @@
     "social_media": "सोशल मीडिया",
     "returning": "दोबारा आए",
     "other": "अन्य",
-    "internal_transfer": "आंतरिक स्थानांतरण"
+    "internal_transfer": "आंतरिक स्थानांतरण",
+    "abdm_scan_share": "ABHA से"
   },
   "status": {
     "checked_in": "चेक-इन हुआ",
@@ -134,6 +136,9 @@
     "findInRegistry": "मरीज़ रजिस्ट्री में खोजें",
     "reack": "मरीज़ ने फिर से स्वीकार किया",
     "reackFail": "स्वीकृति दर्ज नहीं हो सकी।",
+    "scanShareConsent": "Scan & Share — सहमति की पुष्टि करें",
+    "scanShareConsentHint": "इस मरीज़ ने काउंटर पर अपनी ABHA प्रोफ़ाइल साझा की है। डेस्क पर डेटा प्रोसेसिंग की सहमति की पुष्टि करें।",
+    "openRecord": "मरीज़ का रिकॉर्ड खोलें",
     "title": "#{token} · {name}"
   },
   "priority": {

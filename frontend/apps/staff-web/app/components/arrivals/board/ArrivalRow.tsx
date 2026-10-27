@@ -34,6 +34,7 @@ function ArrivalRowImpl({ row: r, doctorName, grants, sendingId, h, onOpen }: Pr
       <td className={styles.token} data-label={t("board.token")}>
         #{r.tokenNumber}
         {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label={t("board.priority")} /></span>}
+        {r.source === "abdm_scan_share" && <span className={styles.priorityTag}><StatusPill tone="info" label={t("board.viaAbha")} /></span>}
         {r.position != null && <span className={styles.muted} data-testid="why-here">{" "}{t("board.nextWhy", { position: r.position, reason: t.has(`board.why.${r.orderReason}`) ? t(`board.why.${r.orderReason}`) : (r.orderReason ?? ""), range: r.expectedRange || "none" })}</span>}
       </td>
       <td data-label={t("board.patient")}><span className={styles.patientName}>{r.patientName}</span>

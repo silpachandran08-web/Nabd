@@ -50,6 +50,9 @@ class InternalSchedulingService {
     private final ClinicPolicies policies;
     private final AuditService audit;
     private final ClinicClock clock;
+    /** ADM-032: doctors whose licence lapsed are not offered online. Field-injected on purpose: keeps this class's constructor untouched for the other ACC stories. */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.iam.api.StaffLicenceSync staffSync;
 
     InternalSchedulingService(TenantScope tenantScope, AppointmentService appointments, AppointmentRepository appointmentRepo,
                               ScheduleRepository scheduleRepo, PatientRefs patientRefs, ClinicPolicies policies, AuditService audit,
@@ -83,7 +86,8 @@ class InternalSchedulingService {
                     "from and to are required, to is not before from, and the range is at most " + MAX_DAYS + " days.");
         }
         return tenantScope.run(tid, () -> {
-            List<UUID> doctors = doctorId != null ? List.of(doctorId) : scheduleRepo.doctorsWithHours(tid);
+            Set<UUID> hidden = staffSync.hiddenFromOnlineBooking(); // ADM-032
+            List<UUID> doctors = (doctorId != null ? List.of(doctorId) : scheduleRepo.doctorsWithHours(tid)).stream().filter(d -> !hidden.contains(d)).toList();
             ZoneId zone = clock.zone(tid);
             Instant now = clock.now();
             List<DoctorSessions> out = new ArrayList<>();
@@ -123,6 +127,9 @@ class InternalSchedulingService {
     Map<String, Object> book(UUID tid, ServiceIdentity edge, String patientRef, UUID doctorId, Instant startTime) {
         return tenantScope.run(tid, () -> {
             UUID patientId = patientRefs.patientIdFor(patientRef).orElseThrow(InternalSchedulingService::notOwner);
+            if (staffSync.hiddenFromOnlineBooking().contains(doctorId)) { // ADM-032: lapsed licence
+                throw new ApiException(HttpStatus.CONFLICT, "doctor-not-bookable", "Doctor not available online", "This doctor cannot be booked online at the moment. Please call the clinic.");
+            }
             AppointmentResponse a = appointments.book(tid, null, new AppointmentWriteRequest(patientId, doctorId, startTime, false));
             record(tid, edge, "appointment.booked_via_edge", a.id(), patientRef);
             return Map.of("appointmentId", a.id(), "status", a.status());

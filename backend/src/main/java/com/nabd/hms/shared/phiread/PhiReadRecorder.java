@@ -69,6 +69,11 @@ public class PhiReadRecorder {
         writer.execute(() -> write(read));
     }
 
+    /** PLT-041: another write (a secure-link open) on the same background thread, with the same full-queue rule. */
+    void submitTask(Runnable task) {
+        writer.execute(task);
+    }
+
     void write(Read r) {
         try {
             tx.executeWithoutResult(s -> {

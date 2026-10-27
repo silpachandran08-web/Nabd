@@ -50,7 +50,8 @@ final class SetupModels {
 
     record LicenceRow(UUID id, String licenceType, UUID holderId, String holderName,
                       String number, String issuingBody, LocalDate expiryDate,
-                      String region, String status) {
+                      String region, String status, java.util.Set<Integer> remindersSent, LocalDate overrideUntil, String overrideReason,
+                      UUID certificateUploadId) {
     }
 
     record StaffSummaryRow(UUID id, String name, String roleName) {

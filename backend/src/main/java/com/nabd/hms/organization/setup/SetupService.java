@@ -63,10 +63,13 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final com.nabd.hms.iam.api.ActorDirectory actors;
 
     private final com.nabd.hms.patient.api.PrivacyNotices privacyNotices;
+    private final com.nabd.hms.organization.licence.LicenceLifecycleService licences;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
-                 com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices) {
+                 com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
+                 com.nabd.hms.organization.licence.LicenceLifecycleService licences) {
+        this.licences = licences;
         this.actors = actors;
         this.entitlements = entitlements;
         this.privacyNotices = privacyNotices;
@@ -318,10 +321,36 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         return new ExportJobResponse(id.toString(), req.exportType(), "pending", null, null, null);
     }
 
+    /** ADM-032: the register, soonest expiry first; kind (licence type) and status narrow it. */
     @Transactional
-    public List<LicenceResponse> listLicences(UUID tenantId) {
+    public List<LicenceResponse> listLicences(UUID tenantId, String kind, String status) {
         tenantContext.set(tenantId);
-        return repo.listLicences(tenantId).stream().map(this::toLicenceResponse).toList();
+        var hidden = licences.hiddenFromBooking();
+        var today = licences.today();
+        return repo.listLicences(tenantId).stream()
+                .filter(l -> kind == null || kind.isBlank() || kind.equals(l.licenceType()))
+                .filter(l -> status == null || status.isBlank() || status.equals(l.status()))
+                .map(l -> toLicenceResponse(l, today, hidden)).toList();
+    }
+
+    /** ADM-032: one register row as the API shows it (the override reads it back). Runs in the caller's tenant transaction. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public LicenceResponse licence(UUID id) {
+        var hidden = licences.hiddenFromBooking();
+        var today = licences.today();
+        return repo.listLicences(tenantContext.current()).stream().filter(l -> l.id().equals(id)).findFirst().map(l -> toLicenceResponse(l, today, hidden))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "licence-not-found", "Licence not found", "Licence not found"));
+    }
+
+    /** ADM-032: a holder is a staff member of this clinic (never a foreign-key 500); their name is copied into the register when none was typed. */
+    private LicenceWriteRequest withHolder(UUID tenantId, LicenceWriteRequest req) {
+        if (req.holderId() == null) {
+            return req;
+        }
+        var a = actors.findActor(tenantId, req.holderId()).orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "holder-not-found", "Holder not found",
+                "That staff member does not exist in this clinic."));
+        return req.holderName() != null && !req.holderName().isBlank() ? req
+                : new LicenceWriteRequest(req.licenceType(), req.holderId(), a.name(), req.number(), req.issuingBody(), req.expiryDate(), req.region(), req.certificateUploadId());
     }
 
     @Transactional
@@ -339,25 +368,21 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public LicenceResponse addLicence(UUID tenantId, UUID callerStaffId, LicenceWriteRequest req) {
         tenantContext.set(tenantId);
-        UUID id = repo.insertLicence(tenantId, req);
+        UUID id = repo.insertLicence(tenantId, withHolder(tenantId, req));
         log.info("licence {} added for tenant {} by {}", id, tenantId, callerStaffId);
-        return repo.listLicences(tenantId).stream()
-                .filter(l -> l.id().equals(id))
-                .findFirst()
-                .map(this::toLicenceResponse)
-                .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "licence-not-found", "Licence not found after insert", "Licence not found after insert"));
+        licences.afterSave(id, callerStaffId, null, null); // status, reminders and the holder's bookability follow the saved date at once
+        return licence(id);
     }
 
     @Transactional
     public LicenceResponse updateLicence(UUID tenantId, UUID callerStaffId, UUID id, LicenceWriteRequest req) {
         tenantContext.set(tenantId);
-        repo.updateLicence(tenantId, id, req);
+        java.time.LocalDate before = repo.listLicences(tenantId).stream().filter(l -> l.id().equals(id)).findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "licence-not-found", "Licence not found", "Licence not found")).expiryDate();
+        repo.updateLicence(tenantId, id, withHolder(tenantId, req));
         log.info("licence {} updated for tenant {} by {}", id, tenantId, callerStaffId);
-        return repo.listLicences(tenantId).stream()
-                .filter(l -> l.id().equals(id))
-                .findFirst()
-                .map(this::toLicenceResponse)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "licence-not-found", "Licence not found", "Licence not found"));
+        licences.afterSave(id, callerStaffId, null, before);
+        return licence(id);
     }
 
     @Transactional
@@ -454,7 +479,9 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
                 row.createdAt());
     }
 
-    private LicenceResponse toLicenceResponse(LicenceRow row) {
+    private LicenceResponse toLicenceResponse(LicenceRow row, java.time.LocalDate today, java.util.Set<UUID> hidden) {
+        long left = java.time.temporal.ChronoUnit.DAYS.between(today, row.expiryDate());
+        var next = com.nabd.hms.organization.licence.LicenceLifecycleService.nextReminder(left, row.remindersSent());
         return new LicenceResponse(
                 row.id().toString(),
                 row.licenceType(),
@@ -464,6 +491,13 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
                 row.issuingBody(),
                 row.expiryDate(),
                 row.region(),
-                row.status());
+                row.status(),
+                left,
+                row.remindersSent().stream().sorted(java.util.Comparator.reverseOrder()).toList(),
+                next.map(t -> row.expiryDate().minusDays(t)).orElse(null),
+                "clinician".equals(row.licenceType()) && row.holderId() != null ? !hidden.contains(row.holderId()) : null,
+                row.overrideUntil(),
+                row.overrideReason(),
+                row.certificateUploadId() == null ? null : row.certificateUploadId().toString());
     }
 }

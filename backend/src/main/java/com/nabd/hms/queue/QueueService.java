@@ -182,8 +182,8 @@ public class QueueService {
             events.publish(tenantId, DomainEventType.APPOINTMENT_ARRIVED, req.appointmentId(), java.util.Map.of(
                     "appointmentId", req.appointmentId(), "doctorId", req.doctorId(), "queueEntryId", id, "status", "arrived"));
         }
-        var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
-        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+        var actor = callerStaffId == null ? null : actors.findActor(tenantId, callerStaffId).orElseThrow(); // IDC-018: null caller = self check-in
+        auditService.record(tenantId, actor == null ? "system" : "staff", callerStaffId, actor == null ? "Self check-in" : actor.name(), actor == null ? "system" : actor.role(), null,
                 "queue.check_in", "queue_entry", id, null,
                 java.util.Map.of("doctorId", req.doctorId(), "tokenNumber", token, "source", source,
                         "appointmentId", req.appointmentId() == null ? "" : req.appointmentId().toString()));
@@ -382,7 +382,7 @@ public class QueueService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private void recordEvent(UUID tenantId, UUID entryId, String from, String to, String kind, Integer minutes, UUID callerStaffId, UUID doctorId) {
         eventRepo.record(tenantId, entryId, from, to, kind, minutes, clock.now(), callerStaffId,
-                callerStaffId.equals(doctorId) ? "doctor" : "desk");
+                callerStaffId != null && callerStaffId.equals(doctorId) ? "doctor" : "desk");
     }
 
     /** NB-143: the "alerts the doctor" half of the AC — a doctor (or anyone with queue:edit)

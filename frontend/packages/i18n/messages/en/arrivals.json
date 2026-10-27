@@ -54,6 +54,7 @@
     "status": "Status",
     "actions": "Actions",
     "priority": "Priority",
+    "viaAbha": "via ABHA",
     "rowLabel": "Open details for {name}, token {token}",
     "waitShort": "{n}m",
     "waitLong": "{n} min",
@@ -75,7 +76,8 @@
     "social_media": "Social media",
     "returning": "Returning",
     "other": "Other",
-    "internal_transfer": "Internal transfer"
+    "internal_transfer": "Internal transfer",
+    "abdm_scan_share": "via ABHA"
   },
   "status": {
     "checked_in": "Checked in",
@@ -134,6 +136,9 @@
     "findInRegistry": "Find in patient registry",
     "reack": "Patient re-acknowledged",
     "reackFail": "Could not record the acknowledgement.",
+    "scanShareConsent": "Scan & Share — confirm consent",
+    "scanShareConsentHint": "This patient shared their ABHA profile at the counter. Confirm data-processing consent at the desk.",
+    "openRecord": "Open patient record",
     "title": "#{token} · {name}"
   },
   "priority": {
