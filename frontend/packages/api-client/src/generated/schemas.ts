@@ -87,6 +87,8 @@ export const ChatConsentDecisionSchema = z.object({ granted: z.boolean(), purpos
 export const ChatConsentEvidenceSchema = z.object({ wamid: z.string().min(1) });
 export const ChatConsentRequestSchema = z.object({ decisions: z.array(ChatConsentDecisionSchema), evidence: ChatConsentEvidenceSchema, language: z.string().min(1), noticeVersion: z.string().min(0).max(40), phoneHash: z.string().min(1) });
 export const ChatConsentResponseSchema = z.object({ consentIds: z.array(z.string()).optional() });
+export const ChatDependantRequestSchema = z.object({ dob: z.string(), firstName: z.string().min(0).max(60), sex: z.string() });
+export const ChatDependantResponseSchema = z.object({ patientRef: z.string().optional() });
 export const ChatNoticeCurrentSchema = z.object({ language: z.string().optional(), path: z.string().optional(), version: z.string().optional() });
 export const CheckInRequestSchema = z.object({ appointmentId: z.string().optional(), doctorId: z.string(), patientId: z.string(), paymentMode: z.string().optional(), presentingComplaint: z.string().optional(), source: z.string().optional() });
 export const CheckoutSchema = z.object({ outstanding: z.number().optional(), pending: z.number().int().optional() });
@@ -226,7 +228,7 @@ export const GrantResponseSchema = z.object({ active: z.boolean().optional(), de
 export const GuardianConsentSchema = z.object({ channel: z.string().optional(), confirmed: z.boolean().optional() });
 export const GuardianReviewDecisionRequestSchema = z.object({ decision: z.string() });
 export const GuardianReviewResponseSchema = z.object({ dob: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), mrn: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional() });
-export const HouseholdMemberSchema = z.object({ age: z.string().optional(), firstName: z.string().optional(), isGuardian: z.boolean().optional(), patientRef: z.string().optional(), relation: z.string().optional() });
+export const HouseholdMemberSchema = z.object({ age: z.string().optional(), firstName: z.string().optional(), isGuardian: z.boolean().optional(), patientRef: z.string().optional(), relation: z.string().optional(), years: z.number().int().optional() });
 export const MemberSchema = z.object({ age: z.number().int().optional(), displayName: z.string().optional(), guardianId: z.string().optional(), lastVisitAt: z.string().optional(), patientId: z.string().optional(), relation: z.string().optional(), sex: z.string().optional() });
 export const HouseholdResponseSchema = z.object({ household: z.array(MemberSchema).optional() });
 export const ImportColumnSchema = z.object({ source: z.string().min(1), target: z.string().min(1) });
@@ -250,6 +252,8 @@ export const InternalDoctorSessionsSchema = z.object({ doctorId: z.string().opti
 export const InternalAvailabilitySchema = z.object({ doctors: z.array(InternalDoctorSessionsSchema).optional(), v: z.number().int().optional() });
 export const InternalBookRequestSchema = z.object({ doctorId: z.string(), patientRef: z.string().min(1), startTime: z.string() });
 export const InternalBookingOfferChoiceSchema = z.object({ patientRef: z.string().min(1), slotStart: z.string().optional() });
+export const InternalProfileDoctorSchema = z.object({ doctorId: z.string().optional(), name: z.string().optional() });
+export const InternalBookingProfileSchema = z.object({ clinicName: z.string().optional(), doctors: z.array(InternalProfileDoctorSchema).optional(), timeZone: z.string().optional() });
 export const InternalBookingRequestSchema = z.object({ channel: z.string().min(1), doctorId: z.string(), group: z.boolean().optional(), note: z.string().min(0).max(280).optional(), patientRef: z.string().min(1), slotStart: z.string(), triageFlags: z.array(z.string()).optional(), visitType: z.string().optional() });
 export const InternalEtaResponseSchema = z.object({ display: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), p50At: z.string().optional(), p80At: z.string().optional(), position: z.number().int().optional(), v: z.number().int().optional() });
 export const InviteResendResponseSchema = z.object({ expiresAt: z.string().optional(), inviteId: z.string().optional(), inviteToken: z.string().optional() });
@@ -548,11 +552,13 @@ export const operationSchemas = {
   InternalSchedulingController_act: { body: InternalAppointmentActionRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalSchedulingController_availability: { response: InternalAvailabilitySchema },
   InternalBookingRequestController_choose: { body: InternalBookingOfferChoiceSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  InternalBookingProfileController_profile: { response: InternalBookingProfileSchema },
   InternalBookingRequestController_route: { body: InternalBookingRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalCheckInController_checkIn: { body: SelfCheckInRequestSchema, response: SelfCheckInResponseSchema },
   InternalCheckInController_context: { response: SelfCheckInContextSchema },
   EtaController_one: { response: InternalEtaResponseSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
+  InternalDependantController_add: { body: ChatDependantRequestSchema, response: ChatDependantResponseSchema },
   InternalChatConsentController_capture: { body: ChatConsentRequestSchema, response: ChatConsentResponseSchema },
   InternalChatConsentController_currentNotice: { response: ChatNoticeCurrentSchema },
   InternalSchedulingController_reasonCodes: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },

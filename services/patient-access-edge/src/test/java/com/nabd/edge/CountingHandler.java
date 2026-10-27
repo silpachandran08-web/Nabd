@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Test flow for State.START: counts steps in the context ("step") and probes availability when the text is "doctor:<uuid>". */
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "edge.booking-flow", havingValue = "false")
 class CountingHandler implements FlowHandler {
 
     final AtomicInteger invocations = new AtomicInteger();

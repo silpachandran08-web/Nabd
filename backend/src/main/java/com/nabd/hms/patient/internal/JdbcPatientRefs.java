@@ -71,8 +71,9 @@ class JdbcPatientRefs implements PatientRefs {
                 (rs, i) -> new Row(rs.getObject("id", UUID.class), rs.getString("name"), rs.getDate("dob").toLocalDate(),
                         rs.getObject("guardian_id", UUID.class), rs.getBoolean("is_guardian")),
                 tenant, phoneHash, tenant, phoneHash, tenant);
-        return rows.stream().map(r -> new HouseholdMember(refFor(r.id()), firstName(r.name()), band(Period.between(r.dob(), today).getYears()),
-                r.isGuardian() ? "guardian" : r.guardianId() != null ? "dependent" : "self", r.isGuardian())).toList();
+        // IDC-012 / ACC-042: a dependant who turned 18, or a minor whose guardian link was revoked, is not part of the list
+        return rows.stream().filter(r -> (r.guardianId() != null) == (Period.between(r.dob(), today).getYears() < 18)).map(r -> new HouseholdMember(refFor(r.id()), firstName(r.name()), band(Period.between(r.dob(), today).getYears()),
+                r.isGuardian() ? "guardian" : r.guardianId() != null ? "dependent" : "self", r.isGuardian(), Period.between(r.dob(), today).getYears())).toList();
     }
 
     private static String firstName(String name) {

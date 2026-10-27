@@ -3757,11 +3757,42 @@ paths:
       summary: "ACC-038. Household of a WhatsApp-verified phone: the patients registered on it plus their dependants. Returns only patientRef (opaque, per tenant), firstName, age band (0-4, 5-11, 12-17, 18-39, 40-59, 60+), relation (self, guardian, dependent) and isGuardian; never a date of birth or full name. Audited as 'patient via edge'."
       x-required-permission: authenticated
       responses:
-        "200": { description: "{ members: [{ patientRef, firstName, age, relation, isGuardian }] }", content: { application/json: { schema: { type: object } } } }
+        "200": { description: "{ members: [{ patientRef, firstName, age (band), years (whole years, ACC-042), relation, isGuardian }] }; a dependant aged 18 or more is not listed (IDC-012)", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/households/{phoneHash}/dependants:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    post:
+      tags: [Patients]
+      summary: "ACC-042. A parent adds a child from the WhatsApp chat. The child is created as a minor of the oldest adult registered on the phone (guardian_id, guardian_access consent, guardian's phone and surname), audited as 'patient via edge'. 400 NOT_A_MINOR when the date of birth is 18 years ago or earlier; 409 POSSIBLE_DUPLICATE with the existing patientRef when that guardian already has a child with the same first name and date of birth; 404 when no adult is registered on the phone. Idempotency-Key required."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [firstName, dob, sex], properties: { firstName: { type: string, maxLength: 60 }, dob: { type: string, format: date }, sex: { type: string, enum: [male, female, other] } } } } }
+      responses:
+        "201": { description: "{ patientRef }", content: { application/json: { schema: { type: object } } } }
+        "400": { description: "NOT_A_MINOR or validation (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "POSSIBLE_DUPLICATE { patientRef } (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/booking-profile:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Queue]
+      summary: "ACC-040. What the WhatsApp booking flow shows around the slots: clinic name, clinic time zone and the names of the doctors who have working hours. Staff data only."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ clinicName, timeZone, doctors: [{ doctorId, name }] }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/patients/consents:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]

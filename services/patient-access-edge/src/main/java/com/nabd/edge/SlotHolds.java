@@ -28,13 +28,18 @@ public class SlotHolds {
 
     /** One atomic upsert: wins when the slot is free, expired, or already held by this same conversation. */
     public boolean tryHold(UUID tenantId, UUID doctorId, Instant slot, UUID conversationId) {
+        return tryHold(tenantId, doctorId, slot, conversationId, props.holdSeconds());
+    }
+
+    /** ACC-040: the 2-minute hold taken when the patient picks a time. */
+    public boolean tryHold(UUID tenantId, UUID doctorId, Instant slot, UUID conversationId, int seconds) {
         boolean got = tx.run(tenantId, (j, s) -> j.update("""
                 insert into booking_holds (id, tenant_id, doctor_id, slot_start, conversation_id, expires_at)
                 values (?, ?, ?, ?, ?, now() + make_interval(secs => ?))
                 on conflict (tenant_id, doctor_id, slot_start) do update
                    set id = excluded.id, conversation_id = excluded.conversation_id, expires_at = excluded.expires_at
                    where booking_holds.expires_at <= now() or booking_holds.conversation_id = excluded.conversation_id""",
-                UUID.randomUUID(), tenantId, doctorId, java.sql.Timestamp.from(slot), conversationId, props.holdSeconds()) == 1);
+                UUID.randomUUID(), tenantId, doctorId, java.sql.Timestamp.from(slot), conversationId, seconds) == 1);
         if (!got) {
             meters.counter("edge_hold_conflicts_total").increment();
         }
@@ -58,6 +63,13 @@ public class SlotHolds {
             }
         }
         return held;
+    }
+
+    /** ACC-040: slots of this doctor that another conversation holds right now (not to be offered). */
+    public java.util.Set<Instant> heldByOthers(UUID tenantId, UUID doctorId, UUID conversationId) {
+        return new java.util.HashSet<>(tx.run(tenantId, (j, s) -> j.query(
+                "select slot_start from booking_holds where tenant_id = ? and doctor_id = ? and conversation_id <> ? and expires_at > now()",
+                (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, doctorId, conversationId)));
     }
 
     public void release(UUID tenantId, UUID conversationId) {

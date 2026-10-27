@@ -27,7 +27,7 @@ final class Http {
         return send(builder(url).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(json)).build());
     }
 
-    /** ACC-033: a POST Core de-duplicates on the key, so a re-run of the same step never repeats the effect. */
+    /** Core's @Idempotent endpoints: the same key replays the stored answer instead of acting twice. */
     String post(String url, String json, String idempotencyKey) {
         return send(builder(url).header("Content-Type", "application/json").header("Idempotency-Key", idempotencyKey)
                 .POST(HttpRequest.BodyPublishers.ofString(json)).build());
@@ -59,13 +59,13 @@ final class Http {
     /** A non-2xx answer; the status lets a caller tell a rule refusal (409) from an outage. Same message as before. */
     static final class UpstreamStatusException extends IllegalStateException {
         final int status;
-        /** The problem+json body (ids and codes, no patient data); never logged. */
+        /** Problem+json from Core (error codes only; never logged). */
         final String body;
 
         UpstreamStatusException(int status, String body) {
             super("upstream status " + status);
             this.status = status;
-            this.body = body;
+            this.body = body == null ? "" : body;
         }
     }
 }
