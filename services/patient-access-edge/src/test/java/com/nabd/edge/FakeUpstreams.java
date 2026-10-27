@@ -39,6 +39,9 @@ final class FakeUpstreams {
     volatile String bookMode = "confirmed";
     volatile int dependantStatus = 201;
     final Map<String, String> bookResults = new ConcurrentHashMap<>();   // Idempotency-Key -> stored answer
+    /** ACC-041/044: a test may script Core. (METHOD + " " + path?query, body) -> {status, json}, or null to fall through. */
+    volatile java.util.function.BiFunction<String, String, String[]> coreHook;
+    final List<String> coreLog = new CopyOnWriteArrayList<>();
     final HttpServer core;
     final HttpServer comms;
 
@@ -47,6 +50,17 @@ final class FakeUpstreams {
             core = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             core.createContext("/internal/v1/tenants/", ex -> {
                 String path0 = ex.getRequestURI().getPath();
+                var hook = coreHook;
+                if (hook != null) {
+                    String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    String line = ex.getRequestMethod() + " " + path0.replaceFirst("^/internal/v1/tenants/[^/]+", "") + (ex.getRequestURI().getQuery() == null ? "" : "?" + ex.getRequestURI().getQuery());
+                    coreLog.add(line + " " + body + " key=" + ex.getRequestHeaders().getFirst("Idempotency-Key"));
+                    String[] scripted = hook.apply(line, body);
+                    if (scripted != null) {
+                        reply(ex, Integer.parseInt(scripted[0]), scripted[1]);
+                        return;
+                    }
+                }
                 if (path0.endsWith("/privacy-notice/current")) {
                     reply(ex, 200, "{\"version\":\"" + noticeVersion + "\",\"language\":\"x\",\"path\":\"/v1/public/notices/clinic/" + noticeVersion + "?lang=x\"}");
                     return;

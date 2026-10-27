@@ -3791,6 +3791,18 @@ paths:
       x-required-permission: authenticated
       responses:
         "200": { description: "{ clinicName, timeZone, doctors: [{ doctorId, name }] }", content: { application/json: { schema: { type: object } } } }
+  /tenants/{tid}/status/{phoneHash}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, description: "SHA-256, lower-case hex, of the verified phone's E.164 digits without +", schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Queue]
+      summary: "ACC-044. Today's open (scheduled or arrived) visits of the household with the ETA text shaped by the doctor's display mode (ACC-018). p50 is null in delay_only and hidden modes, so the Edge can send no time-based message there."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ items: [{ appointmentId, patientRef, status, mode, text, leaveHomeAlert, p50 }] }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/patients/consents:
@@ -3896,15 +3908,30 @@ paths:
         "409": { description: "SLOT_TAKEN (may carry nextAlternative) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "410": { description: "OFFER_EXPIRED: expired, superseded or the booking is no longer scheduled (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /tenants/{tid}/appointments/{id}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: patientRef, in: query, required: true, schema: { type: string } }
+    get:
+      tags: [Queue]
+      summary: "ACC-041. The patient's own appointment for the reminder buttons: doctorId, startTime, status, the clinic time zone and the cancellation window in hours (0 = none). 403 NOT_OWNER for another patient's appointment."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ appointmentId, doctorId, startTime, status, zone, windowHours }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed, or NOT_OWNER (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
   /tenants/{tid}/appointments/{id}/{action}:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters:
       - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-      - { name: action, in: path, required: true, schema: { type: string, enum: [confirm, reschedule, cancel] } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [confirm, reschedule, cancel, call-me] } }
     post:
       tags: [Queue]
-      summary: "ACC-038. Confirm, reschedule or cancel the patient's own appointment on their behalf. reasonCode (lower-case code, 3-40 characters) is required to cancel, newStartTime to reschedule (the response then carries the new appointment id). Idempotency-Key required. Core has no separate 'confirmed' state: confirm validates ownership and status, records the confirmation in the audit trail and answers status scheduled."
+      summary: "ACC-038. Confirm, reschedule or cancel the patient's own appointment on their behalf. reasonCode (lower-case code, 3-40 characters) is required to cancel, newStartTime to reschedule (the response then carries the new appointment id). Idempotency-Key required. confirm (ACC-041) validates ownership, stores appointments.patient_confirmed_at once (idempotent) and answers { status: scheduled, patientConfirmedAt }. call-me (ACC-041) opens a desk exception (kind call_me) for an appointment inside the cancellation window. A change inside the window is refused 422 INSIDE_CANCELLATION_WINDOW with windowHours."
       x-required-permission: authenticated
       parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
       requestBody:

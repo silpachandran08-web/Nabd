@@ -56,6 +56,12 @@ class InternalSchedulingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.book(tid, caller(tid), req.patientRef(), req.doctorId(), req.startTime()));
     }
 
+    @GetMapping("/internal/v1/tenants/{tid}/appointments/{id}")
+    Map<String, Object> detail(@PathVariable UUID tid, @PathVariable UUID id, @RequestParam String patientRef) {
+        caller(tid);
+        return service.detail(tid, id, patientRef);
+    }
+
     @Idempotent
     @PostMapping("/internal/v1/tenants/{tid}/appointments/{id}/{action}")
     Map<String, Object> act(@PathVariable UUID tid, @PathVariable UUID id, @PathVariable String action, @Valid @RequestBody ActionRequest req) {

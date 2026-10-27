@@ -68,6 +68,7 @@ schemas:
       working_hours_id: operational
       needs_reschedule_reason: operational
       confirmed_at: operational
+      patient_confirmed_at: operational
       no_show_at: operational
       no_show_marked_by: operational
       no_show_reason_code: operational
@@ -101,6 +102,13 @@ schemas:
       accepted_slot: operational
       new_appointment_id: operational
       created_by: operational
+    appointment_desk_exceptions:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      kind: operational
+      status: operational
+      created_at: operational
     booking_policy_versions:
       id: operational
       tenant_id: operational

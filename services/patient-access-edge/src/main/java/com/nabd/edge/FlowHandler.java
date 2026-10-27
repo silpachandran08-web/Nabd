@@ -18,7 +18,8 @@ public interface FlowHandler {
     /** Context keys the Edge may keep: ids, first name, age. Anything else is refused (no clinical content in the Edge DB). */
     Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care", "cands", "ciChannel",
             /* ACC-040/042: who (opaque patientRef), day, misses (unrecognised messages in a row), urgent, cname/dob (child being added) */
-            "who", "day", "misses", "urgent", "cname", "dob");
+            "who", "day", "misses", "urgent", "cname", "dob",
+            "appointmentId", "patientRef", "flow");
 
     record Conversation(UUID id, UUID tenantId, String channel, String contactHash, State state, Map<String, String> context,
                         int version) {

@@ -78,6 +78,8 @@ abstract class EdgeTestBase {
         UP.checkIns.clear();
         UP.checkInReplies.clear();
         UP.consentStatus = 201;
+        UP.coreHook = null;
+        UP.coreLog.clear();
         UP.noticeVersion = "v1";
         if (counting != null) {
             counting.invocations.set(0);
