@@ -36,4 +36,9 @@ module "aws" {
   pgbouncer_ami_id            = var.pgbouncer_ami_id
   db_max_allocated_storage_gb = var.db_max_allocated_storage_gb
   pgbouncer_app_pool_size     = var.pgbouncer_app_pool_size
+
+  # OPS-059
+  dr_standby_enabled = var.dr_standby_enabled
+  dr_vpc_cidr        = var.dr_vpc_cidr
+  dr_azs             = var.dr_azs
 }
