@@ -660,6 +660,37 @@ schemas:
       decision_note: pii  # free text typed by staff
       decided_at: operational
       created_at: operational
+    charge_doctor_fees:
+      tenant_id: operational
+      charge_id: operational
+      doctor_id: operational
+      amount: financial
+      updated_by: operational
+      updated_at: operational
+    charge_price_changes:
+      id: operational
+      tenant_id: operational
+      charge_id: operational
+      doctor_id: operational
+      field: operational
+      old_value: financial
+      new_value: financial
+      actor_id: operational
+      effective_from: operational
+      created_at: operational
+    payment_gateway_accounts:
+      id: operational
+      tenant_id: operational
+      provider: operational
+      merchant_ref: operational
+      secret_ref: operational  # a secret NAME in the tenant secret store, never the value
+      webhook_secret_ref: operational
+      status: operational
+      last_test_status: operational
+      last_test_at: operational
+      connected_by: operational
+      connected_at: operational
+      disabled_at: operational
     credit_notes:
       id: operational
       tenant_id: operational

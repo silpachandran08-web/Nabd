@@ -1414,6 +1414,113 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "invalid-sac-hsn or rate-not-allowed" }
 
+  /setup/charges/{id}/doctor-fees:
+    get:
+      tags: [Setup]
+      summary: "Per-doctor fees of a Consultation charge (FIN-015); 422 NOT_CONSULTATION_CATEGORY for another category"
+      x-required-permission: setup:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Fees as { fees: [{ doctorId, doctorName, amount }] }", content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Setup]
+      summary: "Set or clear doctor fees (amount null clears back to the base price); audited and logged in the price change log"
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: "The fees now in force", content: { application/json: { schema: { type: object } } } }
+        "422": { description: "unknown-doctor | NOT_CONSULTATION_CATEGORY" }
+
+  /setup/policies/follow_up_window_days:
+    put:
+      tags: [Setup]
+      summary: "Set the follow-up window in days, 1 to 90 (FIN-015). Body { value }"
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: "The policy", content: { application/json: { schema: { $ref: "#/components/schemas/Policy" } } } }
+        "400": { description: "validation-failed" }
+
+  /setup/charges/changes:
+    get:
+      tags: [Setup]
+      summary: "Price change log (FIN-016), newest first. Filters chargeId, field, from, to; cursor paging"
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "items and nextCursor", content: { application/json: { schema: { type: object } } } }
+
+  /setup/charges/changes/export:
+    get:
+      tags: [Setup]
+      summary: The price change log as CSV with the same filters (FIN-016)
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "text/csv", content: { text/csv: { schema: { type: string } } } }
+
+  /billing/gateway-accounts/current:
+    get:
+      tags: [Billing]
+      summary: The clinic's connected payment gateway, if any (FIN-019)
+      x-required-permission: billing:view
+      responses:
+        "200": { description: "connected and account", content: { application/json: { schema: { type: object } } } }
+
+  /billing/gateway-accounts:
+    post:
+      tags: [Billing]
+      summary: "Connect the clinic's own Razorpay account (FIN-019). Step-up required; keys are stored by reference and never returned"
+      x-required-permission: setup:edit
+      x-step-up: true
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "201": { description: "The connected account", content: { application/json: { schema: { type: object } } } }
+        "422": { description: "gateway-keys-rejected" }
+        "503": { description: "gateway-unavailable (secret store or provider not reachable)" }
+
+  /billing/gateway-accounts/{id}/test-payment:
+    post:
+      tags: [Billing]
+      summary: Create a Rs 1 test payment link on the connected account (FIN-019)
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      responses:
+        "202": { description: "testId and paymentLinkUrl", content: { application/json: { schema: { type: object } } } }
+
+  /billing/gateway-accounts/{id}:
+    delete:
+      tags: [Billing]
+      summary: Disconnect the gateway account (FIN-019). Step-up required
+      x-required-permission: setup:edit
+      x-step-up: true
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: Disconnected }
+
+  /owner/messaging/health:
+    get:
+      tags: [Messaging]
+      summary: "WhatsApp sender health for the owner (COM-022): quality, tier, throttle mode, 7-day block rate, history and templates"
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "MessagingHealth", content: { application/json: { schema: { type: object } } } }
+
+  /messaging/quality:
+    get:
+      tags: [Messaging]
+      summary: "One-word WhatsApp quality label for the inbox header (High, Medium, Low or Unknown); empty object when the clinic has no number"
+      x-required-permission: isAuthenticated()
+      responses:
+        "200": { description: "quality", content: { application/json: { schema: { type: object } } } }
+
   /setup/policies:
     get:
       tags: [Setup]

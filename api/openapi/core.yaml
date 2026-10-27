@@ -2291,6 +2291,157 @@ paths:
       tags:
       - billing
       x-required-permission: billing:edit
+  /v1/billing/gateway-accounts:
+    post:
+      operationId: GatewayAccountController_connect
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AccountView"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: setup:edit
+  /v1/billing/gateway-accounts/current:
+    get:
+      operationId: GatewayAccountController_current
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Current"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+  /v1/billing/gateway-accounts/{id}:
+    delete:
+      operationId: GatewayAccountController_disconnect
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: setup:edit
+  /v1/billing/gateway-accounts/{id}/test-payment:
+    post:
+      operationId: GatewayAccountController_testPayment
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TestRun"
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: setup:edit
   /v1/billing/invoices:
     get:
       operationId: DuesController_invoices
@@ -7052,6 +7203,39 @@ paths:
       tags:
       - staff
       x-required-permission: authenticated
+  /v1/messaging/quality:
+    get:
+      operationId: OwnerMessagingController_quality
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - messaging
+      x-required-permission: isAuthenticated()
   /v1/nursing/activity/today:
     get:
       operationId: NursingController_activityToday
@@ -7620,6 +7804,37 @@ paths:
       tags:
       - organization
       x-required-permission: setup:edit
+  /v1/owner/messaging/health:
+    get:
+      operationId: OwnerMessagingController_health
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MessagingHealth"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - messaging
+      x-required-permission: setup:view
   /v1/owners/auth/login:
     post:
       operationId: OwnerController_login
@@ -11298,6 +11513,59 @@ paths:
       tags:
       - organization
       x-required-permission: authenticated
+  /v1/platform/senders:
+    get:
+      operationId: PlatformSendersController_list
+      parameters:
+      - in: query
+        name: rating
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: region
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FleetSenderPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: clinics_fleet:view
   /v1/platform/support-access/grants:
     get:
       operationId: SupportAccessController_listGrants
@@ -13703,6 +13971,128 @@ paths:
       tags:
       - organization
       x-required-permission: setup:edit
+  /v1/setup/charges/changes:
+    get:
+      operationId: PricingController_changes
+      parameters:
+      - in: query
+        name: chargeId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: field
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PriceChangePage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/setup/charges/changes/export:
+    get:
+      operationId: PricingController_export
+      parameters:
+      - in: query
+        name: chargeId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: field
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
   /v1/setup/charges/{id}:
     patch:
       operationId: SetupController_updateCharge
@@ -13725,6 +14115,87 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ChargeHeadResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/charges/{id}/doctor-fees:
+    get:
+      operationId: PricingController_fees
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DoctorFeesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+    put:
+      operationId: PricingController_setFees
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DoctorFeeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DoctorFeesResponse"
           description: OK
         "401":
           content:
@@ -14834,6 +15305,43 @@ paths:
       tags:
       - organization
       x-required-permission: setup:view
+  /v1/setup/policies/follow_up_window_days:
+    put:
+      operationId: PricingController_followUpWindow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WindowRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
   /v1/setup/policies/{key}:
     patch:
       operationId: SetupController_updatePolicy
@@ -16569,6 +17077,24 @@ components:
           type: string
         version:
           type: string
+    AccountView:
+      type: object
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        connectedAt:
+          type: string
+          format: date-time
+        lastTestAt:
+          type: string
+          format: date-time
+        oauthUrl:
+          type: string
+        provider:
+          type: string
+        status:
+          type: string
     ActivateRequest:
       type: object
       properties:
@@ -17879,6 +18405,15 @@ components:
           format: date
       required:
       - condition
+    ConnectRequest:
+      type: object
+      properties:
+        keys:
+          $ref: "#/components/schemas/Keys"
+        mode:
+          type: string
+        provider:
+          type: string
     ConsentCaptureRequest:
       type: object
       properties:
@@ -18072,6 +18607,13 @@ components:
             type: string
         type:
           type: string
+    Current:
+      type: object
+      properties:
+        account:
+          $ref: "#/components/schemas/AccountView"
+        connected:
+          type: boolean
     DailyMoneyResponse:
       type: object
       properties:
@@ -18610,6 +19152,38 @@ components:
           format: uuid
         reason:
           type: string
+    DoctorFee:
+      type: object
+      properties:
+        amount:
+          type: number
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+    DoctorFeeInput:
+      type: object
+      properties:
+        amount:
+          type: number
+        doctorId:
+          type: string
+          format: uuid
+    DoctorFeeRequest:
+      type: object
+      properties:
+        fees:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorFeeInput"
+    DoctorFeesResponse:
+      type: object
+      properties:
+        fees:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorFee"
     DoctorLeaveResponse:
       type: object
       properties:
@@ -19399,6 +19973,46 @@ components:
             $ref: "#/components/schemas/TenantSummaryResponse"
         page:
           $ref: "#/components/schemas/PageMeta"
+    FleetSender:
+      type: object
+      properties:
+        deliveredRate7d:
+          type: number
+          format: double
+        displayPhone:
+          type: string
+        kind:
+          type: string
+        rating:
+          type: string
+        region:
+          type: string
+        senderAccountId:
+          type: string
+          format: uuid
+        sends7d:
+          type: integer
+          format: int64
+        status:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+        tenantName:
+          type: string
+        throttleMode:
+          type: string
+        tier:
+          type: string
+    FleetSenderPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FleetSender"
+        nextCursor:
+          type: string
     FleetSummaryResponse:
       type: object
       properties:
@@ -20080,6 +20694,13 @@ components:
           type: string
     JsonNode:
       type: object
+    Keys:
+      type: object
+      properties:
+        keyId:
+          type: string
+        keySecret:
+          type: string
     KillRequest:
       type: object
       properties:
@@ -20250,6 +20871,8 @@ components:
           type: number
           exclusiveMinimum: false
           minimum: 0
+        tier:
+          type: string
         unitPrice:
           type: number
           exclusiveMinimum: false
@@ -20351,6 +20974,77 @@ components:
           format: uuid
       required:
       - duplicatePatientId
+    MessagingHealth:
+      type: object
+      properties:
+        senders:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessagingSender"
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessagingTemplate"
+    MessagingSender:
+      type: object
+      properties:
+        blockRate24h:
+          type: number
+          format: double
+        blockRate7d:
+          type: array
+          items:
+            type: number
+            format: double
+        displayName:
+          type: string
+        displayPhone:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/SenderEvent"
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        overrideUntil:
+          type: string
+          format: date-time
+        quality:
+          type: string
+        rating:
+          type: string
+        status:
+          type: string
+        throttleLine:
+          type: number
+          format: double
+        throttleMode:
+          type: string
+        throttleReason:
+          type: string
+        tier:
+          type: string
+        tierLabel:
+          type: string
+    MessagingTemplate:
+      type: object
+      properties:
+        category:
+          type: string
+        id:
+          type: string
+          format: uuid
+        language:
+          type: string
+        name:
+          type: string
+        rejectionReason:
+          type: string
+        status:
+          type: string
     Method:
       type: object
       properties:
@@ -22108,6 +22802,40 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Component"
+    PriceChange:
+      type: object
+      properties:
+        actor:
+          type: string
+        at:
+          type: string
+          format: date-time
+        chargeId:
+          type: string
+          format: uuid
+        chargeName:
+          type: string
+        doctorId:
+          type: string
+          format: uuid
+        field:
+          type: string
+        id:
+          type: string
+          format: uuid
+        newValue:
+          type: string
+        oldValue:
+          type: string
+    PriceChangePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriceChange"
+        nextCursor:
+          type: string
     PrivacyNoticePublishRequest:
       type: object
       properties:
@@ -23359,6 +24087,16 @@ components:
       - packageId
       - patientId
       - paymentMethod
+    SenderEvent:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+        text:
+          type: string
     Service:
       type: object
       properties:
@@ -23926,7 +24664,15 @@ components:
       properties:
         chargeCode:
           type: string
+        emergencyAmount:
+          type: number
+        followUpAmount:
+          type: number
         name:
+          type: string
+        normalAmount:
+          type: number
+        reason:
           type: string
         tier:
           type: string
@@ -24196,6 +24942,14 @@ components:
           format: int32
         method:
           type: string
+    TestRun:
+      type: object
+      properties:
+        paymentLinkUrl:
+          type: string
+        testId:
+          type: string
+          format: uuid
     TicketResponse:
       type: object
       properties:
@@ -24754,6 +25508,12 @@ components:
       required:
       - doctorId
       - patientId
+    WindowRequest:
+      type: object
+      properties:
+        value:
+          type: integer
+          format: int32
     WithdrawConsentRequest:
       type: object
       properties:

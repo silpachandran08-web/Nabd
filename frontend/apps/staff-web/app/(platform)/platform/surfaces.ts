@@ -30,6 +30,7 @@ export type Surface = {
 export const SURFACES: Surface[] = [
   { permission: "", label: "Command Centre", short: "Today", href: "/platform", icon: "chart", section: "Today" },
   { permission: "clinics_fleet:view", label: "Clinics", short: "Clinics", href: "/platform/fleet", icon: "building", section: "Customers" },
+  { permission: "clinics_fleet:view", label: "WhatsApp Senders", short: "Senders", href: "/platform/senders", icon: "bolt", section: "Customers" },
   { permission: "onboarding_provisioning:view", label: "Onboarding", short: "Onboard", href: "/platform/provisioning", icon: "plusSquare", section: "Customers" },
   { permission: "territories:view", label: "Territories", short: "Territories", href: "/platform/territories", icon: "globe", section: "Customers" },
   { permission: "billing_revenue:view", label: "Billing & Revenue", short: "Billing", href: "/platform/billing", icon: "wallet", section: "Money" },
