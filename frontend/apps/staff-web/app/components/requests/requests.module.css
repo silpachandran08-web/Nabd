@@ -22,7 +22,7 @@
 .overdue { color: var(--nb-text-primary); font-weight: 600; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
 .primary, .secondary { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-16); border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer; border: 1px solid var(--nb-border-default); }
-.primary { background: var(--nb-accent-500); color: var(--nb-text-on-accent, #fff); border-color: var(--nb-accent-500); font-weight: 600; }
+.primary { background: var(--nb-accent-500); color: var(--nb-on-accent); border-color: var(--nb-accent-500); font-weight: 600; }
 .secondary { background: var(--nb-surface-2); color: var(--nb-text-primary); }
 .primary:disabled { opacity: 0.6; cursor: default; }
 .primary:focus-visible, .secondary:focus-visible, .linkBtn:focus-visible, .moreLink:focus-visible, .field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }

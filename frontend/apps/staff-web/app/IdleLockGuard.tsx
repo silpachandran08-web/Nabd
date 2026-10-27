@@ -123,7 +123,7 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
     }
   }
 
-  // The lock overlay covers the whole viewport (z-index 9999), above every page's own modals,
+  // The lock overlay covers the whole viewport (--z-lock), above every page's own modals,
   // so without this, a locked session with a forgotten PIN has no way out at all.
   async function signOut() {
     setSigningOut(true);
@@ -149,7 +149,7 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
       <div id="app-root" style={{ display: "contents" }} inert={locked}>{booted && (released || !locked) ? children : null}</div>
       {warn !== null && !locked && (
         <div role="alert" style={{
-          position: "fixed", insetBlockEnd: 16, insetInlineStart: 16, zIndex: 9998, maxInlineSize: 360,
+          position: "fixed", insetBlockEnd: 16, insetInlineStart: 16, zIndex: "calc(var(--z-lock) - 1)", maxInlineSize: 360,
           background: "var(--nb-surface-1)", color: "var(--nb-text-primary)", border: "1px solid var(--nb-border-default)",
           borderRadius: "var(--nb-radius-lg)", padding: "12px 16px", fontSize: 13,
         }}>
@@ -158,7 +158,7 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
       )}
       {locked && (
         <div style={{
-          position: "fixed", inset: 0, background: "rgba(10,12,14,0.97)", zIndex: 9999,
+          position: "fixed", inset: 0, background: "rgba(10,12,14,0.97)", zIndex: "var(--z-lock)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <form ref={dialogRef} onSubmit={unlock} onKeyDown={trapTab} role="dialog" aria-modal="true" aria-labelledby="lock-title" style={{

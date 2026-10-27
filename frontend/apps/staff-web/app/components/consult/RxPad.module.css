@@ -35,7 +35,7 @@
   position: absolute;
   inset-inline: 0;
   inset-block-start: 100%;
-  z-index: 20;
+  z-index: var(--z-nav);
   margin: 2px 0 0;
   padding: var(--nb-space-4);
   list-style: none;

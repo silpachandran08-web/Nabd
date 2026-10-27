@@ -97,7 +97,7 @@ export default function TenantFeaturesPage() {
                 {rows.map((r) => (
                   <tr key={r.code} data-testid={`override-${r.code}`}>
                     <td>{r.code}</td>
-                    <td style={r.state === "kill" ? { color: "var(--nb-danger, #ff6b6b)", fontWeight: 600 } : undefined}>{r.state}</td>
+                    <td style={r.state === "kill" ? { color: "var(--nb-danger-500)", fontWeight: 600 } : undefined}>{r.state}</td>
                     <td>{r.reason}</td>
                     <td>{r.expiresAt ? new Date(r.expiresAt).toLocaleString() : "never"}</td>
                   </tr>

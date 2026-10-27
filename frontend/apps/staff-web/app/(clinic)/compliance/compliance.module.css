@@ -2,13 +2,13 @@
 .title { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0 0 var(--nb-space-4); }
 .subtitle { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-24); }
 .h2 { font-size: 16px; font-weight: 600; margin: 0 0 var(--nb-space-16); }
-.card { background: var(--nb-surface); border: 1px solid var(--nb-border); border-radius: 12px; padding: var(--nb-space-24); }
-.req { border-block-end: 1px solid var(--nb-border); padding-block: var(--nb-space-16); display: grid; gap: var(--nb-space-8); }
+.card { background: var(--nb-surface-1); border: 1px solid var(--nb-border-default); border-radius: 12px; padding: var(--nb-space-24); }
+.req { border-block-end: 1px solid var(--nb-border-default); padding-block: var(--nb-space-16); display: grid; gap: var(--nb-space-8); }
 .muted { color: var(--nb-text-secondary); font-size: 13px; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; }
-.input { min-block-size: 44px; padding-inline: var(--nb-space-12); flex: 1 1 200px; border: 1px solid var(--nb-border); border-radius: 8px; background: transparent; color: inherit; }
-.primary, .secondary { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-16); border-radius: 8px; border: 1px solid var(--nb-border); cursor: pointer; font: inherit; color: inherit; background: transparent; }
-.primary { background: var(--nb-accent, #2f6fed); border-color: transparent; color: #fff; }
+.input { min-block-size: 44px; padding-inline: var(--nb-space-12); flex: 1 1 200px; border: 1px solid var(--nb-border-default); border-radius: 8px; background: transparent; color: inherit; }
+.primary, .secondary { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-16); border-radius: 8px; border: 1px solid var(--nb-border-default); cursor: pointer; font: inherit; color: inherit; background: transparent; }
+.primary { background: var(--nb-accent-500); border-color: transparent; color: #fff; }
 .history { list-style: none; margin: var(--nb-space-16) 0 0; padding: 0; display: grid; gap: var(--nb-space-12); }
-.error { padding: var(--nb-space-12); border-radius: 8px; border: 1px solid var(--nb-danger, #c0392b); margin-block-end: var(--nb-space-16); }
+.error { padding: var(--nb-space-12); border-radius: 8px; border: 1px solid var(--nb-danger-500); margin-block-end: var(--nb-space-16); }
 @media (max-width: 480px) { .page { padding: var(--nb-space-16); } .card { padding: var(--nb-space-16); } }

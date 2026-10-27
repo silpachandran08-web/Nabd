@@ -11,11 +11,13 @@ const SHOTS = '/home/claude/ws/reports/shots-rec7';
 const SHOT = (p, n) => p.screenshot({ path: `${SHOTS}/${n}.png` });
 
 // ---- 1. token contrast (dark is the only theme in globals.css; assert that so a light theme forces an update here)
-const css = readFileSync(join(ROOT, 'app/globals.css'), 'utf8');
+// FEF-022: tokens moved to the generated packages/tokens/dist/tokens.css (dark :root first, provisional [data-theme=light] after it).
+const css = readFileSync(join(ROOT, '../../packages/tokens/dist/tokens.css'), 'utf8').split(':root[data-theme="light"]')[0];
+const globalsCss = readFileSync(join(ROOT, 'app/globals.css'), 'utf8');
 const tok = (n) => css.match(new RegExp(`--nb-${n}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
 const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-check('T0 only the dark theme exists (no light/data-theme overrides)', !/prefers-color-scheme|data-theme[^{]*\{[^}]*--nb-(text|bg|surface|border)/.test(css)); // FEF-027's light focus-ring override is not a theme
+check('T0 dark is the default theme (no prefers-color-scheme switch; light only via explicit [data-theme])', !/prefers-color-scheme/.test(css + globalsCss) && !/data-theme/.test(globalsCss)); // FEF-027's light focus-ring override is not a theme
 const surfaces = ['bg-root', 'bg-canvas', 'bg-nav', 'surface-1', 'surface-2', 'surface-3', 'surface-overlay'];
 for (const s of surfaces) {
   const r = ratio(tok('text-tertiary'), tok(s));
