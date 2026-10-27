@@ -32,7 +32,7 @@ class InternalSchedulingController {
     }
 
     @Schema(name = "InternalAppointmentActionRequest")
-    record ActionRequest(@NotBlank String patientRef, Instant newStartTime, String reasonCode) {
+    record ActionRequest(@NotBlank String patientRef, Instant newStartTime, String reasonCode, String note) {
     }
 
     private final InternalSchedulingService service;
@@ -59,7 +59,14 @@ class InternalSchedulingController {
     @Idempotent
     @PostMapping("/internal/v1/tenants/{tid}/appointments/{id}/{action}")
     Map<String, Object> act(@PathVariable UUID tid, @PathVariable UUID id, @PathVariable String action, @Valid @RequestBody ActionRequest req) {
-        return service.act(tid, caller(tid), id, action, req.patientRef(), req.newStartTime(), req.reasonCode());
+        return service.act(tid, caller(tid), id, action, req.patientRef(), req.newStartTime(), req.reasonCode(), req.note());
+    }
+
+    /** ACC-007: the same coded list the desk uses, in the patient's language, for the bot's one-tap cancel reasons. */
+    @GetMapping("/internal/v1/tenants/{tid}/reason-codes")
+    Map<String, Object> reasonCodes(@PathVariable UUID tid, @RequestParam String kind, @RequestParam(required = false) String locale) {
+        caller(tid);
+        return Map.of("items", service.reasonCodes(tid, kind, locale));
     }
 
     /** Second line behind InternalCallerFilter: only a service identity, and only for a clinic its token names. */

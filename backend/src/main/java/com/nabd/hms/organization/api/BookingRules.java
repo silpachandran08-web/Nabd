@@ -17,6 +17,12 @@ public interface BookingRules {
     /** visitType: new | followUp | procedure | teleconsult. Empty for any other value. */
     Optional<Rule> rule(UUID facilityId, String visitType);
 
+    /** ACC-025: noShow section of the published policy (defaults: grace 15 min, auto-mark off). */
+    record NoShowRule(int graceMinutes, boolean autoMark, boolean pullForward) {
+    }
+
+    NoShowRule noShowRule();
+
     /** The published version for the bound tenant, empty when the clinic never published (appointments.policy_version stays null). */
     Optional<Integer> publishedVersion();
 }

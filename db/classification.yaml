@@ -66,6 +66,27 @@ schemas:
       decided_at: operational
       session_token: operational
       working_hours_id: operational
+      no_show_at: operational
+      no_show_marked_by: operational
+      no_show_reason_code: operational
+      decision_source_before_no_show: operational
+      late_arrival_queue_entry_id: operational
+      cancel_reason_code: operational
+    reason_code_catalogue:
+      kind: operational
+      code: operational
+      market: operational
+      labels: operational
+      requires_note: operational
+      sort: operational
+    tenant_reason_codes:
+      id: operational
+      tenant_id: operational
+      kind: operational
+      code: operational
+      labels: operational
+      hidden: operational
+      created_at: operational
     booking_policy_versions:
       id: operational
       tenant_id: operational

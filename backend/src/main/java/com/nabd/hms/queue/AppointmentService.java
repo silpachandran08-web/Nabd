@@ -48,11 +48,13 @@ public class AppointmentService {
     private final SlotValidator slotValidator;
     private final EventPublisher events;
     private final com.nabd.hms.shared.notify.NotificationPort notifications;
+    private final com.nabd.hms.queue.api.ReasonCodes reasons;
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
                         SlotValidator slotValidator, EventPublisher events,
-                        com.nabd.hms.shared.notify.NotificationPort notifications) {
+                        com.nabd.hms.shared.notify.NotificationPort notifications, com.nabd.hms.queue.api.ReasonCodes reasons) {
+        this.reasons = reasons;
         this.events = events;
         this.notifications = notifications;
         this.slotValidator = slotValidator;
@@ -140,7 +142,8 @@ public class AppointmentService {
     public AppointmentResponse cancel(UUID tenantId, UUID callerStaffId, UUID id, CancelRequest req) {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
-        repo.cancel(tenantId, id, req.reason());
+        String note = reasons.require("cancel", req.reasonCode(), req.note() != null ? req.note() : req.reason());
+        repo.cancel(tenantId, id, req.reasonCode(), note);
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED); // COM-004: reminders about it are void
         log.info("appointment {} cancelled by {}", id, callerStaffId);
         published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled", Map.of());
@@ -155,7 +158,7 @@ public class AppointmentService {
         int slotMinutes = slotValidator.validate(tenantId, current.doctorId(), req.newStartTime(), clock.now());
         slotValidator.requireNoLiveOffer(tenantId, current.doctorId(), req.newStartTime(), null);
 
-        repo.cancel(tenantId, id, "rescheduled");
+        repo.cancel(tenantId, id, "rescheduled", "rescheduled");
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED);
         enforceSessionCapacity(tenantId, current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
@@ -267,7 +270,8 @@ public class AppointmentService {
 
     private AppointmentResponse toResponse(AppointmentRow row) {
         return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(),
-                row.status(), row.isFollowUp(), row.cancelReason(), row.decisionSource(), row.channel(), row.bookingKind(), row.sessionToken(), expectedRange(row));
+                row.status(), row.isFollowUp(), row.cancelReason(), row.decisionSource(), row.channel(), row.bookingKind(), row.sessionToken(), expectedRange(row),
+                row.cancelReasonCode(), row.noShowAt(), row.noShowMarkedBy(), row.lateArrivalQueueEntryId());
     }
 
     /** ACC-011: a token booking shows an expected range from the average consult time, never a fixed time. */

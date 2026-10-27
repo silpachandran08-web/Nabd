@@ -194,10 +194,11 @@ class AppointmentApiTest extends ApiTestBase {
         String id = (String) booked.getBody().get("id");
 
         ResponseEntity<Map> resp = exchange("/v1/appointments/" + id + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "patient request")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "other", "note", "patient request")), Map.class); // ACC-007: coded reason, free text only with 'other'
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("status")).isEqualTo("cancelled");
         assertThat(resp.getBody().get("cancelReason")).isEqualTo("patient request"); // QA-06
+        assertThat(resp.getBody().get("cancelReasonCode")).isEqualTo("other");
 
         // QA-06: the reason is on GET single and the list too; a live booking carries cancelReason: null
         ResponseEntity<Map> single = exchange("/v1/appointments/" + id, HttpMethod.GET, authed(token), Map.class);
@@ -209,7 +210,7 @@ class AppointmentApiTest extends ApiTestBase {
 
         // cancelling an already-cancelled appointment is no longer "scheduled" -> 404
         ResponseEntity<Map> again = exchange("/v1/appointments/" + id + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "patient request")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 

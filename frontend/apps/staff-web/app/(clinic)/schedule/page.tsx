@@ -8,7 +8,7 @@ import styles from "./schedule.module.css";
 import NewAppointmentDialog from "./NewAppointmentDialog";
 import Dialog from "../../components/ui/Dialog";
 import { can } from "../../lib/permissions";
-import { CancelAppointmentDialog, MoveAppointmentDialog } from "./AppointmentActions";
+import { CancelAppointmentDialog, MoveAppointmentDialog, NoShowDialog, NoShowFollowUpDialog } from "./AppointmentActions";
 import LiveQueueBoard from "./LiveQueueBoard";
 import WaitlistPanel from "./WaitlistPanel";
 import EtaDisplayPanel from "./EtaDisplayPanel";
@@ -78,7 +78,8 @@ type Dialog =
   | { kind: "booking"; booking: Booking; doctor: Doctor }
   | { kind: "slot"; cell: Cell; doctor: Doctor; time: string }
   | { kind: "cancel"; booking: Booking; doctor: Doctor }
-  | { kind: "move"; booking: Booking; doctor: Doctor };
+  | { kind: "move"; booking: Booking; doctor: Doctor }
+  | { kind: "noshow" | "undo" | "late"; booking: Booking; doctor: Doctor }; // ACC-025
 
 export default function SchedulePage() {
   const qc = useQueryClient();
@@ -298,20 +299,33 @@ export default function SchedulePage() {
             ["Status", statusLabel(dialog.booking.status)],
           ]}
           action={day.today ? { label: "Open live queue", href: "/arrivals" } : undefined}
-          extra={canEdit && dialog.booking.appointmentId && dialog.booking.status === "scheduled" ? (
+          extra={dialog.booking.appointmentId ? (
             <>
-              <button type="button" className={styles.btn} onClick={() => setDialog({ kind: "move", booking: dialog.booking, doctor: dialog.doctor })}>Move</button>
-              <button type="button" className={styles.btnDangerOutline} onClick={() => setDialog({ kind: "cancel", booking: dialog.booking, doctor: dialog.doctor })}>Cancel appointment</button>
+              {canEdit && dialog.booking.status === "scheduled" && (
+                <>
+                  <button type="button" className={styles.btn} onClick={() => setDialog({ kind: "move", booking: dialog.booking, doctor: dialog.doctor })}>Move</button>
+                  {day.today && <button type="button" className={styles.btn} onClick={() => setDialog({ kind: "noshow", booking: dialog.booking, doctor: dialog.doctor })}>Mark no-show</button>}
+                  <button type="button" className={styles.btnDangerOutline} onClick={() => setDialog({ kind: "cancel", booking: dialog.booking, doctor: dialog.doctor })}>Cancel appointment</button>
+                </>
+              )}
+              {dialog.booking.status === "no_show" && day.today && canEdit && (
+                <button type="button" className={styles.btn} onClick={() => setDialog({ kind: "undo", booking: dialog.booking, doctor: dialog.doctor })}>Undo no-show</button>
+              )}
+              {dialog.booking.status === "no_show" && day.today && canBook && (
+                <button type="button" className={styles.btn} onClick={() => setDialog({ kind: "late", booking: dialog.booking, doctor: dialog.doctor })}>Late arrival</button>
+              )}
             </>
           ) : undefined} />
       )}
-      {(dialog?.kind === "cancel" || dialog?.kind === "move") && day && dialog.booking.appointmentId && (() => {
+      {(dialog?.kind === "cancel" || dialog?.kind === "move" || dialog?.kind === "noshow" || dialog?.kind === "undo" || dialog?.kind === "late") && day && dialog.booking.appointmentId && (() => {
         const target = {
           appointmentId: dialog.booking.appointmentId, patientName: dialog.booking.patientName,
           doctorId: dialog.doctor.id, doctorName: dialog.doctor.name, time: dialog.booking.time,
           dateLabel: formatDay(day.date, { day: "numeric", month: "short", year: "numeric" }),
         };
         const done = () => { setDialog(null); void load(); };
+        if (dialog.kind === "noshow") return <NoShowDialog target={target} onClose={closeDialog} onDone={done} />;
+        if (dialog.kind === "undo" || dialog.kind === "late") return <NoShowFollowUpDialog kind={dialog.kind} target={target} onClose={closeDialog} onDone={done} />;
         return dialog.kind === "cancel"
           ? <CancelAppointmentDialog target={target} onClose={closeDialog} onDone={done} />
           : <MoveAppointmentDialog target={target} timezone={day.timezone} initialDate={day.date} onClose={closeDialog} onDone={done} />;

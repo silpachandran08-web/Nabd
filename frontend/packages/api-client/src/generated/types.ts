@@ -26,7 +26,7 @@ export type AllergyStatusResponse = { activeCount?: number; documentedAt?: strin
 export type AllergyWriteRequest = { allergenClassId?: string; allergenIngredientId?: string; category?: string; reaction?: string; severity: string; source?: string; substance: string; };
 export type Answer = { label?: string; nextQuestion?: string; outcome?: string; };
 export type AppointmentPage = { data?: Array<AppointmentResponse>; page?: PageMeta; };
-export type AppointmentResponse = { bookingKind?: string; cancelReason?: string; channel?: string; decisionSource?: string; doctorId?: string; endTime?: string; expectedRange?: string; id?: string; isFollowUp?: boolean; patientId?: string; sessionToken?: number; startTime?: string; status?: string; };
+export type AppointmentResponse = { bookingKind?: string; cancelReason?: string; cancelReasonCode?: string; channel?: string; decisionSource?: string; doctorId?: string; endTime?: string; expectedRange?: string; id?: string; isFollowUp?: boolean; lateArrivalQueueEntryId?: string; noShowAt?: string; noShowMarkedBy?: string; patientId?: string; sessionToken?: number; startTime?: string; status?: string; };
 export type AppointmentWriteRequest = { doctorId: string; followUpOrDefault?: boolean; isFollowUp?: boolean; patientId: string; startTime: string; };
 export type ApproveRefundRequest = { expectedAmount?: number; };
 export type ApproveRequest = { approvedBy: string; csoApprovalRef: string; };
@@ -49,6 +49,7 @@ export type BookingPolicyPublishResponse = { effectiveAt?: string; version?: num
 export type BookingPolicyPublished = { config?: Record<string, Record<string, unknown>>; publishedAt?: string; publishedBy?: string; version?: number; };
 export type BookingPolicyVersion = { changeNote?: string; diff?: Array<BookingPolicyChange>; publishedAt?: string; publishedBy?: string; publishedByName?: string; version?: number; };
 export type BookingPolicyVersions = { items?: Array<BookingPolicyVersion>; nextCursor?: string; };
+export type BookingReasonsResponse = { noShowByDoctorWeek?: Array<NoShowWeekRow>; topCancelReasons?: Array<CancelReasonRow>; };
 export type BookingRequestAcceptBody = { note?: string; slotStart?: string; };
 export type BookingRequestDeclineBody = { note?: string; reasonCode?: string; };
 export type BookingRequestItem = { appointmentId?: string; channel?: string; doctorId?: string; patient?: BookingRequestPatient; reviewReason?: string; slaDueAt?: string; start?: string; status?: string; suggestedAlternative?: string; triageFlags?: Array<string>; };
@@ -65,7 +66,8 @@ export type BreakGlassResponse = { activatedAt?: string; expiresAt?: string; gra
 export type CallNextRequest = { expectedHeadId?: string; };
 export type CallNextResponse = { entry?: QueueEntryResponse; reason?: string; };
 export type CallbackEntryResponse = { appointmentId?: string; doctorId?: string; patientId?: string; patientName?: string; startTime?: string; status?: string; };
-export type CancelRequest = { reason: string; };
+export type CancelReasonRow = { code?: string; count?: number; label?: string; };
+export type CancelRequest = { note?: string; reason?: string; reasonCode?: string; };
 export type Cell = { bookings?: Array<Booking>; doctorId?: string; kind?: string; slotStart?: string; };
 export type ChargeHeadResponse = { active?: boolean; baseAmount?: number; category?: string; code?: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom?: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; id?: string; name?: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeHeadWriteRequest = { active?: boolean; baseAmount: number; category: string; code: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; name: string; taxCode?: string; taxRatePercent?: number; };
@@ -212,7 +214,7 @@ export type InstanceEventResponse = { actorName?: string; createdAt?: string; de
 export type InstanceItemResponse = { allocatedPrice?: number; id?: string; itemType?: string; name?: string; quantityConsumed?: number; quantityTotal?: number; taxRatePercent?: number; unitListPrice?: number; };
 export type InstanceResponse = { events?: Array<InstanceEventResponse>; graceDays?: number; id?: string; invoiceId?: string; invoiceNumber?: string; items?: Array<InstanceItemResponse>; packageId?: string; packageName?: string; patientId?: string; patientName?: string; soldPrice?: number; soldTax?: number; status?: string; validityEnd?: string; validityStart?: string; };
 export type InstantiateRequest = { languages?: Array<string>; };
-export type InternalAppointmentActionRequest = { newStartTime?: string; patientRef: string; reasonCode?: string; };
+export type InternalAppointmentActionRequest = { newStartTime?: string; note?: string; patientRef: string; reasonCode?: string; };
 export type InternalAvailability = { doctors?: Array<InternalDoctorSessions>; v?: number; };
 export type InternalBookRequest = { doctorId: string; patientRef: string; startTime: string; };
 export type InternalBookingOfferChoice = { patientRef: string; slotStart?: string; };
@@ -230,6 +232,7 @@ export type InvoiceSeriesResponse = { fiscalYear?: string; fyStartMonth?: number
 export type Item = { classId?: string; lang?: string; matchKind?: string; value?: string; };
 export type JsonNode = Record<string, unknown>;
 export type KillRequest = { active?: boolean; reason: string; };
+export type LateArrivalRequest = { appointmentId: string; };
 export type LiabilityResponse = { activePatientPackages?: number; expiringIn30Days?: number; inGracePeriod?: number; potentialExpiryLoss?: number; refundsAwaitingApproval?: number; remainingAllocatedValue?: number; remainingListValue?: number; sessionsOwed?: number; };
 export type LicenceRequest = { isClinician: boolean; licenceExpiresOn?: string; };
 export type LicenceResponse = { hasRegistrationNo?: boolean; isClinician?: boolean; licenceExpiresOn?: string; licenceOverrideUntil?: string; staffId?: string; };
@@ -254,7 +257,9 @@ export type MfaVerifyRequest = { challengeId: string; code: string; };
 export type ModuleGrant = { approve?: boolean; breakGlass?: boolean; create?: boolean; delete?: boolean; edit?: boolean; export?: boolean; module?: string; refundDiscount?: boolean; view?: boolean; };
 export type ModuleState = { code?: string; enabled?: boolean; };
 export type MoneyResponse = { billsRaised?: number; bookings?: number; collected?: number; currency?: string; from?: string; includesToday?: boolean; noShows?: number; taxCollected?: number; taxLabel?: string; tender?: Array<Tender>; to?: string; topServices?: Array<Service>; waitingNow?: number; };
+export type NoShowRequest = { reasonCode?: string; };
 export type NoShowRiskResponse = { entries?: Array<Entry>; rule?: string; };
+export type NoShowWeekRow = { bookings?: number; doctorId?: string; doctorName?: string; noShowPct?: number; noShows?: number; weekStart?: string; };
 export type NoteAmendmentRequest = { assessment?: string; diagnosis?: string; objective?: string; plan?: string; reason: string; subjective?: string; };
 export type NoteAmendmentResponse = { amendedBy?: string; assessment?: string; createdAt?: string; diagnosis?: string; id?: string; objective?: string; plan?: string; reason?: string; subjective?: string; };
 export type NoteResponse = { assessment?: string; diagnosis?: string; doctorId?: string; id?: string; objective?: string; patientId?: string; plan?: string; queueEntryId?: string; signedAt?: string; signedBy?: string; status?: string; subjective?: string; updatedAt?: string; };
@@ -366,6 +371,8 @@ export type QuoteResponse = { currency?: string; documentType?: string; lines?: 
 export type QuoteTotals = { discountMinor?: number; roundOffMinor?: number; subtotalMinor?: number; taxMinor?: number; totalMinor?: number; };
 export type RaiseTicketRequest = { description: string; priority?: string; subject: string; };
 export type RangeTotals = { asOf?: string; billed?: number; byMethod?: Record<string, number>; collected?: number; completed?: number; from?: string; noShows?: number; packagesSold?: number; to?: string; visits?: number; };
+export type ReasonCodeAddRequest = { code: string; kind: string; labels: Record<string, string>; };
+export type ReasonCodeList = { items?: Array<Item>; };
 export type RecentMerges = { items?: Array<Item>; };
 export type RecoveryVerifyRequest = { challengeToken: string; recoveryCode: string; };
 export type RecoveryVerifyResponse = { accessToken?: string; expiresIn?: number; refreshToken?: string; remainingCodes?: number; };
@@ -532,6 +539,7 @@ export type Operations = {
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
   InternalChatConsentController_capture: { method: "post"; path: "/internal/v1/tenants/{tid}/patients/consents"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatConsentRequest; response: ChatConsentResponse };
   InternalChatConsentController_currentNotice: { method: "get"; path: "/internal/v1/tenants/{tid}/privacy-notice/current"; permission: "authenticated"; pathParams: { tid: string; }; query: { language?: string; }; body: never; response: ChatNoticeCurrent };
+  InternalSchedulingController_reasonCodes: { method: "get"; path: "/internal/v1/tenants/{tid}/reason-codes"; permission: "authenticated"; pathParams: { tid: string; }; query: { kind: string; locale?: string; }; body: never; response: Record<string, Record<string, unknown>> };
   AbhaController_enrol: { method: "post"; path: "/v1/abha/enrol"; permission: "patients:edit"; pathParams: never; query: never; body: AbhaEnrolRequest; response: AbhaResult };
   AbhaController_status: { method: "get"; path: "/v1/abha/status"; permission: "patients:edit"; pathParams: never; query: never; body: never; response: AbhaStatus };
   AppointmentController_list: { method: "get"; path: "/v1/appointments"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; patientId?: string; date?: string; limit?: number; cursor?: string; }; body: never; response: AppointmentPage };
@@ -540,6 +548,8 @@ export type Operations = {
   FollowUpListController_list: { method: "get"; path: "/v1/appointments/follow-ups"; permission: "queue:view"; pathParams: never; query: { status?: string; from?: string; to?: string; limit?: number; cursor?: string; }; body: never; response: FollowUpPage };
   AppointmentController_get: { method: "get"; path: "/v1/appointments/{id}"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: AppointmentResponse };
   AppointmentController_cancel: { method: "post"; path: "/v1/appointments/{id}/cancel"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: CancelRequest; response: AppointmentResponse };
+  NoShowController_mark: { method: "post"; path: "/v1/appointments/{id}/no-show"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: NoShowRequest; response: AppointmentResponse };
+  NoShowController_undo: { method: "post"; path: "/v1/appointments/{id}/no-show/undo"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: AppointmentResponse };
   AppointmentController_reschedule: { method: "post"; path: "/v1/appointments/{id}/reschedule"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: RescheduleRequest; response: AppointmentResponse };
   BreakGlassController_activate: { method: "post"; path: "/v1/auth/break-glass/activate"; permission: "clinical:breakGlass"; pathParams: never; query: never; body: BreakGlassActivateRequest; response: BreakGlassActivateResponse };
   BreakGlassController_active: { method: "get"; path: "/v1/auth/break-glass/active"; permission: "staff:view"; pathParams: never; query: never; body: never; response: BreakGlassListResponse };
@@ -826,6 +836,7 @@ export type Operations = {
   QueueController_checkIn: { method: "post"; path: "/v1/queue/check-in"; permission: "queue:create"; pathParams: never; query: never; body: CheckInRequest; response: QueueEntryResponse };
   QueueController_callNext: { method: "post"; path: "/v1/queue/doctors/{doctorId}/call-next"; permission: "queue:edit"; pathParams: { doctorId: string; }; query: never; body: CallNextRequest; response: CallNextResponse };
   EtaController_get: { method: "get"; path: "/v1/queue/eta"; permission: "queue:view"; pathParams: never; query: { doctorId: string; date?: string; }; body: never; response: EtaResponse };
+  NoShowController_lateArrival: { method: "post"; path: "/v1/queue/late-arrival"; permission: "queue:create"; pathParams: never; query: never; body: LateArrivalRequest; response: QueueEntryResponse };
   QueueController_waitEstimate: { method: "get"; path: "/v1/queue/wait-estimate"; permission: "queue:view"; pathParams: never; query: { doctorId: string; }; body: never; response: WaitEstimateResponse };
   QueueController_extend: { method: "post"; path: "/v1/queue/{id}/extend"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: ConsultExtendRequest; response: ConsultExtendResponse };
   QueueController_acknowledgePriority: { method: "post"; path: "/v1/queue/{id}/priority/acknowledge"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: QueueEntryResponse };
@@ -833,8 +844,11 @@ export type Operations = {
   QueueController_reorder: { method: "post"; path: "/v1/queue/{id}/reorder"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueReorderRequest; response: QueueEntryResponse };
   QueueController_updateStatus: { method: "patch"; path: "/v1/queue/{id}/status"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueStatusUpdateRequest; response: QueueEntryResponse };
   QueueController_transfer: { method: "post"; path: "/v1/queue/{id}/transfer"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: TransferRequest; response: TransferResponse };
+  ReasonCodeController_list: { method: "get"; path: "/v1/reason-codes"; permission: "queue:view"; pathParams: never; query: { kind: string; locale?: string; }; body: never; response: ReasonCodeList };
+  ReasonCodeController_add: { method: "post"; path: "/v1/reason-codes"; permission: "setup:edit"; pathParams: never; query: never; body: ReasonCodeAddRequest; response: Record<string, Record<string, unknown>> };
   RegionController_list_1: { method: "get"; path: "/v1/regions"; permission: "authenticated"; pathParams: never; query: never; body: never; response: RegionListResponse };
   ReportsController_billingLeakage: { method: "get"; path: "/v1/reports/billing-leakage"; permission: "reports:view"; pathParams: never; query: { thresholdAmount?: number; }; body: never; response: BillingLeakageResponse };
+  BookingReasonsReportController_report: { method: "get"; path: "/v1/reports/booking-reasons"; permission: "reports:view"; pathParams: never; query: { from: string; to: string; }; body: never; response: BookingReasonsResponse };
   ReportsController_dailyMoney: { method: "get"; path: "/v1/reports/daily-money"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DailyMoneyResponse };
   ReportsController_doctorPunctuality: { method: "get"; path: "/v1/reports/doctor-punctuality"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DoctorPunctualityResponse };
   EtaAccuracyController_get: { method: "get"; path: "/v1/reports/eta-accuracy"; permission: "reports:view"; pathParams: never; query: { from?: string; to?: string; doctorId?: string; }; body: never; response: EtaAccuracyResponse };

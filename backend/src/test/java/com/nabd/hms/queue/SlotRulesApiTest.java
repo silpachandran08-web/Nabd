@@ -87,7 +87,7 @@ class SlotRulesApiTest extends ApiTestBase {
         assertThat(book(c, c.at("10:15")).getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         String id = (String) first.getBody().get("id");
-        exchange("/v1/appointments/" + id + "/cancel", HttpMethod.POST, authedJsonBody(c.token(), Map.of("reason", "changed mind")), Map.class);
+        exchange("/v1/appointments/" + id + "/cancel", HttpMethod.POST, authedJsonBody(c.token(), Map.of("reasonCode", "illness")), Map.class);
         assertThat(book(c, c.at("10:00")).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
