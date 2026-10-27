@@ -129,13 +129,14 @@ class ClinicalReadScopeApiTest extends ApiTestBase {
                 "/v1/clinical/patients/" + p + "/pregnancy-status",
                 "/v1/clinical/patients/" + p + "/pregnancy-status/history",
                 "/v1/clinical/visits/" + q + "/documents",
+                "/v1/clinical/visits/" + q + "/summary", // CLN-008
                 "/v1/clinical/visits/" + q + "/documents/summary-prefill",
                 "/v1/clinical/documents/" + docId,
                 "/v1/specialty/dental/patients/" + p + "/chart",
                 "/v1/specialty/dental/patients/" + p + "/chart/entries/" + UUID.randomUUID() + "/history");
 
         // before: visible everywhere it has data, and present in the clinic-wide lists
-        for (String path : List.of(paths.get(0), paths.get(1), paths.get(3), paths.get(10), paths.get(15), paths.get(17), paths.get(18))) {
+        for (String path : List.of(paths.get(0), paths.get(1), paths.get(3), paths.get(10), paths.get(15), paths.get(16), paths.get(18), paths.get(19))) {
             assertThat(exchange(path, HttpMethod.GET, authed(token), String.class).getStatusCode()).as(path).isEqualTo(HttpStatus.OK);
         }
         assertThat(get(token, "/v1/clinical/encounters")).contains(q);

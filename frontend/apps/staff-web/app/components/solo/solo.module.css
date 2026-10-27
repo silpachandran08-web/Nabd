@@ -1,0 +1,30 @@
+/* CLN-008: phone-first solo screens. Primary actions live in a bar fixed to the bottom (the thumb zone), targets >= 48px. */
+.page { padding: var(--nb-space-16); padding-block-end: calc(96px + env(safe-area-inset-bottom, 0px)); max-inline-size: 640px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--nb-space-12); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-12); }
+.title { font-size: 20px; line-height: 26px; font-weight: 600; margin: 0; }
+.subtitle { font-size: 13px; color: var(--nb-text-secondary); margin: 0; }
+.card { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-12) var(--nb-space-16); }
+.cardTitle { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--nb-text-tertiary); margin: 0 0 var(--nb-space-8); }
+.muted { color: var(--nb-text-secondary); font-size: 13px; margin: 0; }
+.line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--nb-space-4) var(--nb-space-12); padding-block: var(--nb-space-4); font-size: 14px; overflow-wrap: anywhere; }
+.list { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: var(--nb-space-12); min-block-size: 56px; padding-block: var(--nb-space-8); border-block-start: 1px solid var(--nb-border-subtle); }
+.row:first-child { border-block-start: 0; }
+.rowActive { background: var(--nb-surface-2); border-radius: var(--nb-radius-md); padding-inline: var(--nb-space-8); }
+.token { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--nb-text-secondary); }
+.name { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--nb-space-4); justify-content: flex-end; }
+.strip { display: flex; flex-direction: column; gap: var(--nb-space-4); padding: var(--nb-space-12) var(--nb-space-16); border-radius: var(--nb-radius-lg); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); }
+.stripDanger { border-color: var(--nb-danger-500); }
+.stripTitle { display: flex; align-items: center; gap: var(--nb-space-8); font-size: 14px; font-weight: 600; margin: 0; }
+.stripLine { font-size: 14px; margin: 0; overflow-wrap: anywhere; }
+.banner { background: var(--nb-surface-2); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-12) var(--nb-space-16); font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-12); }
+.bannerDanger { border-color: var(--nb-danger-500); }
+.bar { position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 20; display: flex; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); padding-block-end: calc(var(--nb-space-8) + env(safe-area-inset-bottom, 0px)); background: var(--nb-surface-1); border-block-start: 1px solid var(--nb-border-default); }
+.barBtn { flex: 1 1 0; min-block-size: 56px; min-inline-size: 48px; border: 1px solid var(--nb-border-default); border-radius: 14px; background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.barPrimary { background: var(--nb-accent-gradient); color: var(--nb-on-accent); border-color: transparent; }
+.barBtn:disabled { opacity: 0.55; cursor: progress; }
+.barBtn:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-12); padding: var(--nb-space-12) var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); font-size: 14px; }
+.noticeBtn { min-block-size: 48px; padding-inline: var(--nb-space-16); border-radius: 999px; border: 1px solid var(--nb-border-default); background: var(--nb-surface-1); color: var(--nb-text-primary); font: inherit; font-weight: 600; cursor: pointer; }
+.nameBtn { min-block-size: 48px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 15px; font-weight: 500; text-align: start; cursor: pointer; }
