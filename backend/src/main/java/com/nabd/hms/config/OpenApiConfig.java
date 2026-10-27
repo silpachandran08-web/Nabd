@@ -44,7 +44,7 @@ public class OpenApiConfig {
             "/internal/v1/notification-requests/*", // COM-004: service token, not a bearer
             "/internal/v1/consents:export", // COM-008: same service token
             "/v1/plans/catalogue", // ADM-034: public plan comparison
-            "/v1/public/notices/*/*", "/v1/proxy-invites/*", "/v1/proxy-invites/*/otp", "/v1/proxy-invites/*/accept", "/v1/public/trials", "/v1/public/trials/*/verify", "/v1/public/trials/*/status", "/abdm/v3/callbacks/**", "/v1/display/pair", "/v1/display/stream", "/files-blob/object"); // PLT-029 signed object URLs (FilesBlobSecurityConfig); ACC-023 lobby TV (own device token), ADM-003 trials, IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
+            "/v1/public/notices/*/*", "/v1/proxy-invites/*", "/v1/proxy-invites/*/otp", "/v1/proxy-invites/*/accept", "/v1/public/links/*/otp", "/v1/public/links/*/open", "/v1/public/trials", "/v1/public/trials/*/verify", "/v1/public/trials/*/status", "/abdm/v3/callbacks/**", "/v1/display/pair", "/v1/display/stream", "/files-blob/object"); // PLT-029 signed object URLs (FilesBlobSecurityConfig); ACC-023 lobby TV (own device token), ADM-003 trials, IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
 
     private static final Pattern AUTHORITY = Pattern.compile("'([^']+)'");
     /** OPS-035: only a plain OR-chain of hasAuthority/hasAnyAuthority becomes "a | b"; any other SpEL is written verbatim. */

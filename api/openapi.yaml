@@ -1646,6 +1646,51 @@ paths:
         "304": { description: "Not modified" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /public/links/{token}/otp:
+    post:
+      tags: [Patients]
+      summary: "IDC-015. Send a one-time code to the recipient's WhatsApp number for a secure link. The token names the clinic; unknown, malformed and expired tokens all answer 410 link-expired. Limits: one code per 60 s and 5 per hour per link, 10 per hour per recipient (429 otp-rate-limited); 423 link-locked while locked. No cache."
+      security: []
+      x-required-permission: public
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "202": { description: "Code sent" }
+        "410": { description: "link-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "423": { description: "link-locked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "otp-rate-limited (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/links/{token}/open:
+    post:
+      tags: [Patients]
+      summary: "IDC-015. Verify the code and get a 60-second signed file URL. Every attempt writes a secure_link_opens row with IP and user agent. 401 otp-invalid; the fifth wrong code locks the link for 30 minutes (423 link-locked); 410 link-expired (also after expiry, max opens or a withdrawn processing consent). The code works once. No cache."
+      security: []
+      x-required-permission: public
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [otp], properties: { otp: { type: string, pattern: "^[0-9]{6}$" } } } } }
+      responses:
+        "200": { description: "{ fileUrl, mime, title }", content: { application/json: { schema: { type: object, properties: { fileUrl: { type: string }, mime: { type: string }, title: { type: string } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "otp-invalid (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "410": { description: "link-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "423": { description: "link-locked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /secure-links:
+    post:
+      tags: [Patients]
+      summary: "IDC-015. Issue an OTP-protected link for a stored document (report or document; rx and invoice answer 422 document-type-unavailable until their PDFs are stored files) and send the PHI-free WhatsApp message with it. recipientRef is the patient id of the recipient: the patient, the guardian of a minor, or a caregiver whose proxy scope is GUARDIAN (BOOK_ONLY gets 403 recipient-not-allowed). ttlDays 1 to 30, default the clinic setting (7). Permission patients:edit (there is no documents:share permission yet)."
+      x-required-permission: patients:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [documentType, documentId, recipientRef], properties: { documentType: { type: string, enum: [rx, invoice, report, document] }, documentId: { type: string, format: uuid }, recipientRef: { type: string, format: uuid }, ttlDays: { type: integer, minimum: 1, maximum: 30 }, sendMessage: { type: boolean, default: true }, language: { type: string } } } } }
+      responses:
+        "201": { description: "{ linkId, expiresAt }", content: { application/json: { schema: { type: object, properties: { linkId: { type: string, format: uuid }, expiresAt: { type: string, format: date-time } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "recipient-not-allowed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "document-type-unavailable, or TEMPLATE_NOT_SENDABLE when the clinic has no approved secure_link template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/consent-contact:
     get:
       tags: [Setup]
@@ -3997,6 +4042,36 @@ paths:
         "200": { description: "{ relation, scope, status }", content: { application/json: { schema: { type: object } } } }
         "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "proxy-consent-pending, proxy-scope-insufficient or not-a-proxy (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/patients/{caregiverRef}/members:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: caregiverRef, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Patients]
+      summary: "IDC-010. The Edge creates a family member for a caregiver (the clinic is the path tenant). Under 18: the caregiver becomes guardian and a guardian consent row is stored (guardianConsent.otpChallengeId as evidence, noticeVersion checked); 422 guardian-required without it, 409 notice-version-stale. Adult with phone: created without consent, proxyStatus awaiting_consent. Adult without phone: created on the caregiver's number, scope BOOK_ONLY, proxyStatus pending_desk_confirmation and a desk task is raised. memberRef (an existing minor) adds a second guardian's own consent row instead of a patient. A replay of the same name and date of birth answers 200 with the first memberRef."
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [relation, name, dob], properties: { relation: { type: string, enum: [child, parent, other] }, name: { type: string }, dob: { type: string, format: date }, phone: { type: string }, gender: { type: string, enum: [male, female, other] }, language: { type: string }, guardianConsent: { type: object, required: [otpChallengeId, noticeVersion], properties: { otpChallengeId: { type: string }, noticeVersion: { type: string } } }, memberRef: { type: string } } } } }
+      responses:
+        "200": { description: "Replay: { memberRef, proxyStatus }", content: { application/json: { schema: { type: object } } } }
+        "201": { description: "{ memberRef, proxyStatus }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "notice-version-stale (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "guardian-required, not-a-minor (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    get:
+      tags: [Patients]
+      summary: "IDC-010. The members this caregiver added from chat: memberRef, first name, relation, proxyStatus (guardian_consented, awaiting_consent, pending_desk_confirmation) and proxyScope (GUARDIAN, BOOK_ONLY, NONE)."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ members: [...] }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
   /tenants/{tid}/appointments:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]

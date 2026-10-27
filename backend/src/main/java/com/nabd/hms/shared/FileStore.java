@@ -21,4 +21,7 @@ public interface FileStore {
 
     /** A single-object GET URL valid for at most five minutes; only for a file whose status is 'available'. */
     SignedUrl downloadUrl(UUID fileId);
+
+    /** Same, valid for {@code ttl} (at most five minutes). IDC-015 asks for 60 seconds. */
+    SignedUrl downloadUrl(UUID fileId, java.time.Duration ttl);
 }

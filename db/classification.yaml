@@ -1359,6 +1359,49 @@ schemas:
       otp_expires_at: operational
       otp_attempts: operational
       otp_challenge_id: operational
+    secure_links:
+      id: operational
+      tenant_id: operational
+      token_hash: operational
+      document_type: operational
+      document_id: operational
+      patient_id: pii
+      recipient_patient_id: pii
+      expires_at: operational
+      max_opens: operational
+      open_count: operational
+      failed_otps: operational
+      locked_until: operational
+      otp_hash: operational
+      otp_expires_at: operational
+      created_by: operational
+      created_at: operational
+    secure_link_opens:
+      id: operational
+      tenant_id: operational
+      link_id: operational
+      opened_at: operational
+      ip: pii
+      user_agent: pii
+      outcome: operational
+    chat_added_members:
+      id: operational
+      tenant_id: operational
+      caregiver_patient_id: pii
+      member_patient_id: pii
+      relation: pii
+      proxy_scope: operational
+      proxy_status: operational
+      created_at: operational
+    patient_desk_tasks:
+      id: operational
+      tenant_id: operational
+      kind: operational
+      patient_id: pii
+      caregiver_patient_id: pii
+      status: operational
+      created_at: operational
+      done_at: operational
     chat_consents:
       id: operational
       tenant_id: operational
@@ -1757,6 +1800,7 @@ schemas:
       billing_mode: operational
       tax_registration_id: operational
       consent_default_deny: operational
+      secure_link_ttl_days: operational
       consent_two_witnesses: operational
       day_start_minute: operational
     vaccine_records:
