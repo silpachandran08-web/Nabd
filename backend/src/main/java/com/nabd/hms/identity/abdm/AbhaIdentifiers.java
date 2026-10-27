@@ -67,6 +67,13 @@ class AbhaIdentifiers {
         return patients.find(patientId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such patient."));
     }
 
+    /** IDC-018: the patient of this clinic holding exactly this id (blind-index equality, nothing fuzzy). */
+    @Transactional(readOnly = true)
+    Optional<UUID> findPatient(String idType, String value) {
+        return jdbc.query("SELECT patient_id FROM patient_identifiers WHERE tenant_id = ? AND id_type = ? AND blind_index = ?",
+                (rs, i) -> rs.getObject(1, UUID.class), tenantContext.current(), idType, blindIndex(idType, value)).stream().findFirst();
+    }
+
     /** Throws 409 abha-linked-elsewhere (with the existing patient, for the merge prompt) when another patient of this clinic holds the id. */
     @Transactional(readOnly = true)
     void requireNotLinkedElsewhere(String idType, String value, UUID patientId) {

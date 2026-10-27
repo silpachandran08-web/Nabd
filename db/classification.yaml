@@ -880,6 +880,11 @@ schemas:
       expiry_date: pii
       region: operational
       status: operational
+      certificate_upload_id: operational
+      reminders_sent: operational
+      override_until: operational
+      override_reason: pii  # free text typed by the owner
+      override_by: operational
       created_at: operational
       updated_at: operational
     login_attempts:
@@ -980,6 +985,7 @@ schemas:
       mfa_secret_enc: pii
       mfa_pending_secret_enc: pii
       mfa_last_used_step: operational
+      bookable_online: operational
     package_eligible_doctors:
       package_id: operational
       doctor_id: operational
@@ -1271,6 +1277,8 @@ schemas:
       ip: pii
       request_id: operational
       batch_id: operational
+      outcome: operational
+      device_family: operational
     phi_read_volume_alerts:
       id: operational
       tenant_id: operational
@@ -1424,6 +1432,15 @@ schemas:
       last4: pii
       verified_via: operational
       verified_at: operational
+      created_at: operational
+    abdm_share_requests:
+      tenant_id: operational
+      request_id: operational
+      outcome: operational
+      reason: operational
+      patient_id: pii
+      queue_entry_id: operational
+      token_number: operational
       created_at: operational
     privacy_notices:
       id: operational
@@ -1692,6 +1709,7 @@ schemas:
       status: operational
       scope: operational
       mfa_enabled: operational
+      bookable_online: operational
       mfa_secret_enc: pii
       invite_token_hash: pii
       invite_expires_at: operational

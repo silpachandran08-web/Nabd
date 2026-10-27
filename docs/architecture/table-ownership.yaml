@@ -21,7 +21,7 @@ modules:
     reads: [tenants]  # PLT-045: TenantKeyService lists tenants and reads their region and status; the same read ClinicClock, TenantContext and CryptoReencryptJob already do
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
-    owns: [patient_identifiers, tenant_integrations_abdm]
+    owns: [abdm_share_requests, patient_identifiers, tenant_integrations_abdm]
     reads: []
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff

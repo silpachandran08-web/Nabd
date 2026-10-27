@@ -15,6 +15,7 @@ import StatusBadge from "../board/StatusBadge";
 import WaitCell from "../board/WaitCell";
 import { patientDetailQuery } from "../hooks/useArrivals";
 import ReackPrompt from "../ReackPrompt";
+import ScanShareConsentPrompt from "../ScanShareConsentPrompt";
 import type { Grants, Row } from "../types";
 
 // Detail rail: the same cached patient query the board row uses (revalidated when the rail opens).
@@ -54,6 +55,7 @@ export default function DetailRail({ row, doctorName, grants, sendingId, h, onCl
         </dl>
       )}
       {grants.patientsView && <ReackPrompt patientId={row.patientId} />}
+      {grants.patientsView && row.source === "abdm_scan_share" && <ScanShareConsentPrompt patientId={row.patientId} mrn={row.patientMrn} />}
       <div className={styles.railActions}>
         {/* Rail actions close the rail first so only one dialog traps focus at a time (the page's dialog state is one slot). */}
         <RowActions row={row} grants={grants} sendingId={sendingId} h={h} />

@@ -330,27 +330,27 @@ class SetupRepository {
 
     List<LicenceRow> listLicences(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status " +
-                        "FROM licence_registry WHERE tenant_id = ? ORDER BY licence_type, holder_name",
+                "SELECT id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status, COALESCE((SELECT array_agg(k::int) FROM jsonb_object_keys(reminders_sent) k), '{}'::int[]) AS reminders, " +
+                        "override_until, override_reason, certificate_upload_id " +
+                        "FROM licence_registry WHERE tenant_id = ? ORDER BY expiry_date, licence_type, holder_name",
                 licenceMapper(), tenantId);
     }
 
     UUID insertLicence(UUID tenantId, LicenceWriteRequest req) {
         UUID id = UUID.randomUUID();
-        String status = computeLicenceStatus(req.expiryDate(), clock.today(tenantId));
-        jdbc.update("INSERT INTO licence_registry (id, tenant_id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        String status = "valid"; // ADM-032: the lifecycle pass right after the save sets the real status, so a lapse is seen as a change and announced once
+        jdbc.update("INSERT INTO licence_registry (id, tenant_id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status, certificate_upload_id) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, tenantId, req.licenceType(), req.holderId(), req.holderName(), req.number(),
-                req.issuingBody(), Date.valueOf(req.expiryDate()), req.region(), status);
+                req.issuingBody(), Date.valueOf(req.expiryDate()), req.region(), status, req.certificateUploadId());
         return id;
     }
 
     void updateLicence(UUID tenantId, UUID id, LicenceWriteRequest req) {
-        String status = computeLicenceStatus(req.expiryDate(), clock.today(tenantId));
         jdbc.update("UPDATE licence_registry SET licence_type = ?, holder_id = ?, holder_name = ?, number = ?, " +
-                        "issuing_body = ?, expiry_date = ?, region = ?, status = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
+                        "issuing_body = ?, expiry_date = ?, region = ?, certificate_upload_id = COALESCE(?, certificate_upload_id), updated_at = now() WHERE tenant_id = ? AND id = ?",
                 req.licenceType(), req.holderId(), req.holderName(), req.number(), req.issuingBody(),
-                Date.valueOf(req.expiryDate()), req.region(), status, tenantId, id);
+                Date.valueOf(req.expiryDate()), req.region(), req.certificateUploadId(), tenantId, id);
     }
 
     /** {total, expiringSoon (expiry within 30 days, inclusive), expired}, judged from expiry_date today (the stored status can be stale). */
@@ -361,16 +361,6 @@ class SetupRepository {
                         "FROM licence_registry WHERE tenant_id = ?",
                 (rs, i) -> new int[]{rs.getInt(1), rs.getInt(2), rs.getInt(3)},
                 Date.valueOf(today), Date.valueOf(today.plusDays(30)), Date.valueOf(today), tenantId);
-    }
-
-    private String computeLicenceStatus(LocalDate expiry, LocalDate now) {
-        if (expiry.isBefore(now)) {
-            return "expired";
-        }
-        if (expiry.isBefore(now.plusDays(30))) {
-            return "expiring_soon";
-        }
-        return "valid";
     }
 
     // ── Staff lookup helper ──
@@ -500,6 +490,10 @@ class SetupRepository {
                 rs.getString("issuing_body"),
                 rs.getDate("expiry_date").toLocalDate(),
                 rs.getString("region"),
-                rs.getString("status"));
+                rs.getString("status"),
+                java.util.Set.copyOf(java.util.Arrays.asList((Integer[]) rs.getArray("reminders").getArray())),
+                rs.getDate("override_until") == null ? null : rs.getDate("override_until").toLocalDate(),
+                rs.getString("override_reason"),
+                rs.getString("certificate_upload_id") == null ? null : UUID.fromString(rs.getString("certificate_upload_id")));
     }
 }

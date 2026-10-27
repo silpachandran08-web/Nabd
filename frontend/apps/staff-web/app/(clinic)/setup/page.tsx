@@ -11,6 +11,9 @@ import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../../components/setup/PharmacyPanel";
 import PrivacyNoticePanel from "../../components/setup/PrivacyNoticePanel";
 import AbdmCard from "../../components/setup/AbdmCard";
+import LicenceTable, { type LicenceRow } from "../../components/setup/LicenceTable";
+import { ISSUING_BODIES } from "@nabd/domain";
+import { clinicToday } from "../../lib/clinicTime";
 import PrintPaperPanel from "../../components/setup/PrintPaperPanel";
 import Icon from "../../components/ui/Icon";
 import AccessGate from "../../components/ui/AccessGate";
@@ -36,7 +39,7 @@ type PayrollRow = { staffId: string; staffName: string; role: string; days: numb
 type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number; modules?: { code: string; enabled: boolean }[]; killedFeatures?: string[]; seatsUsed?: number; seatsLimit?: number | null };
 type ImportJob = { id: string; importType: string; fileName: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
-type Licence = { id: string; licenceType: string; holderId: string | null; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string; region: string; status: string };
+type Licence = LicenceRow;
 type StaffSummary = { id: string; name: string; roleName: string };
 
 const TABS = [
@@ -65,7 +68,7 @@ const isSetupTab = (t: string | null): t is string => TABS.some((x) => x.key ===
 const TAB_DATA: Record<string, string[]> = {
   checklist: ["checklist"], profile: ["profile"], charges: ["charges"], policies: ["policies"], consent: ["consent"],
   holidays: ["holidays"], shifts: ["shifts", "staff"], subscription: ["subscription"], data: ["importJobs", "exportJobs"],
-  licences: ["licences"], payroll: [],
+  licences: ["licences", "staff"], payroll: [],
 };
 
 function csvCell(v: string | number): string {
@@ -773,15 +776,28 @@ function SetupPageInner() {
                   <select className={styles.select} value={newLicence.licenceType} onChange={(e) => setNewLicence({ ...newLicence, licenceType: e.target.value })}>
                     <option value="clinician">Clinician</option>
                     <option value="facility">Facility</option>
+                    <option value="nurse">Nurse</option>
+                    <option value="lab">Lab staff</option>
+                    <option value="pharmacist">Pharmacist</option>
                   </select>
                 </div>
+                {newLicence.licenceType !== "facility" && (
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="licence-holder">Holder</label>
+                    <select id="licence-holder" className={styles.select} value={newLicence.holderId ?? ""} onChange={(e) => setNewLicence({ ...newLicence, holderId: e.target.value || null })}>
+                      <option value="">Choose staff member</option>
+                      {staff.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className={styles.field}>
                   <label className={styles.label}>Number</label>
                   <input className={styles.input} value={newLicence.number ?? ""} onChange={(e) => setNewLicence({ ...newLicence, number: e.target.value })} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Issuing body</label>
-                  <input className={styles.input} value={newLicence.issuingBody ?? ""} onChange={(e) => setNewLicence({ ...newLicence, issuingBody: e.target.value })} />
+                  <input className={styles.input} list="licence-issuing-bodies" value={newLicence.issuingBody ?? ""} onChange={(e) => setNewLicence({ ...newLicence, issuingBody: e.target.value })} />
+                  <datalist id="licence-issuing-bodies">{(ISSUING_BODIES[newLicence.region ?? licenceRegion] ?? []).map((b) => <option key={b} value={b} />)}</datalist>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Expiry</label>
@@ -792,25 +808,7 @@ function SetupPageInner() {
                 <button className={styles.btnPrimary} type="submit">Add licence</button>
               </div>
             </form>
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th scope="col">Type</th><th scope="col">Holder</th><th scope="col">Number</th><th scope="col">Issuing body</th><th scope="col">Expiry</th><th scope="col">Status</th></tr>
-                </thead>
-                <tbody>
-                  {licences.map((l) => (
-                    <tr key={l.id}>
-                      <td>{l.licenceType}</td>
-                      <td>{l.holderName ?? "—"}</td>
-                      <td>{l.number}</td>
-                      <td>{l.issuingBody ?? "—"}</td>
-                      <td>{l.expiryDate}</td>
-                      <td><span className={`${styles.pill} ${l.status === "valid" ? styles.pillValid : l.status === "expiring_soon" ? styles.pillExpiring : styles.pillExpired}`}>{l.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <LicenceTable licences={licences} today={clinicToday()} onChanged={loadAll} />
           </div>
         );
       case "whatsapp":

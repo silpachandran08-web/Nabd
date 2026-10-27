@@ -4,6 +4,8 @@ import { z } from "zod";
 
 export const AbdmSettingsSchema = z.object({ enabled: z.boolean().optional(), hfrId: z.string().optional(), hfrVerified: z.boolean().optional() });
 export const AbdmSettingsRequestSchema = z.object({ enabled: z.boolean(), hfrId: z.string().min(0).max(40).optional() });
+export const AbdmShareProfileSchema = z.object({ abhaAddress: z.string().optional(), abhaNumber: z.string().optional(), dayOfBirth: z.number().int().optional(), gender: z.string().optional(), monthOfBirth: z.number().int().optional(), name: z.string().optional(), phoneNumber: z.string().optional(), yearOfBirth: z.number().int().optional() });
+export const AbdmShareRequestSchema = z.object({ counter: z.string().optional(), hipId: z.string().optional(), profile: AbdmShareProfileSchema.optional(), requestId: z.string().optional() });
 export const AbhaEnrolRequestSchema = z.object({ aadhaarNumber: z.string().min(0).max(14).optional(), mobile: z.string().min(0).max(16).optional(), mode: z.string().min(1), otp: z.string().min(0).max(8).optional(), patientId: z.string().optional(), step: z.string().min(1), txnId: z.string().min(0).max(100).optional() });
 export const AbhaResultSchema = z.object({ abhaAddress: z.string().optional(), abhaLast4: z.string().optional(), txnId: z.string().optional(), verified: z.boolean().optional() });
 export const AbhaStatusSchema = z.object({ enabled: z.boolean().optional() });
@@ -269,13 +271,16 @@ export const InvoiceSeriesListResponseSchema = z.object({ items: z.array(Invoice
 export const KillRequestSchema = z.object({ active: z.boolean().optional(), reason: z.string().min(0).max(500) });
 export const LateArrivalRequestSchema = z.object({ appointmentId: z.string() });
 export const LiabilityResponseSchema = z.object({ activePatientPackages: z.number().int().optional(), expiringIn30Days: z.number().int().optional(), inGracePeriod: z.number().int().optional(), potentialExpiryLoss: z.number().optional(), refundsAwaitingApproval: z.number().int().optional(), remainingAllocatedValue: z.number().optional(), remainingListValue: z.number().optional(), sessionsOwed: z.number().int().optional() });
+export const LicenceOverrideRequestSchema = z.object({ reason: z.string().min(0).max(200), until: z.string() });
 export const LicenceRequestSchema = z.object({ isClinician: z.boolean(), licenceExpiresOn: z.string().optional() });
 export const LicenceResponseSchema = z.object({ hasRegistrationNo: z.boolean().optional(), isClinician: z.boolean().optional(), licenceExpiresOn: z.string().optional(), licenceOverrideUntil: z.string().optional(), staffId: z.string().optional() });
-export const LicenceWriteRequestSchema = z.object({ expiryDate: z.string(), holderId: z.string().optional(), holderName: z.string().optional(), issuingBody: z.string().optional(), licenceType: z.string().min(1), number: z.string().min(1), region: z.string().min(1) });
+export const LicenceWriteRequestSchema = z.object({ certificateUploadId: z.string().optional(), expiryDate: z.string(), holderId: z.string().optional(), holderName: z.string().optional(), issuingBody: z.string().optional(), licenceType: z.string().min(1), number: z.string().min(1), region: z.string().min(1) });
 export const LifecycleEventResponseSchema = z.object({ changedAt: z.string().optional(), changedBy: z.string().optional(), fromStatus: z.string().optional(), reason: z.string().optional(), toStatus: z.string().optional() });
 export const LimitsSchema = z.object({ branches: z.number().int().gte(1).optional(), seats: z.number().int().gte(1).optional(), visitsPerMonth: z.number().int().gte(1).optional() });
 export const TaxSchema = z.object({ amountMinor: z.number().int().optional(), rate: z.number().optional(), type: z.string().optional() });
 export const LineSchema = z.object({ chargeCode: z.string().optional(), discountMinor: z.number().int().optional(), taxableMinor: z.number().int().optional(), taxes: z.array(TaxSchema).optional() });
+export const LinkOpenItemSchema = z.object({ at: z.string().optional(), deviceFamily: z.string().optional(), id: z.number().int().optional(), ip: z.string().optional(), linkId: z.string().optional(), outcome: z.string().optional(), patientId: z.string().optional(), resourceId: z.string().optional(), resourceType: z.string().optional() });
+export const LinkOpensResponseSchema = z.object({ items: z.array(LinkOpenItemSchema).optional() });
 export const LoginRequestSchema = z.object({ email: z.string().min(1), pin: z.string().min(1), tenantSlug: z.string().min(1) });
 export const ModuleStateSchema = z.object({ code: z.string().optional(), enabled: z.boolean().optional() });
 export const MeEntitlementsSchema = z.object({ killedFeatures: z.array(z.string()).optional(), modules: z.array(ModuleStateSchema).optional(), seatLimit: z.number().int().optional() });
@@ -536,6 +541,7 @@ export const operationSchemas = {
   JwksController_jwks: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   JwksController_jwksFor: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   AbdmCallbackController_callback: {  },
+  AbdmShareController_share: { body: AbdmShareRequestSchema },
   BlobController_get: { response: z.string() },
   BlobController_put: { body: z.string() },
   ConsentExportController_export: { response: PageSchema },
@@ -809,6 +815,7 @@ export const operationSchemas = {
   PharmacyController_settings: { response: PharmacySettingsResponseSchema },
   PharmacyController_updateSettings: { body: PharmacySettingsWriteRequestSchema, response: PharmacySettingsResponseSchema },
   PhiReadAlertController_phiReadAlerts: { response: AlertsResponseSchema },
+  LinkOpenController_linkOpens: { response: LinkOpensResponseSchema },
   PlanCatalogueController_catalogue: { response: z.array(PlanCatalogueEntrySchema) },
   AuditSearchController_search: { response: AuditLogPageSchema },
   AuditSearchController_export: { response: z.string() },
@@ -932,6 +939,7 @@ export const operationSchemas = {
   SetupController_licences: { response: z.array(LicenceResponseSchema) },
   SetupController_addLicence: { body: LicenceWriteRequestSchema, response: LicenceResponseSchema },
   SetupController_updateLicence: { body: LicenceWriteRequestSchema, response: LicenceResponseSchema },
+  LicenceOverrideController_override: { body: LicenceOverrideRequestSchema, response: LicenceResponseSchema },
   SetupController_payrollExport: { response: z.array(PayrollExportRowResponseSchema) },
   SetupController_policies: { response: z.array(PolicyResponseSchema) },
   SetupController_updatePolicy: { body: PolicyWriteRequestSchema, response: PolicyResponseSchema },

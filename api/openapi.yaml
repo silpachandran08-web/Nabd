@@ -495,6 +495,41 @@ paths:
         "403":
           description: Caller is not the clinic Owner
 
+  /phi-read/link-opens:
+    get:
+      tags: [Auth]
+      summary: PLT-041 Owner's list of secure-link opens (prescription, invoice, report), newest first - outcome, device family and IP only, no document content, User-Agent or OTP
+      x-required-permission: authenticated
+      x-permission-check: owner
+      parameters:
+        - { name: patientId, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: Link opens of the caller's clinic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer, format: int64 }
+                        at: { type: string, format: date-time }
+                        linkId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        resourceType: { type: string }
+                        resourceId: { type: [string, "null"], format: uuid }
+                        outcome: { type: string, enum: [otp_ok, otp_failed, expired, revoked] }
+                        deviceFamily: { type: string }
+                        ip: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403":
+          description: Caller is not the clinic Owner
+
   # NB-046 (PIN reset & account recovery): specced, not yet implemented in the backend.
   /auth/pin-reset/request:
     post:
@@ -1935,8 +1970,11 @@ paths:
   /setup/licences:
     get:
       tags: [Setup]
-      summary: Facility & clinician licence registry
+      summary: Licence register (clinicians, facilities, nurses, lab staff, pharmacists), soonest expiry first, with status, reminders sent and booking state (ADM-032)
       x-required-permission: setup:view
+      parameters:
+        - { name: kind, in: query, required: false, schema: { type: string, enum: [clinician, facility, nurse, lab, pharmacist] } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [valid, expiring_soon, expired] } }
       responses:
         "200": { description: "Licences", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Licence" } } } } }
     post:
@@ -1979,6 +2017,28 @@ paths:
                         status: { type: string, enum: [ok, attention, expired] }
                         detail: { type: string }
                         link: { type: string, example: "/setup?tab=licences" }
+
+  /setup/licences/{id}/override:
+    post:
+      tags: [Setup]
+      summary: ADM-032 Owner lets an expired clinician licence keep the doctor bookable online until a date (at most 30 days) while the renewal is in progress; audited, does not touch prescription signing
+      x-required-permission: setup:edit
+      x-permission-check: owner
+      x-step-up: true
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+        - { name: X-Step-Up-Token, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LicenceOverrideRequest" } } }
+      responses:
+        "200": { description: "Updated licence", content: { application/json: { schema: { $ref: "#/components/schemas/Licence" } } } }
+        "400": { description: "invalid-override-window | invalid-reason (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "owner-only | step-up-required (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "not-lapsed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "override-too-long, code OVERRIDE_TOO_LONG (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /setup/licences/{id}:
     patch:
@@ -8120,26 +8180,41 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        licenceType: { type: string, enum: [clinician, facility] }
+        licenceType: { type: string, enum: [clinician, facility, nurse, lab, pharmacist] }
         holderId: { type: [string, "null"], format: uuid }
         holderName: { type: [string, "null"] }
         number: { type: string }
         issuingBody: { type: [string, "null"] }
         expiryDate: { type: string, format: date }
-        region: { type: string, enum: [IN, KSA] }
+        region: { type: string, enum: [IN, AE, SA, QA] }
         status: { type: string, enum: [valid, expiring_soon, expired] }
+        daysLeft: { type: integer, format: int64, description: "ADM-032: whole days to expiry in the clinic's day; negative once expired" }
+        remindersSent: { type: array, items: { type: integer }, description: "ADM-032: reminder thresholds (days before expiry) already sent, largest first" }
+        nextReminder: { type: [string, "null"], format: date, description: "ADM-032: the date the next reminder is due" }
+        bookable: { type: [boolean, "null"], description: "ADM-032: clinician licences only; false while the doctor is hidden from online booking" }
+        overrideUntil: { type: [string, "null"], format: date }
+        overrideReason: { type: [string, "null"] }
+        certificateUploadId: { type: [string, "null"], format: uuid }
+
+    LicenceOverrideRequest:
+      type: object
+      required: [until, reason]
+      properties:
+        until: { type: string, format: date, description: "today or later, at most 30 days ahead (422 override-too-long otherwise)" }
+        reason: { type: string, minLength: 3, maxLength: 200 }
 
     LicenceWrite:
       type: object
       required: [licenceType, number, expiryDate, region]
       properties:
-        licenceType: { type: string, enum: [clinician, facility] }
-        holderId: { type: [string, "null"], format: uuid }
+        licenceType: { type: string, enum: [clinician, facility, nurse, lab, pharmacist] }
+        holderId: { type: [string, "null"], format: uuid, description: "ADM-032: a staff member of the clinic (400 holder-not-found otherwise); their name is copied when holderName is empty" }
         holderName: { type: [string, "null"] }
         number: { type: string }
         issuingBody: { type: [string, "null"] }
         expiryDate: { type: string, format: date }
-        region: { type: string, enum: [IN, KSA] }
+        region: { type: string, enum: [IN, AE, SA, QA] }
+        certificateUploadId: { type: [string, "null"], format: uuid, description: "ADM-032: optional; kept when an edit omits it" }
 
     StaffSummary:
       type: object

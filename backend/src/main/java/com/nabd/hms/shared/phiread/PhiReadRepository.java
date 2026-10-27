@@ -43,6 +43,25 @@ class PhiReadRepository {
         });
     }
 
+    /** PLT-041: one secure-link open. purpose treatment stands for "the clinic's own document shown to its patient"; the link is the actor. */
+    void insertLinkOpen(LinkOpenLog.Open o, String resourceType, String deviceFamily, String ip, long atMillis) {
+        jdbc.update("""
+                INSERT INTO phi_read_log (tenant_id, read_at, actor_type, actor_id, patient_id, resource_type, resource_id, purpose_code, ip, request_id, outcome, device_family)
+                VALUES (?,?,'patient_link',?,?,?,?,'treatment',?::inet,?,?,?)""",
+                o.tenantId(), new Timestamp(atMillis), o.linkId(), o.patientId(), resourceType, o.resourceId(), ip, o.requestId(), o.outcome().code(), deviceFamily);
+    }
+
+    /** PLT-041: newest link opens of the bound tenant, optionally one patient's. */
+    List<LinkOpenController.Item> linkOpens(UUID patientId, int limit) {
+        return jdbc.query("""
+                SELECT id, read_at, actor_id, patient_id, resource_type, resource_id, outcome, device_family, host(ip) AS ip FROM phi_read_log
+                WHERE tenant_id = app_tenant_id() AND actor_type = 'patient_link' AND (?::uuid IS NULL OR patient_id = ?::uuid)
+                ORDER BY read_at DESC, id DESC LIMIT ?""",
+                (rs, i) -> new LinkOpenController.Item(rs.getLong("id"), rs.getTimestamp("read_at").toInstant(), rs.getObject("actor_id", UUID.class),
+                        rs.getObject("patient_id", UUID.class), rs.getString("resource_type"), rs.getObject("resource_id", UUID.class), rs.getString("outcome"),
+                        rs.getString("device_family"), rs.getString("ip")), patientId, patientId, limit);
+    }
+
     /** The visit's patient, for endpoints keyed by queue entry whose body does not name the patient. */
     List<UUID> queueEntryPatient(UUID tenantId, UUID queueEntryId) {
         return jdbc.queryForList("SELECT patient_id FROM queue_entries WHERE tenant_id = ? AND id = ?", UUID.class, tenantId, queueEntryId);
