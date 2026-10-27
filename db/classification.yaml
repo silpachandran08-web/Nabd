@@ -692,6 +692,41 @@ schemas:
       sha256: operational
       content: financial
       created_at: operational
+    payment_intents:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      purpose: operational
+      purpose_ref: operational
+      kind: operational
+      provider: operational
+      provider_order_id: operational
+      amount_minor: financial
+      currency: operational
+      payer_kind: operational
+      payer_ref: pii
+      status: operational
+      url: operational
+      qr_payload: operational
+      expires_at: operational
+      paid_at: operational
+      payment_id: operational
+      gateway_ref: operational
+      created_by: operational
+      created_at: operational
+    gateway_webhook_events:
+      id: operational
+      tenant_id: operational
+      provider: operational
+      event_id: operational
+      event_type: operational
+      provider_order_id: operational
+      gateway_ref: operational
+      amount_minor: financial
+      payload_sha256: operational
+      received_at: operational
+      processed_at: operational
+      error: operational
     dues_reminders:
       id: operational
       tenant_id: operational
@@ -846,6 +881,11 @@ schemas:
       amount_minor: financial
       kind: operational
       refund_request_id: operational
+      gateway: operational
+      gateway_ref: operational
+      payment_intent_id: operational
+      payer_kind: operational
+      payer_ref: pii
       refund_of_payment_id: operational
     invoice_series:
       id: operational

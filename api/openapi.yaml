@@ -5316,6 +5316,52 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: not-open }
         "422": { description: EXCEEDS_BALANCE }
+  /billing/invoices/{id}/payment-intents:
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-020. Create a UPI payment link (default expiry 24 h, sent by WhatsApp to the patient or a linked caregiver) or a dynamic QR
+        (10 min) for the invoice balance or a part of it. 409 GATEWAY_NOT_CONNECTED (desk falls back to recording payments),
+        422 AMOUNT_EXCEEDS_BALANCE, 422 NOT_A_CAREGIVER, 409 NO_CONSENTED_CHANNEL. Payment is recorded by the gateway webhook, not here.
+      x-required-permission: billing:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [kind], properties: { kind: { type: string, enum: [link, qr] }, amount: { type: number, minimum: 0.01 }, recipient: { type: string, enum: [patient, caregiver] }, caregiverId: { type: string, format: uuid } } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { type: object, properties: { intentId: { type: string, format: uuid }, url: { type: string, nullable: true }, qrPayload: { type: string, nullable: true }, expiresAt: { type: string, format: date-time } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: GATEWAY_NOT_CONNECTED or NO_CONSENTED_CHANNEL }
+        "422": { description: AMOUNT_EXCEEDS_BALANCE or NOT_A_CAREGIVER }
+  /billing/payment-intents/{id}:
+    get:
+      tags: [Billing]
+      summary: FIN-020. Status of a payment intent (created, paid, failed, expired, ...). A link past its expiry reads as expired.
+      x-required-permission: billing:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Status, content: { application/json: { schema: { type: object, properties: { status: { type: string }, paidAt: { type: string, format: date-time, nullable: true }, gatewayRef: { type: string, nullable: true } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /billing/gateway-webhooks/{provider}/{tenantKey}:
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-020. Payment gateway webhook (public). The HMAC-SHA256 of the raw body (hex, header X-Razorpay-Signature or X-Webhook-Signature) with the
+        tenant's webhook secret is the only credential: 401 BAD_SIGNATURE otherwise and nothing is stored. The event is stored first (deduplicated by
+        provider event id), then applied through the atomic payment path; 200 for a repeat delivery.
+      security: []
+      x-required-permission: public
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string } }
+        - { name: tenantKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: Stored and acknowledged }
+        "401": { description: BAD_SIGNATURE }
   /billing/invoices/{id}/document:
     get:
       tags: [Billing]

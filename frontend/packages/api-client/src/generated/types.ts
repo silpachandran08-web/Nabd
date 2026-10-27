@@ -328,6 +328,9 @@ export type PatientRegistryRow = { age?: number; allergy?: string; archived?: bo
 export type PatientResponse = { dob?: string; gender?: string; id?: string; isMinor?: boolean; matchedOn?: string; mrn?: string; name?: string; phone?: string; status?: string; };
 export type PatientViewResponse = { birthYear?: number; initials?: string; maskedPhone?: string; mrn?: string; };
 export type PatientWriteRequest = { address?: string; confirmedNotDuplicate?: boolean; dob: string; gender: string; guardianConsent?: GuardianConsent; guardianId?: string; name: string; nationalId?: string; phone: string; synthetic?: boolean; };
+export type PaymentIntentCreated = { expiresAt?: string; intentId?: string; qrPayload?: string; url?: string; };
+export type PaymentIntentRequest = { amount?: number; caregiverId?: string; kind: string; recipient?: string; };
+export type PaymentIntentStatus = { gatewayRef?: string; paidAt?: string; status?: string; };
 export type PaymentRequest = { amount: number; method: string; reference?: string; };
 export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: string; method?: string; recordedAt?: string; };
 export type PaymentSplit = { amount?: number; method?: string; };
@@ -625,15 +628,18 @@ export type Operations = {
   DayCloseController_reopen: { method: "post"; path: "/v1/billing/day-close/reopen"; permission: "billing:approve"; pathParams: never; query: { date?: string; }; body: DayReopenRequest; response: DayCloseSummaryResponse };
   DuesController_dues: { method: "get"; path: "/v1/billing/dues"; permission: "billing:view"; pathParams: never; query: { bucket?: string; cursor?: string; limit?: number; }; body: never; response: DuesResponse };
   DuesController_remind: { method: "post"; path: "/v1/billing/dues/{patientId}/remind"; permission: "billing:edit"; pathParams: { patientId: string; }; query: never; body: DuesRemindRequest; response: Record<string, string> };
+  PaymentIntentController_webhook: { method: "post"; path: "/v1/billing/gateway-webhooks/{provider}/{tenantKey}"; permission: "public"; pathParams: { provider: string; tenantKey: string; }; query: never; body: string; response: void };
   DuesController_invoices: { method: "get"; path: "/v1/billing/invoices"; permission: "billing:view"; pathParams: never; query: { from?: string; to?: string; status?: string; doctorId?: string; method?: string; q?: string; cursor?: string; limit?: number; }; body: never; response: InvoiceListResponse };
   CheckoutController_getInvoice: { method: "get"; path: "/v1/billing/invoices/{id}"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: never; response: InvoiceResponse };
   InvoiceDocumentController_document: { method: "get"; path: "/v1/billing/invoices/{id}/document"; permission: "billing:view"; pathParams: { id: string; }; query: { layout?: string; kind?: string; }; body: never; response: string };
+  PaymentIntentController_create: { method: "post"; path: "/v1/billing/invoices/{id}/payment-intents"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: PaymentIntentRequest; response: PaymentIntentCreated };
   CheckoutController_recordPayment: { method: "post"; path: "/v1/billing/invoices/{id}/payments"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: PaymentRequest; response: InvoiceResponse };
   RefundController_request: { method: "post"; path: "/v1/billing/invoices/{id}/refund-requests"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: RefundRequestRequest; response: RefundRequestResponse };
   CheckoutController_voidInvoice: { method: "post"; path: "/v1/billing/invoices/{id}/void"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: VoidInvoiceRequest; response: InvoiceResponse };
   DuesController_writeOff: { method: "post"; path: "/v1/billing/invoices/{id}/write-off"; permission: "billing:approve"; pathParams: { id: string; }; query: never; body: WriteOffRequest; response: InvoiceListItem };
   CheckoutController_otcCharges: { method: "get"; path: "/v1/billing/otc-charges"; permission: "billing:view"; pathParams: never; query: never; body: never; response: OtcChargesResponse };
   CheckoutController_otcCheckout: { method: "post"; path: "/v1/billing/otc-checkout"; permission: "billing:create"; pathParams: never; query: never; body: CheckoutRequest; response: InvoiceResponse };
+  PaymentIntentController_status: { method: "get"; path: "/v1/billing/payment-intents/{id}"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: never; response: PaymentIntentStatus };
   CheckoutController_quote: { method: "post"; path: "/v1/billing/quotes"; permission: "billing:view"; pathParams: never; query: never; body: QuoteRequest; response: QuoteResponse };
   RefundController_list: { method: "get"; path: "/v1/billing/refund-requests"; permission: "billing:view"; pathParams: never; query: { status?: string; cursor?: string; limit?: number; }; body: never; response: RefundRequestPage };
   RefundController_approve: { method: "post"; path: "/v1/billing/refund-requests/{id}/approve"; permission: "billing:approve"; pathParams: { id: string; }; query: never; body: RefundApproveRequest; response: RefundApproveResponse };
