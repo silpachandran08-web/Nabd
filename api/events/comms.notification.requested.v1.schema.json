@@ -32,6 +32,8 @@
         "review_request",
         "secure_link",
         "delay_notice",
+        "doctor_delay",
+        "queue_paused",
         "otp",
         "emergency_access_used"
       ]

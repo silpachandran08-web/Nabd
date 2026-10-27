@@ -23,9 +23,11 @@ public class DoctorSessionController {
     private static final String CAN_ACT = "hasAuthority('queue:edit') and (authentication.name == #id.toString() or hasAuthority('setup:edit'))";
 
     private final DoctorSessionService service;
+    private final DelayBroadcastService broadcast;
 
-    DoctorSessionController(DoctorSessionService service) {
+    DoctorSessionController(DoctorSessionService service, DelayBroadcastService broadcast) {
         this.service = service;
+        this.broadcast = broadcast;
     }
 
     @GetMapping
@@ -39,7 +41,13 @@ public class DoctorSessionController {
     @PreAuthorize(CAN_ACT)
     public DoctorSessionResponse act(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @PathVariable String action,
                                      @Valid @RequestBody(required = false) SessionActionRequest req) {
-        return service.act(tenantId(jwt), UUID.fromString(jwt.getSubject()), id, action, req == null ? null : req.reasonCode());
+        DoctorSessionResponse r = service.act(tenantId(jwt), UUID.fromString(jwt.getSubject()), id, action, req == null ? null : req.reasonCode());
+        if ("pause".equals(action)) { // ACC-024: the pause has committed; the patients hear a neutral notice, the reason code stays private
+            broadcast.onPause(tenantId(jwt), id, r.sessionId());
+        } else if ("resume".equals(action)) {
+            broadcast.onResume(tenantId(jwt), id, r.sessionId());
+        }
+        return r;
     }
 
     private UUID tenantId(Jwt jwt) {

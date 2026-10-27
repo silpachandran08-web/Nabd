@@ -193,7 +193,7 @@ public class DisplayService {
         UUID tenantId = tenantContext.current();
         LocalDate day = clock.today(tenantId);
         var zone = clock.zone(tenantId);
-        var delays = board.activeDelays(tenantId, day);
+        var delays = board.activeDelays(tenantId, day, clock.now());
         var entries = board.entries(tenantId, day, scope.departmentId());
         List<LobbyDoctor> out = new ArrayList<>();
         for (var d : board.doctors(tenantId, day, scope.departmentId())) {
