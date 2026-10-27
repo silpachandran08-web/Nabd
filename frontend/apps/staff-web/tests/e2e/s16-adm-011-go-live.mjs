@@ -20,6 +20,8 @@ const handlers = () => [
     r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ liveAt: '2026-10-27T10:00:00Z', bookingUrl: 'https://book.example.test/b/qa-clinic', qrPosterUrl: '/setup/go-live/poster' }) });
   }],
   ['GET', /^\/setup\/go-live\/poster$/, (r) => { o.poster = true; r.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF' }); }],
+  ['GET', /^\/setup\/profile$/, { body: { name: 'QA Clinic', region: 'IN', timezone: 'Asia/Kolkata', taxIdType: null, taxId: null, whatsappNumber: null, specialties: [] } }],
+  ['GET', /^\/setup\/subscription$/, { status: 404, body: { title: 'x' } }],
   ['GET', /^\/setup\/checklist/, { body: [{ step: 'go_live', status: 'current' }] }],
   ['GET', /^\/setup\/trial$/, { body: { status: 'active', endsAt: null, daysLeft: null, blockers: [], conversion: null } }],
   ['GET', /^\/setup/, { body: {} }],
@@ -40,12 +42,12 @@ try {
   const t = await s.page.locator('main').innerText();
   check('1 open blocker listed in plain words with a Fix link', /At least one doctor has working hours/.test(t) && await s.page.getByRole('link', { name: 'Fix' }).getAttribute('href') === '/setup?tab=shifts');
   check('2 good-to-have items are listed as not required', /Good to have[\s\S]*Not yet: Staff invited \(2 of 3 invites are still pending/.test(t) && /Not yet: E-invoicing/.test(t));
-  check('3 Go live is disabled while a blocker is open', await s.page.getByRole('button', { name: 'Go live' }).isDisabled());
+  check('3 Go live is disabled while a blocker is open', await s.page.getByRole('button', { name: 'Go live', exact: true }).last().isDisabled());
   check('4 no console errors (blocked)', errs(s.log).length === 0, errs(s.log).join('|'));
   await s.browser.close();
 
   s = await open(P, { owner: true }, {});
-  const btn = s.page.getByRole('button', { name: 'Go live' });
+  const btn = s.page.getByRole('button', { name: 'Go live', exact: true }).last();
   check('5 all blockers ok: Go live enabled', await btn.isEnabled());
   await btn.click();
   await s.page.getByText('You are live').waitFor({ timeout: 5000 });
@@ -61,16 +63,16 @@ try {
   await s.browser.close();
 
   s = await open(P, { owner: true }, { goFail: true });
-  await s.page.getByRole('button', { name: 'Go live' }).click();
+  await s.page.getByRole('button', { name: 'Go live', exact: true }).last().click();
   await s.page.getByText('Some required checks are still open.').waitFor({ timeout: 5000 }).then(() => check('11 refusal shows the server reason', true), () => check('11 refusal reason', false));
   await s.browser.close();
 
   s = await open(['setup:view'], { owner: false }, {});
-  check('12 without setup:edit Go live is disabled and says why', await s.page.getByRole('button', { name: 'Go live' }).isDisabled() && /Only the clinic owner can go live/.test(await s.page.locator('main').innerText()));
+  check('12 without setup:edit Go live is disabled and says why', await s.page.getByRole('button', { name: 'Go live', exact: true }).last().isDisabled() && /Only the clinic owner can go live/.test(await s.page.locator('main').innerText()));
   await s.browser.close();
 
   s = await open(P, { owner: true }, { checksFail: true });
-  check('13 checks fail: error state with Retry, no Go live', await s.page.getByRole('button', { name: /Retry|Try again/i }).count() >= 1 && await s.page.getByRole('button', { name: 'Go live' }).count() === 0);
+  check('13 checks fail: error state with Retry, no Go live', await s.page.getByRole('button', { name: /Retry|Try again/i }).count() >= 1 && await s.page.getByRole('button', { name: 'Go live', exact: true }).count() === 1); // only the step tab, no action button
   await s.browser.close();
 
   s = await open(P, { owner: true }, { open: true }, { width: 390, height: 800 });
