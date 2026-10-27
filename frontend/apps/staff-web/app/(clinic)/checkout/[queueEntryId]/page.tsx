@@ -16,6 +16,8 @@ import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
 import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "@nabd/api-client/types";
 import { PRICE_REASONS, reasonLabel } from "../../../components/checkout/priceReasons";
+import RxPrefillBlock from "../../../components/checkout/RxPrefillBlock";
+import { initialTicks, toBillLine, type PrefillLine } from "../../../components/checkout/rxPrefill";
 
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
@@ -78,8 +80,26 @@ export default function CheckoutPage() {
   const [continuing, setContinuing] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
   const [showAddMore, setShowAddMore] = useState(false);
+  // PHL-018: the visit's in-house Rx lines, which are ticked into `items`, and the "dispense anyway" reasons
+  const [prefill, setPrefill] = useState<PrefillLine[]>([]);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [reasons, setReasons] = useState<Record<string, string>>({});
 
   const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused on a retry of the same bill/payment/step
+
+  // Best-effort: a failure leaves the plain charge picker. `tick` pre-fills the bill with the lines the shelf covers (first billing stop only).
+  const loadPrefill = useCallback(async (ctx: CheckoutContext, tick: boolean) => {
+    const lines = canBill ? (await api.get<{ lines: PrefillLine[] }>(`/billing/checkout/${queueEntryId}/prefill`).catch(() => ({ lines: [] as PrefillLine[] }))).lines : [];
+    setPrefill(lines);
+    setReasons({});
+    const on = tick ? initialTicks(lines) : [];
+    setTicked(new Set(on));
+    const add = lines.filter((l) => on.includes(l.chargeCode)).flatMap((l) => {
+      const c = ctx.charges.find((x) => x.code === l.chargeCode);
+      return c ? [toBillLine(l, c)] : [];
+    });
+    if (add.length > 0) setItems((prev) => [...prev, ...add.filter((a) => !prev.some((i) => i.chargeCode === a.chargeCode))]);
+  }, [queueEntryId, canBill]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,13 +117,14 @@ export default function CheckoutPage() {
       setFlowSteps(await api.get<FlowStep[]>(`/departments/${ctx.departmentId}/flow`).catch(() => []));
       const inv = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
       if (inv) setInvoice(inv);
+      await loadPrefill(ctx, !inv);
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setForbidden(true);
       else setError(e instanceof ApiError ? "Couldn't load checkout details. Try again." : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [queueEntryId]);
+  }, [queueEntryId, loadPrefill]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -126,6 +147,20 @@ export default function CheckoutPage() {
       const prescriptionItemId = charge.isRx ? autoLink(charge.name, context?.prescribedItems ?? []) ?? undefined : undefined;
       return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice, taxRatePercent: charge.taxRatePercent, prescriptionItemId }];
     });
+  }
+
+  function toggleRx(l: PrefillLine, on: boolean, reason?: string) {
+    setTicked((prev) => { const n = new Set(prev); if (on) n.add(l.chargeCode); else n.delete(l.chargeCode); return n; });
+    const c = context?.charges.find((x) => x.code === l.chargeCode);
+    setItems((prev) => {
+      const rest = prev.filter((i) => i.chargeCode !== l.chargeCode);
+      return on && c ? [...rest, toBillLine(l, c, reason ?? reasons[l.chargeCode])] : rest;
+    });
+  }
+
+  function setRxReason(l: PrefillLine, reason: string | null) {
+    setReasons((prev) => { const n = { ...prev }; if (reason) n[l.chargeCode] = reason; else delete n[l.chargeCode]; return n; });
+    toggleRx(l, reason != null, reason ?? undefined);
   }
 
   function linkRx(code: string, prescriptionItemId: string) {
@@ -177,13 +212,14 @@ export default function CheckoutPage() {
       const body = {
         // codes only: the server prices every line from the catalogue (FIN-003)
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}),
-          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
+          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}), ...(i.shortfallReason ? { shortfallReason: i.shortfallReason } : {}) })),
         ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
       };
       const inv = await api.post<Invoice>(`/billing/checkout/${queueEntryId}`, body, { idempotencyKey: keys.current.get("bill", body) });
       keys.current.done("bill");
       setInvoice(inv);
       setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
+      if (context) void loadPrefill(context, false);
       setDiscount("0");
       setDiscountReason("");
       setShowAddMore(false);
@@ -304,6 +340,8 @@ export default function CheckoutPage() {
   const visibleCharges = category === "All" ? context.charges : context.charges.filter((c) => c.category === category);
 
   const picker = (
+    <>
+    <RxPrefillBlock lines={prefill} ticked={ticked} reasons={reasons} onToggle={(l, on) => toggleRx(l, on)} onReason={setRxReason} />
     <div className={styles.layout}>
       <div className={styles.card}>
         <h2 className={styles.cardTitle}>Charges</h2>
@@ -424,6 +462,7 @@ export default function CheckoutPage() {
         )}
       </div>
     </div>
+    </>
   );
   const tenderedMinor = tenderTotalMinor(tenders);
   // Sticky Collect bar. Balance due = total minus what is typed into the split rows (never negative).

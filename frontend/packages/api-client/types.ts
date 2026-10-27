@@ -33,7 +33,7 @@ export type FlowStep = Patch<G.FlowStepResponse, "stepType">;
 /** Also a UI model: `override` is what the cashier picked (sent as LineItemRequest.override); prescriptionItemId is
  * in LineItemRequest but not in LineItemResponse (gap: the response should echo it, PHL-001). */
 export type LineItem = Patch<G.LineItemResponse, "chargeCode" | "chargeName" | "category" | "quantity" | "unitPrice" | "taxRatePercent", "listUnitPrice" | "overrideReason">
-  & { override?: { unitPrice: number; reasonCode: string }; prescriptionItemId?: string };
+  & { override?: { unitPrice: number; reasonCode: string }; prescriptionItemId?: string; shortfallReason?: string /* PHL-018 "dispense anyway" */ };
 export type Payment = Patch<G.PaymentResponse, "id" | "method" | "amount" | "recordedAt">;
 export type Invoice = Omit<Patch<G.InvoiceResponse, "id" | "invoiceNumber" | "patientName" | "currency" | "subtotal" | "discount" | "tax" | "roundOff" | "total"
   | "paid" | "balanceDue" | "status">, "lineItems" | "payments"> & { lineItems: LineItem[]; payments: Payment[] };

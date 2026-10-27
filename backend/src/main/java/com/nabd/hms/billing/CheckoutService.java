@@ -169,7 +169,7 @@ public class CheckoutService {
             Totals t = computeTotals(null, lineItems, List.of(), BigDecimal.ZERO, req, canDiscount);
             invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
                     t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
-            repo.insertLineItems(tenantId, invoiceId, t.items());
+            repo.insertLineItems(tenantId, invoiceId, t.items(), staffId);
             tax.persist(invoiceId, t.computation());
             repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
             auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), BigDecimal.ZERO);
@@ -182,7 +182,7 @@ public class CheckoutService {
             BigDecimal earlier = repo.sumDiscounts(tenantId, invoiceId);
             Totals t = computeTotals(invoiceId, lineItems, existingItems, earlier, req, canDiscount);
             if (!lineItems.isEmpty()) {
-                repo.appendLineItems(tenantId, invoiceId, t.items(), repo.nextLineItemOrder(tenantId, invoiceId));
+                repo.appendLineItems(tenantId, invoiceId, t.items(), repo.nextLineItemOrder(tenantId, invoiceId), staffId);
             }
             tax.persist(invoiceId, t.computation());
             if (locked.paid().compareTo(t.total()) > 0) {
@@ -257,7 +257,7 @@ public class CheckoutService {
 
         UUID invoiceId = repo.insertInvoice(tenantId, null, patientId != null ? patientId : rxPatient, null, t.subtotal(), t.discount(), t.tax(),
                 t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
-        repo.insertLineItems(tenantId, invoiceId, t.items());
+        repo.insertLineItems(tenantId, invoiceId, t.items(), staffId);
         tax.persist(invoiceId, t.computation());
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
