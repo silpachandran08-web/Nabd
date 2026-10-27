@@ -61,4 +61,15 @@ public class CoreClient {
             throw e;
         }
     }
+
+    /** IDC-010: Core's answer to "add this family member". */
+    public record Member(String memberRef, String proxyStatus) {
+    }
+
+    /** IDC-010: creates the member (and the guardian consent for a minor). Idempotent at Core on the caregiver, name and date of birth.
+     * Throws Http.UpstreamStatusException: 409 notice-version-stale, 422 guardian-required, anything else is an outage. */
+    public Member addMember(UUID tenantId, String caregiverRef, java.util.Map<String, Object> body) {
+        JsonNode n = json.readTree(http.post(base + "/internal/v1/tenants/" + tenantId + "/patients/" + caregiverRef + "/members", json.writeValueAsString(body)));
+        return new Member(n.path("memberRef").asString(""), n.path("proxyStatus").asString(""));
+    }
 }
