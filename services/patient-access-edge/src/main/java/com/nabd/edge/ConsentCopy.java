@@ -49,7 +49,7 @@ final class ConsentCopy {
     }
 
     static boolean supported(String lang) {
-        return BY_LANG.containsKey(lang);
+        return lang != null && BY_LANG.containsKey(lang);
     }
 
     static Copy of(String lang) {

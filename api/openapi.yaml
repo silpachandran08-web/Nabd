@@ -2681,6 +2681,55 @@ paths:
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
         "200": { description: "Array of attempts", content: { application/json: { schema: { type: array, items: { type: object } } } } }
+  /patients/{id}/complete-in-chat:
+    post:
+      tags: [Patients]
+      summary: "ACC-043. The desk registered the patient with the minimum fields and asks the bot to collect the rest (address, email, language) on WhatsApp. Sends a WhatsApp utility message and marks the request; the patient's answers come back through the Edge. 409 messaging-consent-missing when the patient has not agreed to WhatsApp messages, 409 already-completed. Audit patient.chat_completion_requested. Idempotency-Key required."
+      x-required-permission: patients:edit
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "202": { description: "{ requested: true }", content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "messaging-consent-missing or already-completed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /proxy-invites/{token}:
+    parameters: [{ name: token, in: path, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{16,128}$" } }]
+    get:
+      tags: [Patients]
+      summary: "IDC-009. Public. The family member opens the consent link: clinic name, the caregiver's first name and relation, expiry. The token is the credential; an unknown, used or older-than-7-days link is the same 410 invite-expired. Rate limited per IP; Cache-Control no-store."
+      security: []
+      x-required-permission: public
+      responses:
+        "200": { description: "{ clinicName, relation, caregiverFirstName, expiresAt }", content: { application/json: { schema: { type: object } } } }
+        "410": { description: "invite-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /proxy-invites/{token}/otp:
+    parameters: [{ name: token, in: path, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{16,128}$" } }]
+    post:
+      tags: [Patients]
+      summary: "IDC-009. Public. Sends a 6-digit code (valid 10 minutes, one per 30 seconds) to the member's WhatsApp number. The code is sent only on this call, never when the link is merely opened."
+      security: []
+      x-required-permission: public
+      responses:
+        "202": { description: "{ sent: true }", content: { application/json: { schema: { type: object } } } }
+        "410": { description: "invite-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "Too soon after the last code (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "otp-send-failed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /proxy-invites/{token}/accept:
+    parameters: [{ name: token, in: path, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{16,128}$" } }]
+    post:
+      tags: [Patients]
+      summary: "IDC-009. Public. The member verifies the code and picks the scope (BOOK_ONLY, BOOK_AND_RECORDS, FULL). The proxy becomes active and the evidence (otpChallengeId, IP, user agent, notice version) is stored and audited as patient.proxy_accepted. 401 otp-invalid (five wrong codes lock the code), 410 invite-expired, 409 already-accepted with a different scope; the same scope again is a harmless 200."
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [otp, scope], properties: { otp: { type: string, pattern: "^[0-9]{6}$" }, scope: { type: string, enum: [BOOK_ONLY, BOOK_AND_RECORDS, FULL] } } } } }
+      responses:
+        "200": { description: "{ status: active, scope }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "otp-invalid (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "already-accepted (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "410": { description: "invite-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /booking-requests:
     get:
       tags: [Queue]
@@ -3835,6 +3884,119 @@ paths:
         "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/patients:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Patients]
+      summary: "ACC-043. Chat registration: the Edge creates the patient of an unknown WhatsApp number. Needs the care-data consent recorded in the same chat first (consentRecordId from POST /patients/consents; 422 CONSENT_REQUIRED otherwise, nothing stored). Name, sex and dob or age; an age is stored as the date of birth that age implies and flagged. Under 18 needs guardianRef (an adult registered on the same phone who consented; 422 GUARDIAN_REQUIRED). A likely duplicate (same phone and similar name and date of birth) creates nothing: 409 POSSIBLE_DUPLICATE with candidates (patientRef list) and the audit row patient.chat_registration_duplicate, which the desk's duplicate review (ACC-030) reads. Idempotency-Key required. registration_source is whatsapp."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [phoneVerified, phone, phoneHash, firstName, sex], properties: { phoneVerified: { type: boolean, enum: [true] }, phone: { type: string }, phoneHash: { type: string, pattern: "^[0-9a-f]{64}$" }, firstName: { type: string, maxLength: 80 }, lastName: { type: string, maxLength: 80 }, dob: { type: string, format: date }, age: { type: integer, minimum: 0, maximum: 120 }, sex: { type: string, enum: [male, female, other] }, consentRecordId: { type: string, format: uuid }, guardianRef: { type: string, maxLength: 64 } } } } }
+      responses:
+        "201": { description: "{ patientRef }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "POSSIBLE_DUPLICATE: { code, candidates[] } (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "CONSENT_REQUIRED or GUARDIAN_REQUIRED, or a phone that is not valid for the clinic country (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/patients/{patientRef}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: patientRef, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Patients]
+      summary: "ACC-043. The fields the patient answered when the desk asked to complete in chat: address, email, preferredLanguage (each optional, only given fields change). Stamps profile_completed_at and clears the desk's request; audit patient.completed_in_chat. Idempotency-Key required."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { address: { type: string, maxLength: 300 }, email: { type: string, maxLength: 120 }, preferredLanguage: { type: string } } } } }
+      responses:
+        "200": { description: "{ patientRef }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/patients/pending-completion/{phoneHash}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Patients]
+      summary: "ACC-043. Who on this phone the desk asked to finish in chat (oldest request first): patientRef and first name only. 404 when nobody is waiting."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ patientRef, firstName }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/family/members:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Patients]
+      summary: "IDC-009. A caregiver adds a family member on WhatsApp. An adult must have their own phone (422 own-phone-required) and gets a WhatsApp utility message with a consent link (valid 7 days); the proxy is pending until they accept. A minor uses the guardian model (proxyStatus guardian). 409 duplicate-member when the caregiver already has this person. Idempotency-Key required."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [caregiverRef, name, dob, relation], properties: { caregiverRef: { type: string, maxLength: 64 }, name: { type: string, maxLength: 120 }, dob: { type: string, format: date }, relation: { type: string, pattern: "^[a-z_]{2,20}$" }, phone: { type: string, maxLength: 20 }, sex: { type: string, enum: [male, female, other] } } } } }
+      responses:
+        "201": { description: "{ memberRef, proxyStatus: pending | guardian }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "duplicate-member (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "own-phone-required, or the WhatsApp template is not sendable (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    get:
+      tags: [Patients]
+      summary: "IDC-009. The caregiver's family members with relation and proxy status (pending, active, guardian), first name only."
+      x-required-permission: authenticated
+      parameters: [{ name: caregiverRef, in: query, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: "{ members: [{ memberRef, firstName, relation, status }] }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/family/members/{memberRef}/resend:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: memberRef, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Patients]
+      summary: "IDC-009. The caregiver sends a new consent link for a pending member; older links stop working. Idempotency-Key required."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [caregiverRef], properties: { caregiverRef: { type: string, maxLength: 64 } } } } }
+      responses:
+        "202": { description: "Sent", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "The member is not pending (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/family/members/{memberRef}/access:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: memberRef, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Patients]
+      summary: "IDC-009. What the caregiver may do for this member: need=book (a pending proxy may book) or need=records (403 proxy-consent-pending until the member accepts, 403 proxy-scope-insufficient under Book only, 403 not-a-proxy)."
+      x-required-permission: authenticated
+      parameters:
+        - { name: caregiverRef, in: query, required: true, schema: { type: string } }
+        - { name: need, in: query, required: false, schema: { type: string, enum: [book, records], default: book } }
+      responses:
+        "200": { description: "{ relation, scope, status }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "proxy-consent-pending, proxy-scope-insufficient or not-a-proxy (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/appointments:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
@@ -3845,7 +4007,7 @@ paths:
       parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [patientRef, doctorId, startTime], properties: { patientRef: { type: string }, doctorId: { type: string, format: uuid }, startTime: { type: string, format: date-time } } } } }
+        content: { application/json: { schema: { type: object, required: [patientRef, doctorId, startTime], properties: { patientRef: { type: string }, doctorId: { type: string, format: uuid }, startTime: { type: string, format: date-time }, actedByRef: { type: string, maxLength: 64, description: "IDC-011. patientRef of the family member who is booking on the patient's behalf; the server resolves the relation from the proxy, so the Edge cannot invent one. 403 when that person is not a proxy of the patient." } } } } }
       responses:
         "201": { description: "{ appointmentId, status }", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -3936,7 +4098,7 @@ paths:
       parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [patientRef], properties: { patientRef: { type: string }, newStartTime: { type: string, format: date-time }, reasonCode: { type: string, pattern: "^[a-z0-9_]{3,40}$" } } } } }
+        content: { application/json: { schema: { type: object, required: [patientRef], properties: { patientRef: { type: string }, newStartTime: { type: string, format: date-time }, reasonCode: { type: string, pattern: "^[a-z0-9_]{3,40}$" }, actedByRef: { type: string, maxLength: 64, description: "IDC-011. The family member acting for the patient (audited as proxy.acted)" } } } } }
       responses:
         "200": { description: "{ appointmentId, status }", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -4883,6 +5045,8 @@ paths:
                 method: { type: string, enum: [cash, card, upi, other] }
                 amount: { type: number, minimum: 0.01, description: "At most 2 decimals, not more than the balance" }
                 reference: { type: string, maxLength: 100 }
+                actedByPatientId: { type: [string, "null"], format: uuid, description: "IDC-011. Who paid on the patient's behalf (a payment link paid by a caregiver); stored on the payment row and audited as proxy.acted. Both acted-by fields or neither" }
+                actedByRelation: { type: [string, "null"], pattern: "^[a-z_]{2,20}$" }
       responses:
         "201": { description: "The invoice with its new paid, balanceDue, status and payments", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -7097,6 +7261,8 @@ components:
         patientId: { type: string, format: uuid }
         doctorId: { type: string, format: uuid }
         startTime: { type: string, format: date-time }
+        actedByPatientId: { type: [string, "null"], format: uuid, description: "IDC-011. Who booked on the patient's behalf (a family member with an active or pending proxy). Both acted-by fields or neither; 400 acted-by-invalid otherwise. Stored on the appointment, audited as proxy.acted." }
+        actedByRelation: { type: [string, "null"], pattern: "^[a-z_]{2,20}$", description: "IDC-011. The relation to the patient (daughter); shown on the card as Booked by daughter" }
 
     WaitlistEntry:
       type: object
@@ -7186,6 +7352,8 @@ components:
         source: { type: [string, "null"], enum: [walk_in, referral, online, social_media, returning, other], description: "Defaults to walk_in" }
         presentingComplaint: { type: [string, "null"] }
         paymentMode: { type: [string, "null"], enum: [cash, card, upi, other] }
+        actedByPatientId: { type: [string, "null"], format: uuid, description: "IDC-011. Who checked the patient in on their behalf; both acted-by fields or neither" }
+        actedByRelation: { type: [string, "null"], pattern: "^[a-z_]{2,20}$" }
 
     QueueSettingsSession:
       type: object

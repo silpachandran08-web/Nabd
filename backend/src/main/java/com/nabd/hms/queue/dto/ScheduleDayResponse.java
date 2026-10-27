@@ -41,7 +41,11 @@ public record ScheduleDayResponse(
     /** visitType: appointment · follow_up · walk_in · transfer. status: the queue status once the
      * patient has arrived (token set), otherwise the appointment's own status. */
     public record Booking(UUID appointmentId, UUID queueEntryId, UUID patientId, String patientName, String visitType,
-                          String time, Integer token, String status) {
+                          String time, Integer token, String status, String actedByRelation) {
+        /** IDC-011: actedByRelation is who booked or checked in on the patient's behalf ("daughter"); null when the patient came themselves. */
+        public Booking(UUID appointmentId, UUID queueEntryId, UUID patientId, String patientName, String visitType, String time, Integer token, String status) {
+            this(appointmentId, queueEntryId, patientId, patientName, visitType, time, token, status, null);
+        }
     }
 
     public record Counts(int appointments, int walkIns, int freeSlots) {

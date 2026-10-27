@@ -18,6 +18,9 @@ export type ConsentSummary = {
   consentId: string; requester: string; categories: string[]; from: string; to: string;
   purpose: string; validUntil: string; artefactHash: string; decided?: "approve" | "decline" | null;
 };
+/** IDC-009: GET {base}/proxy-invites/{token} (public; the token is the credential, the OTP proves the phone). */
+export type ProxyInvite = { clinicName: string; relation: string; caregiverFirstName: string; expiresAt: string };
+export type ProxyScope = "BOOK_ONLY" | "BOOK_AND_RECORDS" | "FULL";
 export type Booking = { doctorName: string; clinicName: string; address?: string | null; startsAt: string; timeZone: string; status: "confirmed" | "held" | "cancelled" };
 export type Resolved =
   | { kind: "document"; contentType: string; fileName?: string | null }
@@ -73,6 +76,10 @@ export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
     (await call(f, `/patient-links/${enc(linkId)}/otp/verify`, { method: "POST", body: JSON.stringify({ code }) })).json(),
   content: async (linkId: string, token: string): Promise<Resolved> => (await call(f, `/patient-links/${enc(linkId)}/content`, { token })).json(),
   document: async (linkId: string, token: string): Promise<Blob> => (await call(f, `/patient-links/${enc(linkId)}/document`, { token })).blob(),
+  proxyInvite: async (token: string): Promise<ProxyInvite> => (await call(f, `/proxy-invites/${enc(token)}`)).json(),
+  proxyOtp: async (token: string): Promise<void> => { await call(f, `/proxy-invites/${enc(token)}/otp`, { method: "POST" }); },
+  proxyAccept: async (token: string, otp: string, scope: ProxyScope): Promise<{ status: string; scope: ProxyScope }> =>
+    (await call(f, `/proxy-invites/${enc(token)}/accept`, { method: "POST", body: JSON.stringify({ otp, scope }) })).json(),
   decide: async (consentId: string, token: string, decision: "approve" | "decline", artefactHash: string, key: string): Promise<{ status: string }> =>
     (await call(f, `/exchange/consents/${enc(consentId)}/patient-decision`, { method: "POST", token, idempotencyKey: key, body: JSON.stringify({ decision, artefactHash }) })).json(),
 });

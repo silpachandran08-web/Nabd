@@ -53,13 +53,16 @@ class InternalSchedulingService {
     private final com.nabd.hms.queue.api.ReasonCodes reasons;
     private final DeskExceptions desk;
     private final PatientConfirmationRepository confirmations;
+    private final com.nabd.hms.patient.api.ProxyAccess proxy; // IDC-011
 
     InternalSchedulingService(TenantScope tenantScope, AppointmentService appointments, AppointmentRepository appointmentRepo,
                               ScheduleRepository scheduleRepo, PatientRefs patientRefs, ClinicPolicies policies, AuditService audit,
                               ClinicClock clock, com.nabd.hms.queue.api.ReasonCodes reasons, DeskExceptions desk,
-                              PatientConfirmationRepository confirmations) {
+                              PatientConfirmationRepository confirmations,
+                              com.nabd.hms.patient.api.ProxyAccess proxy) {
         this.reasons = reasons;
         this.desk = desk;
+        this.proxy = proxy;
         this.tenantScope = tenantScope;
         this.appointments = appointments;
         this.appointmentRepo = appointmentRepo;
@@ -132,16 +135,19 @@ class InternalSchedulingService {
         });
     }
 
-    Map<String, Object> book(UUID tid, ServiceIdentity edge, String patientRef, UUID doctorId, Instant startTime) {
+    /** actedByRef (IDC-011): the caregiver or guardian who booked for the patient; 403 not-a-proxy without a live relation. */
+    Map<String, Object> book(UUID tid, ServiceIdentity edge, String patientRef, UUID doctorId, Instant startTime, String actedByRef) {
         return tenantScope.run(tid, () -> {
             UUID patientId = patientRefs.patientIdFor(patientRef).orElseThrow(InternalSchedulingService::notOwner);
-            AppointmentResponse a = appointments.book(tid, null, new AppointmentWriteRequest(patientId, doctorId, startTime, false));
+            var by = actedByRef == null ? null : proxy.resolve(actedByRef, patientId);
+            AppointmentResponse a = appointments.book(tid, null, new AppointmentWriteRequest(patientId, doctorId, startTime, false,
+                    by == null ? null : by.patientId(), by == null ? null : by.relation()));
             record(tid, edge, "appointment.booked_via_edge", a.id(), patientRef);
             return Map.of("appointmentId", a.id(), "status", a.status());
         });
     }
 
-    Map<String, Object> act(UUID tid, ServiceIdentity edge, UUID id, String action, String patientRef, Instant newStartTime, String reasonCode, String note) {
+    Map<String, Object> act(UUID tid, ServiceIdentity edge, UUID id, String action, String patientRef, Instant newStartTime, String reasonCode, String note, String actedByRef) {
         if (!Set.of("confirm", "reschedule", "cancel", "call-me").contains(action)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
         }
@@ -160,6 +166,7 @@ class InternalSchedulingService {
             if (!"scheduled".equals(a.status())) {
                 throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
             }
+            var by = actedByRef == null ? null : proxy.resolve(actedByRef, patientId);
             UUID resultId = id;
             String status = "scheduled";
             if ("call-me".equals(action)) { // ACC-041: the patient asks the desk to ring instead of changing inside the window
@@ -180,6 +187,10 @@ class InternalSchedulingService {
                     status = "cancelled";
                 } else {
                     resultId = appointments.reschedule(tid, null, id, new RescheduleRequest(newStartTime)).id();
+                }
+                if (by != null) { // IDC-011: the new row of a reschedule carries who moved it
+                    if (!"cancel".equals(action)) appointmentRepo.stampActedBy(tid, resultId, by.patientId(), by.relation());
+                    proxy.audit(by, action, "appointment", resultId);
                 }
             }
             record(tid, edge, "appointment." + ("confirm".equals(action) ? "confirmed" : "cancel".equals(action) ? "cancelled" : "rescheduled") + "_via_edge", id, patientRef);

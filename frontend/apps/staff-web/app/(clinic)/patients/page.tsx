@@ -1,5 +1,6 @@
 "use client";
 
+import CompleteInChat from "./CompleteInChat";
 import { formatNumber } from "@nabd/i18n";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -928,6 +929,8 @@ function PatientsList() {
                     <div className={styles.sectionLabel}>Address and national ID</div>
                     <div className={styles.muted}>Not available yet. They are saved at registration, but the server does not return them.</div>
                   </div>
+
+                  {patientsEdit && <CompleteInChat key={drawerPatient.id} patientId={drawerPatient.id} />}
 
                   {drawerPatient.guardianId && (
                     <div className={styles.section}>

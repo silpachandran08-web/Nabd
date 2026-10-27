@@ -38,11 +38,19 @@ public class ConsentFlow {
 
     /** Shows the current notice (fetched from Core, so the version echoed back is the one the patient saw) and asks tap 1. */
     public Outcome begin(Conversation c, String language) {
+        return begin(c, language, false);
+    }
+
+    /** ACC-043: the same step as the first part of registration (step=reg): after the taps the flow asks for the name instead of ending. */
+    public Outcome begin(Conversation c, String language, boolean registration) {
         String lang = ConsentCopy.supported(language) ? language : ConsentCopy.DEFAULT;
         CoreClient.Notice n = core.currentNotice(c.tenantId(), lang);
         Map<String, String> ctx = new HashMap<>(c.context());
         ctx.put("lang", lang);
         ctx.put("noticeVersion", n.version());
+        if (registration) {
+            ctx.put("step", RegistrationFlow.STEP);
+        }
         ConsentCopy.Copy t = ConsentCopy.of(lang);
         return new Outcome(State.CONSENT_CARE, ctx, t.notice().formatted(props.noticeBaseUrl() + n.path()),
                 List.of(new Button(CARE_YES, t.agree()), new Button(CARE_NO, t.no())));
@@ -71,6 +79,13 @@ public class ConsentFlow {
                         List.of(new Button(UPD_ONLY, t.updOnly()), new Button(UPD_OFFERS, t.updOffers()), new Button(UPD_NONE, t.updNone())));
             }
             if (CARE_NO.equals(m.buttonAction())) {
+                if (RegistrationFlow.STEP.equals(c.context().get("step"))) {
+                    if (m.messageId() != null) { // only the declined decision is stored, no patient
+                        flow.core.relayConsentRecord(c.tenantId(), c.contactHash(), Map.of("data_processing", false), c.context().get("noticeVersion"),
+                                c.context().getOrDefault("lang", ConsentCopy.DEFAULT), m.messageId());
+                    }
+                    return RegistrationFlow.declined();
+                }
                 return new Outcome(State.DONE, Map.of(), t.declined(), List.of(new Button(CALLBACK, t.callback())));
             }
             return flow.begin(c, c.context().get("lang")); // anything else: ask again (also refreshes the notice version)
@@ -103,8 +118,12 @@ public class ConsentFlow {
             decisions.put("marketing", UPD_OFFERS.equals(a)); // only an explicit tap grants it
             String lang = c.context().getOrDefault("lang", ConsentCopy.DEFAULT);
             // Core is idempotent on the message id, so the engine re-running this step after a version conflict stores nothing twice.
-            if (!flow.core.relayConsent(c.tenantId(), c.contactHash(), decisions, c.context().get("noticeVersion"), lang, m.messageId())) {
+            String consentId = flow.core.relayConsentRecord(c.tenantId(), c.contactHash(), decisions, c.context().get("noticeVersion"), lang, m.messageId());
+            if (consentId == null) {
                 return flow.begin(c, lang); // the notice changed while the patient was deciding: show the current one
+            }
+            if (RegistrationFlow.STEP.equals(c.context().get("step"))) {
+                return RegistrationFlow.afterConsent(lang, consentId);
             }
             Map<String, String> ctx = new HashMap<>();
             ctx.put("lang", lang);

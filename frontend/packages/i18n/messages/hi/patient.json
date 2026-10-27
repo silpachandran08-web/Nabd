@@ -56,5 +56,16 @@
  "purpose_referral": "रेफ़रल",
  "purpose_second_opinion": "दूसरी राय",
  "purpose_insurance_claim": "बीमा दावा",
- "purpose_personal_record": "आपके अपने रिकॉर्ड"
+ "purpose_personal_record": "आपके अपने रिकॉर्ड",
+ "proxyTitle": "{name} को अपनी देखभाल में मदद की अनुमति दें",
+ "proxyIntro": "{name} ({relation}) ने {clinic} में आपकी विज़िट में मदद माँगी है। चुनें कि वे क्या कर सकते हैं।",
+ "proxyScopeLabel": "वे क्या कर सकते हैं?",
+ "proxyScopeBook": "सिर्फ़ अपॉइंटमेंट बुक करना",
+ "proxyScopeBookHint": "वे आपके अपॉइंटमेंट बुक और बदल सकते हैं। वे आपके मेडिकल रिकॉर्ड नहीं देख सकते।",
+ "proxyScopeRecords": "अपॉइंटमेंट बुक करना और मेरे रिकॉर्ड देखना",
+ "proxyScopeRecordsHint": "वे आपके पर्चे और रिपोर्ट भी देख सकते हैं।",
+ "proxyScopeFull": "पूरी मदद",
+ "proxyScopeFullHint": "ऊपर की सब बातें, साथ में भुगतान और फ़ॉर्म।",
+ "proxyAccept": "पुष्टि करें",
+ "proxyDone": "धन्यवाद। {name} अब आपकी विज़िट में मदद कर सकते हैं।"
 }

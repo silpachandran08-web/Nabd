@@ -82,13 +82,16 @@ public class QueueService {
     private final EtaService eta;
     private final ServiceTimeService serviceTimes;
     private final DeskExceptions desk;
+    private final com.nabd.hms.patient.api.ProxyAccess proxy; // IDC-011
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, OrganizationConfig departmentService, TenantContext tenantContext, ClinicClock clock,
                  com.nabd.hms.common.AuditService auditService,
                  com.nabd.hms.common.EventPublisher events, ActorDirectory actors,
-                 QueueEventRepository eventRepo, DoctorSessionService sessions, EtaService eta, ServiceTimeService serviceTimes, DeskExceptions desk) {
+                 QueueEventRepository eventRepo, DoctorSessionService sessions, EtaService eta, ServiceTimeService serviceTimes, DeskExceptions desk,
+                 com.nabd.hms.patient.api.ProxyAccess proxy) {
         this.desk = desk;
+        this.proxy = proxy;
         this.eta = eta;
         this.serviceTimes = serviceTimes;
         this.eventRepo = eventRepo;
@@ -114,6 +117,7 @@ public class QueueService {
             throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
                     "That patient doesn't exist in this clinic.");
         }
+        var by = req.actedByPatientId() == null ? null : proxy.onBehalf(req.actedByPatientId(), req.actedByRelation(), req.patientId()); // IDC-011
         var doctorDepartment = repo.findCheckInDepartment(tenantId, req.doctorId()); // also the doctor-exists check
         if (doctorDepartment.isEmpty()) {
             throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
@@ -172,6 +176,10 @@ public class QueueService {
                         "This appointment has already been checked in.", java.util.Map.of("code", "ALREADY_CHECKED_IN")); // DB backstop of the lock; tx is aborted, no lookup
             }
             throw e;
+        }
+        if (by != null) {
+            repo.stampActedBy(tenantId, id, by.patientId(), by.relation());
+            proxy.audit(by, "check_in", "queue_entry", id);
         }
         entryCreated(tenantId, id, req.doctorId(), today, "checked_in", callerStaffId);
         if (lateAfterGrace != null && clock.now().isAfter(lateAfterGrace)) { // ACC-012

@@ -33,6 +33,11 @@ final class Http {
                 .POST(HttpRequest.BodyPublishers.ofString(json)).build());
     }
 
+    String patch(String url, String json, String idempotencyKey) {
+        return send(builder(url).header("Content-Type", "application/json").header("Idempotency-Key", idempotencyKey)
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(json)).build());
+    }
+
     private HttpRequest.Builder builder(String url) {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).timeout(timeout);
         if (!token.isBlank()) {

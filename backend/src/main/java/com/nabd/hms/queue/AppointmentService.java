@@ -50,13 +50,16 @@ public class AppointmentService {
     private final com.nabd.hms.shared.notify.NotificationPort notifications;
     private final com.nabd.hms.queue.api.ReasonCodes reasons;
     private final AppointmentChangeNotifier changeNotifier;
+    private final com.nabd.hms.patient.api.ProxyAccess proxy; // IDC-011
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
                         SlotValidator slotValidator, EventPublisher events,
-                        com.nabd.hms.shared.notify.NotificationPort notifications, com.nabd.hms.queue.api.ReasonCodes reasons, AppointmentChangeNotifier changeNotifier) {
+                        com.nabd.hms.shared.notify.NotificationPort notifications, com.nabd.hms.queue.api.ReasonCodes reasons, AppointmentChangeNotifier changeNotifier,
+                        com.nabd.hms.patient.api.ProxyAccess proxy) {
         this.reasons = reasons;
         this.changeNotifier = changeNotifier;
+        this.proxy = proxy;
         this.events = events;
         this.notifications = notifications;
         this.slotValidator = slotValidator;
@@ -73,12 +76,13 @@ public class AppointmentService {
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
         requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
+        com.nabd.hms.patient.api.ProxyAccess.ActedBy by = req.actedByPatientId() == null ? null : proxy.onBehalf(req.actedByPatientId(), req.actedByRelation(), req.patientId());
         ZoneId zone = clock.zone(tenantId);
         LocalDate day = clock.clinicDate(tenantId, req.startTime()); // ACC-005
         Optional<WorkingHoursRow> tokenBlock = scheduleRepo.blockAt(tenantId, req.doctorId(), req.startTime())
                 .filter(b -> SessionModes.TOKEN.equals(SessionModes.modeOn(b, day)));
         if (tokenBlock.isPresent()) {
-            return bookToken(tenantId, callerStaffId, req, tokenBlock.get(), day, zone);
+            return bookToken(tenantId, callerStaffId, req, tokenBlock.get(), day, zone, by);
         }
         int slotMinutes = slotValidator.validate(tenantId, req.doctorId(), req.startTime(), clock.now());
         slotValidator.requireNoLiveOffer(tenantId, req.doctorId(), req.startTime(), null);
@@ -88,7 +92,8 @@ public class AppointmentService {
             UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault(), callerStaffId == null ? "system" : "staff");
             log.info("appointment {} booked by {}: patient {} with doctor {} at {}",
                     id, callerStaffId, req.patientId(), req.doctorId(), req.startTime());
-            published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), req.startTime(), "scheduled", Map.of());
+            actedBy(tenantId, id, by);
+            published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), req.startTime(), "scheduled", by == null ? Map.of() : Map.of("actedByRef", by.ref()));
             return toResponse(repo.findById(tenantId, id).orElseThrow());
         } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
             log.warn("booking conflict: doctor {} already booked at {}", req.doctorId(), req.startTime());
@@ -99,7 +104,7 @@ public class AppointmentService {
     /** ACC-011: a place in a token session. start/end = the session window; the number is reserved under the doctor-day lock. */
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private AppointmentResponse bookToken(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req, WorkingHoursRow block,
-                                          LocalDate day, ZoneId zone) {
+                                          LocalDate day, ZoneId zone, com.nabd.hms.patient.api.ProxyAccess.ActedBy by) {
         Instant start = clock.atSecond(tenantId, day, block.startSecond());
         Instant end = clock.atSecond(tenantId, day, block.endSecond());
         slotValidator.validateToken(tenantId, req.doctorId(), block, day, end, clock.now());
@@ -109,8 +114,18 @@ public class AppointmentService {
                 .orElseThrow(() -> sessionFull(true));
         UUID id = repo.insertToken(tenantId, req.patientId(), req.doctorId(), start, end, req.isFollowUpOrDefault(), block.id(), token);
         log.info("token booking {} by {}: doctor {} token {} on {}", id, callerStaffId, req.doctorId(), token, day); // log-phi-ok: token booking number, not a credential
-        published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), start, "scheduled", Map.of());
+        actedBy(tenantId, id, by);
+        published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), start, "scheduled", by == null ? Map.of() : Map.of("actedByRef", by.ref()));
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** IDC-011: stores who booked on the patient's behalf and writes the proxy.acted audit row. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the booking tx
+    private void actedBy(UUID tenantId, UUID appointmentId, com.nabd.hms.patient.api.ProxyAccess.ActedBy by) {
+        if (by != null) {
+            repo.stampActedBy(tenantId, appointmentId, by.patientId(), by.relation());
+            proxy.audit(by, "booking", "appointment", appointmentId);
+        }
     }
 
     @Transactional

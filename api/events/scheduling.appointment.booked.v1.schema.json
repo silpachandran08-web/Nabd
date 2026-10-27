@@ -42,7 +42,11 @@
       "type": "integer",
       "minimum": 1,
       "description": "Outbox id of this event: monotonic per aggregate."
-    }
+    },
+    "actedByRef": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "IDC-011: opaque patient reference of the caregiver, guardian or desk-named person who booked on the patient's behalf; absent when the patient booked.", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
   },
   "examples": [
     {

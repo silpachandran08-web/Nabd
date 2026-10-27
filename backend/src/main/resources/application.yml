@@ -120,6 +120,7 @@ app:
   # inside the email body server-side (the frontend builds the same link client-side from
   # window.location.origin for the manual-relay banner; this is that same value for SmtpEmailSender).
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  patient-web-base-url: ${PATIENT_WEB_BASE_URL:http://localhost:3810} # IDC-009: where the family member opens the consent link (/proxy-invite/<token>)
   auth:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 30

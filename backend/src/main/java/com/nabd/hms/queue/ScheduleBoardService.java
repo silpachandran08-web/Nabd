@@ -109,7 +109,7 @@ public class ScheduleBoardService {
             int end = clock.secondOfClinicDay(tenantId, day, a.end()) / 60;
             bookings.add(new ScheduleGrid.BookingInput(a.doctorId(), start, Math.max(end, start + 1), new ScheduleDayResponse.Booking(
                     a.id(), a.queueEntryId(), a.patientId(), a.patientName(), a.followUp() ? "follow_up" : "appointment",
-                    ScheduleGrid.hhmm(start), a.token(), a.queueStatus() != null ? a.queueStatus() : a.status())));
+                    ScheduleGrid.hhmm(start), a.token(), a.queueStatus() != null ? a.queueStatus() : a.status(), a.actedByRelation())));
         }
         for (ScheduleBoardRepository.WalkInRow w : walkIns) {
             if (w.doctorId() == null) {
@@ -118,7 +118,7 @@ public class ScheduleBoardService {
             int start = clock.secondOfClinicDay(tenantId, day, w.createdAt()) / 60;
             bookings.add(new ScheduleGrid.BookingInput(w.doctorId(), start, start, new ScheduleDayResponse.Booking(
                     null, w.queueEntryId(), w.patientId(), w.patientName(),
-                    "internal_transfer".equals(w.source()) ? "transfer" : "walk_in", ScheduleGrid.hhmm(start), w.token(), w.status())));
+                    "internal_transfer".equals(w.source()) ? "transfer" : "walk_in", ScheduleGrid.hhmm(start), w.token(), w.status(), w.actedByRelation())));
         }
 
         List<ScheduleDayResponse.Session> sessions = ScheduleGrid.build(day, zone, now, holiday != null, doctors, bookings);

@@ -21,6 +21,10 @@ public enum NotificationPurpose {
     APPT_RESCHEDULED("appt_rescheduled", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** ACC-006: the clinic cancelled the patient's appointment (first name, date, time). */
     APPT_CANCELLED_BY_CLINIC("appt_cancelled_by_clinic", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-043: the desk asks the patient to finish registering in chat (no params, no names in the body). */
+    PROFILE_COMPLETION("profile_completion", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** IDC-009: consent link to an adult family member's own number (no names in the body; the link is the only parameter). */
+    PROXY_INVITE("proxy_invite", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
     EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
