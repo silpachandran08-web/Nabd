@@ -13,7 +13,8 @@ export class ArrivalsCheckIn {
     await p.getByRole('button', { name: 'Check in', exact: true }).first().click();
     const dlg = p.getByRole('dialog');
     await dlg.waitFor();
-    await dlg.getByRole('button', { name: 'Check in', exact: true }).click();
+    await dlg.getByRole('button', { name: 'Check in', exact: true }).click(); // the list row opens the check-in form
+    await p.locator('form').getByRole('button', { name: 'Check in', exact: true }).click();
   }
   slip() { return this.page.getByRole('dialog', { name: 'Checked in' }); }
   async closeSlip() { await this.slip().getByRole('button', { name: 'Done' }).click(); await this.slip().waitFor({ state: 'detached' }); }

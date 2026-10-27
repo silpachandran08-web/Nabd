@@ -1,4 +1,13 @@
 {
   "_policy": "FEF-049: pre-existing critical/serious axe findings that do not block stage 7 until `expires` (max 30 days from `added`). Each needs an owner and a fix; an expired entry blocks again. Never add a finding your own change introduced.",
-  "entries": []
+  "entries": [
+    {
+      "rule": "color-contrast",
+      "selector": "_faint",
+      "owner": "@nabd/engineering",
+      "added": "2026-10-27",
+      "expires": "2026-11-26",
+      "reason": "Schedule grid 'Passed' slot label (.faint, #657078 on #11161b = 3.58:1) predates FEF-050; the token needs a design fix (found by the J3/J4 nightly)."
+    }
+  ]
 }
