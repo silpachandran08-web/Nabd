@@ -11,6 +11,7 @@ export const AbhaVerifyRequestSchema = z.object({ abhaNumberOrAddress: z.string(
 export const AcceptInviteRequestSchema = z.object({ pin: z.string().min(1) });
 export const AcceptOwnerInviteRequestSchema = z.object({ pin: z.string().min(1) });
 export const AcceptedSchema = z.object({ acceptanceId: z.string().optional(), at: z.string().optional(), by: z.string().optional(), method: z.string().optional(), version: z.string().optional() });
+export const ActionRequestSchema = z.object({ note: z.string().optional(), snoozeMinutes: z.number().int().optional() });
 export const ActivateRequestSchema = z.object({ csoApprovalRef: z.string().min(0).max(200), reason: z.string().min(0).max(500) });
 export const ActiveStaffSchema = z.object({ departmentName: z.string().optional(), inConsult: z.boolean().optional(), name: z.string().optional(), roleName: z.string().optional(), signedInAt: z.string().optional(), staffId: z.string().optional() });
 export const ActivityEntryResponseSchema = z.object({ activity: z.string().optional(), kind: z.string().optional(), occurredAt: z.string().optional(), patientName: z.string().optional() });
@@ -35,6 +36,7 @@ export const ApproveRefundRequestSchema = z.object({ expectedAmount: z.number().
 export const ApproveRequestSchema = z.object({ approvedBy: z.string().min(0).max(200), csoApprovalRef: z.string().min(0).max(200) });
 export const AttachmentCreateRequestSchema = z.object({ fileId: z.string(), kind: z.string(), note: z.string().min(0).max(500).optional() });
 export const AttachmentCreateResponseSchema = z.object({ attachmentId: z.string().optional() });
+export const AttemptSchema = z.object({ appointmentId: z.string().optional(), channel: z.string().optional(), createdAt: z.string().optional(), distanceM: z.number().int().optional(), id: z.string().optional(), outcome: z.string().optional() });
 export const JsonNodeSchema = z.record(z.string(), z.unknown());
 export const AuditEntryResponseSchema = z.object({ action: z.string().optional(), actorId: z.string().optional(), actorName: z.string().optional(), actorRole: z.string().optional(), actorType: z.string().optional(), after: JsonNodeSchema.optional(), before: JsonNodeSchema.optional(), createdAt: z.string().optional(), entityId: z.string().optional(), entityType: z.string().optional(), id: z.number().int().optional(), ipAddress: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional() });
 export const AuditLogPageSchema = z.object({ data: z.array(AuditEntryResponseSchema).optional(), page: PageMetaSchema.optional() });
@@ -146,6 +148,9 @@ export const DepartmentWorkflowRequestSchema = z.object({ templateCode: z.string
 export const WorkflowTemplateResponseSchema = z.object({ code: z.string().optional(), name: z.string().optional(), steps: z.array(z.string()).optional(), toggleKeys: z.array(z.string()).optional() });
 export const DepartmentWorkflowResponseSchema = z.object({ availableTemplates: z.array(WorkflowTemplateResponseSchema).optional(), resolvedSteps: z.array(z.string()).optional(), templateCode: z.string().optional(), toggles: z.record(z.string(), z.boolean()).optional() });
 export const DepartmentWriteRequestSchema = z.object({ active: z.boolean().optional(), name: z.string().min(1) });
+export const DeskExceptionActionResponseSchema = z.object({ id: z.string().optional(), status: z.string().optional() });
+export const DeskExceptionItemSchema = z.object({ actions: z.array(z.string()).optional(), createdAt: z.string().optional(), id: z.string().optional(), kind: z.string().optional(), params: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), refId: z.string().optional(), refType: z.string().optional(), severity: z.string().optional(), summary: z.string().optional() });
+export const DeskExceptionPageSchema = z.object({ items: z.array(DeskExceptionItemSchema).optional(), nextCursor: z.string().optional() });
 export const DiscountResponseSchema = z.object({ createdAt: z.string().optional(), id: z.string().optional(), percent: z.number().optional(), reason: z.string().optional(), requestedBy: z.string().optional(), requestedByName: z.string().optional(), reviewedAt: z.string().optional(), reviewedBy: z.string().optional(), reviewedByName: z.string().optional(), status: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional() });
 export const DiscountPageSchema = z.object({ data: z.array(DiscountResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const DiscountRequestCreateSchema = z.object({ percent: z.number().gte(0.01).lte(100), reason: z.string().min(1), tenantId: z.string() });
@@ -197,6 +202,7 @@ export const ExpiringSoonResponseSchema = z.object({ alertTier: z.number().int()
 export const ExportJobRequestSchema = z.object({ exportType: z.string().min(1) });
 export const ExportJobResponseSchema = z.object({ createdAt: z.string().optional(), errorMessage: z.string().optional(), exportType: z.string().optional(), id: z.string().optional(), resultUrl: z.string().optional(), status: z.string().optional() });
 export const ExtendRequestSchema = z.object({ newValidityEnd: z.string(), reason: z.string().min(1) });
+export const FacilityCheckInConfigSchema = z.object({ checkinCode: z.string().optional(), geofenceRadiusM: z.number().int().optional(), geofenceRequired: z.boolean().optional(), lat: z.number().optional(), lng: z.number().optional(), walkinAllowed: z.boolean().optional(), whatsappNumber: z.string().optional() });
 export const RxCodeSuggestionSchema = z.object({ display: z.string().optional(), drugId: z.string().optional() });
 export const FavouriteRxSetItemResponseSchema = z.object({ brandName: z.string().optional(), codeSuggestion: RxCodeSuggestionSchema.optional(), dosage: z.string().optional(), drugId: z.string().optional(), drugName: z.string().optional(), duration: z.string().optional(), frequency: z.string().optional(), genericName: z.string().optional(), instructions: z.string().optional(), quantity: z.number().optional(), quantityUnit: z.string().optional(), route: z.string().optional(), sigPattern: z.string().optional(), stale: z.boolean().optional() });
 export const RxWarningDecisionSchema = z.object({ kind: z.string().min(1), note: z.string().min(0).max(500).optional(), reasonCode: z.string().min(1) });
@@ -434,6 +440,12 @@ export const SafetyDictionaryBundleSchema = z.object({ classes: z.array(ClassDef
 export const SessionSchema = z.object({ end: z.string().optional(), label: z.string().optional(), rows: z.array(RowSchema).optional(), start: z.string().optional(), stepMinutes: z.number().int().optional() });
 export const ScheduleDayResponseSchema = z.object({ counts: CountsSchema.optional(), date: z.string().optional(), doctors: z.array(DoctorSchema).optional(), holiday: z.string().optional(), sessions: z.array(SessionSchema).optional(), timezone: z.string().optional(), today: z.boolean().optional() });
 export const ScheduleWeekResponseSchema = z.object({ days: z.array(DaySchema).optional(), start: z.string().optional(), today: z.string().optional() });
+export const SelfCheckInCandidateSchema = z.object({ appointmentId: z.string().optional(), checkedIn: z.boolean().optional(), firstName: z.string().optional(), patientRef: z.string().optional() });
+export const SelfCheckInContextSchema = z.object({ candidates: z.array(SelfCheckInCandidateSchema).optional(), facilityCode: z.string().optional(), geofenceRequired: z.boolean().optional(), radiusM: z.number().int().optional(), walkinAllowed: z.boolean().optional() });
+export const SelfCheckInLocationSchema = z.object({ accuracyM: z.number().optional(), lat: z.number().optional(), lng: z.number().optional() });
+export const SelfCheckInWalkInSchema = z.object({ doctorId: z.string().optional() });
+export const SelfCheckInRequestSchema = z.object({ appointmentId: z.string().optional(), channel: z.string().optional(), location: SelfCheckInLocationSchema.optional(), patientRef: z.string().min(1), walkIn: SelfCheckInWalkInSchema.optional() });
+export const SelfCheckInResponseSchema = z.object({ expectedRange: z.string().optional(), position: z.number().int().optional(), queueEntryId: z.string().optional(), token: z.number().int().optional() });
 export const SellPackageRequestSchema = z.object({ packageId: z.string(), patientId: z.string(), paymentMethod: z.string().min(1) });
 export const ServiceTimeItemSchema = z.object({ medianMin: z.number().optional(), n: z.number().int().optional(), p80Min: z.number().optional(), priorSource: z.string().optional(), visitType: z.string().optional() });
 export const ServiceTimesResponseSchema = z.object({ items: z.array(ServiceTimeItemSchema).optional() });
@@ -537,6 +549,8 @@ export const operationSchemas = {
   InternalSchedulingController_availability: { response: InternalAvailabilitySchema },
   InternalBookingRequestController_choose: { body: InternalBookingOfferChoiceSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalBookingRequestController_route: { body: InternalBookingRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  InternalCheckInController_checkIn: { body: SelfCheckInRequestSchema, response: SelfCheckInResponseSchema },
+  InternalCheckInController_context: { response: SelfCheckInContextSchema },
   EtaController_one: { response: InternalEtaResponseSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   InternalChatConsentController_capture: { body: ChatConsentRequestSchema, response: ChatConsentResponseSchema },
@@ -693,10 +707,16 @@ export const operationSchemas = {
   ScheduleController_updateWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_deleteWorkingHours: {  },
   EventsController_stream: { response: SseEmitterSchema },
+  FacilityCheckInController_attempts: { response: z.array(AttemptSchema) },
+  FacilityCheckInController_config: { response: FacilityCheckInConfigSchema },
+  FacilityCheckInController_save: { body: FacilityCheckInConfigSchema, response: FacilityCheckInConfigSchema },
+  FacilityCheckInController_poster: { response: z.string() },
   FileController_init: { body: FileUploadInitRequestSchema, response: FileUploadInitResponseSchema },
   FileController_complete: { body: FileUploadCompleteRequestSchema, response: FileUploadCompleteResponseSchema },
   FileController_get: { response: FileStatusResponseSchema },
   AttachmentController_downloadUrl: { response: FileDownloadUrlResponseSchema },
+  DeskExceptionController_list: { response: DeskExceptionPageSchema },
+  DeskExceptionController_act: { body: ActionRequestSchema, response: DeskExceptionActionResponseSchema },
   MeEntitlementsController_get: { response: MeEntitlementsSchema },
   MePreferencesController_get: { response: UiPreferencesReadSchema },
   MePreferencesController_put: { body: UiPreferencesWriteSchema, response: UiPreferencesSchema },

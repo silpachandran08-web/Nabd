@@ -851,6 +851,81 @@ paths:
       tags:
       - queue
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/check-ins:
+    post:
+      operationId: InternalCheckInController_checkIn
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelfCheckInRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SelfCheckInResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/check-ins/context:
+    get:
+      operationId: InternalCheckInController_context
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: phoneHash
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SelfCheckInContext"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/eta/appointments/{appointmentId}:
     get:
       operationId: EtaController_one
@@ -7029,6 +7104,153 @@ paths:
       tags:
       - realtime
       x-required-permission: authenticated
+  /v1/facility/checkin-attempts:
+    get:
+      operationId: FacilityCheckInController_attempts
+      parameters:
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Attempt"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
+  /v1/facility/checkin-config:
+    get:
+      operationId: FacilityCheckInController_config
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FacilityCheckInConfig"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
+    put:
+      operationId: FacilityCheckInController_save
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FacilityCheckInConfig"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FacilityCheckInConfig"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
+  /v1/facility/checkin-qr:
+    get:
+      operationId: FacilityCheckInController_poster
+      parameters:
+      - in: query
+        name: format
+        required: false
+        schema:
+          type: string
+          default: png
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
   /v1/files/uploads:
     post:
       operationId: FileController_init
@@ -7185,6 +7407,103 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:view
+  /v1/front-desk/exceptions:
+    get:
+      operationId: DeskExceptionController_list
+      parameters:
+      - in: query
+        name: kind
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeskExceptionPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
+  /v1/front-desk/exceptions/{id}/{action}:
+    post:
+      operationId: DeskExceptionController_act
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: action
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeskExceptionActionResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:edit
   /v1/me/entitlements:
     get:
       operationId: MeEntitlementsController_get
@@ -17142,6 +17461,14 @@ components:
           type: string
         version:
           type: string
+    ActionRequest:
+      type: object
+      properties:
+        note:
+          type: string
+        snoozeMinutes:
+          type: integer
+          format: int32
     ActivateRequest:
       type: object
       properties:
@@ -17587,6 +17914,25 @@ components:
         attachmentId:
           type: string
           format: uuid
+    Attempt:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        distanceM:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        outcome:
+          type: string
     AuditEntryResponse:
       type: object
       properties:
@@ -19058,6 +19404,51 @@ components:
           minLength: 1
       required:
       - name
+    DeskExceptionActionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    DeskExceptionItem:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        params:
+          type: object
+          additionalProperties:
+            type: object
+        refId:
+          type: string
+          format: uuid
+        refType:
+          type: string
+        severity:
+          type: string
+        summary:
+          type: string
+    DeskExceptionPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeskExceptionItem"
+        nextCursor:
+          type: string
     DiscountPage:
       type: object
       properties:
@@ -19916,6 +20307,24 @@ components:
       required:
       - newValidityEnd
       - reason
+    FacilityCheckInConfig:
+      type: object
+      properties:
+        checkinCode:
+          type: string
+        geofenceRadiusM:
+          type: integer
+          format: int32
+        geofenceRequired:
+          type: boolean
+        lat:
+          type: number
+        lng:
+          type: number
+        walkinAllowed:
+          type: boolean
+        whatsappNumber:
+          type: string
     FavouriteRxSetItemResponse:
       type: object
       properties:
@@ -24147,6 +24556,84 @@ components:
         today:
           type: string
           format: date
+    SelfCheckInCandidate:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        checkedIn:
+          type: boolean
+        firstName:
+          type: string
+        patientRef:
+          type: string
+    SelfCheckInContext:
+      type: object
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SelfCheckInCandidate"
+        facilityCode:
+          type: string
+        geofenceRequired:
+          type: boolean
+        radiusM:
+          type: integer
+          format: int32
+        walkinAllowed:
+          type: boolean
+    SelfCheckInLocation:
+      type: object
+      properties:
+        accuracyM:
+          type: number
+          format: double
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+    SelfCheckInRequest:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          pattern: qr|whatsapp|geofence
+        location:
+          $ref: "#/components/schemas/SelfCheckInLocation"
+        patientRef:
+          type: string
+          minLength: 1
+        walkIn:
+          $ref: "#/components/schemas/SelfCheckInWalkIn"
+      required:
+      - patientRef
+    SelfCheckInResponse:
+      type: object
+      properties:
+        expectedRange:
+          type: string
+        position:
+          type: integer
+          format: int32
+        queueEntryId:
+          type: string
+          format: uuid
+        token:
+          type: integer
+          format: int32
+    SelfCheckInWalkIn:
+      type: object
+      properties:
+        doctorId:
+          type: string
+          format: uuid
     SellPackageRequest:
       type: object
       properties:

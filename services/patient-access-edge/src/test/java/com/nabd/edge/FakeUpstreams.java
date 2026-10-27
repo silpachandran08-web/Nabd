@@ -24,6 +24,10 @@ final class FakeUpstreams {
     volatile String noticeVersion = "v1";
     volatile int consentStatus = 201;
     final List<String> relayed = new CopyOnWriteArrayList<>();
+    /** ACC-033: the context Core reports, the queued answers to POST /check-ins (status, body; default 201 token 7 position 2) and the POSTs seen as "key body". */
+    volatile String checkInContext = "{\"facilityCode\":\"ABCD2345\",\"geofenceRequired\":false,\"walkinAllowed\":false,\"candidates\":[]}";
+    final java.util.concurrent.ConcurrentLinkedQueue<Object[]> checkInReplies = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    final List<String> checkIns = new CopyOnWriteArrayList<>();
     final HttpServer core;
     final HttpServer comms;
 
@@ -34,6 +38,17 @@ final class FakeUpstreams {
                 String path0 = ex.getRequestURI().getPath();
                 if (path0.endsWith("/privacy-notice/current")) {
                     reply(ex, 200, "{\"version\":\"" + noticeVersion + "\",\"language\":\"x\",\"path\":\"/v1/public/notices/clinic/" + noticeVersion + "?lang=x\"}");
+                    return;
+                }
+                if (path0.endsWith("/check-ins/context")) {
+                    reply(ex, 200, checkInContext);
+                    return;
+                }
+                if (path0.endsWith("/check-ins")) {
+                    String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    checkIns.add(ex.getRequestHeaders().getFirst("Idempotency-Key") + " " + body);
+                    Object[] r = checkInReplies.poll();
+                    reply(ex, r == null ? 201 : (Integer) r[0], r == null ? "{\"queueEntryId\":\"e\",\"token\":7,\"position\":2}" : (String) r[1]);
                     return;
                 }
                 if (path0.endsWith("/patients/consents")) {
@@ -82,6 +97,11 @@ final class FakeUpstreams {
     void inbound(String messageId, String contactHash, String text, String buttonPayload) {
         messages.put(messageId, "{\"kind\":\"" + (buttonPayload == null ? "text" : "button") + "\",\"text\":\"" + text + "\",\"contactHash\":\""
                 + contactHash + "\"" + (buttonPayload == null ? "" : ",\"buttonPayload\":\"" + buttonPayload + "\"") + "}");
+    }
+
+    /** ACC-033: a shared location as the Comms Gateway is assumed to deliver it: kind location, text "lat,lng,accuracyM". */
+    void location(String messageId, String contactHash, String latLngAcc) {
+        messages.put(messageId, "{\"kind\":\"location\",\"text\":\"" + latLngAcc + "\",\"contactHash\":\"" + contactHash + "\"}");
     }
 
     static String id() {

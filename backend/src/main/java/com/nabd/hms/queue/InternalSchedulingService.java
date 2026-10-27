@@ -51,11 +51,13 @@ class InternalSchedulingService {
     private final AuditService audit;
     private final ClinicClock clock;
     private final com.nabd.hms.queue.api.ReasonCodes reasons;
+    private final DeskExceptions desk;
 
     InternalSchedulingService(TenantScope tenantScope, AppointmentService appointments, AppointmentRepository appointmentRepo,
                               ScheduleRepository scheduleRepo, PatientRefs patientRefs, ClinicPolicies policies, AuditService audit,
-                              ClinicClock clock, com.nabd.hms.queue.api.ReasonCodes reasons) {
+                              ClinicClock clock, com.nabd.hms.queue.api.ReasonCodes reasons, DeskExceptions desk) {
         this.reasons = reasons;
+        this.desk = desk;
         this.tenantScope = tenantScope;
         this.appointments = appointments;
         this.appointmentRepo = appointmentRepo;
@@ -157,6 +159,7 @@ class InternalSchedulingService {
             }
             UUID resultId = id;
             String status = "scheduled";
+            if ("confirm".equals(action)) desk.onConfirmed(tid, id); // ACC-032: the patient answered, the 'unconfirmed' item goes
             if (!"confirm".equals(action)) {
                 requireOutsideWindow(tid, a.startTime());
                 if ("cancel".equals(action)) {
