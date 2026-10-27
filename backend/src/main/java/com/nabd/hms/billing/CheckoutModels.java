@@ -15,7 +15,7 @@ final class CheckoutModels {
 
     /** V3-004 / QA-OI-2: the authoritative catalogue row behind a charge code (stocked = pharmacy item). */
     record PharmacyChargeRow(UUID id, String name, String category, BigDecimal baseAmount, BigDecimal followUpAmount, BigDecimal taxRatePercent,
-                              boolean active, boolean doctorOverride, boolean stocked, boolean isRx) {
+                              boolean active, boolean doctorOverride, boolean stocked, boolean isRx, BigDecimal emergencyAmount) {
     }
 
     record VoidableInvoice(String invoiceNumber, String status, java.math.BigDecimal paid) {

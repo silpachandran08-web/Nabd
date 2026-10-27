@@ -182,7 +182,8 @@ class SetupRepository {
                 {"no_show_fee_amount", "0"},
                 {"reminder_hours_before", "24,2"},
                 {"refund_rule", "Full refund on unused sessions"},
-                {"appointment_buffer_minutes", "15"}
+                {"appointment_buffer_minutes", "15"},
+                {"follow_up_window_days", "7"} // FIN-015
         };
         for (String[] d : defaults) {
             jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, ?, ?)",

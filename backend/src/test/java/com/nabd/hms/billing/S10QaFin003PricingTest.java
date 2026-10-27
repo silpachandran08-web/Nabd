@@ -306,22 +306,21 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         assertThat(firstLine(r1).get("tier")).isEqualTo("normal");
         assertThat(inTenantTx(e.tenant().id(), () -> jdbc.queryForObject("SELECT status FROM queue_entries WHERE id = ?::uuid", String.class, first))).isEqualTo("completed");
 
-        // 13 days ago: still inside the 14-day window
-        su("UPDATE queue_entries SET queue_date = CURRENT_DATE - 13, token_number = 9001 WHERE id = ?::uuid", first);
+        // FIN-015: the clinic window now defaults to 7 days (was a fixed 14). 6 days ago: still inside the window
+        su("UPDATE queue_entries SET queue_date = CURRENT_DATE - 6, token_number = 9001 WHERE id = ?::uuid", first);
         String second = (String) exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(e.token(), Map.of(
                 "patientId", patientId, "doctorId", e.owner().id().toString())), Map.class).getBody().get("id");
         ResponseEntity<Map> ctx = exchange("/v1/billing/checkout/" + second, HttpMethod.GET, authed(e.token()), Map.class);
         assertThat(ctx.getBody().get("followUpEligible")).isEqualTo(true);
         move(e, second, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
-        Map<String, Object> asksNormal = line("CONS", 1);
-        asksNormal.put("tier", "normal");
-        ResponseEntity<Map> r2 = checkout(e.token(), second, List.of(asksNormal));
+        // FIN-016: an explicit "normal" is now a legitimate tier choice, so the server-chosen follow-up is checked with no tier sent
+        ResponseEntity<Map> r2 = checkout(e.token(), second, List.of(line("CONS", 1)));
         assertThat(num(firstLine(r2).get("unitPrice"))).isEqualTo(150.0);
         assertThat(firstLine(r2).get("tier")).isEqualTo("follow_up");
 
-        // 16 days ago: outside the window
-        su("UPDATE queue_entries SET queue_date = CURRENT_DATE - 16, token_number = 9002 WHERE id = ?::uuid", first);
-        su("UPDATE queue_entries SET queue_date = CURRENT_DATE - 17, token_number = 9003 WHERE id = ?::uuid", second);
+        // 9 days ago: outside the 7-day window
+        su("UPDATE queue_entries SET queue_date = CURRENT_DATE - 9, token_number = 9002 WHERE id = ?::uuid", first);
+        su("UPDATE queue_entries SET queue_date = CURRENT_DATE - 10, token_number = 9003 WHERE id = ?::uuid", second);
         String third = (String) exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(e.token(), Map.of(
                 "patientId", patientId, "doctorId", e.owner().id().toString())), Map.class).getBody().get("id");
         assertThat(exchange("/v1/billing/checkout/" + third, HttpMethod.GET, authed(e.token()), Map.class).getBody().get("followUpEligible")).isEqualTo(false);

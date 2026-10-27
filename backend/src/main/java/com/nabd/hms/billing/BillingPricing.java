@@ -56,7 +56,7 @@ class BillingPricing {
     }
 
     /** trusted = a server-built bill (package sale): lines are not client input, so no catalogue/authority check. */
-    List<LineItemInput> resolveLines(UUID tenantId, List<LineItemRequest> lines, boolean followUpEligible,
+    List<LineItemInput> resolveLines(UUID tenantId, List<LineItemRequest> lines, ConsultationTier.Context tierCtx,
                                      boolean canDiscount, boolean trusted, UUID staffId) {
         List<LineItemInput> out = new ArrayList<>(lines.size());
         // OPS-061: a free-text line without its own rate takes the region's headline rate (AE 5, SA 15); none (India GST slabs, Qatar) is 0
@@ -76,12 +76,14 @@ class BillingPricing {
                 out.add(freeText(li, canDiscount, trusted, staffId, regionTax));
                 continue;
             }
-            boolean followUp = followUpEligible && "Consultation".equals(c.category()) && c.followUpAmount() != null;
-            BigDecimal list = followUp ? c.followUpAmount() : c.baseAmount();
+            BigDecimal doctorFee = ConsultationTier.isConsultation(c.category()) && tierCtx.doctorId() != null
+                    ? repo.findDoctorFee(tenantId, c.id(), tierCtx.doctorId()) : null;
+            var pick = ConsultationTier.pick(c.category(), c.baseAmount(), doctorFee, c.followUpAmount(), c.emergencyAmount(), tierCtx, li.tier());
+            BigDecimal list = pick.price();
             if (c.doctorOverride() && canDiscount && li.unitPrice() != null) {
                 list = li.unitPrice(); // the flag means "the doctor sets this price"
             }
-            String tier = followUp ? "follow_up" : "normal";
+            String tier = pick.tier();
             var o = li.override();
             if (o == null) {
                 out.add(new LineItemInput(li.chargeCode(), c.name(), c.category(), li.quantity(), list, c.taxRatePercent(),

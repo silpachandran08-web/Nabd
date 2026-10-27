@@ -108,13 +108,26 @@ class CheckoutRepository {
                 (rs, i) -> rs.getString("name"), tenantId, staffId).stream().findFirst();
     }
 
-    /** NB-162's follow-up pricing auto-detection: same doctor, a completed visit within the window. */
-    boolean hasRecentCompletedVisit(UUID tenantId, UUID patientId, UUID doctorId, LocalDate since) {
-        Boolean exists = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM queue_entries WHERE tenant_id = ? AND patient_id = ? AND doctor_id = ? " +
-                        "AND status = 'completed' AND queue_date >= ?)",
-                Boolean.class, tenantId, patientId, doctorId, Date.valueOf(since));
-        return Boolean.TRUE.equals(exists);
+    /** FIN-015: date of the last completed visit with this doctor billed at full price; a follow-up visit does not restart the window. */
+    LocalDate lastFullPriceVisit(UUID tenantId, UUID patientId, UUID doctorId) {
+        Date d = jdbc.queryForObject(
+                "SELECT max(q.queue_date) FROM queue_entries q WHERE q.tenant_id = ? AND q.patient_id = ? AND q.doctor_id = ? " +
+                        "AND q.status = 'completed' AND NOT EXISTS (SELECT 1 FROM invoices i JOIN invoice_line_items li ON li.invoice_id = i.id " +
+                        "WHERE i.tenant_id = q.tenant_id AND i.queue_entry_id = q.id AND li.tier = 'follow_up')",
+                Date.class, tenantId, patientId, doctorId);
+        return d == null ? null : d.toLocalDate();
+    }
+
+    /** FIN-016: the check-in's urgent flag is queue_entries.priority (owned by the queue domain; billing only reads it). */
+    boolean isUrgent(UUID tenantId, UUID queueEntryId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT COALESCE(priority, false) FROM queue_entries WHERE tenant_id = ? AND id = ?",
+                Boolean.class, tenantId, queueEntryId));
+    }
+
+    /** FIN-015: a doctor's own fee for a consultation head, or null (blank override: the base amount applies). */
+    BigDecimal findDoctorFee(UUID tenantId, UUID chargeId, UUID doctorId) {
+        return jdbc.query("SELECT amount FROM charge_doctor_fees WHERE tenant_id = ? AND charge_id = ? AND doctor_id = ?",
+                (rs, i) -> rs.getBigDecimal(1), tenantId, chargeId, doctorId).stream().findFirst().orElse(null);
     }
 
     /** FIN-006: the number comes from the facility's gapless series (allocated in this transaction); currency and *_minor are filled by the DB. */
@@ -171,13 +184,13 @@ class CheckoutRepository {
     java.util.Map<String, PharmacyChargeRow> findCatalogueCharges(UUID tenantId, List<String> chargeCodes) {
         java.util.Map<String, PharmacyChargeRow> out = new java.util.HashMap<>();
         jdbc.query(
-                "SELECT code, id, name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
+                "SELECT code, id, name, category, base_amount, follow_up_amount, emergency_amount, tax_rate_percent, active, doctor_override, " +
                         "stock_qty IS NOT NULL AS stocked, COALESCE(is_rx, false) AS is_rx FROM charge_catalogue " +
                         "WHERE tenant_id = ? AND code = ANY (?)",
                 (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.put(rs.getString("code"), new PharmacyChargeRow(
                         UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
                         rs.getBigDecimal("follow_up_amount"), rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active"),
-                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked"), rs.getBoolean("is_rx"))),
+                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked"), rs.getBoolean("is_rx"), rs.getBigDecimal("emergency_amount"))),
                 tenantId, chargeCodes.toArray(String[]::new));
         return out;
     }
