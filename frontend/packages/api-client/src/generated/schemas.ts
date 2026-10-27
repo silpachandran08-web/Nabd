@@ -326,6 +326,9 @@ export const PatientRegistryRowSchema = z.object({ age: z.number().int().optiona
 export const PatientRegistryResponseSchema = z.object({ counts: z.record(z.string(), z.number().int()).optional(), hasMore: z.boolean().optional(), matchedTotal: z.number().int().optional(), page: PageMetaSchema.optional(), rows: z.array(PatientRegistryRowSchema).optional(), total: z.number().int().optional() });
 export const PatientViewResponseSchema = z.object({ birthYear: z.number().int().optional(), initials: z.string().optional(), maskedPhone: z.string().optional(), mrn: z.string().optional() });
 export const PatientWriteRequestSchema = z.object({ address: z.string().optional(), confirmedNotDuplicate: z.boolean().optional(), dob: z.string(), gender: z.string().min(1), guardianConsent: GuardianConsentSchema.optional(), guardianId: z.string().optional(), name: z.string().min(1), nationalId: z.string().optional(), phone: z.string().min(1), synthetic: z.boolean().optional() });
+export const PaymentIntentCreatedSchema = z.object({ expiresAt: z.string().optional(), intentId: z.string().optional(), qrPayload: z.string().optional(), url: z.string().optional() });
+export const PaymentIntentRequestSchema = z.object({ amount: z.number().gte(0.01).optional(), caregiverId: z.string().optional(), kind: z.string(), recipient: z.string().optional() });
+export const PaymentIntentStatusSchema = z.object({ gatewayRef: z.string().optional(), paidAt: z.string().optional(), status: z.string().optional() });
 export const PaymentRequestSchema = z.object({ amount: z.number().gte(0.01), method: z.string(), reference: z.string().min(0).max(100).optional() });
 export const PayrollExportRowResponseSchema = z.object({ days: z.number().int().optional(), hours: z.number().optional(), notes: z.string().optional(), role: z.string().optional(), salary: z.number().optional(), staffId: z.string().optional(), staffName: z.string().optional() });
 export const PharmacyCapabilitiesResponseSchema = z.object({ features: z.array(z.string()).optional(), mode: z.string().optional() });
@@ -571,15 +574,18 @@ export const operationSchemas = {
   DayCloseController_reopen: { body: DayReopenRequestSchema, response: DayCloseSummaryResponseSchema },
   DuesController_dues: { response: DuesResponseSchema },
   DuesController_remind: { body: DuesRemindRequestSchema, response: z.record(z.string(), z.string()) },
+  PaymentIntentController_webhook: { body: z.string() },
   DuesController_invoices: { response: InvoiceListResponseSchema },
   CheckoutController_getInvoice: { response: InvoiceResponseSchema },
   InvoiceDocumentController_document: { response: z.string() },
+  PaymentIntentController_create: { body: PaymentIntentRequestSchema, response: PaymentIntentCreatedSchema },
   CheckoutController_recordPayment: { body: PaymentRequestSchema, response: InvoiceResponseSchema },
   RefundController_request: { body: RefundRequestRequestSchema, response: RefundRequestResponseSchema },
   CheckoutController_voidInvoice: { body: VoidInvoiceRequestSchema, response: InvoiceResponseSchema },
   DuesController_writeOff: { body: WriteOffRequestSchema, response: InvoiceListItemSchema },
   CheckoutController_otcCharges: { response: OtcChargesResponseSchema },
   CheckoutController_otcCheckout: { body: CheckoutRequestSchema, response: InvoiceResponseSchema },
+  PaymentIntentController_status: { response: PaymentIntentStatusSchema },
   CheckoutController_quote: { body: QuoteRequestSchema, response: QuoteResponseSchema },
   RefundController_list: { response: RefundRequestPageSchema },
   RefundController_approve: { body: RefundApproveRequestSchema, response: RefundApproveResponseSchema },

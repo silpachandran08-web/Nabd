@@ -2291,6 +2291,49 @@ paths:
       tags:
       - billing
       x-required-permission: billing:edit
+  /v1/billing/gateway-webhooks/{provider}/{tenantKey}:
+    post:
+      operationId: PaymentIntentController_webhook
+      parameters:
+      - in: path
+        name: provider
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: tenantKey
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: X-Razorpay-Signature
+        required: false
+        schema:
+          type: string
+      - in: header
+        name: X-Webhook-Signature
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: byte
+        required: true
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: public
   /v1/billing/invoices:
     get:
       operationId: DuesController_invoices
@@ -2462,6 +2505,50 @@ paths:
       tags:
       - billing
       x-required-permission: billing:view
+  /v1/billing/invoices/{id}/payment-intents:
+    post:
+      operationId: PaymentIntentController_create
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentIntentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaymentIntentCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:edit
   /v1/billing/invoices/{id}/payments:
     post:
       operationId: CheckoutController_recordPayment
@@ -2711,6 +2798,44 @@ paths:
       tags:
       - billing
       x-required-permission: billing:create
+  /v1/billing/payment-intents/{id}:
+    get:
+      operationId: PaymentIntentController_status
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PaymentIntentStatus"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
   /v1/billing/quotes:
     post:
       operationId: CheckoutController_quote
@@ -21347,6 +21472,47 @@ components:
       - gender
       - name
       - phone
+    PaymentIntentCreated:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        intentId:
+          type: string
+          format: uuid
+        qrPayload:
+          type: string
+        url:
+          type: string
+    PaymentIntentRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: false
+          minimum: 0.01
+        caregiverId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          pattern: link|qr
+        recipient:
+          type: string
+          pattern: patient|caregiver
+      required:
+      - kind
+    PaymentIntentStatus:
+      type: object
+      properties:
+        gatewayRef:
+          type: string
+        paidAt:
+          type: string
+          format: date-time
+        status:
+          type: string
     PaymentRequest:
       type: object
       properties:

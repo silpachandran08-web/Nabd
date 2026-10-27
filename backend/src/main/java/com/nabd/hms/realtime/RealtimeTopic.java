@@ -10,7 +10,8 @@ public enum RealtimeTopic {
     DOCTOR_STATUS("doctor-status", "queue:view"),
     REQUESTS("requests", "queue:create"),
     EXCEPTIONS("exceptions", "queue:view"),
-    MESSAGES("messages", "patients:view"); // COM-006: delivery ticks on the patient file
+    MESSAGES("messages", "patients:view"), // COM-006: delivery ticks on the patient file
+    BILLING("billing", "billing:view"); // FIN-020: an invoice turns paid on the checkout screen
 
     private final String wire;
     private final String permission;
