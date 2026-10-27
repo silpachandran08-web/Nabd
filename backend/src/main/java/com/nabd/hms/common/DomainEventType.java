@@ -38,7 +38,8 @@ public enum DomainEventType {
     PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization"),
     BOOKING_ROUTED("scheduling.booking.routed.v1", "core/scheduling"),
     SENDER_THROTTLED("comms.sender.throttled.v1", "core/messaging"),
-    ATTACHMENT_SCANNED("shared.attachment.scanned.v1", "core/shared");
+    ATTACHMENT_SCANNED("shared.attachment.scanned.v1", "core/shared"),
+    CALENDAR_CHANGED("organization.calendar.changed.v1", "core/organization");
 
     private final String type;
     private final String source;

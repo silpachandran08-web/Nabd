@@ -179,7 +179,7 @@
     "affected": "{count, plural, one {# waiting patient is affected.} other {# waiting patients are affected.}}",
     "ladderLabel": "How the delay is delivered",
     "ladderQueue": "Queue sidebar: shown to the front desk as soon as you announce.",
-    "ladderPatient": "Patient message (WhatsApp, then SMS): not available yet.",
+    "ladderPatient": "Patient message (WhatsApp, then SMS): everyone booked and not yet called who agreed to messages is told the new time.",
     "announcing": "Announcing…",
     "announce": "Announce delay",
     "fail": "Couldn't announce the delay.",

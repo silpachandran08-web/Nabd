@@ -29,7 +29,7 @@ final class SetupModels {
     record ConsentContactRow(String name, String email, String phone) {
     }
 
-    record HolidayRow(UUID id, LocalDate holidayDate, String name, boolean recurring) {
+    record HolidayRow(UUID id, LocalDate holidayDate, String name, boolean recurring, String effect, String hours, String source) {
     }
 
     record StaffShiftRow(UUID id, UUID staffId, String staffName, String patternJson,

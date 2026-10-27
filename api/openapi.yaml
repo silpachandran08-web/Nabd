@@ -1680,7 +1680,59 @@ paths:
       responses:
         "201": { description: "Created holiday", content: { application/json: { schema: { $ref: "#/components/schemas/ClinicHoliday" } } } }
 
+  /setup/calendar/templates:
+    get:
+      tags: [Setup]
+      summary: "ADM-028 - holiday templates of a market (default IN): code, name, year and where the dates come from"
+      x-required-permission: setup:view
+      parameters: [{ name: market, in: query, required: false, schema: { type: string, default: IN } }]
+      responses:
+        "200": { description: "Templates", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/HolidayTemplate" } } } } }
+
+  /setup/calendar/templates/{code}/apply:
+    post:
+      tags: [Setup]
+      summary: "ADM-028 - add the template's holidays for a year (state days plus the market's national days) as closed days; dates the clinic already has are left as they are, so applying twice adds nothing. Publishes organization.calendar.changed.v1. Needs an Idempotency-Key."
+      x-required-permission: setup:edit
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [year], properties: { year: { type: integer, minimum: 2000, maximum: 2100 } } } } }
+      responses:
+        "200": { description: "Counts", content: { application/json: { schema: { type: object, properties: { added: { type: integer }, skipped: { type: integer } } } } } }
+        "404": { description: "Problem `template-not-found`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/calendar/quiet-hours:
+    get:
+      tags: [Setup]
+      summary: "ADM-028 - quiet hours for patient messages (default off, 21:00-09:00 when switched on)"
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Quiet hours", content: { application/json: { schema: { $ref: "#/components/schemas/QuietHours" } } } }
+    put:
+      tags: [Setup]
+      summary: "ADM-028 - switch quiet hours on or off and set the window (HH:mm, clinic clock; may cross midnight). Reminders and bulk messages inside it wait for its end; OTPs and queue or delay updates never wait."
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/QuietHours" } } }
+      responses:
+        "200": { description: "Saved", content: { application/json: { schema: { $ref: "#/components/schemas/QuietHours" } } } }
+        "422": { description: "Problem `out-of-range`: same start and end", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/holidays/{id}:
+    patch:
+      tags: [Setup]
+      summary: "ADM-028 - what the holiday does: closed (no slots), short (only the given windows are bookable) or open (an ordinary day). Publishes organization.calendar.changed.v1. Needs an Idempotency-Key."
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [effect], properties: { effect: { type: string, enum: [closed, short, open] }, hours: { type: array, items: { $ref: "#/components/schemas/HolidayWindow" } } } } } }
+      responses:
+        "200": { description: "The holiday", content: { application/json: { schema: { $ref: "#/components/schemas/ClinicHoliday" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "Problem `out-of-range`: short needs one to four non-overlapping windows, closed and open take none", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
     delete:
       tags: [Setup]
       summary: Delete a clinic holiday
@@ -2391,7 +2443,7 @@ paths:
         "200": { description: "Delays", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DoctorDelay" } } } } }
     post:
       tags: [Queue]
-      summary: "Announce a doctor delay, active until cleared or the clinic day ends (ACC-001)"
+      summary: "Announce a doctor delay (ACC-001). It lapses at the end of the session it was announced in (ACC-024). Unless broadcast=false, every patient still to be seen who has messaging consent gets the doctor_delay template (at most one delay message per patient per 20 minutes). The minutes may be sent as `minutes` or `delayMinutes`. Needs an Idempotency-Key."
       x-required-permission: queue:edit
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
@@ -2400,7 +2452,34 @@ paths:
       responses:
         "201": { description: "Delay announced", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorDelay" } } } }
         "400": { description: "Problem `validation-failed`: delayMinutes outside 1..240, reason over 200 chars", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "409": { description: "Problem `delay-already-active`: a concurrent announcement for the same doctor and clinic day won", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `delay-already-active` (code DELAY_ALREADY_ACTIVE): a delay is already running, change it with PATCH; also a concurrent announcement for the same doctor and clinic day won", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /doctors/{id}/delay/{delayId}:
+    patch:
+      tags: [Queue]
+      summary: "ACC-024 - change the minutes of the active delay and tell the affected patients again (patients messaged in the last 20 minutes are held). Needs an Idempotency-Key."
+      x-required-permission: queue:edit
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: delayId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DelayChangeRequest" } } }
+      responses:
+        "200": { description: "Changed; recipients = patients messaged now", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorDelay" } } } }
+        "409": { description: "Problem `delay-not-active` (code DELAY_NOT_ACTIVE): cleared, lapsed or another delay", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /doctors/{id}/delay/{delayId}/responses:
+    get:
+      tags: [Queue]
+      summary: "ACC-024 - the desk's list for one delay broadcast: per patient the delivery status (queued, sent, delivered, held, skipped_no_consent, failed) and the reply (ok, reschedule, cancel) with counts"
+      x-required-permission: queue:view
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: delayId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Items and counts", content: { application/json: { schema: { $ref: "#/components/schemas/DelayResponsesResponse" } } } }
+        "404": { description: "Problem `delay-not-found`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /doctors/{id}/delay/clear:
     post:
@@ -6913,8 +6992,30 @@ components:
       type: object
       required: [delayMinutes]
       properties:
-        delayMinutes: { type: integer, minimum: 1, maximum: 240 }
+        delayMinutes: { type: integer, minimum: 1, maximum: 240, description: "Also accepted as `minutes` (ACC-024 ladder: 15, 30, 45, 60 or any 1..240)" }
         reason: { type: string, maxLength: 200 }
+        reasonCode: { type: string, maxLength: 40, description: "Private code; never sent to patients" }
+        broadcast: { type: boolean, description: "Default true: tell the patients still to be seen" }
+    DelayChangeRequest:
+      type: object
+      required: [minutes]
+      properties:
+        minutes: { type: integer, minimum: 1, maximum: 240 }
+    DelayResponsesResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              appointmentId: { type: string, format: uuid, nullable: true }
+              displayName: { type: string }
+              status: { type: string, enum: [queued, sent, delivered, held, skipped_no_consent, failed] }
+              response: { type: string, enum: [ok, reschedule, cancel], nullable: true }
+              deliveredAt: { type: string, format: date-time, nullable: true }
+              respondedAt: { type: string, format: date-time, nullable: true }
+        counts: { type: object, additionalProperties: { type: integer } }
     DoctorDelay:
       type: object
       properties:
@@ -6927,7 +7028,10 @@ components:
         clearedBy: { type: string, format: uuid, nullable: true }
         clearedAt: { type: string, format: date-time, nullable: true }
         clinicDate: { type: string, format: date, description: "Clinic-timezone day the delay was announced; it lapses at the end of that day" }
-        active: { type: boolean, description: "Uncleared AND clinicDate is today" }
+        active: { type: boolean, description: "Uncleared, clinicDate is today AND expiresAt is still ahead" }
+        delayId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time, description: "End of the session it was announced in (ACC-024)" }
+        recipients: { type: integer, nullable: true, description: "Patients messaged by this announce or change" }
     CheckInRequest:
       type: object
       required: [patientId, doctorId]
@@ -7445,6 +7549,29 @@ components:
         holidayDate: { type: string, format: date }
         name: { type: string }
         recurring: { type: boolean }
+        effect: { type: string, enum: [closed, short, open], description: "ADM-028" }
+        hours: { type: array, items: { $ref: "#/components/schemas/HolidayWindow" }, description: "Bookable windows of a short day" }
+        source: { type: string, nullable: true, description: "Where the date came from, e.g. the gazette of a template" }
+        bookingsToMove: { type: integer, nullable: true, description: "Booked appointments on an upcoming closed day" }
+    HolidayWindow:
+      type: object
+      properties:
+        from: { type: string, example: "09:00" }
+        to: { type: string, example: "13:00" }
+    HolidayTemplate:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        year: { type: integer }
+        source: { type: string }
+    QuietHours:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        from: { type: string, example: "21:00" }
+        to: { type: string, example: "09:00" }
 
     ClinicHolidayWrite:
       type: object

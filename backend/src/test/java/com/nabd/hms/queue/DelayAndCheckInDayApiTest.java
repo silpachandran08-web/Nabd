@@ -121,7 +121,7 @@ class DelayAndCheckInDayApiTest extends ApiTestBase {
         try (Connection rival = superuserConnection()) {
             rival.setAutoCommit(false);
             try (PreparedStatement ps = rival.prepareStatement(
-                    "INSERT INTO doctor_delays (tenant_id, doctor_id, delay_minutes, announced_by, clinic_date) VALUES (?,?,?,?,?)")) {
+                    "INSERT INTO doctor_delays (tenant_id, doctor_id, delay_minutes, announced_by, clinic_date, expires_at) VALUES (?,?,?,?,?, now() + interval '1 day')")) {
                 ps.setObject(1, c.tenant.id());
                 ps.setObject(2, c.doctor.id());
                 ps.setInt(3, 15);

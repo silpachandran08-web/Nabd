@@ -253,6 +253,7 @@ public class ScheduleService {
         ZoneId zone = clock.zone(tenantId); // "09:00" in working hours is the clinic's wall clock
         Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, clock.dayStart(tenantId, date), clock.dayStart(tenantId, date.plusDays(1))));
         List<int[]> leave = repo.partialLeaves(tenantId, doctorId, date); // ACC-005: part-day leave hides the slots it touches
+        var shortDay = repo.shortWindows(tenantId, date); // ADM-028: null on an ordinary day
 
         Instant now = clock.now();
         List<Instant> slots = new ArrayList<>();
@@ -262,7 +263,9 @@ public class ScheduleService {
             Instant slotStart = clock.atSecond(tenantId, date, wh.startSecond());
             Instant blockEnd = clock.atSecond(tenantId, date, wh.endSecond());
             while (!slotStart.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(blockEnd)) {
+                var local = slotStart.atZone(zone).toLocalTime();
                 if (slotStart.isAfter(now) && !booked.contains(slotStart)
+                        && ScheduleRepository.inWindows(shortDay, local, local.plusMinutes(wh.slotMinutes()))
                         && !reserved.contains(ScheduleGrid.minuteOf(slotStart.atZone(zone).toLocalTime()))
                         && !ScheduleRepository.overlapsLeave(leave, clock.secondOfClinicDay(tenantId, date, slotStart), wh.slotMinutes() * 60)) {
                     slots.add(slotStart);
@@ -336,17 +339,39 @@ public class ScheduleService {
         if (!repo.doctorInTenant(tenantId, doctorId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Doctor not found", "No such doctor.");
         }
+        Instant now = clock.now();
+        if (repo.findActiveDelay(doctorId, today, now).isPresent()) { // ACC-024: change it with PATCH, a new announcement is not a silent replace
+            throw new ApiException(HttpStatus.CONFLICT, "delay-already-active", "Delay already active",
+                    "This doctor already has a delay running; change its minutes instead.", java.util.Map.of("code", "DELAY_ALREADY_ACTIVE"));
+        }
+        java.time.ZoneId zone = clock.zone(tenantId);
+        Instant expiresAt = DelayWindow.expiresAt(repo.sessionsOn(doctorId, today.getDayOfWeek().getValue() % 7), today, zone, now);
         UUID id;
         try {
-            id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), callerStaffId, today);
+            id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), req.reasonCode(),
+                    !Boolean.FALSE.equals(req.broadcast()), callerStaffId, today, expiresAt);
         } catch (DuplicateKeyException e) { // lost the race on uq_doctor_delays_active_day
             throw new ApiException(HttpStatus.CONFLICT, "delay-already-active", "Delay already active",
                     "Another delay was announced for this doctor at the same moment.");
         }
         log.info("doctor {} delay announced by {}: {} min", doctorId, callerStaffId, req.delayMinutes());
-        DoctorDelayRow row = repo.findActiveDelay(doctorId, today).orElseThrow();
+        DoctorDelayRow row = repo.findActiveDelay(doctorId, today, clock.now()).orElseThrow();
         auditDelay(tenantId, callerStaffId, "doctor_delay.announced", id, null, toDelayResponse(row, today));
         delayChanged(tenantId, doctorId, id, req.delayMinutes(), "active");
+        return toDelayResponse(row, today);
+    }
+
+    /** ACC-024: PATCH the minutes of the active delay. */
+    @Transactional
+    public DoctorDelayResponse changeDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, UUID delayId, int minutes) {
+        LocalDate today = clock.today(tenantId);
+        DoctorDelayRow before = repo.findActiveDelay(doctorId, today, clock.now()).filter(r -> r.id().equals(delayId)).orElseThrow(() ->
+                new ApiException(HttpStatus.CONFLICT, "delay-not-active", "Delay not active",
+                        "That delay is cleared or has lapsed.", java.util.Map.of("code", "DELAY_NOT_ACTIVE")));
+        repo.changeDelayMinutes(delayId, minutes);
+        DoctorDelayRow row = repo.findActiveDelay(doctorId, today, clock.now()).orElseThrow();
+        auditDelay(tenantId, callerStaffId, "doctor_delay.changed", delayId, toDelayResponse(before, today), toDelayResponse(row, today));
+        delayChanged(tenantId, doctorId, delayId, minutes, "active");
         return toDelayResponse(row, today);
     }
 
@@ -354,7 +379,7 @@ public class ScheduleService {
     public void clearDelay(UUID tenantId, UUID callerStaffId, UUID doctorId) {
         tenantContext.set(tenantId);
         LocalDate today = clock.clinicDate(tenantId);
-        DoctorDelayRow active = repo.findActiveDelay(doctorId, today).orElse(null);
+        DoctorDelayRow active = repo.findActiveDelay(doctorId, today, clock.now()).orElse(null);
         if (active == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "no-active-delay", "No active delay",
                     "This doctor doesn't have an active delay to clear.");
@@ -387,6 +412,7 @@ public class ScheduleService {
 
     private DoctorDelayResponse toDelayResponse(DoctorDelayRow row, LocalDate today) {
         return new DoctorDelayResponse(row.id(), row.doctorId(), row.delayMinutes(), row.reason(), row.announcedBy(),
-                row.announcedAt(), row.clearedBy(), row.clearedAt(), row.active(today), row.clinicDate());
+                row.announcedAt(), row.clearedBy(), row.clearedAt(), row.active(today, clock.now()), row.clinicDate(),
+                row.id(), row.expiresAt(), null);
     }
 }

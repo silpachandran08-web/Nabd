@@ -73,6 +73,7 @@ owner,GET /v1/display-devices,setup:view,allow
 owner,GET /v1/doctors/{id}/availability,queue:view,allow
 owner,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 owner,GET /v1/doctors/{id}/delay,queue:view,allow
+owner,GET /v1/doctors/{id}/delay/{delayId}/responses,queue:view,allow
 owner,GET /v1/doctors/{id}/leave,queue:view,allow
 owner,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner,GET /v1/doctors/{id}/session,queue:view,allow
@@ -152,6 +153,8 @@ owner,GET /v1/schedule/day,queue:view,allow
 owner,GET /v1/schedule/week,queue:view,allow
 owner,GET /v1/settings/integrations/abdm,setup:view,allow
 owner,GET /v1/settings/privacy/privacy-notice,setup:view,allow
+owner,GET /v1/setup/calendar/quiet-hours,setup:view,allow
+owner,GET /v1/setup/calendar/templates,setup:view,allow
 owner,GET /v1/setup/charges,setup:view,allow
 owner,GET /v1/setup/checklist,setup:view,allow
 owner,GET /v1/setup/consent-contact,setup:view,allow
@@ -190,6 +193,7 @@ owner,PATCH /v1/clinical/prescriptions/{queueEntryId},clinical:edit,deny-403
 owner,PATCH /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 owner,PATCH /v1/clinical/vitals/{queueEntryId},clinical:create|clinical:edit,deny-403
 owner,PATCH /v1/departments/{id},departments:edit,allow
+owner,PATCH /v1/doctors/{id}/delay/{delayId},queue:edit,allow
 owner,PATCH /v1/nursing/procedure-orders/{id}/notes,nursing:edit,allow
 owner,PATCH /v1/nursing/procedure-orders/{id}/status,nursing:edit,allow
 owner,PATCH /v1/packages/settings,packages:edit,allow
@@ -205,6 +209,7 @@ owner,PATCH /v1/roles/{id},staff:edit,allow
 owner,PATCH /v1/setup/charges/{id},setup:edit,allow
 owner,PATCH /v1/setup/charges/{id}/tax,setup:edit,allow
 owner,PATCH /v1/setup/consent-contact,setup:edit,allow
+owner,PATCH /v1/setup/holidays/{id},setup:edit,allow
 owner,PATCH /v1/setup/licences/{id},setup:edit,allow
 owner,PATCH /v1/setup/policies/{key},setup:edit,allow
 owner,PATCH /v1/setup/profile,setup:edit,allow
@@ -321,6 +326,7 @@ owner,POST /v1/reason-codes,setup:edit,allow
 owner,POST /v1/roles,staff:create,allow
 owner,POST /v1/roles/delegations,staff:edit,allow
 owner,POST /v1/roles/{id}/reset-to-preset,staff:edit,allow
+owner,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,allow
 owner,POST /v1/setup/charges,setup:edit,allow
 owner,POST /v1/setup/checklist/{step}/complete,setup:edit,allow
 owner,POST /v1/setup/checklist/{step}/skip,setup:edit,allow
@@ -357,6 +363,7 @@ owner,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,den
 owner,PUT /v1/queue-settings/facility,setup:edit,allow
 owner,PUT /v1/settings/integrations/abdm,setup:edit,allow
 owner,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
+owner,PUT /v1/setup/calendar/quiet-hours,setup:edit,allow
 owner,PUT /v1/setup/checklist/{step}/draft,setup:edit,allow
 owner,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,allow
 owner,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
@@ -433,6 +440,7 @@ owner_doctor,GET /v1/display-devices,setup:view,allow
 owner_doctor,GET /v1/doctors/{id}/availability,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/delay,queue:view,allow
+owner_doctor,GET /v1/doctors/{id}/delay/{delayId}/responses,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/leave,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/session,queue:view,allow
@@ -512,6 +520,8 @@ owner_doctor,GET /v1/schedule/day,queue:view,allow
 owner_doctor,GET /v1/schedule/week,queue:view,allow
 owner_doctor,GET /v1/settings/integrations/abdm,setup:view,allow
 owner_doctor,GET /v1/settings/privacy/privacy-notice,setup:view,allow
+owner_doctor,GET /v1/setup/calendar/quiet-hours,setup:view,allow
+owner_doctor,GET /v1/setup/calendar/templates,setup:view,allow
 owner_doctor,GET /v1/setup/charges,setup:view,allow
 owner_doctor,GET /v1/setup/checklist,setup:view,allow
 owner_doctor,GET /v1/setup/consent-contact,setup:view,allow
@@ -550,6 +560,7 @@ owner_doctor,PATCH /v1/clinical/prescriptions/{queueEntryId},clinical:edit,allow
 owner_doctor,PATCH /v1/clinical/rx-sets/{setId},clinical:edit,allow
 owner_doctor,PATCH /v1/clinical/vitals/{queueEntryId},clinical:create|clinical:edit,allow
 owner_doctor,PATCH /v1/departments/{id},departments:edit,allow
+owner_doctor,PATCH /v1/doctors/{id}/delay/{delayId},queue:edit,allow
 owner_doctor,PATCH /v1/nursing/procedure-orders/{id}/notes,nursing:edit,allow
 owner_doctor,PATCH /v1/nursing/procedure-orders/{id}/status,nursing:edit,allow
 owner_doctor,PATCH /v1/packages/settings,packages:edit,allow
@@ -565,6 +576,7 @@ owner_doctor,PATCH /v1/roles/{id},staff:edit,allow
 owner_doctor,PATCH /v1/setup/charges/{id},setup:edit,allow
 owner_doctor,PATCH /v1/setup/charges/{id}/tax,setup:edit,allow
 owner_doctor,PATCH /v1/setup/consent-contact,setup:edit,allow
+owner_doctor,PATCH /v1/setup/holidays/{id},setup:edit,allow
 owner_doctor,PATCH /v1/setup/licences/{id},setup:edit,allow
 owner_doctor,PATCH /v1/setup/policies/{key},setup:edit,allow
 owner_doctor,PATCH /v1/setup/profile,setup:edit,allow
@@ -681,6 +693,7 @@ owner_doctor,POST /v1/reason-codes,setup:edit,allow
 owner_doctor,POST /v1/roles,staff:create,allow
 owner_doctor,POST /v1/roles/delegations,staff:edit,allow
 owner_doctor,POST /v1/roles/{id}/reset-to-preset,staff:edit,allow
+owner_doctor,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,allow
 owner_doctor,POST /v1/setup/charges,setup:edit,allow
 owner_doctor,POST /v1/setup/checklist/{step}/complete,setup:edit,allow
 owner_doctor,POST /v1/setup/checklist/{step}/skip,setup:edit,allow
@@ -717,6 +730,7 @@ owner_doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:e
 owner_doctor,PUT /v1/queue-settings/facility,setup:edit,allow
 owner_doctor,PUT /v1/settings/integrations/abdm,setup:edit,allow
 owner_doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
+owner_doctor,PUT /v1/setup/calendar/quiet-hours,setup:edit,allow
 owner_doctor,PUT /v1/setup/checklist/{step}/draft,setup:edit,allow
 owner_doctor,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,allow
 owner_doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
@@ -793,6 +807,7 @@ doctor,GET /v1/display-devices,setup:view,deny-403
 doctor,GET /v1/doctors/{id}/availability,queue:view,allow
 doctor,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 doctor,GET /v1/doctors/{id}/delay,queue:view,allow
+doctor,GET /v1/doctors/{id}/delay/{delayId}/responses,queue:view,allow
 doctor,GET /v1/doctors/{id}/leave,queue:view,allow
 doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 doctor,GET /v1/doctors/{id}/session,queue:view,allow
@@ -872,6 +887,8 @@ doctor,GET /v1/schedule/day,queue:view,allow
 doctor,GET /v1/schedule/week,queue:view,allow
 doctor,GET /v1/settings/integrations/abdm,setup:view,deny-403
 doctor,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
+doctor,GET /v1/setup/calendar/quiet-hours,setup:view,deny-403
+doctor,GET /v1/setup/calendar/templates,setup:view,deny-403
 doctor,GET /v1/setup/charges,setup:view,deny-403
 doctor,GET /v1/setup/checklist,setup:view,deny-403
 doctor,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -910,6 +927,7 @@ doctor,PATCH /v1/clinical/prescriptions/{queueEntryId},clinical:edit,allow
 doctor,PATCH /v1/clinical/rx-sets/{setId},clinical:edit,allow
 doctor,PATCH /v1/clinical/vitals/{queueEntryId},clinical:create|clinical:edit,allow
 doctor,PATCH /v1/departments/{id},departments:edit,deny-403
+doctor,PATCH /v1/doctors/{id}/delay/{delayId},queue:edit,allow
 doctor,PATCH /v1/nursing/procedure-orders/{id}/notes,nursing:edit,deny-403
 doctor,PATCH /v1/nursing/procedure-orders/{id}/status,nursing:edit,deny-403
 doctor,PATCH /v1/packages/settings,packages:edit,allow
@@ -925,6 +943,7 @@ doctor,PATCH /v1/roles/{id},staff:edit,deny-403
 doctor,PATCH /v1/setup/charges/{id},setup:edit,deny-403
 doctor,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 doctor,PATCH /v1/setup/consent-contact,setup:edit,deny-403
+doctor,PATCH /v1/setup/holidays/{id},setup:edit,deny-403
 doctor,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 doctor,PATCH /v1/setup/policies/{key},setup:edit,deny-403
 doctor,PATCH /v1/setup/profile,setup:edit,deny-403
@@ -1041,6 +1060,7 @@ doctor,POST /v1/reason-codes,setup:edit,deny-403
 doctor,POST /v1/roles,staff:create,deny-403
 doctor,POST /v1/roles/delegations,staff:edit,deny-403
 doctor,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
+doctor,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 doctor,POST /v1/setup/charges,setup:edit,deny-403
 doctor,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 doctor,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
@@ -1077,6 +1097,7 @@ doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,de
 doctor,PUT /v1/queue-settings/facility,setup:edit,deny-403
 doctor,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
+doctor,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 doctor,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 doctor,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
 doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
@@ -1153,6 +1174,7 @@ nurse,GET /v1/display-devices,setup:view,deny-403
 nurse,GET /v1/doctors/{id}/availability,queue:view,allow
 nurse,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 nurse,GET /v1/doctors/{id}/delay,queue:view,allow
+nurse,GET /v1/doctors/{id}/delay/{delayId}/responses,queue:view,allow
 nurse,GET /v1/doctors/{id}/leave,queue:view,allow
 nurse,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 nurse,GET /v1/doctors/{id}/session,queue:view,allow
@@ -1232,6 +1254,8 @@ nurse,GET /v1/schedule/day,queue:view,allow
 nurse,GET /v1/schedule/week,queue:view,allow
 nurse,GET /v1/settings/integrations/abdm,setup:view,deny-403
 nurse,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
+nurse,GET /v1/setup/calendar/quiet-hours,setup:view,deny-403
+nurse,GET /v1/setup/calendar/templates,setup:view,deny-403
 nurse,GET /v1/setup/charges,setup:view,deny-403
 nurse,GET /v1/setup/checklist,setup:view,deny-403
 nurse,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -1270,6 +1294,7 @@ nurse,PATCH /v1/clinical/prescriptions/{queueEntryId},clinical:edit,allow
 nurse,PATCH /v1/clinical/rx-sets/{setId},clinical:edit,allow
 nurse,PATCH /v1/clinical/vitals/{queueEntryId},clinical:create|clinical:edit,allow
 nurse,PATCH /v1/departments/{id},departments:edit,deny-403
+nurse,PATCH /v1/doctors/{id}/delay/{delayId},queue:edit,allow
 nurse,PATCH /v1/nursing/procedure-orders/{id}/notes,nursing:edit,allow
 nurse,PATCH /v1/nursing/procedure-orders/{id}/status,nursing:edit,allow
 nurse,PATCH /v1/packages/settings,packages:edit,allow
@@ -1285,6 +1310,7 @@ nurse,PATCH /v1/roles/{id},staff:edit,deny-403
 nurse,PATCH /v1/setup/charges/{id},setup:edit,deny-403
 nurse,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 nurse,PATCH /v1/setup/consent-contact,setup:edit,deny-403
+nurse,PATCH /v1/setup/holidays/{id},setup:edit,deny-403
 nurse,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 nurse,PATCH /v1/setup/policies/{key},setup:edit,deny-403
 nurse,PATCH /v1/setup/profile,setup:edit,deny-403
@@ -1401,6 +1427,7 @@ nurse,POST /v1/reason-codes,setup:edit,deny-403
 nurse,POST /v1/roles,staff:create,deny-403
 nurse,POST /v1/roles/delegations,staff:edit,deny-403
 nurse,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
+nurse,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 nurse,POST /v1/setup/charges,setup:edit,deny-403
 nurse,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 nurse,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
@@ -1437,6 +1464,7 @@ nurse,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,den
 nurse,PUT /v1/queue-settings/facility,setup:edit,deny-403
 nurse,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 nurse,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
+nurse,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 nurse,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 nurse,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
 nurse,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
@@ -1513,6 +1541,7 @@ receptionist,GET /v1/display-devices,setup:view,deny-403
 receptionist,GET /v1/doctors/{id}/availability,queue:view,allow
 receptionist,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 receptionist,GET /v1/doctors/{id}/delay,queue:view,allow
+receptionist,GET /v1/doctors/{id}/delay/{delayId}/responses,queue:view,allow
 receptionist,GET /v1/doctors/{id}/leave,queue:view,allow
 receptionist,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 receptionist,GET /v1/doctors/{id}/session,queue:view,allow
@@ -1592,6 +1621,8 @@ receptionist,GET /v1/schedule/day,queue:view,allow
 receptionist,GET /v1/schedule/week,queue:view,allow
 receptionist,GET /v1/settings/integrations/abdm,setup:view,deny-403
 receptionist,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
+receptionist,GET /v1/setup/calendar/quiet-hours,setup:view,deny-403
+receptionist,GET /v1/setup/calendar/templates,setup:view,deny-403
 receptionist,GET /v1/setup/charges,setup:view,deny-403
 receptionist,GET /v1/setup/checklist,setup:view,deny-403
 receptionist,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -1630,6 +1661,7 @@ receptionist,PATCH /v1/clinical/prescriptions/{queueEntryId},clinical:edit,deny-
 receptionist,PATCH /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 receptionist,PATCH /v1/clinical/vitals/{queueEntryId},clinical:create|clinical:edit,deny-403
 receptionist,PATCH /v1/departments/{id},departments:edit,deny-403
+receptionist,PATCH /v1/doctors/{id}/delay/{delayId},queue:edit,allow
 receptionist,PATCH /v1/nursing/procedure-orders/{id}/notes,nursing:edit,deny-403
 receptionist,PATCH /v1/nursing/procedure-orders/{id}/status,nursing:edit,deny-403
 receptionist,PATCH /v1/packages/settings,packages:edit,deny-403
@@ -1645,6 +1677,7 @@ receptionist,PATCH /v1/roles/{id},staff:edit,deny-403
 receptionist,PATCH /v1/setup/charges/{id},setup:edit,deny-403
 receptionist,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 receptionist,PATCH /v1/setup/consent-contact,setup:edit,deny-403
+receptionist,PATCH /v1/setup/holidays/{id},setup:edit,deny-403
 receptionist,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 receptionist,PATCH /v1/setup/policies/{key},setup:edit,deny-403
 receptionist,PATCH /v1/setup/profile,setup:edit,deny-403
@@ -1761,6 +1794,7 @@ receptionist,POST /v1/reason-codes,setup:edit,deny-403
 receptionist,POST /v1/roles,staff:create,deny-403
 receptionist,POST /v1/roles/delegations,staff:edit,deny-403
 receptionist,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
+receptionist,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 receptionist,POST /v1/setup/charges,setup:edit,deny-403
 receptionist,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 receptionist,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
@@ -1797,6 +1831,7 @@ receptionist,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:e
 receptionist,PUT /v1/queue-settings/facility,setup:edit,deny-403
 receptionist,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 receptionist,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
+receptionist,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 receptionist,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 receptionist,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
 receptionist,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
@@ -1873,6 +1908,7 @@ frontdesk_vitals,GET /v1/display-devices,setup:view,deny-403
 frontdesk_vitals,GET /v1/doctors/{id}/availability,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/availability/sessions,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/delay,queue:view,allow
+frontdesk_vitals,GET /v1/doctors/{id}/delay/{delayId}/responses,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/leave,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/session,queue:view,allow
@@ -1952,6 +1988,8 @@ frontdesk_vitals,GET /v1/schedule/day,queue:view,allow
 frontdesk_vitals,GET /v1/schedule/week,queue:view,allow
 frontdesk_vitals,GET /v1/settings/integrations/abdm,setup:view,deny-403
 frontdesk_vitals,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/calendar/quiet-hours,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/calendar/templates,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/charges,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/checklist,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -1990,6 +2028,7 @@ frontdesk_vitals,PATCH /v1/clinical/prescriptions/{queueEntryId},clinical:edit,d
 frontdesk_vitals,PATCH /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 frontdesk_vitals,PATCH /v1/clinical/vitals/{queueEntryId},clinical:create|clinical:edit,allow
 frontdesk_vitals,PATCH /v1/departments/{id},departments:edit,deny-403
+frontdesk_vitals,PATCH /v1/doctors/{id}/delay/{delayId},queue:edit,allow
 frontdesk_vitals,PATCH /v1/nursing/procedure-orders/{id}/notes,nursing:edit,deny-403
 frontdesk_vitals,PATCH /v1/nursing/procedure-orders/{id}/status,nursing:edit,deny-403
 frontdesk_vitals,PATCH /v1/packages/settings,packages:edit,deny-403
@@ -2005,6 +2044,7 @@ frontdesk_vitals,PATCH /v1/roles/{id},staff:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/charges/{id},setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/consent-contact,setup:edit,deny-403
+frontdesk_vitals,PATCH /v1/setup/holidays/{id},setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/policies/{key},setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/profile,setup:edit,deny-403
@@ -2121,6 +2161,7 @@ frontdesk_vitals,POST /v1/reason-codes,setup:edit,deny-403
 frontdesk_vitals,POST /v1/roles,staff:create,deny-403
 frontdesk_vitals,POST /v1/roles/delegations,staff:edit,deny-403
 frontdesk_vitals,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
+frontdesk_vitals,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/charges,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
@@ -2157,6 +2198,7 @@ frontdesk_vitals,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_deta
 frontdesk_vitals,PUT /v1/queue-settings/facility,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
+frontdesk_vitals,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403

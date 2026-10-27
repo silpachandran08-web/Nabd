@@ -54,10 +54,20 @@ class EtaRepository {
                 tenantId, doctorId, Timestamp.from(from), Timestamp.from(to));
     }
 
-    int activeDelayMinutes(UUID tenantId, UUID doctorId, LocalDate day) {
-        Integer m = jdbc.query("SELECT delay_minutes FROM doctor_delays WHERE tenant_id = ? AND doctor_id = ? AND clinic_date = ? AND cleared_at IS NULL",
-                (rs, i) -> rs.getInt(1), tenantId, doctorId, java.sql.Date.valueOf(day)).stream().findFirst().orElse(0);
+    int activeDelayMinutes(UUID tenantId, UUID doctorId, LocalDate day, Instant now) {
+        Integer m = jdbc.query("SELECT delay_minutes FROM doctor_delays WHERE tenant_id = ? AND doctor_id = ? AND clinic_date = ? AND cleared_at IS NULL AND expires_at > ?",
+                (rs, i) -> rs.getInt(1), tenantId, doctorId, java.sql.Date.valueOf(day), Timestamp.from(now)).stream().findFirst().orElse(0);
         return m;
+    }
+
+    /** ACC-024: whole minutes the doctor has been paused today (an open pause counts up to {@code now}). */
+    int pausedMinutes(UUID tenantId, UUID doctorId, LocalDate day, Instant now) {
+        Long s = jdbc.queryForObject("""
+                SELECT coalesce(sum(extract(epoch FROM (coalesce(p.resumed_at, ?) - p.paused_at))), 0)::bigint
+                FROM doctor_session_pauses p JOIN doctor_sessions s ON s.id = p.session_id
+                WHERE s.tenant_id = ? AND s.doctor_id = ? AND s.clinic_date = ?""",
+                Long.class, Timestamp.from(now), tenantId, doctorId, java.sql.Date.valueOf(day));
+        return (int) (Math.max(0, s == null ? 0 : s) / 60);
     }
 
     /** Doctors with anyone waiting or in consult today: the 60 s tick recomputes these (ETAs drift with the clock). */

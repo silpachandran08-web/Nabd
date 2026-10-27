@@ -379,6 +379,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("scheduling.booking.routed.v1"); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove("scheduling.appointment.no_show.v1"); // ACC-025: Acc025NoShowApiTest
         expected.remove("shared.attachment.scanned.v1"); // PLT-029: Plt029FilesApiTest
+        expected.remove("organization.calendar.changed.v1"); // ADM-028: Adm028CalendarApiTest, DomainEventContractApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

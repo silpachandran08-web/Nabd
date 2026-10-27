@@ -155,4 +155,15 @@ class AppointmentRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, doctorId));
     }
+
+    /** ADM-028: appointments still 'scheduled' on each of the given clinic days. */
+    java.util.Map<java.time.LocalDate, Integer> scheduledPerDay(java.util.UUID tenantId, java.util.Collection<java.time.LocalDate> days, java.time.ZoneId zone) {
+        var out = new java.util.HashMap<java.time.LocalDate, Integer>();
+        for (java.time.LocalDate d : days) {
+            out.put(d, jdbc.queryForObject("SELECT count(*) FROM appointments WHERE tenant_id = ? AND status = 'scheduled' AND start_time >= ? AND start_time < ?",
+                    Integer.class, tenantId, java.sql.Timestamp.from(com.nabd.hms.common.ClinicClock.startOf(d, zone)),
+                    java.sql.Timestamp.from(com.nabd.hms.common.ClinicClock.startOf(d.plusDays(1), zone))));
+        }
+        return out;
+    }
 }

@@ -42,9 +42,12 @@ class WhatsAppInboundService {
     private final Clock clock;
     private final TenantScope scope;
     private final OptOutService optOut;
+    private final java.util.List<com.nabd.hms.shared.notify.InboundButtonListener> buttonListeners;
 
     WhatsAppInboundService(WhatsAppInboundRepository repo, WhatsAppTemplateRepository templates, FieldCipher cipher,
-                           EventPublisher events, ObjectMapper mapper, Clock clock, TenantScope scope, OptOutService optOut) {
+                           EventPublisher events, ObjectMapper mapper, Clock clock, TenantScope scope, OptOutService optOut,
+                           java.util.List<com.nabd.hms.shared.notify.InboundButtonListener> buttonListeners) {
+        this.buttonListeners = buttonListeners;
         this.scope = scope;
         this.optOut = optOut;
         this.repo = repo;
@@ -176,6 +179,9 @@ class WhatsAppInboundService {
         scope.run(tenant, () -> { // binds this transaction to the clinic, which the consent and send calls below read
             events.publish(tenant, DomainEventType.INBOUND_RECEIVED, new UUID(0, row.id()), data);
             optOut.handle(tenant, m, payload, row.id());
+            if (payload != null && SAFE_PAYLOAD.matcher(payload).matches() && !buttonListeners.isEmpty()) { // ACC-024: delay-message buttons
+                repo.patientOfMessage(replyTo).ifPresent(p -> buttonListeners.forEach(l -> l.onButton(p, payload)));
+            }
         });
         return tenant;
     }

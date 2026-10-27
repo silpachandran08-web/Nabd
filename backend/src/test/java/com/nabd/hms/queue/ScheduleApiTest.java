@@ -196,7 +196,7 @@ class ScheduleApiTest extends ApiTestBase {
     }
 
     @Test
-    void announcingASecondDelayClosesTheFirstOneOutInHistory() {
+    void announcingASecondDelayWhileOneIsActiveIs409UntilTheFirstIsCleared() { // ACC-024: change it with PATCH; was a silent replace
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doctor = seedStaff(tenant, roleId, "doc9@a.com", "+919400000009", false);
@@ -204,6 +204,10 @@ class ScheduleApiTest extends ApiTestBase {
 
         exchange("/v1/doctors/" + doctor.id() + "/delay", HttpMethod.POST,
                 authedJsonBody(token, Map.of("delayMinutes", 10, "reason", "first")), Map.class);
+        ResponseEntity<Map> refused = exchange("/v1/doctors/" + doctor.id() + "/delay", HttpMethod.POST,
+                authedJsonBody(token, Map.of("delayMinutes", 25, "reason", "second, worse")), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        exchange("/v1/doctors/" + doctor.id() + "/delay/clear", HttpMethod.POST, authed(token), Void.class);
         ResponseEntity<Map> second = exchange("/v1/doctors/" + doctor.id() + "/delay", HttpMethod.POST,
                 authedJsonBody(token, Map.of("delayMinutes", 25, "reason", "second, worse")), Map.class);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CREATED);

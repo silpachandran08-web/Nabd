@@ -70,6 +70,12 @@ class WhatsAppInboundRepository {
         return Optional.ofNullable(jdbc.queryForObject("SELECT whatsapp_message_tenant(?)", UUID.class, wamid));
     }
 
+    /** The patient our message (by wamid) went to; call inside a transaction bound to the clinic. */
+    Optional<UUID> patientOfMessage(String wamid) {
+        return jdbc.query("SELECT patient_id FROM whatsapp_messages WHERE wamid = ? AND patient_id IS NOT NULL",
+                (rs, i) -> rs.getObject(1, UUID.class), wamid).stream().findFirst();
+    }
+
     int purge(int bodyDays, int keyDays, int batch) {
         return jdbc.queryForObject("SELECT purge_whatsapp_inbound_events(?, ?, ?)", Integer.class, bodyDays, keyDays, batch);
     }

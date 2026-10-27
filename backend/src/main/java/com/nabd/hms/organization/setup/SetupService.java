@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -63,10 +64,13 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final com.nabd.hms.iam.api.ActorDirectory actors;
 
     private final com.nabd.hms.patient.api.PrivacyNotices privacyNotices;
+    private final CalendarService calendar;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
-                 com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices) {
+                 com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
+                 CalendarService calendar) {
+        this.calendar = calendar;
         this.actors = actors;
         this.entitlements = entitlements;
         this.privacyNotices = privacyNotices;
@@ -223,7 +227,7 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public List<ClinicHolidayResponse> listHolidays(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listHolidays(tenantId).stream().map(this::toHolidayResponse).toList();
+        return calendar.withBookingsToMove(repo.listHolidays(tenantId).stream().map(this::toHolidayResponse).toList());
     }
 
     @Transactional
@@ -231,16 +235,19 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         tenantContext.set(tenantId);
         UUID id = repo.insertHoliday(tenantId, req);
         log.info("holiday {} added for tenant {} by {}", id, tenantId, callerStaffId);
-        return new ClinicHolidayResponse(id.toString(), req.holidayDate(), req.name(), req.recurring());
+        calendar.changed(tenantId, List.of(new CalendarService.Change(req.holidayDate(), "closed", null)));
+        return new ClinicHolidayResponse(id.toString(), req.holidayDate(), req.name(), req.recurring(), "closed", List.of(), null, null);
     }
 
     @Transactional
     public void deleteHoliday(UUID tenantId, UUID callerStaffId, UUID id) {
         tenantContext.set(tenantId);
+        LocalDate date = calendar.dateOf(tenantId, id).orElse(null);
         int deleted = repo.deleteHoliday(tenantId, id);
         if (deleted == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "holiday-not-found", "Holiday not found", "Holiday not found");
         }
+        calendar.changed(tenantId, List.of(new CalendarService.Change(date, "open", null))); // the day is an ordinary day again
         log.info("holiday {} deleted for tenant {} by {}", id, tenantId, callerStaffId);
     }
 
@@ -420,7 +427,7 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     }
 
     private ClinicHolidayResponse toHolidayResponse(HolidayRow row) {
-        return new ClinicHolidayResponse(row.id().toString(), row.holidayDate(), row.name(), row.recurring());
+        return CalendarService.response(row);
     }
 
     private StaffShiftResponse toShiftResponse(StaffShiftRow row) {

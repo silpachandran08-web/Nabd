@@ -7,12 +7,12 @@ import styles from "../arrivals.module.css";
 import Dialog from "../../ui/Dialog";
 import StatusPill from "../../ui/StatusPill";
 import { EmptyState } from "../../ui/StateViews";
-import { api } from "../../../lib/api";
+import { ApiError, api } from "../../../lib/api";
 import { prefix } from "../../../lib/query";
 import { failText } from "../failText";
 import type { Staff } from "../types";
 
-const DELAY_PRESETS = [10, 15, 30, 45, 60];
+const DELAY_PRESETS = [15, 30, 45, 60];
 
 export function DelayForm({ doctor, waiting, onClose }: { doctor?: Staff; waiting: number; onClose: () => void }) {
   const qc = useQueryClient();
@@ -29,7 +29,16 @@ export function DelayForm({ doctor, waiting, onClose }: { doctor?: Staff; waitin
     if (!doctor) return;
     setBusy(true);
     try {
-      await api.post(`/doctors/${doctor.id}/delay`, { delayMinutes: mins, reason: reason || null });
+      try {
+        await api.post(`/doctors/${doctor.id}/delay`, { delayMinutes: mins, reason: reason || null, broadcast: true });
+      } catch (err) {
+        // ACC-024: one delay at a time; a second tap changes the active one.
+        if (!(err instanceof ApiError && err.status === 409)) throw err;
+        const rows = await api.get<{ delayId?: string; active?: boolean }[]>(`/doctors/${doctor.id}/delay`);
+        const active = rows.find((r) => r.active);
+        if (!active?.delayId) throw err;
+        await api.patch(`/doctors/${doctor.id}/delay/${active.delayId}`, { minutes: mins });
+      }
       void qc.invalidateQueries({ queryKey: prefix("doctor-delay") });
       void qc.invalidateQueries({ queryKey: prefix("wait-estimate") });
       onClose();
@@ -71,8 +80,7 @@ export function DelayForm({ doctor, waiting, onClose }: { doctor?: Staff; waitin
         </div>
         <ul className={styles.ladder} aria-label={t("delay.ladderLabel")}>
           <li>{t("delay.ladderQueue")}</li>
-          {/* shortcut: no patient-messaging endpoint for delays yet; replace with a real channel ladder (WhatsApp, then SMS) when the backend sends them. */}
-          <li className={styles.muted}>{t("delay.ladderPatient")}</li>
+          <li>{t("delay.ladderPatient")}</li>
         </ul>
         {error && <div className={styles.formError} role="alert">{error}</div>}
         <div className={styles.modalActions}>

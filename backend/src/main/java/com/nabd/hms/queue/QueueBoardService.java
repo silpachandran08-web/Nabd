@@ -82,7 +82,7 @@ class QueueBoardService {
         var byDoctor = new LinkedHashMap<UUID, List<QueueBoardRepository.EntryRow>>();
         repo.entries(tenantId, day, departmentId).forEach(e -> byDoctor.computeIfAbsent(e.doctorId(), k -> new ArrayList<>()).add(e));
         var states = repo.sessionStates(tenantId, day);
-        var delays = repo.activeDelays(tenantId, day);
+        var delays = repo.activeDelays(tenantId, day, clock.now());
         List<Doctor> out = new ArrayList<>();
         for (var d : doctors) {
             List<Entry> entries = new ArrayList<>();

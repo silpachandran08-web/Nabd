@@ -84,9 +84,11 @@ final class QueueModels {
 
     /** NB-100: one entry in a doctor's delay history — active while clearedAt is null. */
     record DoctorDelayRow(UUID id, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, Instant announcedAt,
-                           UUID clearedBy, Instant clearedAt, java.time.LocalDate clinicDate) {
-        boolean active(java.time.LocalDate today) {
-            return clearedAt == null && clinicDate.equals(today);
+                           UUID clearedBy, Instant clearedAt, java.time.LocalDate clinicDate,
+                           Instant expiresAt, String reasonCode, boolean broadcast) {
+        /** ACC-024: a delay lapses at its session end even if nobody clears it. */
+        boolean active(java.time.LocalDate today, Instant now) {
+            return clearedAt == null && clinicDate.equals(today) && expiresAt.isAfter(now);
         }
     }
 }

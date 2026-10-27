@@ -11,6 +11,10 @@ public enum NotificationPurpose {
     REVIEW_REQUEST("review_request", ConsentClass.MARKETING, Priority.BULK, ChannelPolicy.WHATSAPP_ONLY),
     SECURE_LINK("secure_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     DELAY_NOTICE("delay_notice", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-024: the doctor is running late (catalogue template doctor_delay: first name, doctor, new expected time). */
+    DOCTOR_DELAY("doctor_delay", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-024: the queue is paused; neutral text, no parameters and never a reason. */
+    QUEUE_PAUSED("queue_paused", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** FIN-014: dues reminder; the template body names the clinic only (no amounts, no line items). */
     DUES_REMINDER("dues_reminder", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** ACC-006: the clinic moved the patient's appointment (first name, date, time). */

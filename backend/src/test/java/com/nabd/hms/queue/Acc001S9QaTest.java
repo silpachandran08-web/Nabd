@@ -117,6 +117,8 @@ class Acc001S9QaTest extends ApiTestBase {
         assertThat(count(c, "doctor_delays")).isZero();
         // boundaries accepted
         assertThat(announce(c.token, c.doctor.id(), 1).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        // ACC-024: one active delay at a time, so lift the first before the 240 boundary
+        exchange("/v1/doctors/" + c.doctor.id() + "/delay/clear", HttpMethod.POST, authed(c.token), Void.class);
         ResponseEntity<Map> ok = announce(c.token, c.doctor.id(), 240);
         assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(ok.getBody()).containsKeys("id", "doctorId", "delayMinutes", "clinicDate", "active");
@@ -136,7 +138,7 @@ class Acc001S9QaTest extends ApiTestBase {
     @Test
     void db_checkConstraintAndUniqueIndexHoldEvenBypassingTheApi() throws Exception {
         Ctx c = ctx("Asia/Kolkata");
-        String ins = "INSERT INTO doctor_delays (tenant_id, doctor_id, delay_minutes, announced_by, clinic_date) VALUES (?,?,?,?,?)";
+        String ins = "INSERT INTO doctor_delays (tenant_id, doctor_id, delay_minutes, announced_by, clinic_date, expires_at) VALUES (?,?,?,?,?, now() + interval '1 day')";
         try (Connection su = superuserConnection()) {
             for (int bad : new int[]{0, 241, -5}) {
                 try (PreparedStatement ps = su.prepareStatement(ins)) {

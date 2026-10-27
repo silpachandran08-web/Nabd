@@ -36,12 +36,28 @@ class ScheduleRepository {
      * month+day across any year (e.g. a fixed public holiday); non-recurring matches the exact date. */
     boolean isClinicHoliday(UUID tenantId, LocalDate date) {
         Boolean exists = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM clinic_holidays WHERE tenant_id = ? AND (" +
+                "SELECT EXISTS(SELECT 1 FROM clinic_holidays WHERE tenant_id = ? AND effect = 'closed' AND (" + // ADM-028: short and open days are not closed
                         "  (NOT recurring AND holiday_date = ?) OR " +
                         "  (recurring AND EXTRACT(MONTH FROM holiday_date) = ? AND EXTRACT(DAY FROM holiday_date) = ?)" +
                         "))",
                 Boolean.class, tenantId, Date.valueOf(date), date.getMonthValue(), date.getDayOfMonth());
         return Boolean.TRUE.equals(exists);
+    }
+
+    /** ADM-028: the bookable windows of a short-hours holiday on this date, or null when the date is not a short day. */
+    List<LocalTime[]> shortWindows(UUID tenantId, LocalDate date) {
+        List<LocalTime[]> out = jdbc.query("""
+                SELECT e->>'from', e->>'to' FROM clinic_holidays h, jsonb_array_elements(h.short_hours) e
+                 WHERE h.tenant_id = ? AND h.effect = 'short' AND ((NOT h.recurring AND h.holiday_date = ?) OR
+                       (h.recurring AND EXTRACT(MONTH FROM h.holiday_date) = ? AND EXTRACT(DAY FROM h.holiday_date) = ?))""",
+                (rs, i) -> new LocalTime[] {LocalTime.parse(rs.getString(1)), LocalTime.parse(rs.getString(2))},
+                tenantId, Date.valueOf(date), date.getMonthValue(), date.getDayOfMonth());
+        return out.isEmpty() ? null : out;
+    }
+
+    /** A slot [start, end) is bookable on a short day only inside one of its windows (null windows = ordinary day). */
+    static boolean inWindows(List<LocalTime[]> windows, LocalTime start, LocalTime end) {
+        return windows == null || windows.stream().anyMatch(w -> !start.isBefore(w[0]) && !end.isAfter(w[1]));
     }
 
     private static final String WH_COLS = "id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients, " +
@@ -279,11 +295,22 @@ class ScheduleRepository {
     // ── delay ladder (NB-100) ────────────────────────────────────────────
 
     private static final String DELAY_SELECT =
-            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at, clinic_date " +
+            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at, clinic_date, expires_at, reason_code, broadcast " +
                     "FROM doctor_delays WHERE doctor_id = ? ";
 
-    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId, java.time.LocalDate today) {
-        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL AND clinic_date = ?", delayMapper(), doctorId, today).stream().findFirst();
+    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId, java.time.LocalDate today, Instant now) {
+        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL AND clinic_date = ? AND expires_at > ?", delayMapper(), doctorId, today, Timestamp.from(now)).stream().findFirst();
+    }
+
+    /** ACC-024: change the minutes of a delay that is still active. */
+    int changeDelayMinutes(UUID delayId, int minutes) {
+        return jdbc.update("UPDATE doctor_delays SET delay_minutes = ? WHERE id = ? AND cleared_at IS NULL", minutes, delayId);
+    }
+
+    /** ACC-024: (start, end) of the doctor's sessions on a weekday (0 = Sunday), earliest first. */
+    List<java.time.LocalTime[]> sessionsOn(UUID doctorId, int dayOfWeek) {
+        return jdbc.query("SELECT start_time, end_time FROM doctor_working_hours WHERE doctor_id = ? AND day_of_week = ? ORDER BY start_time",
+                (rs, i) -> new java.time.LocalTime[] {rs.getObject(1, java.time.LocalTime.class), rs.getObject(2, java.time.LocalTime.class)}, doctorId, dayOfWeek);
     }
 
     List<DoctorDelayRow> delayHistory(UUID doctorId, int limit) {
@@ -292,7 +319,8 @@ class ScheduleRepository {
 
     /** "Writing the delay then closing and appending to history" — a fresh announcement always
      * closes out any still-active one first, so the unique active-per-doctor index never fires. */
-    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, java.time.LocalDate clinicDate) {
+    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, String reasonCode, boolean broadcast,
+                       UUID announcedBy, java.time.LocalDate clinicDate, Instant expiresAt) {
         // A concurrent announcement for the same doctor loses (409); sequential ones still supersede.
         // Also lost if another announcement was inserted after this transaction began (shortcut: requests staggered beyond a txn are indistinguishable from fast sequential supersedes, which must stay 201).
         if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtext(?))", Boolean.class, "doctor-delay:" + doctorId))
@@ -301,8 +329,8 @@ class ScheduleRepository {
         }
         clearActiveDelay(tenantId, doctorId, announcedBy);
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by, clinic_date, announced_at) VALUES (?,?,?,?,?,?,?, clock_timestamp())",
-                id, tenantId, doctorId, delayMinutes, reason, announcedBy, clinicDate);
+        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, reason_code, broadcast, announced_by, clinic_date, expires_at, announced_at) VALUES (?,?,?,?,?,?,?,?,?,?, clock_timestamp())",
+                id, tenantId, doctorId, delayMinutes, reason, reasonCode, broadcast, announcedBy, clinicDate, Timestamp.from(expiresAt));
         return id;
     }
 
@@ -328,7 +356,8 @@ class ScheduleRepository {
                     rs.getTimestamp("announced_at").toInstant(),
                     clearedBy == null ? null : UUID.fromString(clearedBy),
                     clearedAt == null ? null : clearedAt.toInstant(),
-                    rs.getObject("clinic_date", java.time.LocalDate.class));
+                    rs.getObject("clinic_date", java.time.LocalDate.class),
+                    rs.getTimestamp("expires_at").toInstant(), rs.getString("reason_code"), rs.getBoolean("broadcast"));
         };
     }
 

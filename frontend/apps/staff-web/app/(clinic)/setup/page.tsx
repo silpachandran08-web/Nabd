@@ -4,6 +4,7 @@ import { seatMeter } from "../../lib/entitlements";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
+import RegionalCalendar, { type CalHoliday } from "../../components/setup/RegionalCalendar";
 import WhatsAppTemplates from "./WhatsAppTemplates";
 import DisplayDevices from "./DisplayDevices";
 import TimezoneSelect from "./TimezoneSelect";
@@ -29,7 +30,7 @@ type Profile = { id: string; name: string; region: string; timezone: string; tax
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; emergencyAmount: number | null; taxCode: string | null; taxRatePercent: number; doctorOverride: boolean; active: boolean; effectiveFrom: string; effectiveTo: string | null; displayOrder: number };
 type Policy = { id: string; policyKey: string; value: string; version: number };
 type ConsentContact = { name: string; email: string; phone: string | null };
-type Holiday = { id: string; holidayDate: string; name: string; recurring: boolean };
+type Holiday = CalHoliday;
 type Shift = { id: string; staffId: string; staffName: string | null; patternJson: string; effectiveFrom: string; effectiveTo: string | null };
 type PayrollRow = { staffId: string; staffName: string; role: string; days: number; hours: number; salary: number; notes: string };
 type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number; modules?: { code: string; enabled: boolean }[]; killedFeatures?: string[]; seatsUsed?: number; seatsLimit?: number | null };
@@ -557,6 +558,7 @@ function SetupPageInner() {
         return (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Clinic holidays</h2>
+            <RegionalCalendar holidays={holidays} canEdit={can("setup:edit")} onChanged={loadAll} />
             <form onSubmit={addHoliday}>
               <div className={styles.row}>
                 <div className={styles.field}>

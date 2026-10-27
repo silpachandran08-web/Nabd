@@ -207,7 +207,9 @@ class SetupRepository {
     // ── Holidays ──
 
     List<HolidayRow> listHolidays(UUID tenantId) {
-        return jdbc.query("SELECT id, holiday_date, name, recurring FROM clinic_holidays WHERE tenant_id = ? ORDER BY holiday_date",
+        return jdbc.query("SELECT id, holiday_date, name, recurring, effect, source_template, " +
+                        "(SELECT string_agg((e->>'from') || '-' || (e->>'to'), ',' ORDER BY o) FROM jsonb_array_elements(short_hours) WITH ORDINALITY AS t(e, o)) AS hours " +
+                        "FROM clinic_holidays WHERE tenant_id = ? ORDER BY holiday_date",
                 holidayMapper(), tenantId);
     }
 
@@ -442,7 +444,8 @@ class SetupRepository {
                 UUID.fromString(rs.getString("id")),
                 rs.getDate("holiday_date").toLocalDate(),
                 rs.getString("name"),
-                rs.getBoolean("recurring"));
+                rs.getBoolean("recurring"),
+                rs.getString("effect"), rs.getString("hours"), rs.getString("source_template"));
     }
 
     private RowMapper<StaffShiftRow> shiftMapper() {

@@ -64,10 +64,13 @@ public class EtaService {
                 ahead.add(new Item(e.id(), e.appointmentId(), d, null));
             }
         }
+        // ACC-024: a booked patient's slot moves by the time the doctor spent paused (waiting patients are computed from now)
+        long pausedSeconds = repo.pausedMinutes(tid, doctorId, day, now) * 60L;
         for (var b : repo.bookedNotArrived(tid, doctorId, clock.dayStart(tid, day), clock.dayStart(tid, day.plusDays(1)))) {
-            ahead.add(new Item(null, b.appointmentId(), serviceTimes.estimate(doctorId, b.followUp() ? "follow_up" : "new", "default").dist(), b.startTime()));
+            ahead.add(new Item(null, b.appointmentId(), serviceTimes.estimate(doctorId, b.followUp() ? "follow_up" : "new", "default").dist(),
+                    b.startTime().plusSeconds(pausedSeconds)));
         }
-        int delay = repo.activeDelayMinutes(tid, doctorId, day);
+        int delay = repo.activeDelayMinutes(tid, doctorId, day, now);
         List<Result> out = EtaEngine.compute(now, now, running, delay, ahead);
         // the newcomer joins behind everyone already waiting
         List<Item> withNewcomer = new ArrayList<>(ahead);

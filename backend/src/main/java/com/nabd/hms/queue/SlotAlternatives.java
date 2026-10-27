@@ -43,13 +43,15 @@ class SlotAlternatives {
             if (scheduleRepo.isClinicHoliday(tenantId, day) || scheduleRepo.isOnLeave(doctorId, day)) continue;
             Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(doctorId, clock.dayStart(tenantId, day), clock.dayStart(tenantId, day.plusDays(1))));
             List<int[]> leave = scheduleRepo.partialLeaves(tenantId, doctorId, day); // ACC-005
+            var shortDay = scheduleRepo.shortWindows(tenantId, day); // ADM-028
             for (WorkingHoursRow wh : scheduleRepo.findForDay(doctorId, day.getDayOfWeek().getValue() % 7).stream()
                     .sorted(Comparator.comparing(WorkingHoursRow::startTime)).toList()) {
                 if (wh.maxPatients() != null && scheduleRepo.countSessionOccupancy(tenantId, doctorId, day, wh) >= wh.maxPatients()) continue;
                 Instant end = clock.atSecond(tenantId, day, wh.endSecond());
                 for (Instant s = clock.atSecond(tenantId, day, wh.startSecond()); !s.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end);
                      s = s.plus(wh.slotMinutes(), ChronoUnit.MINUTES)) {
-                    if (s.isAfter(from) && !booked.contains(s)
+                    var local = s.atZone(zone).toLocalTime();
+                    if (s.isAfter(from) && !booked.contains(s) && ScheduleRepository.inWindows(shortDay, local, local.plusMinutes(wh.slotMinutes()))
                             && !ScheduleRepository.overlapsLeave(leave, clock.secondOfClinicDay(tenantId, day, s), wh.slotMinutes() * 60)) return Optional.of(s);
                 }
             }

@@ -66,11 +66,11 @@ class QueueBoardRepository {
         return out;
     }
 
-    java.util.Map<UUID, Integer> activeDelays(UUID tenantId, LocalDate day) {
+    java.util.Map<UUID, Integer> activeDelays(UUID tenantId, LocalDate day, java.time.Instant now) {
         var out = new java.util.HashMap<UUID, Integer>();
-        jdbc.query("SELECT doctor_id, delay_minutes FROM doctor_delays WHERE tenant_id = ? AND clinic_date = ? AND cleared_at IS NULL", rs -> {
+        jdbc.query("SELECT doctor_id, delay_minutes FROM doctor_delays WHERE tenant_id = ? AND clinic_date = ? AND cleared_at IS NULL AND expires_at > ?", rs -> {
             out.put(rs.getObject(1, UUID.class), rs.getInt(2));
-        }, tenantId, Date.valueOf(day));
+        }, tenantId, Date.valueOf(day), java.sql.Timestamp.from(now));
         return out;
     }
 
