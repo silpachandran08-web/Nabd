@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import StatusPill from "../ui/StatusPill";
 import type { DrugSuggestion } from "./shared";
@@ -38,6 +39,7 @@ export default function DrugCombobox({
   /** A suggestion was chosen: its name replaces the field text; the row (drugId, generic, brand ...) comes with it. */
   onPick: (name: string, it: DrugSuggestion) => void;
 }) {
+  const t = useTranslations("consult.drugCombobox");
   const uid = useId();
   const listId = `${uid}-list`;
   const [open, setOpen] = useState(false);
@@ -125,10 +127,10 @@ export default function DrugCombobox({
   const expanded = open && !disabled && state !== "idle";
   const hasList = expanded && items.length > 0;
   const status =
-    state === "loading" ? "Searching…"
-    : state === "error" ? "Suggestions are unavailable. You can still type the name."
-    : state === "done" && items.length === 0 ? "No match in the drug list, your pharmacy list or past prescriptions. Your own text will be used."
-    : state === "done" ? `${items.length} suggestion${items.length === 1 ? "" : "s"}. Use the arrow keys, Enter to choose.`
+    state === "loading" ? t("searching")
+    : state === "error" ? t("unavailable")
+    : state === "done" && items.length === 0 ? t("noMatch")
+    : state === "done" ? t("suggestionCount", { count: items.length })
     : "";
 
   return (
@@ -158,7 +160,7 @@ export default function DrugCombobox({
       {/* CARRY-12: a listbox exists only with options (an empty one fails aria-required-children); notes sit outside it. */}
       {expanded && !hasList && <div className={s.listbox} aria-hidden="true"><p className={s.listNote}>{status}</p></div>}
       {hasList && (
-        <ul id={listId} role="listbox" aria-label={`${label} suggestions`} className={s.listbox}>
+        <ul id={listId} role="listbox" aria-label={t("suggestionsFor", { label })} className={s.listbox}>
           {items.map((it, n) => (
             <li
               key={`${it.source}-${it.drugId ?? it.name}-${it.code ?? ""}`}
@@ -171,11 +173,11 @@ export default function DrugCombobox({
             >
               <span>{it.name}</span>
               <span className={s.optionMeta}>
-                {it.source === "master" ? <span>Drug list</span> : it.source === "pharmacy" ? <span>Pharmacy list</span> : <span>Prescribed before</span>}
-                {it.source === "master" && it.inStock === true && <StatusPill tone="ok" label="In stock" />}
-                {it.source === "pharmacy" && it.inStock === true && <StatusPill tone="ok" label="In stock" />}
-                {it.source === "pharmacy" && it.inStock === false && <StatusPill tone="warn" label="Out of stock" />}
-                {it.prescriptionOnly === true && <span>Rx only</span>}
+                {it.source === "master" ? <span>{t("drugList")}</span> : it.source === "pharmacy" ? <span>{t("pharmacyList")}</span> : <span>{t("prescribedBefore")}</span>}
+                {it.source === "master" && it.inStock === true && <StatusPill tone="ok" label={t("inStock")} />}
+                {it.source === "pharmacy" && it.inStock === true && <StatusPill tone="ok" label={t("inStock")} />}
+                {it.source === "pharmacy" && it.inStock === false && <StatusPill tone="warn" label={t("outOfStock")} />}
+                {it.prescriptionOnly === true && <span>{t("rxOnly")}</span>}
               </span>
             </li>
           ))}

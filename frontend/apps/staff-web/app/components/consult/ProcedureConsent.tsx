@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
@@ -15,6 +16,7 @@ import s from "./consultParts.module.css";
 export default function ProcedureConsent({
   authedFetch, order, onClose, onRecorded,
 }: { authedFetch: AuthedFetch; order: ProcOrder; onClose: () => void; onRecorded: (o: ProcOrder) => void }) {
+  const tx = useTranslations("consult.procedureConsent");
   const [name, setName] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -30,50 +32,50 @@ export default function ProcedureConsent({
       if (!res.ok) {
         // Stay open: consent that failed to record must not look recorded.
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "" }));
-        setError(p.detail || "Consent was not recorded. Try again.");
+        setError(p.detail || tx("consentWasNotRecordedTry"));
         return;
       }
       onRecorded((await res.json()) as ProcOrder);
     } catch {
-      setError("Couldn't reach the server. Consent was not recorded.");
+      setError(tx("couldnTReachTheServer"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Dialog title="Record procedure consent" onClose={onClose}>
+    <Dialog title={tx("recordProcedureConsent")} onClose={onClose}>
       <div className={s.stack}>
         <p className={s.muted}>{order.patientName} · {order.chargeName}</p>
         <div className={`${s.notice} ${s.noticeDanger}`}>
           <Icon name="alert" size={16} />
-          <span>Hard gate: this procedure cannot be marked ready or completed until consent is recorded.</span>
+          <span>{tx("hardGateThisProcedureCannot")}</span>
         </div>
         {order.consentNote ? (
           <div>
-            <strong className={s.muted}>Consent note entered by {order.orderedByName}</strong>
+            <strong className={s.muted}>{tx("consentNoteEnteredBy", { orderedByName: order.orderedByName })}</strong>
             <p className={s.complaint}>{order.consentNote}</p>
           </div>
         ) : (
           <div className={`${s.notice} ${s.noticeWarn}`} role="status">
             <Icon name="alert" size={16} />
-            <span>No consent wording was entered with this order. The clinic must supply its approved procedure consent text (clinical and legal sign-off) before relying on this record.</span>
+            <span>{tx("noConsentWordingWasEntered")}</span>
           </div>
         )}
         <div className={s.field}>
-          <label htmlFor="pcName">Name of the person giving consent (patient or guardian)</label>
+          <label htmlFor="pcName">{tx("nameOfThePersonGiving")}</label>
           <input id="pcName" className={s.input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" autoFocus />
         </div>
         <label className={s.check}>
           <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-          <span>The procedure was explained and the person named above agreed to it.</span>
+          <span>{tx("theProcedureWasExplainedAnd")}</span>
         </label>
-        <p className={s.muted}>Recorded: the typed name, your name and the time. Not recorded yet: form version, language, guardian verification or a handwritten signature.</p>
+        <p className={s.muted}>{tx("recordedTheTypedNameYour")}</p>
         {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert"><Icon name="alert" size={16} /><span>{error}</span></div>}
       </div>
       <div className={s.dialogActions}>
-        <button type="button" className={s.btn} onClick={onClose}>Cancel</button>
-        <button type="button" className={s.btnPrimary} onClick={submit} disabled={busy || !name.trim() || !confirmed}>{busy ? "Recording…" : "Record consent"}</button>
+        <button type="button" className={s.btn} onClick={onClose}>{tx("cancel")}</button>
+        <button type="button" className={s.btnPrimary} onClick={submit} disabled={busy || !name.trim() || !confirmed}>{busy ? tx("recording") : tx("recordConsent")}</button>
       </div>
     </Dialog>
   );

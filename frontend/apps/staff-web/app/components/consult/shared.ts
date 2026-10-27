@@ -68,12 +68,12 @@ export function statusLabel(status: string): string {
   return queueStatusLabel(status);
 }
 
-export function daysAgoLabel(iso: string | null): string {
-  if (!iso) return "No previous visit";
+/** `tx` is the `consult.safetyStrip` translator. */
+export function daysAgoLabel(tx: (key: string, values?: Record<string, string | number>) => string, iso: string | null): string {
+  if (!iso) return tx("noPreviousVisit");
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  const when = new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  if (days <= 0) return `Today · ${when}`;
-  return `${days} day${days === 1 ? "" : "s"} ago · ${when}`;
+  const date = new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return days <= 0 ? tx("visitToday", { date }) : tx("visitDaysAgo", { count: days, date });
 }
 
 // "Amoxicillin · 500 mg · TDS · 5 days" — dose, sig and duration as recorded, never reformatted.

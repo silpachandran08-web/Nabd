@@ -1,6 +1,7 @@
 "use client";
 
 // FEF-030: the queue list screen (title, scope and status filters, table with its loading / forbidden / error / empty states).
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { VISIT_LABEL } from "@nabd/domain";
 import StatusPill from "../../ui/StatusPill";
@@ -19,6 +20,8 @@ function rowArrows(e: React.KeyboardEvent<HTMLTableRowElement>) {
 }
 
 export default function QueueList({ q, onOpen }: { q: ConsultQueue; onOpen: (r: Row) => void }) {
+  const tx = useTranslations("consult.queueList");
+  const g = useTranslations("glossary");
   const { rows, loading, error, forbidden, scope, statusFilter, selfId, now } = q;
   const visible = rows.filter((r) =>
     statusFilter === "all" ? true
@@ -29,40 +32,40 @@ export default function QueueList({ q, onOpen }: { q: ConsultQueue; onOpen: (r: 
   return (
     <main className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Consultation Workspace</h1>
-        <p className={styles.subtitle}>Today&apos;s queue.</p>
+        <h1 className={styles.title}>{tx("consultationWorkspace")}</h1>
+        <p className={styles.subtitle}>{tx("todaySQueue")}</p>
       </div>
 
       <div className={styles.toolbar}>
-        <div className={styles.seg} role="group" aria-label="Queue scope">
-          {([["mine", "My patients"], ["all", "All clinic"]] as const).map(([id, label]) => (
-            <button key={id} type="button" className={`${styles.segBtn} ${scope === id ? styles.segBtnOn : ""}`} aria-pressed={scope === id} onClick={() => q.changeScope(id)}>{label}</button>
+        <div className={styles.seg} role="group" aria-label={tx("queueScope")}>
+          {(["mine", "all"] as const).map((id) => (
+            <button key={id} type="button" className={`${styles.segBtn} ${scope === id ? styles.segBtnOn : ""}`} aria-pressed={scope === id} onClick={() => q.changeScope(id)}>{tx(`scope.${id}`)}</button>
           ))}
         </div>
-        <div className={styles.seg} role="group" aria-label="Status filter">
-          {([["all", "All"], ["waiting", "Waiting"], ["in_consult", "In consult"], ["done", "Done"]] as const).map(([id, label]) => (
-            <button key={id} type="button" className={`${styles.segBtn} ${statusFilter === id ? styles.segBtnOn : ""}`} aria-pressed={statusFilter === id} onClick={() => q.setStatusFilter(id)}>{label}</button>
+        <div className={styles.seg} role="group" aria-label={tx("statusFilter")}>
+          {(["all", "waiting", "in_consult", "done"] as const).map((id) => (
+            <button key={id} type="button" className={`${styles.segBtn} ${statusFilter === id ? styles.segBtnOn : ""}`} aria-pressed={statusFilter === id} onClick={() => q.setStatusFilter(id)}>{tx(`filter.${id}`)}</button>
           ))}
         </div>
       </div>
 
       <div className={styles.card}>
         {loading ? (
-          <div className={p.skelPad}><Skeleton rows={5} label="Loading today's queue" /></div>
+          <div className={p.skelPad}><Skeleton rows={5} label={tx("loadingTodaySQueue")} /></div>
         ) : forbidden ? (
-          <EmptyState icon="shield" title="No access to the queue" hint="Your role doesn't include the consultation queue." />
+          <EmptyState icon="shield" title={tx("noAccessToTheQueue")} hint={tx("yourRoleDoesnTInclude")} />
         ) : error ? (
           <ErrorState message={error} onRetry={() => void q.load(scope)} />
         ) : rows.length === 0 ? (
-          <EmptyState title="Nothing here today" hint={scope === "mine" ? "No patients are assigned to you in today's queue. Switch to All clinic to see everyone." : "No patients are in today's queue."}
-            action={<Link href="/patients" className={`${styles.actionBtnGhost} ${styles.anchorBtn}`}>Open patients</Link>} />
+          <EmptyState title={tx("nothingHereToday")} hint={scope === "mine" ? tx("emptyMine") : tx("emptyAll")}
+            action={<Link href="/patients" className={`${styles.actionBtnGhost} ${styles.anchorBtn}`}>{tx("openPatients")}</Link>} />
         ) : visible.length === 0 ? (
-          <EmptyState title="No patients match this filter" hint="Choose another status to see the rest of the queue." />
+          <EmptyState title={tx("noPatientsMatchThisFilter")} hint={tx("chooseAnotherStatusToSee")} />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th scope="col">Patient</th><th scope="col" className={styles.hideNarrow}>Visit type</th><th scope="col">Clinical flags</th><th scope="col" className={styles.hideNarrow}>Wait · arrival</th><th scope="col">Status</th><th scope="col"><span className={p.srOnly}>Action</span></th></tr>
+                <tr><th scope="col">{tx("patient")}</th><th scope="col" className={styles.hideNarrow}>{tx("visitType")}</th><th scope="col">{tx("clinicalFlags")}</th><th scope="col" className={styles.hideNarrow}>{tx("waitArrival")}</th><th scope="col">{tx("status")}</th><th scope="col"><span className={p.srOnly}>{tx("action")}</span></th></tr>
               </thead>
               <tbody>
                 {visible.map((r) => {
@@ -74,28 +77,28 @@ export default function QueueList({ q, onOpen }: { q: ConsultQueue; onOpen: (r: 
                     <tr key={r.id} onMouseEnter={() => q.warm(r)} onFocus={() => q.warm(r)} onKeyDown={rowArrows}>
                       <td className={styles.token}>
                         #{r.tokenNumber} {r.patientName}
-                        <span className={styles.subline}>{[pt ? `${age(pt.dob)} y` : null, r.presentingComplaint?.trim() || null].filter(Boolean).join(" · ") || "No reason recorded"}</span>
+                        <span className={styles.subline}>{[pt ? tx("ageYears", { age: age(pt.dob) }) : null, r.presentingComplaint?.trim() || null].filter(Boolean).join(" · ") || tx("noReasonRecorded")}</span>
                       </td>
-                      <td className={styles.hideNarrow}>{r.appointmentId ? "Appointment" : (VISIT_LABEL[r.source ?? ""] ?? "Walk-in")}</td>
+                      <td className={styles.hideNarrow}>{r.appointmentId ? tx("appointment") : (r.source && VISIT_LABEL[r.source] ? tx(`source.${r.source}`) : tx("source.walk_in"))}</td>
                       <td>
                         <div className={styles.flags}>
-                          {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? `Urgent: ${r.priorityReason}` : "Urgent"} />}
-                          {pt && pt.allergies.length > 0 && <StatusPill tone="danger" label="Allergy" />}
-                          {pt && pt.chronicConditions.length > 0 && <StatusPill tone="warn" icon="pulse" label="Chronic" />}
-                          {pt && pt.activePackages > 0 && <StatusPill tone="info" icon="package" label="Package" />}
-                          {!pt && <StatusPill tone="warn" label="Flags unavailable" />}
+                          {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? tx("urgentReason", { reason: r.priorityReason }) : tx("urgent")} />}
+                          {pt && pt.allergies.length > 0 && <StatusPill tone="danger" label={g("allergy.label")} />}
+                          {pt && pt.chronicConditions.length > 0 && <StatusPill tone="warn" icon="pulse" label={g("condition.chronic")} />}
+                          {pt && pt.activePackages > 0 && <StatusPill tone="info" icon="package" label={tx("package")} />}
+                          {!pt && <StatusPill tone="warn" label={tx("flagsUnavailable")} />}
                         </div>
                       </td>
                       <td className={styles.hideNarrow}>
-                        {waiting && mins !== null ? `${mins} min` : "—"}{r.createdAt ? <span className={styles.subline}>Arrived {new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}
+                        {waiting && mins !== null ? tx("minutes", { mins }) : "—"}{r.createdAt ? <span className={styles.subline}>{tx("arrived")}{" "}{new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}
                       </td>
                       <td><StatusBadge status={r.status} /></td>
                       <td>
                         {r.status === "in_consult" && mine
-                          ? <button className={styles.actionBtn} onClick={() => onOpen(r)}>Resume</button>
+                          ? <button className={styles.actionBtn} onClick={() => onOpen(r)}>{tx("resume")}</button>
                           : q.canStartRow(r)
-                            ? <button className={styles.actionBtn} onClick={() => onOpen(r)}>Start consultation</button>
-                            : <button className={styles.actionBtnGhost} onClick={() => onOpen(r)}>Summary</button>}
+                            ? <button className={styles.actionBtn} onClick={() => onOpen(r)}>{tx("startConsultation")}</button>
+                            : <button className={styles.actionBtnGhost} onClick={() => onOpen(r)}>{tx("summary")}</button>}
                       </td>
                     </tr>
                   );

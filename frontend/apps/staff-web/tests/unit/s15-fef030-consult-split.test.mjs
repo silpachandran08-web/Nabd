@@ -72,10 +72,10 @@ test("close-out checks (DOC-029): diagnosis, empty note, unsigned prescription, 
   const blank = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
   const drug = [{ drugName: "Paracetamol", dosage: "", frequency: "", duration: "", instructions: "" }];
   let v = closeView({ note: blank, noteStatus: "draft", rxItems: [], rxStatus: "draft", entryStatus: "in_consult" });
-  assert.deepEqual(v.issues, ["No diagnosis is entered.", "The note is empty."]);
+  assert.deepEqual(v.issues, ["noDiagnosis", "noteEmpty"]);
   assert.ok(!v.hasDrugs && !v.handoffPending && !v.closedOut);
   v = closeView({ note: { ...blank, diagnosis: "Flu", plan: "rest" }, noteStatus: "draft", rxItems: drug, rxStatus: "draft", entryStatus: "in_consult" });
-  assert.deepEqual(v.issues, ["The prescription is not signed, so the patient would leave without it."]);
+  assert.deepEqual(v.issues, ["rxUnsigned"]);
   v = closeView({ note: blank, noteStatus: "signed", rxItems: drug, rxStatus: "signed", entryStatus: "in_consult" });
   assert.deepEqual(v.issues, []);
   assert.ok(v.handoffPending && !v.closedOut);

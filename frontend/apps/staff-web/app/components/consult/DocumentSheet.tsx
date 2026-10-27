@@ -1,4 +1,6 @@
-import { DOC_FIELDS, DOC_LABEL, obj, registrationNumber, str, type DocBody, type DocType } from "./documents";
+import { useTranslations } from "next-intl";
+import { useDocText } from "./docText";
+import { DOC_FIELDS, obj, registrationNumber, str, type DocBody, type DocType } from "./documents";
 import s from "./documentSheet.module.css";
 import { formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
@@ -14,6 +16,8 @@ const fmtDate = (ymdOrIso: string, tz?: string | null) => (ymdOrIso ? formatClin
 export default function DocumentSheet({
   type, body, header, issuedAt, fallback,
 }: { type: DocType; body: DocBody; header: Record<string, unknown> | null; issuedAt?: string | null; fallback?: SheetFallback }) {
+  const t = useTranslations("consult.documentSheet");
+  const dt = useDocText();
   const issued = header !== null;
   const clinic = obj(header, "clinic");
   const patient = obj(header, "patient");
@@ -33,28 +37,28 @@ export default function DocumentSheet({
   const filled = DOC_FIELDS[type].filter((f) => (body[f.key] ?? "").trim());
 
   return (
-    <article className={s.sheet} aria-label={`${DOC_LABEL[type]}${issued ? "" : " preview"}`}>
+    <article className={s.sheet} aria-label={issued ? dt.label(type) : t("previewNotIssued")}>
       <header className={s.letterhead}>
         <div>
           {clinicName && <p className={s.clinic}>{clinicName}</p>}
-          <h2 className={s.docTitle}>{DOC_LABEL[type]}</h2>
+          <h2 className={s.docTitle}>{dt.label(type)}</h2>
         </div>
-        {!issued && <span className={s.marker}>Preview — not issued</span>}
+        {!issued && <span className={s.marker}>{t("previewNotIssued")}</span>}
       </header>
       <dl className={s.facts}>
-        <div><dt>Patient</dt><dd>{patientName || "—"}</dd></div>
-        {mrn && <div><dt>MRN</dt><dd>{mrn}</dd></div>}
-        {dob && <div><dt>Date of birth</dt><dd>{fmtDate(dob)}</dd></div>}
-        {gender && <div><dt>Gender</dt><dd>{gender}</dd></div>}
-        {dateText && <div><dt>Date</dt><dd>{dateText}</dd></div>}
+        <div><dt>{t("patient")}</dt><dd>{patientName || "—"}</dd></div>
+        {mrn && <div><dt>{t("mrn")}</dt><dd>{mrn}</dd></div>}
+        {dob && <div><dt>{t("dateOfBirth")}</dt><dd>{fmtDate(dob)}</dd></div>}
+        {gender && <div><dt>{t("gender")}</dt><dd>{gender}</dd></div>}
+        {dateText && <div><dt>{t("date")}</dt><dd>{dateText}</dd></div>}
       </dl>
       {filled.length === 0 ? (
-        <p className={s.empty}>Nothing entered yet.</p>
+        <p className={s.empty}>{t("nothingEnteredYet")}</p>
       ) : (
         <dl className={s.fields}>
           {filled.map((f) => (
             <div key={f.key}>
-              <dt>{f.label}</dt>
+              <dt>{dt.field(f.key)}</dt>
               <dd>{f.kind === "date" ? fmtDate(body[f.key]) : body[f.key]}</dd>
             </div>
           ))}
@@ -62,7 +66,7 @@ export default function DocumentSheet({
       )}
       <footer className={s.signoff}>
         {doctorName && <span className={s.signName}>{doctorName}</span>}
-        {reg && <span className={s.small}>Registration no. {reg}</span>}
+        {reg && <span className={s.small}>{t("registrationNo", { reg })}</span>}
         {issued && clinicName && <span className={s.small}>{clinicName}</span>}
       </footer>
     </article>

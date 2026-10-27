@@ -13,6 +13,8 @@ import { api, ApiError, reasonText } from "../../lib/api";
 import { DpaReacceptBanner } from "../../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
 import EtaAccuracyTile from "./EtaAccuracyTile";
+import AllFacilities from "../../components/facilities/AllFacilities";
+import { useFacilityScope } from "../../shell/facilityScope";
 
 
 // Matches GET /v1/reports/overview (ReportsController.overview → OverviewResponse).
@@ -77,7 +79,7 @@ function signedInLabel(signedInAt: string, now: number): string {
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
-export default function OverviewPage() {
+function OverviewInner() {
   const [data, setData] = useState<Overview | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[] | null>(null);
@@ -355,4 +357,9 @@ export default function OverviewPage() {
       </div>
     </main>
   );
+}
+
+// FEF-058: a chain owner can pick "All facilities" in the switcher: a read-only aggregate screen instead of this facility's overview.
+export default function OverviewPage() {
+  return useFacilityScope() === "all" ? <AllFacilities /> : <OverviewInner />;
 }

@@ -109,6 +109,11 @@ Do these in order; each is one line of work.
 - Staff pages moved into the `(clinic)` route group; no URL changes.
 - Five browser scripts still need their own builds (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`); the patient-links script needs a patient-web build.
 
+## After upgrading to Sprint 16 (S7) code
+
+- `s16-fef-039-consult-i18n` (consult in the pseudo-locale) needs a build started with `NABD_PSEUDO=1`.
+- Clinical glossary changes (`packages/i18n/glossary`) need review by the `@nabd/clinical-owners` GitHub team; create that team and turn on code-owner reviews in the repository settings.
+
 ## Errors seen and what they mean
 
 | Error | Cause | Fix |

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { VISIT_LABEL } from "@nabd/domain";
 import StatusPill from "../../ui/StatusPill";
 import StatusBadge from "../queue/StatusBadge";
@@ -8,18 +9,20 @@ import styles from "../consult.module.css";
 
 // FEF-030: "Today's patients": switch to another visit (the workspace saves the open note first).
 export default function TodayAside({ rows, activeId, onSwitch }: { rows: Row[]; activeId: string; onSwitch: (r: Row) => void }) {
+  const t = useTranslations("consult.todayAside");
+  const g = useTranslations("glossary");
   return (
-    <aside className={styles.today} aria-label="Today's patients">
-      <h2 className={styles.todayTitle}>Today&apos;s patients</h2>
+    <aside className={styles.today} aria-label={t("todaySPatients")}>
+      <h2 className={styles.todayTitle}>{t("todaySPatients")}</h2>
       <ul className={styles.todayList}>
         {rows.map((r) => (
           <li key={r.id}>
             <button type="button" className={`${styles.todayBtn} ${r.id === activeId ? styles.todayBtnOn : ""}`} aria-current={r.id === activeId ? "true" : undefined} onClick={() => onSwitch(r)}>
               <span><strong>#{r.tokenNumber}</strong> {r.patientName}</span>
-              <span className={styles.todayMeta}>{r.appointmentId ? "Appointment" : (VISIT_LABEL[r.source ?? ""] ?? "Walk-in")}</span>
+              <span className={styles.todayMeta}>{r.appointmentId ? t("appointment") : (r.source && VISIT_LABEL[r.source] ? t(`source.${r.source}`) : t("source.walk_in"))}</span>
               <span className={styles.flags}>
-                {(r.patient?.allergies.length ?? 0) > 0 && <StatusPill tone="danger" label="Allergy" />}
-                {r.priority && <StatusPill tone="urgent" label="Urgent" />}
+                {(r.patient?.allergies.length ?? 0) > 0 && <StatusPill tone="danger" label={g("allergy.label")} />}
+                {r.priority && <StatusPill tone="urgent" label={t("urgent")} />}
                 <StatusBadge status={r.status} />
               </span>
             </button>

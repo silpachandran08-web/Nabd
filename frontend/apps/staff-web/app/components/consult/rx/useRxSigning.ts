@@ -1,11 +1,13 @@
 "use client";
 
 // FEF-030: signing a prescription and recording a warning decision (override), moved out of consult/page.tsx.
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import type { AuthedFetch, Prescription, Problem, RxWarning } from "../shared";
 import type { RxPad } from "./useRxPad";
 
 export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxPad, reloadCtx: () => void, setNotice: (n: string | null) => void) {
+  const t = useTranslations("consult.useRxSigning");
   const [showSignConfirm, setShowSignConfirm] = useState(false);
   const [signAck, setSignAck] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -17,7 +19,7 @@ export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxP
   // the doctor to confirm what is being signed. A save that the server rejects stays on the pad.
   async function reviewAndSign() {
     if (!pad.rxItems.some((i) => i.drugName.trim() !== "")) {
-      pad.setRxError("Add at least one drug before signing.");
+      pad.setRxError(t("addDrug"));
       return;
     }
     const saved = await pad.saveRx();
@@ -37,8 +39,8 @@ export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxP
       const res = await authedFetch(`/clinical/prescriptions/${entryId}/sign`, { method: "POST" });
       if (!res) return;
       if (!res.ok) {
-        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't sign the prescription." }));
-        setSignError(pr.detail || "Couldn't sign the prescription.");
+        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: t("signFailed") }));
+        setSignError(pr.detail || t("signFailed"));
         // The server re-checks safety at signing (e.g. an allergy recorded since the last save): show its current view.
         const fresh = await authedFetch(`/clinical/prescriptions/${entryId}`);
         if (fresh?.ok) pad.applySaved(await fresh.json() as Prescription);
@@ -46,10 +48,10 @@ export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxP
       }
       pad.setRxStatus("signed");
       setShowSignConfirm(false);
-      setNotice("Prescription signed.");
+      setNotice(t("signed"));
       reloadCtx();
     } catch {
-      setSignError("Couldn't reach the server. The prescription was not signed; try again.");
+      setSignError(t("unreachable"));
     } finally {
       setSigning(false);
     }
@@ -59,9 +61,9 @@ export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxP
     if (!override) return;
     setOverrideError(null);
     const saved = await pad.saveRx({ index: override.index, kind: override.warning.kind, reasonCode, note });
-    if (!saved) { setOverrideError("The decision was not recorded. Nothing was changed; try again."); return; }
+    if (!saved) { setOverrideError(t("decisionFailed")); return; }
     setOverride(null);
-    setNotice("Decision recorded and audited.");
+    setNotice(t("decisionRecorded"));
   }
 
   function askOverride(index: number, warning: RxWarning) { setOverrideError(null); setOverride({ index, warning }); }

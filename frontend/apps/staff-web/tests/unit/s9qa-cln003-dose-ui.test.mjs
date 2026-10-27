@@ -31,7 +31,8 @@ test("component: 422 adult-patient hides the whole helper", () => {
 
 test("component: server weightStale wins over the client month guess, amber warn notice with 're-weigh' wording and the recorded date", () => {
   assert.match(src, /result\.weightStale \?\? age\?\.state === "stale"/);
-  assert.match(src, /noticeWarn[^]*Re-weigh/);
+  assert.match(src, /noticeWarn[^]*tx\("reWeigh"\)/); // FEF-039: the wording moved to the consult catalogue
+  assert.equal(JSON.parse(readFileSync(new URL("../../../../packages/i18n/messages/en/consult.json", import.meta.url), "utf8")).doseCalculator.reWeigh, "Re-weigh.");
   assert.match(src, /fmtDate\(age\.date\)/);
 });
 

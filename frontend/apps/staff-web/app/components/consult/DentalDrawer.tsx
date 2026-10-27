@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { can } from "../../lib/permissions";
@@ -18,6 +19,7 @@ const TONE: Record<string, PillTone> = { healthy: "ok", decayed: "danger", fille
 
 /** Dental chart in a drawer, opened from the Examine step with the active patient's context (DOC-051). */
 export default function DentalDrawer({ authedFetch, patientId, patientName, onClose }: { authedFetch: AuthedFetch; patientId: string; patientName: string; onClose: () => void }) {
+  const tx = useTranslations("consult.dentalDrawer");
   const [chart, setChart] = useState<Tooth[] | null>(null);
   const [error, setError] = useState(false);
   const [tick, setTick] = useState(0);
@@ -50,24 +52,24 @@ export default function DentalDrawer({ authedFetch, patientId, patientName, onCl
       const res = await authedFetch(`/specialty/dental/patients/${patientId}/chart/${n}`, { method: "PATCH", body: JSON.stringify({ status }) });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update the tooth." }));
-        setSaveError(p.detail || "Couldn't update the tooth.");
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: tx("couldnTUpdateTheTooth") }));
+        setSaveError(p.detail || tx("couldnTUpdateTheTooth"));
         return;
       }
       const updated: Tooth = await res.json();
       setChart((prev) => [...(prev ?? []).filter((t) => !(t.toothNumber === n && !t.isSupernumerary)), updated]);
     } catch {
-      setSaveError("Couldn't reach the server. Check your connection and try again.");
+      setSaveError(tx("couldnTReachTheServer"));
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <Dialog title={`Tooth chart · ${patientName}`} onClose={onClose} size="drawer">
-      {error ? <ErrorState message="Couldn't load the dental chart." onRetry={() => setTick((t) => t + 1)} /> : chart === null ? <Skeleton rows={4} label="Loading dental chart" /> : (
+    <Dialog title={tx("chartTitle", { patientName })} onClose={onClose} size="drawer">
+      {error ? <ErrorState message={tx("couldnTLoadTheDental")} onRetry={() => setTick((t) => t + 1)} /> : chart === null ? <Skeleton rows={4} label={tx("loadingDentalChart")} /> : (
         <div className={s.stack}>
-          {!canEdit && <p className={s.muted}>The chart is read-only for your role.</p>}
+          {!canEdit && <p className={s.muted}>{tx("theChartIsReadOnly")}</p>}
           {saveError && <div className={`${s.notice} ${s.noticeDanger}`} role="alert">{saveError}</div>}
           <div className={s.teeth}>
             {FDI_TEETH.map((n) => {
@@ -77,7 +79,7 @@ export default function DentalDrawer({ authedFetch, patientId, patientName, onCl
                 <div key={n} className={s.tooth}>
                   <strong>{n}</strong>
                   <StatusPill tone={TONE[status] ?? "neutral"} label={status.replace(/_/g, " ")} />
-                  {canEdit && <select aria-label={`Tooth ${n} status`} value={status} disabled={busy === n} onChange={(e) => setStatus(n, e.target.value)}>
+                  {canEdit && <select aria-label={tx("toothStatus", { n })} value={status} disabled={busy === n} onChange={(e) => setStatus(n, e.target.value)}>
                     {STATUSES.map((st) => <option key={st} value={st}>{st.replace(/_/g, " ")}</option>)}
                   </select>}
                 </div>
@@ -85,9 +87,9 @@ export default function DentalDrawer({ authedFetch, patientId, patientName, onCl
             })}
           </div>
           {chart.some((t) => t.isSupernumerary) && (
-            <p className={s.muted}>Supernumerary teeth recorded: {chart.filter((t) => t.isSupernumerary).length}. Manage them from the patient record.</p>
+            <p className={s.muted}>{tx("supernumeraryTeethRecorded")}{" "}{chart.filter((t) => t.isSupernumerary).length}{tx("manageThemFromThePatient")}</p>
           )}
-          <Link href="/patients" className={s.linkBtn}>Open full patient record (history, supernumerary teeth)</Link>
+          <Link href="/patients" className={s.linkBtn}>{tx("openFullPatientRecordHistory")}</Link>
         </div>
       )}
     </Dialog>

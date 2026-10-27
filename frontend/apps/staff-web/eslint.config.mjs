@@ -15,7 +15,7 @@ const MONEY_RULES = [
 ];
 
 // FEF-038: Login, MFA, accept-invite and Arrivals are fully extracted (ADR-11 order: Login -> Arrivals -> Consult -> Checkout).
-const MIGRATED = ["app/(auth)/login/**/*.tsx", "app/(auth)/accept-invite/**/*.tsx", "app/(clinic)/arrivals/**/*.tsx", "app/components/arrivals/**/*.tsx", "app/components/MfaEnrolCard.tsx"];
+const MIGRATED = ["app/(auth)/login/**/*.tsx", "app/(auth)/accept-invite/**/*.tsx", "app/(clinic)/arrivals/**/*.tsx", "app/components/arrivals/**/*.tsx", "app/components/MfaEnrolCard.tsx", "app/(clinic)/consult/**/*.tsx", "app/components/consult/**/*.tsx"];
 const TEXT_TEMPLATE_RULES = [
   { selector: "JSXElement > JSXExpressionContainer > :matches(TemplateLiteral, ConditionalExpression > TemplateLiteral, LogicalExpression > TemplateLiteral)", message: "A template literal builds user-facing text. Use a next-intl ICU message with placeholders." },
   { selector: "JSXAttribute[name.name=/^(aria-label|aria-description|title|placeholder|alt|label|message|hint)$/] > JSXExpressionContainer > TemplateLiteral", message: "A template literal builds user-facing text. Use a next-intl ICU message with placeholders." },

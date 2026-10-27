@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import p from "./consultParts.module.css";
 import s from "./noteTemplates.module.css";
@@ -27,6 +28,8 @@ export function parseDiagnosis(value: string): { code: string; description: stri
 export default function DiagnosisField({ value, onChange, disabled, inputClassName }: {
   value: string; onChange: (v: string) => void; disabled: boolean; inputClassName: string;
 }) {
+  const t = useTranslations("consult.diagnosisField");
+  const g = useTranslations("glossary");
   const parsed = parseDiagnosis(value);
   // Text the doctor typed in the code box that is not (yet) a valid code shape; it is kept visible, not stored.
   const [badCode, setBadCode] = useState<string | null>(null);
@@ -49,24 +52,24 @@ export default function DiagnosisField({ value, onChange, disabled, inputClassNa
       <div className={s.dx}>
         <div className={s.dxCode}>
           <label className={s.fieldLabel} htmlFor="diagnosis-code">
-            ICD-10 code (optional)
+            {t("icd10CodeOptional")}
             <input id="diagnosis-code" className={inputClassName} value={codeShown} disabled={disabled} maxLength={8} autoComplete="off"
               aria-invalid={badCode !== null} aria-describedby="diagnosis-help" onFocus={() => setCodeFocused(true)} onBlur={() => setCodeFocused(false)} onChange={(e) => onCode(e.target.value)} />
           </label>
         </div>
         <div>
           <label className={s.fieldLabel} htmlFor="diagnosis">
-            Diagnosis
+            {g("diagnosis.label")}
             <input id="diagnosis" className={inputClassName} value={parsed.description} disabled={disabled}
               onChange={(e) => onChange(composeDiagnosis(parsed.code, e.target.value))} />
           </label>
         </div>
       </div>
       {badCode !== null && !codeFocused && (
-        <p className={s.dxError} role="alert">&ldquo;{badCode.trim()}&rdquo; is not shaped like an ICD-10 code (for example one letter, two characters, then an optional .1 to .4). It is not saved with the diagnosis.</p>
+        <p className={s.dxError} role="alert">&ldquo;{badCode.trim()}{t("isNotShapedLikeAn")}</p>
       )}
       <p id="diagnosis-help" className={`${p.muted} ${s.dxHelp}`}>
-        No ICD-10 code list is loaded in this app. A code is recorded only if you type or paste it, exactly as entered, and it is not checked against any list.
+        {t("noIcd10CodeList")}
       </p>
     </div>
   );
