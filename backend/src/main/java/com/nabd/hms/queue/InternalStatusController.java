@@ -69,12 +69,12 @@ class InternalStatusController {
             for (PatientRefs.HouseholdMember m : refs.household(phoneHash)) {
                 UUID patientId = refs.patientIdFor(m.patientRef()).orElse(null);
                 if (patientId == null) continue;
-                for (var a : appointments.listPage(tid, null, patientId, today, zone, 20, null, null)) {
+                for (var a : appointments.listPage(tid, null, patientId, clock.dayStart(tid, today), clock.dayStart(tid, today.plusDays(1)), 20, null, null)) {
                     if (!List.of("scheduled", "arrived").contains(a.status())) continue;
                     var r = eta.day(a.doctorId(), today).results().stream().filter(x -> a.id().equals(x.appointmentId())).findFirst().orElse(null);
                     var mode = displayModes.resolve(a.doctorId()).mode();
                     var view = PatientEtaView.shape(mode, new PatientEtaView.Input(r == null ? null : r.p50At(), r == null ? null : r.p80At(),
-                            r == null ? null : r.position(), etaRepo.activeDelayMinutes(tid, a.doctorId(), today)), zone);
+                            r == null ? null : r.position(), etaRepo.activeDelayMinutes(tid, a.doctorId(), today, clock.now())), zone);
                     out.add(new Item(a.id(), m.patientRef(), a.status(), view.mode(), view.text(), view.leaveHomeAlert(), r != null && view.leaveHomeAlert() ? r.p50At() : null)); // delay-only / hidden: no time leaves Core
                 }
             }

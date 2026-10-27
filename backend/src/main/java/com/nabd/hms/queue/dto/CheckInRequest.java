@@ -15,4 +15,9 @@ public record CheckInRequest(UUID appointmentId, @NotNull UUID patientId, @NotNu
                               String presentingComplaint,
                               @Pattern(regexp = "cash|card|upi|other") String paymentMode,
                               UUID actedByPatientId, @Pattern(regexp = "^[a-z_]{2,20}$") String actedByRelation) {
+
+    /** Callers that act for themselves: no acting-for fields. */
+    public CheckInRequest(UUID appointmentId, UUID patientId, UUID doctorId, String source, String presentingComplaint, String paymentMode) {
+        this(appointmentId, patientId, doctorId, source, presentingComplaint, paymentMode, null, null);
+    }
 }

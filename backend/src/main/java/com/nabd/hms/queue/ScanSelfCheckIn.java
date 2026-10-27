@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,14 +40,13 @@ class ScanSelfCheckIn implements SelfCheckIn {
         if (queueRepo.findCheckInDepartment(tid, doctorId).isEmpty()) {
             return Optional.of(Refusal.NO_DOCTOR);
         }
-        ZoneId zone = clock.zone(tid);
         LocalDate today = clock.today(tid);
-        var block = scheduleRepo.findBlockCovering(doctorId, today.getDayOfWeek().getValue() % 7, clock.now().atZone(zone).toLocalTime());
+        var block = scheduleRepo.blockAt(tid, doctorId, clock.now());
         if (block.isEmpty()) {
             return Optional.of(Refusal.CLOSED);
         }
         Integer cap = block.get().maxPatients();
-        if (cap != null && scheduleRepo.countSessionOccupancy(tid, doctorId, today, block.get().startTime(), block.get().endTime(), zone) >= cap) {
+        if (cap != null && scheduleRepo.countSessionOccupancy(tid, doctorId, today, block.get()) >= cap) {
             return Optional.of(Refusal.FULL);
         }
         return Optional.empty();
