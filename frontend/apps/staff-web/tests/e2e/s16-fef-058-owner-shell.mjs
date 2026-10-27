@@ -7,7 +7,10 @@ const MODULES = ['queue_eta', 'whatsapp_booking', 'emr_erx', 'billing', 'pharmac
 const ent = (codes) => ({ body: { modules: MODULES.map((code) => ({ code, enabled: codes.includes(code) })), killedFeatures: [], seatLimit: null } });
 const OWNER = ['reports:view', 'queue:view', 'billing:view', 'packages:view', 'staff:view', 'setup:view', 'compliance:view'];
 const q = (status, id) => ({ id, doctorId: null, status, tokenNumber: 1, patientId: 'p1', priority: false });
+const OVERVIEW = { date: '2026-10-19', visits: { total: 0, completed: 0, inFlow: 0 }, collections: { collected: 0, invoices: 0, pendingInvoices: 0 }, checkout: { pending: 0, outstanding: 0 },
+  packages: { soldToday: 0, sessionsOwed: 0 }, paymentSplit: [], dayClose: { unbilledConsultations: 0, pendingCheckouts: 0, closed: false }, activeStaff: [], staff: { active: 1, suspended: 0, invited: 0, roles: 1 } };
 const base = (codes, queue = []) => [
+  ['GET', /^\/reports\/overview/, { body: OVERVIEW }],
   ['GET', /^\/me\/entitlements/, ent(codes)],
   ['GET', /^\/queue/, { body: queue }],
   ['GET', /^\/setup\/subscription/, { body: { plan: 'Growth', status: 'active', branchesUsed: 3, branchesLimit: 5 } }],
@@ -15,7 +18,8 @@ const base = (codes, queue = []) => [
 ];
 const calm = (s) => !s.log.pageErrors.length && !s.log.console.filter((x) => !/Failed to load resource|preload/.test(x)).length;
 const side = (p) => p.locator('nav[aria-label="Main"]').first();
-const hrefsOf = (p) => side(p).locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+const navLinks = (p) => side(p).locator('a:not([class*=planChip])'); // the plan chip is a link too, but not a nav area
+const hrefsOf = (p) => navLinks(p).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
 async function open(perms, handlers, path, viewport) {
   const s = await launch(viewport ? { viewport } : {});
   await seedClinic(s.page, perms, { owner: true });
@@ -69,8 +73,8 @@ const EXPECT = ['/overview', '/schedule', '/workflows', '/integrations', '/setup
 
 // 4. empty state: Plan with no entitlements loaded is calm
 {
-  const s = await open(OWNER, [['GET', /^\/me\/entitlements/, { status: 500, body: { title: 'x' } }], ['GET', /./, { body: [] }]], '/plan');
-  check('4a Plan with entitlements unavailable explains it, no crash', (await s.page.getByText('Plan details are not available right now.').count()) === 1);
+  const s = await open(OWNER, [['GET', /^\/me\/entitlements/, { status: 500, body: { title: 'x' } }], ['GET', /^\/setup\/subscription/, { body: { plan: 'Growth', status: 'active', branchesUsed: 3, branchesLimit: 5 } }], ['GET', /./, { body: [] }]], '/plan');
+  check('4a Plan with entitlements unavailable explains it, no crash', (await s.page.getByText('Plan details are not available right now.').count()) === 1, (await s.page.locator('main').first().innerText()).slice(0, 200));
   await s.browser.close();
 }
 
@@ -78,7 +82,7 @@ const EXPECT = ['/overview', '/schedule', '/workflows', '/integrations', '/setup
 {
   const t = await open(OWNER, base(MODULES), '/overview', { width: 900, height: 800 });
   const w = await side(t.page).evaluate((n) => n.getBoundingClientRect().width);
-  check('5a tablet: icon rail (<= 96px) with sixteen icons', w <= 96 && (await side(t.page).locator('a').count()) === 16, `${w}px`);
+  check('5a tablet: icon rail (<= 96px) with sixteen icons', w <= 96 && (await navLinks(t.page).count()) === 16, `${w}px`);
   check('5b tablet: section headings collapse to dividers (no readable text)', (await side(t.page).locator('[class*=sectionLabel]').evaluateAll((els) => els.every((e) => e.getBoundingClientRect().height <= 2))));
   await t.browser.close();
   for (const width of [375, 390]) {
@@ -113,7 +117,7 @@ const EXPECT = ['/overview', '/schedule', '/workflows', '/integrations', '/setup
     const items = await s.page.getByRole('menuitem').allTextContents();
     check('6b chain owner: All facilities plus each of the three facilities', (await all.count()) === 1 && items.some((t) => /North/.test(t)) && items.some((t) => /South/.test(t)) && items.some((t) => /Current/.test(t)), items.join('|'));
     await all.click();
-    await s.page.getByRole('heading', { name: 'All facilities' }).waitFor({ timeout: 5000 });
+    await s.page.getByRole('heading', { name: 'All facilities' }).waitFor({ timeout: 5000 }).catch(async () => { console.log('  [6c] page text:', (await s.page.locator('body').innerText()).slice(0, 400)); });
     check('6c Overview becomes the read-only aggregate: note, facility list, no write control', (await s.page.getByText(/Read-only view across your facilities/).count()) === 1 && (await s.page.getByRole('list', { name: 'Facilities' }).getByRole('listitem').count()) === 3 && (await s.page.locator('main button').count()) === 1);
     check('6d switcher button says All facilities', /All facilities/.test((await s.page.locator('nav [aria-label^="Clinic:"]').first().getAttribute('aria-label')) ?? ''));
     await s.page.reload({ waitUntil: 'networkidle' });

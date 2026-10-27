@@ -225,6 +225,7 @@
 .sectionLabel { margin: var(--nb-space-12) 0 0; padding-inline: var(--nb-space-12); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--nb-text-tertiary, var(--nb-text-secondary)); }
 .sectionLabel:first-child { margin-block-start: 0; }
 .navRail .sectionLabel { font-size: 0; block-size: 1px; margin: var(--nb-space-8) var(--nb-space-8) 0; padding: 0; background: var(--nb-border-default); }
+@media (max-width: 1024px) { .sectionLabel { font-size: 0; block-size: 1px; margin: var(--nb-space-8) var(--nb-space-8) 0; padding: 0; background: var(--nb-border-default); } } /* tablet rail: headings become dividers */
 
 .link {
   display: flex;
