@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.pharmacy.dto.BatchDtos;
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.pharmacy.dto.PharmacyCapabilitiesResponse;
@@ -34,9 +35,11 @@ import java.util.UUID;
 public class PharmacyController {
 
     private final PharmacyService service;
+    private final BatchService batchService;
 
-    PharmacyController(PharmacyService service) {
+    PharmacyController(PharmacyService service, BatchService batchService) {
         this.service = service;
+        this.batchService = batchService;
     }
 
     @GetMapping("/settings")
@@ -149,6 +152,51 @@ public class PharmacyController {
     @PreAuthorize("hasAuthority('pharmacy:view')")
     public List<PharmacyScheduleClassResponse> scheduleClasses() {
         return service.scheduleClasses();
+    }
+
+    /** PHL-005: batches of one item in FEFO order (Hybrid keeps one implicit batch and gets it without batch fields). */
+    @GetMapping("/items/{id}/batches")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public List<BatchDtos.BatchResponse> batches(@PathVariable UUID id,
+                                                 @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean includeEmpty) {
+        return batchService.list(id, includeEmpty);
+    }
+
+    /** PHL-005: stock list (on-hand, nearest expiry, value), keyset pagination. */
+    @GetMapping("/stock")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public BatchDtos.StockPageResponse stock(@org.springframework.web.bind.annotation.RequestParam(required = false) String q,
+                                             @org.springframework.web.bind.annotation.RequestParam(name = "class", required = false) String scheduleClass,
+                                             @org.springframework.web.bind.annotation.RequestParam(required = false) @jakarta.validation.constraints.Min(0) Integer expiringWithinDays,
+                                             @org.springframework.web.bind.annotation.RequestParam(required = false) String cursor,
+                                             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") int limit) {
+        return batchService.stock(q, scheduleClass, expiringWithinDays, cursor, limit);
+    }
+
+    @GetMapping("/batches/{id}/movements")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public List<BatchDtos.BatchMovementResponse> batchMovements(@PathVariable UUID id) {
+        return batchService.movements(id);
+    }
+
+    /** PHL-005: correct batch number / expiry / location (never quantity). */
+    @PatchMapping("/batches/{id}")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID) // BatchService refuses it in Hybrid once the batch is known (an unknown id stays 404)
+    @PreAuthorize("hasAuthority('pharmacy:edit')")
+    public BatchDtos.BatchResponse patchBatch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                              @Valid @RequestBody BatchDtos.BatchPatchRequest req, HttpServletRequest http) {
+        return batchService.patch(staffId(jwt), RequestMeta.clientIp(http), id, req);
+    }
+
+    /** PHL-006: FEFO pick preview, no stock change. Authority is pharmacy:view: the permission catalogue has no dispense action. */
+    @PostMapping("/picks")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public BatchDtos.PickResponse picks(@Valid @RequestBody BatchDtos.PickRequest req) {
+        return batchService.pick(req);
     }
 
     private UUID tenantId(Jwt jwt) {

@@ -40,7 +40,8 @@ public enum DomainEventType {
     SENDER_THROTTLED("comms.sender.throttled.v1", "core/messaging"),
     ATTACHMENT_SCANNED("shared.attachment.scanned.v1", "core/shared"),
     CALENDAR_CHANGED("organization.calendar.changed.v1", "core/organization"),
-    PATIENT_LINK_OPENED("patient.link.opened.v1", "core/patient");
+    PATIENT_LINK_OPENED("patient.link.opened.v1", "core/patient"),
+    PHARMACY_STOCK_BATCH_CHANGED("pharmacy.stock.batch_changed.v1", "core/pharmacy");
 
     private final String type;
     private final String source;
