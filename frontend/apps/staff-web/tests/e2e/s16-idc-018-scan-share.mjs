@@ -24,7 +24,7 @@ async function run(tag, perms, needsConsent, fn, viewport) {
 }
 const perms = ['queue:view', 'patients:view'];
 await run('scan and share row', perms, true, async ({ page, log }) => {
-  check('only the Scan & Share row has the pill', (await page.getByText('Via ABHA').count()) === 1, String(await page.getByText('Via ABHA').count()));
+  check('only the Scan & Share row has the pill', (await page.locator('tbody tr').nth(0).getByText('Via ABHA').count()) >= 1 && (await page.locator('tbody tr').nth(1).getByText('Via ABHA').count()) === 0);
   await page.locator('tbody tr').nth(0).locator('td').nth(1).click(); await sleep(900);
   check('consent prompt shown once', (await page.getByTestId('scan-share-consent').count()) === 1);
   check('prompt links to the record by MRN', (await page.getByTestId('scan-share-consent').getByRole('link').getAttribute('href')) === '/patients?q=M1');

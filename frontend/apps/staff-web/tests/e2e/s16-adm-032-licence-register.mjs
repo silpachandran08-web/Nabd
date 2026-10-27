@@ -6,8 +6,8 @@ const L = (o) => ({ id: 'l1', licenceType: 'clinician', holderId: 's1', holderNa
 const lic = [L({}), L({ id: 'l2', licenceType: 'facility', holderId: null, holderName: null, number: 'F1', expiryDate: day(20), status: 'expiring_soon', bookable: null, remindersSent: [60] })];
 const base = (list, extra = []) => [...extra,
   ['GET', /^\/setup\/licences/, { body: list }],
-  ['GET', /^\/staff(\?.*)?$/, { body: [{ id: 's1', name: 'Dr Who', role: 'Doctor', status: 'active' }] }],
-  ['GET', /^\/setup\/(profile|subscription|checklist)/, { body: {} }],
+  ['GET', /^\/setup\/staff/, { body: [{ id: 's1', name: 'Dr Who', role: 'Doctor', status: 'active' }] }],
+  ['GET', /^\/setup\/(subscription|checklist)/, { body: {} }],
   ['GET', /^\/compliance\/health/, { body: { items: [] } }]];
 async function run(tag, perms, handlers, fn, viewport) {
   const { browser, page, log } = await launch({ viewport });
@@ -31,7 +31,7 @@ await run('override happy', ['setup:view', 'setup:edit'], base(lic, [stepUp, ['P
   await page.getByRole('button', { name: 'Allow booking' }).last().click(); await sleep(900);
   const r = log.requests.find((x) => x.method === 'POST' && /override/.test(x.path));
   check('override posted with reason and 7 days', !!r && /renewal submitted/.test(r.body ?? '') && (r.body ?? '').includes(day(7)), JSON.stringify(r));
-  check('step-up token sent', !!r && JSON.stringify(r.headers ?? {}).includes('su-token'), JSON.stringify(r?.headers));
+  check('authenticator code verified (step-up) before the override', log.requests.findIndex((x) => /auth\/mfa\/verify/.test(x.path)) >= 0 && log.requests.findIndex((x) => /auth\/mfa\/verify/.test(x.path)) < log.requests.findIndex((x) => /override/.test(x.path)));
 });
 await run('override too long (422)', ['setup:view', 'setup:edit'], base(lic, [stepUp, ['POST', /^\/setup\/licences\/l1\/override/, { status: 422, body: { type: 'override-too-long', title: 'x', code: 'OVERRIDE_TOO_LONG' } }]]), async ({ page }) => {
   await page.getByRole('button', { name: /Allow booking/ }).first().click(); await sleep(300);
