@@ -174,6 +174,22 @@ schemas:
       owner_staff_id: operational
       reason: operational
       created_at: operational
+    stock_batches:
+      id: operational
+      tenant_id: operational
+      item_id: operational
+      batch_no: operational
+      expiry_date: operational
+      mrp: financial
+      purchase_rate: financial
+      qty_on_hand: operational
+      location: operational
+      status: operational
+      supplier_id: operational
+      grn_line_id: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
     visit_attachments:
       id: operational
       tenant_id: operational
@@ -1112,6 +1128,10 @@ schemas:
       pharmacist_in_charge_staff_id: operational
       alert_recipient_staff_id: operational
     pharmacy_stock_movements:
+      batch_id: operational
+      source_type: operational
+      source_id: operational
+      fefo_override_reason: operational
       id: operational
       seq: operational
       tenant_id: operational

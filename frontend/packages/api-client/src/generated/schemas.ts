@@ -201,6 +201,11 @@ export const PrescriptionItemRequestSchema = z.object({ brandName: z.string().mi
 export const FavouriteRxSetRequestSchema = z.object({ items: z.array(PrescriptionItemRequestSchema), name: z.string().min(0).max(120), scope: z.string().optional() });
 export const FavouriteRxSetResponseSchema = z.object({ canEdit: z.boolean().optional(), createdAt: z.string().optional(), doctorId: z.string().optional(), id: z.string().optional(), items: z.array(FavouriteRxSetItemResponseSchema).optional(), lastUsedAt: z.string().optional(), name: z.string().optional(), ownerName: z.string().optional(), scope: z.string().optional(), shared: z.boolean().optional(), staleCheckAvailable: z.boolean().optional(), staleItemCount: z.number().int().optional(), updatedAt: z.string().optional() });
 export const FavouriteRxSetUpdateRequestSchema = z.object({ items: z.array(PrescriptionItemRequestSchema).optional(), name: z.string().min(1).max(120).optional(), scope: z.string().optional() });
+export const FefoPickEntrySchema = z.object({ batchId: z.string().optional(), expiryDate: z.string().optional(), qty: z.number().int().optional(), warning: z.string().optional() });
+export const FefoPickLineSchema = z.object({ itemId: z.string().optional(), picks: z.array(FefoPickEntrySchema).optional() });
+export const FefoPickLineRequestSchema = z.object({ courseDays: z.number().int().gte(1).lte(3650).optional(), itemId: z.string(), qty: z.number().int().gte(1).lte(100000).optional() });
+export const FefoPickRequestSchema = z.object({ lines: z.array(FefoPickLineRequestSchema) });
+export const FefoPickResponseSchema = z.object({ lines: z.array(FefoPickLineSchema).optional() });
 export const FileDownloadUrlResponseSchema = z.object({ expiresAt: z.string().optional(), patientId: z.string().optional(), url: z.string().optional() });
 export const FileStatusResponseSchema = z.object({ contentType: z.string().optional(), createdAt: z.string().optional(), fileId: z.string().optional(), sizeBytes: z.number().int().optional(), status: z.string().optional() });
 export const FileUploadCompleteRequestSchema = z.object({ sha256: z.string().optional() });
@@ -455,6 +460,11 @@ export const StaffShiftResponseSchema = z.object({ effectiveFrom: z.string().opt
 export const StaffShiftWriteRequestSchema = z.object({ effectiveFrom: z.string(), effectiveTo: z.string().optional(), patternJson: z.string().min(1), staffId: z.string() });
 export const StaffSummaryResponseSchema = z.object({ id: z.string().optional(), name: z.string().optional(), roleName: z.string().optional() });
 export const StartRequestSchema = z.object({ clinicName: z.string().optional(), consentToContact: z.boolean().optional(), market: z.string().optional(), mobile: z.string().optional(), specialty: z.string().optional() });
+export const StockBatchSchema = z.object({ batchId: z.string().optional(), batchNo: z.string().optional(), expiryDate: z.string().optional(), expiryUnknown: z.boolean().optional(), location: z.string().optional(), mrp: z.number().optional(), purchaseRate: z.number().optional(), qtyOnHand: z.number().int().optional(), status: z.string().optional() });
+export const StockBatchMovementSchema = z.object({ delta: z.number().int().optional(), id: z.string().optional(), kind: z.string().optional(), occurredAt: z.string().optional(), qtyAfter: z.number().int().optional(), qtyBefore: z.number().int().optional(), reason: z.string().optional() });
+export const StockBatchPatchRequestSchema = z.object({ batchNo: z.string().min(0).max(80).optional(), expiryDate: z.string().min(0).max(10).optional(), location: z.string().min(0).max(80).optional(), reason: z.string().min(3).max(200) });
+export const StockListItemSchema = z.object({ batchCount: z.number().int().optional(), code: z.string().optional(), expiryUnknown: z.boolean().optional(), itemId: z.string().optional(), name: z.string().optional(), nearestExpiry: z.string().optional(), onHand: z.number().int().optional(), scheduleClass: z.string().optional(), value: z.number().optional() });
+export const StockListPageSchema = z.object({ items: z.array(StockListItemSchema).optional(), nextCursor: z.string().optional() });
 export const SubscriptionResponseSchema = z.object({ createdAt: z.string().optional(), currency: z.string().optional(), id: z.string().optional(), mrrCents: z.number().int().optional(), planCode: z.string().optional(), planId: z.string().optional(), planName: z.string().optional(), region: z.string().optional(), renewalDate: z.string().optional(), seatLimit: z.number().int().optional(), seatsUsed: z.number().int().optional(), tenantId: z.string().optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional(), tenantStatus: z.string().optional() });
 export const SubscriptionPageSchema = z.object({ data: z.array(SubscriptionResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const SubscriptionSummaryResponseSchema = z.object({ activePatientsLimit: z.number().int().optional(), activePatientsUsed: z.number().int().optional(), branchesLimit: z.number().int().optional(), branchesUsed: z.number().int().optional(), killedFeatures: z.array(z.string()).optional(), modules: z.array(ModuleStateSchema).optional(), plan: z.string().optional(), seatsLimit: z.number().int().optional(), seatsUsed: z.number().int().optional(), status: z.string().optional(), whatsappMessagesLimit: z.number().int().optional(), whatsappMessagesUsed: z.number().int().optional() });
@@ -758,20 +768,25 @@ export const operationSchemas = {
   PatientMessagesController_messages: { response: PageSchema },
   NoticeController_status: { response: PrivacyNoticeStatusSchema },
   NoticeController_acknowledge: { response: PrivacyNoticeStatusSchema },
+  PharmacyController_patchBatch: { body: StockBatchPatchRequestSchema, response: StockBatchSchema },
+  PharmacyController_batchMovements: { response: z.array(StockBatchMovementSchema) },
   PharmacyController_buyOutside: { response: z.array(z.string()) },
   PharmacyController_capabilities: { response: PharmacyCapabilitiesResponseSchema },
   PharmacyController_dispensingQueue: { response: z.array(DispensingQueueEntryResponseSchema) },
   PharmacyController_items: { response: z.array(PharmacyItemResponseSchema) },
   PharmacyController_addItem: { body: PharmacyItemWriteRequestSchema, response: PharmacyItemResponseSchema },
   PharmacyController_updateItem: { body: PharmacyItemWriteRequestSchema, response: PharmacyItemResponseSchema },
+  PharmacyController_batches: { response: z.array(StockBatchSchema) },
   PharmacyController_linkDrug: { body: DrugLinkRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   PharmacyController_setStatus: { body: PharmacyItemStatusRequestSchema, response: PharmacyItemResponseSchema },
   PharmacyController_adjustStock: { body: PharmacyStockAdjustmentRequestSchema, response: PharmacyItemResponseSchema },
   PharmacyController_stockMovements: { response: z.array(PharmacyStockMovementResponseSchema) },
+  PharmacyController_picks: { body: FefoPickRequestSchema, response: FefoPickResponseSchema },
   RxLineController_search: { body: RxLineSearchRequestSchema, response: z.array(RxLineResponseSchema) },
   PharmacyController_scheduleClasses: { response: z.array(PharmacyScheduleClassResponseSchema) },
   PharmacyController_settings: { response: PharmacySettingsResponseSchema },
   PharmacyController_updateSettings: { body: PharmacySettingsWriteRequestSchema, response: PharmacySettingsResponseSchema },
+  PharmacyController_stock: { response: StockListPageSchema },
   PhiReadAlertController_phiReadAlerts: { response: AlertsResponseSchema },
   PlanCatalogueController_catalogue: { response: z.array(PlanCatalogueEntrySchema) },
   AuditSearchController_search: { response: AuditLogPageSchema },

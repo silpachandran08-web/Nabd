@@ -151,14 +151,6 @@ class PharmacyRepository {
                 "WHERE tenant_id = ? AND id = ?", active, drugId, tenantId, id);
     }
 
-    /** Append-only (trigger-enforced in V51): one row per stock change. Only StockCommandsImpl calls this. */
-    void insertMovement(UUID tenantId, UUID itemId, String kind, int delta, int qtyBefore, int qtyAfter, String reason,
-                        UUID actorId, UUID invoiceId) {
-        jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, actor_id, invoice_id) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?)",
-                tenantId, itemId, kind, delta, qtyBefore, qtyAfter, reason, actorId, invoiceId);
-    }
-
     List<StockMovementRow> listMovements(UUID tenantId, UUID itemId) {
         return jdbc.query(
                 "SELECT m.id, m.kind, m.delta, m.qty_before, m.qty_after, m.reason, m.actor_id, s.name AS actor_name, m.occurred_at " +
