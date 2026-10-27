@@ -52,6 +52,12 @@ class JdbcActorDirectory implements ActorDirectory {
     }
 
     @Override
+    public List<OwnerContact> activeOwners(UUID tenantId) {
+        return jdbc.query("SELECT s.id, s.mobile_phone FROM staff s JOIN roles r ON r.id = s.role_id WHERE s.tenant_id = ? AND r.built_in AND s.status = 'active' ORDER BY s.id",
+                (rs, i) -> new OwnerContact(rs.getObject("id", UUID.class), rs.getString("mobile_phone")), tenantId);
+    }
+
+    @Override
     public int seatsInUse(UUID tenantId) {
         return jdbc.queryForObject("SELECT count(*) FROM staff WHERE tenant_id = ? AND status IN ('invited','active')", Integer.class, tenantId);
     }

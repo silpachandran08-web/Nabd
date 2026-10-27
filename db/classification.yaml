@@ -1569,6 +1569,7 @@ schemas:
       cell: operational
       active: operational
       display_languages: operational
+      einvoice_scheme: operational
     registry_dirty:
       tenant_id: operational
       patient_id: pii
@@ -1784,8 +1785,18 @@ schemas:
       from_status: operational
       to_status: operational
       changed_by: operational
+      changed_by_staff: operational
       reason: operational
       changed_at: operational
+    trial_conversion_jobs:
+      id: operational
+      tenant_id: operational
+      requested_by: operational
+      status: operational
+      synthetic_rows_deleted: operational
+      error_code: operational
+      created_at: operational
+      completed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational
@@ -1801,6 +1812,7 @@ schemas:
       region_code: operational
       status: operational
       data_gate: operational
+      go_live_by: operational
       created_at: operational
       updated_at: operational
       brand_id: operational

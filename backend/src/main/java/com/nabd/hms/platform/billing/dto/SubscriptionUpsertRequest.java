@@ -12,6 +12,7 @@ import java.util.UUID;
 public record SubscriptionUpsertRequest(
         @NotNull UUID planId,
         @Min(0) Integer mrrCents, // ADM-034: omitted = priced from the plan's pricing basis (per_doctor: unit price x active clinicians)
-        @NotNull @Future LocalDate renewalDate
+        @NotNull @Future LocalDate renewalDate,
+        Boolean startTrial // ADM-004: true = a trial subscription that ends after the plan's trial_days (14 by default); omitted/false = a real, active one
 ) {
 }

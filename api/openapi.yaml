@@ -1256,6 +1256,72 @@ paths:
         "200": { description: "PDF", content: { application/pdf: { schema: { type: string, format: binary } } } }
         "404": { description: "Not found", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /setup/trial:
+    get:
+      tags: [Setup]
+      summary: ADM-004 trial status for the countdown banner and the Start-for-real flow
+      description: status is the subscription's (trialing, active, free, cancelled ...) or "none". daysLeft counts clinic days and is set only while trialing. blockers lists what is still missing before real patients (dpa, plan).
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Trial status", content: { application/json: { schema: { $ref: "#/components/schemas/TrialStatus" } } } }
+
+  /setup/trial/convert/otp:
+    post:
+      tags: [Setup]
+      summary: ADM-004 send the owner's step-up code (same channel and limits as the DPA code)
+      x-required-permission: setup:edit
+      responses:
+        "200": { description: "Challenge", content: { application/json: { schema: { $ref: "#/components/schemas/DpaOtpChallenge" } } } }
+        "400": { description: "NO_MOBILE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "OTP_RATE_LIMITED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/trial/convert:
+    post:
+      tags: [Setup]
+      summary: ADM-004 Start for real - delete the demo data in the background and keep the setup
+      description: >
+        Owner only with setup:edit and a step-up code. Idempotency-Key required. Answers 202 at once; the purge runs in a worker
+        (poll GET /setup/trial conversion.status). A repeat while a job runs returns the same job. Demo patients and every row that
+        depends on them are deleted; doctors, schedules, prices, templates and policies stay. The data gate is not opened here.
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/TrialConvertRequest" } } }
+      responses:
+        "202": { description: "Accepted", content: { application/json: { schema: { $ref: "#/components/schemas/TrialConvertResponse" } } } }
+        "400": { description: "OTP_INVALID or CONFIRM_REQUIRED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "ALREADY_CONVERTED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/go-live/checks:
+    get:
+      tags: [Setup]
+      summary: ADM-011 go-live checks - blockers (stop patients being served) and good-to-have items
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Checks", content: { application/json: { schema: { $ref: "#/components/schemas/GoLiveChecks" } } } }
+
+  /setup/go-live:
+    post:
+      tags: [Setup]
+      summary: ADM-011 go live - the clinic becomes active and gets its booking link
+      description: Owner only with setup:edit. Idempotency-Key required; a repeat returns the same answer. 409 BLOCKERS_OPEN lists the open blocker codes in "blockers".
+      x-required-permission: setup:edit
+      responses:
+        "200": { description: "Live", content: { application/json: { schema: { $ref: "#/components/schemas/GoLive" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "BLOCKERS_OPEN", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/go-live/poster:
+    get:
+      tags: [Setup]
+      summary: ADM-011 printable booking poster (PDF with the booking link as a QR code)
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "PDF", content: { application/pdf: { schema: { type: string, format: binary } } } }
+        "404": { description: "Not live yet", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/checklist:
     get:
       tags: [Setup]
@@ -7716,6 +7782,66 @@ components:
         dataGate: { type: string, enum: [demo_only, live] }
         blockers: { type: array, items: { type: string, enum: [DPA_REQUIRED, PLAN_REQUIRED] } }
         reacceptDueBy: { type: [string, "null"], format: date-time, description: "Set when a newer DPA than the accepted one exists: show a non-blocking banner; the gate is never reset" }
+
+    TrialStatus:
+      type: object
+      required: [status, blockers]
+      properties:
+        status: { type: string }
+        endsAt: { type: [string, "null"], format: date-time }
+        daysLeft: { type: [integer, "null"] }
+        blockers: { type: array, items: { type: string, enum: [dpa, plan] } }
+        conversion:
+          type: [object, "null"]
+          properties:
+            jobId: { type: string, format: uuid }
+            status: { type: string, enum: [queued, running, done, failed] }
+            syntheticRowsDeleted: { type: integer, format: int64 }
+
+    TrialConvertRequest:
+      type: object
+      required: [confirm, otpChallengeId, otp]
+      properties:
+        confirm: { type: boolean }
+        otpChallengeId: { type: string, format: uuid }
+        otp: { type: string }
+
+    TrialConvertResponse:
+      type: object
+      required: [conversionJobId]
+      properties:
+        conversionJobId: { type: string, format: uuid }
+
+    GoLiveChecks:
+      type: object
+      required: [blockers, niceToHave]
+      properties:
+        blockers:
+          type: array
+          items:
+            type: object
+            required: [code, ok]
+            properties:
+              code: { type: string, description: "doctor_schedule, price_list, whatsapp_sender, dpa_signed" }
+              ok: { type: boolean }
+              fixUrl: { type: [string, "null"] }
+        niceToHave:
+          type: array
+          items:
+            type: object
+            required: [code, ok]
+            properties:
+              code: { type: string, description: "patients_imported, staff_invited, waiting_room_tv, tax_id, einvoice_phase2 (market-specific items are absent where they do not apply)" }
+              ok: { type: boolean }
+              note: { type: [string, "null"] }
+
+    GoLive:
+      type: object
+      required: [liveAt, bookingUrl, qrPosterUrl]
+      properties:
+        liveAt: { type: string, format: date-time }
+        bookingUrl: { type: string }
+        qrPosterUrl: { type: string }
 
     DpaOtpChallenge:
       type: object

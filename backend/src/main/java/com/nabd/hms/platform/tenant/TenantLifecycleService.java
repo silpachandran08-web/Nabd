@@ -24,7 +24,7 @@ import java.util.UUID;
  * the REST layer (billing/dunning triggers for active/overdue/suspended land with NB-267).
  */
 @Service
-public class TenantLifecycleService {
+public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyclePort {
 
     private static final Logger log = LoggerFactory.getLogger(TenantLifecycleService.class);
 
@@ -41,8 +41,11 @@ public class TenantLifecycleService {
     private final TenantLifecycleRepository repo;
     private final PlatformAudit audit;
     private final SessionRevocation.TenantRevoker sessions;
+    private final com.nabd.hms.common.TenantContext tenantContext;
 
-    TenantLifecycleService(TenantLifecycleRepository repo, PlatformAudit audit, SessionRevocation.TenantRevoker sessions) {
+    TenantLifecycleService(TenantLifecycleRepository repo, PlatformAudit audit, SessionRevocation.TenantRevoker sessions,
+                           com.nabd.hms.common.TenantContext tenantContext) {
+        this.tenantContext = tenantContext;
         this.repo = repo;
         this.audit = audit;
         this.sessions = sessions;
@@ -51,6 +54,25 @@ public class TenantLifecycleService {
     @Transactional
     public TenantLifecycleResponse transition(UUID tenantId, String toStatus, UUID changedBy, String reason,
                                               String ipAddress) {
+        return move(tenantId, toStatus, changedBy, null, reason, ipAddress);
+    }
+
+    /** ADM-004/011: a move caused by the clinic owner (staffId) or by the trial job (staffId null); same rules and audit as an operator's. */
+    @Override
+    @Transactional
+    public void transitionBy(String toStatus, UUID staffId, String reason) {
+        move(tenantContext.current(), toStatus, null, staffId, reason, null);
+    }
+
+    @Override
+    @Transactional
+    public void markLive(UUID staffId) {
+        repo.markLive(tenantContext.current(), staffId);
+    }
+
+    @Transactional
+    TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
+                                         String ipAddress) {
         String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(this::notFound);
         Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());
         if (!allowed.contains(toStatus)) {
@@ -58,13 +80,16 @@ public class TenantLifecycleService {
                     "A tenant in " + fromStatus + " cannot move to " + toStatus + ".");
         }
         repo.updateTenantStatus(tenantId, toStatus);
-        repo.insertEvent(tenantId, fromStatus, toStatus, changedBy, reason);
+        repo.insertEvent(tenantId, fromStatus, toStatus, changedBy, changedByStaff, reason);
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("fromStatus", fromStatus);
         after.put("toStatus", toStatus);
         after.put("reason", reason);
         if (SessionRevocation.INACTIVE_TENANT_STATUSES.contains(toStatus)) {
             after.put("sessionsRevoked", sessions.revokeAll(tenantId, "tenant_suspended")); // PLT-007: same transaction
+        }
+        if (changedByStaff != null) {
+            after.put("byStaff", changedByStaff);
         }
         audit.record(tenantId, changedBy, ipAddress, "platform_tenant.lifecycle_changed", "tenant", tenantId, after);
         log.info("tenant {} transitioned {} -> {} by operator {}", tenantId, fromStatus, toStatus, changedBy);

@@ -10,6 +10,7 @@ import { useLiveStatus } from "./lib/live";
 import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
 import ShellUserMenu from "./shell/ShellUserMenu";
+import TrialChip from "./components/setup/TrialChip";
 import ThemeToggle from "./shell/ThemeToggle";
 import { keyHint } from "./shell/shortcuts";
 import { formatClinicTime } from "./lib/clinicTime";
@@ -152,6 +153,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
           onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}>⌘K</button>
       </>}
       <div className={styles.spacer} />
+      <TrialChip />
       <LanguagePicker />
       <ThemeToggle />
       {/* FEF-034: Register walk-in from any screen (also Ctrl+K and W); the schedule board already carries it as its primary action. */}

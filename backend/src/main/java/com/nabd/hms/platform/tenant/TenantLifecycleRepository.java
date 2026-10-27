@@ -28,10 +28,14 @@ class TenantLifecycleRepository {
         jdbc.update("UPDATE tenants SET status = ? WHERE id = ?", status, tenantId);
     }
 
-    void insertEvent(UUID tenantId, String fromStatus, String toStatus, UUID changedBy, String reason) {
-        jdbc.update("INSERT INTO tenant_lifecycle_events (tenant_id, from_status, to_status, changed_by, reason) " +
-                        "VALUES (?,?,?,?,?)",
-                tenantId, fromStatus, toStatus, changedBy, reason);
+    void markLive(UUID tenantId, UUID staffId) {
+        jdbc.update("UPDATE tenants SET setup_completed_at = COALESCE(setup_completed_at, now()), go_live_by = COALESCE(go_live_by, ?), updated_at = now() WHERE id = ?", staffId, tenantId);
+    }
+
+    void insertEvent(UUID tenantId, String fromStatus, String toStatus, UUID changedBy, UUID changedByStaff, String reason) {
+        jdbc.update("INSERT INTO tenant_lifecycle_events (tenant_id, from_status, to_status, changed_by, changed_by_staff, reason) " +
+                        "VALUES (?,?,?,?,?,?)",
+                tenantId, fromStatus, toStatus, changedBy, changedByStaff, reason);
     }
 
     List<LifecycleEvent> listEvents(UUID tenantId) {
@@ -45,7 +49,7 @@ class TenantLifecycleRepository {
         return (rs, i) -> new LifecycleEvent(
                 rs.getString("from_status"),
                 rs.getString("to_status"),
-                UUID.fromString(rs.getString("changed_by")),
+                rs.getString("changed_by") == null ? null : UUID.fromString(rs.getString("changed_by")), // ADM-004/011: null = owner or system
                 rs.getString("reason"),
                 rs.getTimestamp("changed_at").toInstant());
     }

@@ -206,6 +206,10 @@ export type FleetSummaryResponse = { byStatus?: Record<string, number>; live?: n
 export type FlowStepResponse = { stepType?: string; };
 export type FollowUpItem = { appointmentId?: string; cancelReason?: string; patientId?: string; patientMrn?: string; patientName?: string; startTime?: string; status?: string; };
 export type FollowUpPage = { data?: Array<FollowUpItem>; page?: PageMeta; };
+export type GoLiveBlocker = { code?: string; fixUrl?: string; ok?: boolean; };
+export type GoLiveChecksResponse = { blockers?: Array<GoLiveBlocker>; niceToHave?: Array<GoLiveNiceToHave>; };
+export type GoLiveNiceToHave = { code?: string; note?: string; ok?: boolean; };
+export type GoLiveResponse = { bookingUrl?: string; liveAt?: string; qrPosterUrl?: string; };
 export type GrantResponse = { active?: boolean; declineNote?: string; expiresAt?: string; grantedAt?: string; id?: string; minutes?: number; operatorId?: string; operatorName?: string; operatorRole?: string; reason?: string; revokedAt?: string; scope?: string; status?: string; tenantId?: string; ticketId?: string; windowEndsAt?: string; windowStartedAt?: string; };
 export type GuardianConsent = { channel?: string; confirmed?: boolean; };
 export type GuardianReviewDecisionRequest = { decision: string; };
@@ -480,7 +484,7 @@ export type SubscriptionPage = { data?: Array<SubscriptionResponse>; page?: Page
 export type SubscriptionResponse = { createdAt?: string; currency?: string; id?: string; mrrCents?: number; planCode?: string; planId?: string; planName?: string; region?: string; renewalDate?: string; seatLimit?: number; seatsUsed?: number; tenantId?: string; tenantName?: string; tenantSlug?: string; tenantStatus?: string; };
 export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; branchesLimit?: number; branchesUsed?: number; killedFeatures?: Array<string>; modules?: Array<ModuleState>; plan?: string; seatsLimit?: number; seatsUsed?: number; status?: string; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
 export type SubscriptionTransitionRequest = { reason: string; toStatus: string; };
-export type SubscriptionUpsertRequest = { mrrCents?: number; planId: string; renewalDate: string; };
+export type SubscriptionUpsertRequest = { mrrCents?: number; planId: string; renewalDate: string; startTrial?: boolean; };
 export type SuggestedLine = { chargeCode?: string; name?: string; tier?: string; unitPrice?: number; };
 export type SummaryPrefillResponse = { body?: Record<string, string>; noteSigned?: boolean; prescriptionSigned?: boolean; };
 export type SupernumeraryToothRequest = { nearToothNumber?: number; note?: string; status?: string; };
@@ -511,6 +515,10 @@ export type TransferRequest = { doctorId: string; reason?: string; reasonNote?: 
 export type TransferResponse = { closedLeg?: QueueEntryResponse; newLeg?: QueueEntryResponse; };
 export type TransferTargetResponse = { departmentId?: string; departmentName?: string; doctors?: Array<StaffRosterEntry>; };
 export type TransitionRequest = { reason: string; toStatus: string; };
+export type TrialConversion = { jobId?: string; status?: string; syntheticRowsDeleted?: number; };
+export type TrialConvertRequest = { confirm: boolean; otp: string; otpChallengeId: string; };
+export type TrialConvertResponse = { conversionJobId?: string; };
+export type TrialStatusResponse = { blockers?: Array<string>; conversion?: TrialConversion; daysLeft?: number; endsAt?: string; status?: string; };
 export type UiPreferences = { digitStyle?: string; uiLocale?: string; uiTheme?: string; };
 export type UiPreferencesRead = { clinicDefaultLocale?: string; digitStyle?: string; uiLocale?: string; uiTheme?: string; };
 export type UiPreferencesWrite = { digitStyle?: string; uiLocale?: string; uiTheme: string; };
@@ -942,6 +950,9 @@ export type Operations = {
   DpaController_requestOtp: { method: "post"; path: "/v1/setup/dpa/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };
   SetupController_exportJobs: { method: "get"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ExportJobResponse> };
   SetupController_createExportJob: { method: "post"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: ExportJobRequest; response: ExportJobResponse };
+  GoLiveController_goLive: { method: "post"; path: "/v1/setup/go-live"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: GoLiveResponse };
+  GoLiveController_checks: { method: "get"; path: "/v1/setup/go-live/checks"; permission: "setup:view"; pathParams: never; query: never; body: never; response: GoLiveChecksResponse };
+  GoLiveController_poster: { method: "get"; path: "/v1/setup/go-live/poster"; permission: "setup:view"; pathParams: never; query: never; body: never; response: string };
   SetupController_holidays: { method: "get"; path: "/v1/setup/holidays"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ClinicHolidayResponse> };
   SetupController_addHoliday: { method: "post"; path: "/v1/setup/holidays"; permission: "setup:edit"; pathParams: never; query: never; body: ClinicHolidayWriteRequest; response: ClinicHolidayResponse };
   CalendarController_setEffect: { method: "patch"; path: "/v1/setup/holidays/{id}"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: HolidayEffectRequest; response: ClinicHolidayResponse };
@@ -967,6 +978,9 @@ export type Operations = {
   SetupController_addShift: { method: "post"; path: "/v1/setup/shifts"; permission: "setup:edit"; pathParams: never; query: never; body: StaffShiftWriteRequest; response: StaffShiftResponse };
   SetupController_staff: { method: "get"; path: "/v1/setup/staff"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<StaffSummaryResponse> };
   SetupController_subscription: { method: "get"; path: "/v1/setup/subscription"; permission: "setup:view"; pathParams: never; query: never; body: never; response: SubscriptionSummaryResponse };
+  ClinicTrialController_status: { method: "get"; path: "/v1/setup/trial"; permission: "setup:view"; pathParams: never; query: never; body: never; response: TrialStatusResponse };
+  ClinicTrialController_convert: { method: "post"; path: "/v1/setup/trial/convert"; permission: "setup:edit"; pathParams: never; query: never; body: TrialConvertRequest; response: TrialConvertResponse };
+  ClinicTrialController_requestOtp: { method: "post"; path: "/v1/setup/trial/convert/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };
   WhatsAppTemplateController_list: { method: "get"; path: "/v1/setup/whatsapp-templates"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<TemplateResponse> };
   WhatsAppTemplateController_create: { method: "post"; path: "/v1/setup/whatsapp-templates"; permission: "setup:edit"; pathParams: never; query: never; body: TemplateRequest; response: TemplateResponse };
   WhatsAppTemplateController_resubmit: { method: "patch"; path: "/v1/setup/whatsapp-templates/{id}"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: TemplateRequest; response: TemplateResponse };

@@ -31,7 +31,9 @@ public enum NotificationPurpose {
     /** ADM-018: owner asks a staff member to finish authenticator enrolment (staff recipient, no params). */
     MFA_ENROL_REMINDER("mfa_enrol_reminder", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** ADM-032: licence expiry reminder to the holder and the owners (staff recipients, no patient consent); 4 params: holder, kind, expiry date, days left. */
-    LICENCE_EXPIRING("licence_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    LICENCE_EXPIRING("licence_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-004: the owner is told how many trial days are left (one param: the number; no clinical content). */
+    TRIAL_EXPIRING("trial_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS);
 
     private final String code;
     private final ConsentClass consentClass;
