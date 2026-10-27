@@ -1,0 +1,1303 @@
+{
+ "pack": {
+  "id": "PHL-QA",
+  "jurisdiction": "QA",
+  "taxRegime": "VAT",
+  "currency": "QAR",
+  "minorUnits": 2,
+  "ruleSetVersion": "PHL-QA-1",
+  "minCases": 20
+ },
+ "cases": [
+  {
+   "id": "PHL-QA-001",
+   "title": "Medicine at 10.00 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 1000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 1000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-002",
+   "title": "Medicine at 25.00 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 2500,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 2500,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 2500,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 2500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-003",
+   "title": "Medicine at 49.99 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4999,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4999,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 4999,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 4999
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-004",
+   "title": "Medicine at 100.00 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 10000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-005",
+   "title": "Medicine at 123.45 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 12345,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 12345,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 12345,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 12345
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-006",
+   "title": "Medicine at 3.33 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 333,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 333,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 333,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 333
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-007",
+   "title": "Medicine at 750.00 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 75000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 75000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 75000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 75000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-008",
+   "title": "Medicine at 1.50 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 150,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 150,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 150,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 150
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-009",
+   "title": "Medicine at 99.99 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 9999,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 9999,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 9999,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 9999
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-010",
+   "title": "Medicine at 200.01 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 20001,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 20001,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 20001,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 20001
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-011",
+   "title": "Medicine at 5.25 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 525,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 525,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 525,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 525
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-012",
+   "title": "Medicine at 88.00 QAR, no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 8800,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 8800,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 8800,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 8800
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-013",
+   "title": "Two medicines, no VAT line",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 6000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     },
+     {
+      "key": "b",
+      "discountMinor": 0,
+      "taxableMinor": 6000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 10000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-014",
+   "title": "Three units of one medicine",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 3,
+      "grossMinor": 3000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 3000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 3000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 3000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-015",
+   "title": "Invoice discount, still no VAT",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 500,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 6000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 200,
+      "taxableMinor": 3800,
+      "taxes": []
+     },
+     {
+      "key": "b",
+      "discountMinor": 300,
+      "taxableMinor": 5700,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 500,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 9500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-016",
+   "title": "Zero-rated flag on a nil head",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 4000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 4000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-017",
+   "title": "Exempt head",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "EXEMPT",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 4000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 4000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-018",
+   "title": "Price inclusive flag has nothing to back out at 0%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 4000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 4000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-019",
+   "title": "Whole-number total",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 10000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-QA-020",
+   "title": "Large basket of four lines",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 1250,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 3333,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "c",
+      "quantity": 1,
+      "grossMinor": 99,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "d",
+      "quantity": 1,
+      "grossMinor": 70000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 0,
+      "taxableMinor": 1250,
+      "taxes": []
+     },
+     {
+      "key": "b",
+      "discountMinor": 0,
+      "taxableMinor": 3333,
+      "taxes": []
+     },
+     {
+      "key": "c",
+      "discountMinor": 0,
+      "taxableMinor": 99,
+      "taxes": []
+     },
+     {
+      "key": "d",
+      "discountMinor": 0,
+      "taxableMinor": 70000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 74682,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 74682
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-QA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  }
+ ]
+}

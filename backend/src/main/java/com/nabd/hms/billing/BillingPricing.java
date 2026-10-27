@@ -34,8 +34,11 @@ class BillingPricing {
     private final CheckoutRepository repo;
     private final com.nabd.hms.organization.api.RegionRules regions;
     private final ConfigCache configCache;
+    private final com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy;
 
-    BillingPricing(CheckoutRepository repo, com.nabd.hms.organization.api.RegionRules regions, ConfigCache configCache) {
+    BillingPricing(CheckoutRepository repo, com.nabd.hms.organization.api.RegionRules regions, ConfigCache configCache,
+                   com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy) {
+        this.pharmacy = pharmacy;
         this.repo = repo;
         this.regions = regions;
         this.configCache = configCache;
@@ -84,8 +87,9 @@ class BillingPricing {
             String tier = followUp ? "follow_up" : "normal";
             var o = li.override();
             if (o == null) {
+                if (c.stocked()) pharmacy.requireWithinMrp(c.id(), list); // PHL-021
                 out.add(new LineItemInput(li.chargeCode(), c.name(), c.category(), li.quantity(), list, c.taxRatePercent(),
-                        c.id(), list, tier, null, null, null, c.isRx(), li.prescriptionItemId()));
+                        c.id(), list, tier, null, null, null, c.isRx(), li.prescriptionItemId(), li.shortfallReason()));
                 continue;
             }
             requireDiscountRight(canDiscount);
@@ -93,8 +97,9 @@ class BillingPricing {
             if (o.unitPrice() == null) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "An override needs a unit price.");
             }
+            if (c.stocked()) pharmacy.requireWithinMrp(c.id(), o.unitPrice()); // PHL-021
             out.add(new LineItemInput(li.chargeCode(), c.name(), c.category(), li.quantity(), o.unitPrice(), c.taxRatePercent(),
-                    c.id(), list, tier, reason, o.note(), staffId, c.isRx(), li.prescriptionItemId()));
+                    c.id(), list, tier, reason, o.note(), staffId, c.isRx(), li.prescriptionItemId(), li.shortfallReason()));
         }
         return out;
     }
@@ -112,7 +117,7 @@ class BillingPricing {
         String reason = trusted ? null : requireReason(o == null ? null : o.reasonCode());
         return new LineItemInput(li.chargeCode(), li.chargeName(), li.category() == null || li.category().isBlank() ? "Service" : li.category(),
                 li.quantity(), li.unitPrice(), li.taxRatePercent() != null ? li.taxRatePercent() : regionTax, null,
-                li.unitPrice(), "custom", reason, o == null ? null : o.note(), trusted ? null : staffId, false, li.prescriptionItemId());
+                li.unitPrice(), "custom", reason, o == null ? null : o.note(), trusted ? null : staffId, false, li.prescriptionItemId(), null);
     }
 
     /** Ledger rows for this request. remaining = combined subtotal minus discounts already on the invoice. */

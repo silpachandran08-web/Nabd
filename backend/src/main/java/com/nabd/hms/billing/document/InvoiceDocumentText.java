@@ -13,7 +13,11 @@ import java.util.List;
 /** FIN-012: the text of an invoice or receipt for a given column width (90 for A4, 48 for the 80 mm roll). Pure, so the golden test needs no database. */
 final class InvoiceDocumentText {
 
-    record Supplier(String legalName, String gstin, String stateCode, ZoneId zone) {
+    /** @param licenceLines PHL-021: drug licence numbers printed under the GSTIN of a pharmacy invoice (empty otherwise) */
+    record Supplier(String legalName, String gstin, String stateCode, ZoneId zone, List<String> licenceLines) {
+        Supplier(String legalName, String gstin, String stateCode, ZoneId zone) {
+            this(legalName, gstin, stateCode, zone, List.of());
+        }
     }
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd-MMM-yyyy HH:mm", java.util.Locale.ENGLISH);
@@ -22,6 +26,11 @@ final class InvoiceDocumentText {
     }
 
     static List<String> build(InvoiceResponse inv, Supplier s, String kind, String receiptNo, int cols, List<String> sacHsn) {
+        return build(inv, s, kind, receiptNo, cols, sacHsn, List.of());
+    }
+
+    /** @param lineNotes per line (display order), a short note printed under the line, or null (PHL-021: the zero-rating reason) */
+    static List<String> build(InvoiceResponse inv, Supplier s, String kind, String receiptNo, int cols, List<String> sacHsn, List<String> lineNotes) {
         boolean thermal = cols <= 48;
         boolean receipt = "receipt".equals(kind);
         String rule = "-".repeat(cols);
@@ -29,6 +38,7 @@ final class InvoiceDocumentText {
         String title = receipt ? "PAYMENT RECEIPT" : inv.documentTitle() == null ? "Invoice" : inv.documentTitle();
         out.addAll(center(s.legalName(), cols));
         out.add(s.gstin() == null ? "GSTIN: not registered" : "GSTIN: " + s.gstin() + "  State code: " + s.stateCode());
+        out.addAll(s.licenceLines());
         out.addAll(center(title.toUpperCase(java.util.Locale.ROOT), cols));
         out.add(rule);
         out.add("Invoice No: " + inv.invoiceNumber());
@@ -40,7 +50,7 @@ final class InvoiceDocumentText {
         if (pos != null) out.add("Place of supply: " + pos);
         out.add(rule);
         if (!receipt) {
-            lines(inv, thermal, cols, out, sacHsn);
+            lines(inv, thermal, cols, out, sacHsn, lineNotes);
             out.add(rule);
             row(out, "Subtotal", money(inv.subtotal()), cols);
             if (inv.discount().signum() != 0) row(out, "Discount", "-" + money(inv.discount()), cols);
@@ -62,7 +72,7 @@ final class InvoiceDocumentText {
         return fitted;
     }
 
-    private static void lines(InvoiceResponse inv, boolean thermal, int cols, List<String> out, List<String> sacHsn) {
+    private static void lines(InvoiceResponse inv, boolean thermal, int cols, List<String> out, List<String> sacHsn, List<String> lineNotes) {
         if (!thermal) out.add(String.format("%-28s %-8s %3s %10s %10s %6s %10s", "Description", "SAC/HSN", "Qty", "Rate", "Taxable", "Tax%", "Tax"));
         for (int i = 0; i < inv.lineItems().size(); i++) {
             LineItemResponse l = inv.lineItems().get(i);
@@ -79,6 +89,7 @@ final class InvoiceDocumentText {
                         l.taxRatePercent().stripTrailingZeros().toPlainString(), money(tax)));
                 if (!parts.isEmpty()) out.add("    " + parts);
             }
+            if (i < lineNotes.size() && lineNotes.get(i) != null) out.add("    " + lineNotes.get(i));
         }
     }
 

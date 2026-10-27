@@ -214,6 +214,7 @@ export default function PharmacyPanel() {
   const itemBody = (i: PharmacyItem) => ({
     name: i.name, isRx: i.isRx, hsnCode: i.hsnCode || null, price: i.price, taxRatePercent: i.taxRatePercent,
     scheduleClass: i.scheduleClass, genericName: i.genericName || null, inHouse: i.inHouse,
+    priceInclusiveOfTax: i.priceInclusiveOfTax ?? null, zeroRated: !!i.zeroRated, mrp: i.mrp ?? null,
   });
 
   const openAdjust = (item: PharmacyItem, direction: 1 | -1) => {
@@ -422,6 +423,7 @@ export default function PharmacyPanel() {
             </div>
           )}
 
+          {canWrite && mode === "hybrid" && <p><Link href="/pharmacy/receipt" className={styles.btn}>Enter supplier bill</Link></p>}
           <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
           <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. Open a row to dispense on that patient&apos;s billing screen.</p>
           {queueError ? (
@@ -484,6 +486,16 @@ export default function PharmacyPanel() {
               <label className={styles.label} htmlFor="pe-tax">Tax rate %</label>
               <input id="pe-tax" className={styles.input} type="number" step="0.01" min="0" value={editing.taxRatePercent} {...efe.attrs("taxRatePercent")} onChange={(e) => { efe.clearField("taxRatePercent"); setEditing({ ...editing, taxRatePercent: Number(e.target.value) }); }} />
               <FieldError fe={efe} name="taxRatePercent" className={ph.sub} />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pe-mrp">MRP</label>
+              <input id="pe-mrp" className={styles.input} type="number" step="0.01" min="0" value={editing.mrp ?? ""} onChange={(e) => setEditing({ ...editing, mrp: (e.target.value === "" ? null : Number(e.target.value)) as number })} />
+            </div>
+            <div className={styles.field}>
+              <label><input type="checkbox" checked={!!editing.zeroRated} onChange={(e) => setEditing({ ...editing, zeroRated: e.target.checked })} /> Zero-rated (0% tax, noted on the invoice)</label>
+            </div>
+            <div className={styles.field}>
+              <label><input type="checkbox" checked={editing.priceInclusiveOfTax ?? false} onChange={(e) => setEditing({ ...editing, priceInclusiveOfTax: e.target.checked })} /> Price includes tax</label>
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-hsn">HSN code</label>

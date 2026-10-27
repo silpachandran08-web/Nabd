@@ -70,7 +70,8 @@ class PharmacyRepository {
             "SELECT c.id, c.code, c.name, c.is_rx, c.hsn_code, c.base_amount, c.tax_rate_percent, c.stock_qty, c.active, c.drug_id, " +
                     "COALESCE(p.schedule_class, 'OTC') AS schedule_class, " +
                     "(SELECT max(r.register_type) FROM pharmacy_schedule_rules r WHERE r.schedule_class = p.schedule_class) AS register_type, " +
-                    "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house " +
+                    "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house, " +
+                    "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp " +
                     "FROM charge_catalogue c LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id ";
 
     /** @param scheduleClass optional PHL-002 filter (index on tenant_id, schedule_class) */
@@ -229,6 +230,7 @@ class PharmacyRepository {
                 rs.getString("name"), rs.getBoolean("is_rx"), rs.getString("hsn_code"), rs.getBigDecimal("base_amount"),
                 rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"), rs.getString("drug_id"),
                 rs.getString("schedule_class"), rs.getString("register_type"), rs.getString("generic_name"),
-                (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"));
+                (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"),
+                (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"));
     }
 }

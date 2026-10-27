@@ -1,0 +1,12 @@
+{
+ "packId": "PHL-IN",
+ "ruleSetVersion": "PHL-IN-1",
+ "status": "pending-ca-review",
+ "ruleSetSha256": "adac5c6858412e9f32e326c70e16846f8de4b4e42bc4346b75a1504baad30bd6",
+ "casesSha256": "7696deb057e5d6e4114dc5436e266b9c47c10a491976aaaf0747e29c347a8d59",
+ "reviewer": null,
+ "membershipNo": null,
+ "signedOn": null,
+ "signatureFile": null,
+ "signatureSha256": null
+}

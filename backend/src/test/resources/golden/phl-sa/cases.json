@@ -1,0 +1,1653 @@
+{
+ "pack": {
+  "id": "PHL-SA",
+  "jurisdiction": "SA",
+  "taxRegime": "VAT",
+  "currency": "SAR",
+  "minorUnits": 2,
+  "ruleSetVersion": "PHL-SA-1",
+  "minCases": 20
+ },
+ "cases": [
+  {
+   "id": "PHL-SA-001",
+   "title": "Medicine at 10.00 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1000,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 1000,
+        "amountMinor": 150
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1000,
+    "discountMinor": 0,
+    "taxMinor": 150,
+    "roundOffMinor": 0,
+    "totalMinor": 1150
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 1000,
+      "taxMinor": 150
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-002",
+   "title": "Zero-rated medicine at 10.00 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 1000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 1000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-003",
+   "title": "Medicine at 25.00 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 2500,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 2500,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 2500,
+        "amountMinor": 375
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 2500,
+    "discountMinor": 0,
+    "taxMinor": 375,
+    "roundOffMinor": 0,
+    "totalMinor": 2875
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 2500,
+      "taxMinor": 375
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-004",
+   "title": "Zero-rated medicine at 25.00 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 2500,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 2500,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 2500,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 2500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-005",
+   "title": "Medicine at 49.99 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4999,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4999,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 4999,
+        "amountMinor": 750
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 4999,
+    "discountMinor": 0,
+    "taxMinor": 750,
+    "roundOffMinor": 0,
+    "totalMinor": 5749
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 4999,
+      "taxMinor": 750
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-006",
+   "title": "Zero-rated medicine at 49.99 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4999,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4999,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 4999,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 4999
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-007",
+   "title": "Medicine at 100.00 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 10000,
+        "amountMinor": 1500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1500,
+    "roundOffMinor": 0,
+    "totalMinor": 11500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 10000,
+      "taxMinor": 1500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-008",
+   "title": "Zero-rated medicine at 100.00 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 10000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-009",
+   "title": "Medicine at 123.45 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 12345,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 12345,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 12345,
+        "amountMinor": 1852
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 12345,
+    "discountMinor": 0,
+    "taxMinor": 1852,
+    "roundOffMinor": 0,
+    "totalMinor": 14197
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 12345,
+      "taxMinor": 1852
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-010",
+   "title": "Zero-rated medicine at 123.45 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 12345,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 12345,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 12345,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 12345
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-011",
+   "title": "Medicine at 3.33 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 333,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 333,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 333,
+        "amountMinor": 50
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 333,
+    "discountMinor": 0,
+    "taxMinor": 50,
+    "roundOffMinor": 0,
+    "totalMinor": 383
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 333,
+      "taxMinor": 50
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-012",
+   "title": "Zero-rated medicine at 3.33 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 333,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 333,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 333,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 333
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-013",
+   "title": "Medicine at 750.00 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 75000,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 75000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 75000,
+        "amountMinor": 11250
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 75000,
+    "discountMinor": 0,
+    "taxMinor": 11250,
+    "roundOffMinor": 0,
+    "totalMinor": 86250
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 75000,
+      "taxMinor": 11250
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-014",
+   "title": "Zero-rated medicine at 750.00 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 75000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 75000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 75000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 75000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-015",
+   "title": "Medicine at 1.50 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 150,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 150,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 150,
+        "amountMinor": 23
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 150,
+    "discountMinor": 0,
+    "taxMinor": 23,
+    "roundOffMinor": 0,
+    "totalMinor": 173
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 150,
+      "taxMinor": 23
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-016",
+   "title": "Zero-rated medicine at 1.50 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 150,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 150,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 150,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 150
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-017",
+   "title": "Medicine at 99.99 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 9999,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 9999,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 9999,
+        "amountMinor": 1500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 9999,
+    "discountMinor": 0,
+    "taxMinor": 1500,
+    "roundOffMinor": 0,
+    "totalMinor": 11499
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 9999,
+      "taxMinor": 1500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-018",
+   "title": "Zero-rated medicine at 99.99 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 9999,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 9999,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 9999,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 9999
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-019",
+   "title": "Medicine at 200.01 SAR, VAT 15%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 20001,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 20001,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 20001,
+        "amountMinor": 3000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 20001,
+    "discountMinor": 0,
+    "taxMinor": 3000,
+    "roundOffMinor": 0,
+    "totalMinor": 23001
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 20001,
+      "taxMinor": 3000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-020",
+   "title": "Zero-rated medicine at 200.01 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 20001,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 20001,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 20001,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 20001
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-021",
+   "title": "Two units of a taxable medicine",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 2,
+      "grossMinor": 5000,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 5000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 5000,
+        "amountMinor": 750
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 5000,
+    "discountMinor": 0,
+    "taxMinor": 750,
+    "roundOffMinor": 0,
+    "totalMinor": 5750
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 5000,
+      "taxMinor": 750
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-022",
+   "title": "Zero-rated and taxable medicine on one invoice",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 6000,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     },
+     {
+      "key": "b",
+      "discountMinor": 0,
+      "taxableMinor": 6000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 6000,
+        "amountMinor": 900
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 900,
+    "roundOffMinor": 0,
+    "totalMinor": 10900
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 6000,
+      "taxMinor": 900
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-023",
+   "title": "Invoice discount spread over a taxable and a zero-rated medicine",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 1000,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 6000,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 400,
+      "taxableMinor": 3600,
+      "taxes": []
+     },
+     {
+      "key": "b",
+      "discountMinor": 600,
+      "taxableMinor": 5400,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 5400,
+        "amountMinor": 810
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 1000,
+    "taxMinor": 810,
+    "roundOffMinor": 0,
+    "totalMinor": 9810
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 5400,
+      "taxMinor": 810
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-SA-024",
+   "title": "Tax-inclusive shelf price of 115.00 SAR",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11500,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "15",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 10000,
+        "amountMinor": 1500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1500,
+    "roundOffMinor": 0,
+    "totalMinor": 11500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 10000,
+      "taxMinor": 1500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  }
+ ]
+}
