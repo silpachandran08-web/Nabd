@@ -337,3 +337,9 @@
 }
 .navRail .clinicMenu { position: fixed; top: 56px; inset-inline-start: 96px; }
 .navRail .clinicChevron, .navRail .planChip { display: none; }
+
+/* FEF-055: urgent badge (unacknowledged priority flags). Danger tint + icon + word; the word hides on the rail and bottom nav (kept for screen readers). */
+.urgent { display: inline-flex; align-items: center; gap: 2px; background: var(--nb-danger-tint); color: var(--nb-danger-500); white-space: nowrap; }
+@media (max-width: 1024px) {
+  .urgentText { position: absolute; inset-inline-start: 0; inline-size: 1px; block-size: 1px; clip-path: inset(50%); white-space: nowrap; }
+}

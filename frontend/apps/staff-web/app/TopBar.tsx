@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
 import ShellUserMenu from "./shell/ShellUserMenu";
 import ThemeToggle from "./shell/ThemeToggle";
+import { keyHint } from "./shell/shortcuts";
 import { formatClinicTime } from "./lib/clinicTime";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
 
@@ -112,6 +113,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   // Patient search lands on /patients, so a role without patients:view gets no search box at all.
   const canSearch = can("patients:view");
+  const canWalkIn = can("queue:create") && canSearch;
   const lastSync = conn.lastOkAt ? formatClinicTime(conn.lastOkAt) : null;
   const lastSyncText = lastSync ? t("lastSync", { time: lastSync }) : t("noServerContact");
   const [pillLabel, pillWarn, pillHint] = !online
@@ -140,15 +142,24 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
             className={styles.searchInput}
             placeholder={t("searchPatient")}
             value={query}
+            {...keyHint("search")}
+            aria-label={t("searchPatient")}
             onChange={(e) => setQuery(e.target.value)}
           />
           <span className={styles.kbd}>/</span>
         </form>
-        <span className={styles.kbd}>⌘K</span>
+        <button type="button" className={`${styles.kbd} ${styles.kbdBtn}`} {...keyHint("palette")} aria-label={keyHint("palette").title}
+          onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}>⌘K</button>
       </>}
       <div className={styles.spacer} />
       <LanguagePicker />
       <ThemeToggle />
+      {/* FEF-034: Register walk-in from any screen (also Ctrl+K and W); the schedule board already carries it as its primary action. */}
+      {canWalkIn && !primaryAction?.href.includes("action=walkin") && (
+        <button type="button" className={`${styles.primaryAction} ${styles.walkInBtn}`} {...keyHint("walkin")} onClick={() => router.push("/arrivals?action=walkin")}>
+          {t("registerWalkIn")}
+        </button>
+      )}
       {primaryAction && (
         <button type="button" className={styles.primaryAction} onClick={() => router.push(primaryAction.href)}>
           {t(primaryAction.label)}

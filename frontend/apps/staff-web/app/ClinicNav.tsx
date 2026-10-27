@@ -14,6 +14,7 @@ import { pharmacyNavAllowed } from "./lib/pharmacyRules";
 import { useNavBadges } from "./shell/useNavBadges";
 import FacilitySwitcher from "./shell/FacilitySwitcher";
 import { BottomSheet } from "@nabd/ui";
+import UrgentBadge from "./shell/UrgentBadge";
 
 // FEF-052: the sidebar renders whatever shell/navRegistry resolves for the role context (one registry, one badge resolver).
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -69,7 +70,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pharmacyCaps = usePharmacyCapabilities(input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
   if (input.perms.length === 0 || items.length === 0) return null;
   const currentTab = searchParams.get("tab");
-  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined }));
+  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined, urgent: !!i.urgent }));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4): 4 items + "More" when there are more.
   const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
   const overflowEntries = entries.length > 5 ? entries.slice(4) : [];
@@ -116,7 +117,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             <Icon name={e.icon} />
             <span className={styles.linkLabel}>{e.label}</span>
             <span className={styles.linkShort} aria-hidden="true">{e.short}</span>
-            {!!e.badgeCount && <span className={styles.badge}>{e.badgeCount}</span>}
+            {!!e.badgeCount && (e.urgent ? <UrgentBadge n={e.badgeCount} className={styles.badge} /> : <span className={styles.badge}>{e.badgeCount}</span>)}
           </Link>
         ))}
       </div>
@@ -183,7 +184,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           className={`${styles.bottomLink} ${e.active ? styles.bottomLinkActive : ""}`}>
           <span className={styles.bottomIcon}>
             <Icon name={e.icon} size={20} />
-            {!!e.badgeCount && <span className={styles.bottomBadge}>{e.badgeCount}</span>}
+            {!!e.badgeCount && (e.urgent ? <UrgentBadge n={e.badgeCount} className={styles.bottomBadge} /> : <span className={styles.bottomBadge}>{e.badgeCount}</span>)}
           </span>
           {e.short}
         </Link>

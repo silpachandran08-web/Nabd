@@ -1,5 +1,8 @@
 "use client";
 
+import { FieldError, useFormErrors } from "../../lib/formErrors";
+import { useFormValidation, useUnsavedGuard } from "../../lib/formValidation";
+import { checkInSchema } from "../../lib/formSchemas";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import Dialog from "../ui/Dialog";
@@ -116,6 +119,9 @@ export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
   onDone: (token: number) => void; onCheckedIn?: (token: number) => void;
 }) {
   const t = useTranslations("arrivals");
+  const fv = useTranslations("common.formErrors");
+  const fe = useFormErrors("checkin");
+  const v = useFormValidation(fe, (k) => fv(k));
   const locale = useLocale();
   const booked = !!(patient.nextAppointmentToday && patient.nextAppointmentId && patient.nextDoctorId);
   const [doctors, setDoctors] = useState<StaffOption[] | null>(null);
@@ -141,10 +147,12 @@ export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
     return () => { cancelled = true; };
   }, [booked]);
 
+  useUnsavedGuard(!!complaint);
   const finish = useCallback(() => { if (result) onDone(result.tokenNumber); }, [result, onDone]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!booked && !v.submit(checkInSchema, { doctorId }, e.currentTarget)) return; // FEF-033
     setSaving(true);
     setError(null);
     try {
@@ -173,7 +181,7 @@ export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
     ? new Date(patient.nextAppointment).toLocaleTimeString(dateLocale(locale, "en-GB"), { hour: "2-digit", minute: "2-digit" }) : "";
   return (
     <Dialog title={t("checkin.title", { name: patient.name })} onClose={onClose}>
-      <form onSubmit={submit}>
+      <form noValidate onSubmit={submit}>
         {booked ? (
           <p className={styles.sub}>{t("checkin.booked", { time, doctor: patient.nextDoctorName ?? "" })}</p>
         ) : (
@@ -181,10 +189,11 @@ export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
             <p className={styles.sub}>{t("checkin.walkInNote")}</p>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="checkin-doctor">{t("checkin.doctor")}</label>
-              <select id="checkin-doctor" data-shortcut="doctor" aria-keyshortcuts="F6" className={styles.select} value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
+              <select id="checkin-doctor" data-shortcut="doctor" aria-keyshortcuts="F6" className={styles.select} value={doctorId} onChange={(e) => { fe.clearField("doctorId"); setDoctorId(e.target.value); }} onBlur={() => v.blur(checkInSchema, "doctorId", { doctorId })} {...fe.attrs("doctorId")}>
                 <option value="">{doctors === null ? t("checkin.loading") : t("checkin.chooseDoctor")}</option>
                 {(doctors ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
+              <FieldError fe={fe} name="doctorId" className={styles.error} />
             </div>
           </>
         )}
@@ -192,7 +201,7 @@ export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
         {error && <div className={styles.error} role="alert">{error}</div>}
         <div className={styles.actions}>
           <button type="button" className={styles.secondaryBtn} onClick={onClose}>{t("dialog.cancel")}</button>
-          <button type="submit" className={styles.primaryBtn} disabled={saving || (!booked && !doctorId)} aria-keyshortcuts="Control+Enter">
+          <button type="submit" className={styles.primaryBtn} disabled={saving} aria-keyshortcuts="Control+Enter">
             {saving ? t("checkin.submitting") : t("checkin.submit")}
           </button>
         </div>

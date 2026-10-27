@@ -30,6 +30,7 @@ export function useNavBadges(role: RoleContext | null, perms: readonly string[],
     checkout: count(reception, (r) => r.status === "checkout_pending"),
     myday: count(mine, (r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status ?? "")),
     "nurse-priority": count(priority, () => true),
+    "triage-urgent": count(priority, (r) => !r.priorityAcknowledgedAt), // a raised flag nobody has acknowledged yet (FEF-055)
     "nurse-admin": count(admin, (o) => o.status === "not_started"),
   };
   return { badges, me, mine };

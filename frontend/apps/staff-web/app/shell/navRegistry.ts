@@ -4,12 +4,13 @@ import type { IconName } from "../components/ui/Icon";
 import { navAllowed, type Entitlements } from "../lib/entitlementRules.ts";
 
 export type RoleContext = "owner" | "doctor" | "nurse" | "reception";
-export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin";
+export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent";
 export type NavItem = {
   id: string; href: string; label: string; short: string; icon: IconName;
   perms: string[]; // every grant is required
   owner: string; // squad that fills the screen
   badge?: BadgeSource;
+  urgent?: boolean; // the badge is a warning: shown with an icon and the word "urgent", not colour alone
   /** Planned screen: shown only when the plan explicitly enables one of these modules (half-built features stay invisible). */
   planned?: { module: string[] };
   keywords?: string[]; // Ctrl+K only
@@ -73,13 +74,18 @@ const DOCTOR: NavItem[] = [
   { id: "packages", href: "/packages", label: "Treatment Packages", short: "Packages", icon: "package", perms: ["packages:view"], owner: MON },
 ];
 
+// FEF-055: the nurse's role home is triage and vitals; orders, procedures, vaccines and the clinical inbox sit beside it (prototype
+// nurse.triage / orders / procedures / inbox). The screens belong to Clinical (nursing module); the shell only gates and badges them.
+const NURSING = ["nursing:view"];
 const NURSE: NavItem[] = [
-  { id: "vitals", href: "/nursing", label: "Arrivals & Vitals", short: "Vitals", icon: "pulse", perms: [], owner: CLN, active: tabActive(undefined) },
-  { id: "priority", href: "/nursing?tab=priority", label: "Priority Patients", short: "Priority", icon: "alert", perms: [], owner: CLN, badge: "nurse-priority", active: tabActive("priority") },
-  { id: "administration", href: "/nursing?tab=administration", label: "Administration Orders", short: "Orders", icon: "syringe", perms: [], owner: CLN, badge: "nurse-admin", active: tabActive("administration") },
-  { id: "procedures", href: "/nursing?tab=procedures", label: "Today's Procedures", short: "Procedures", icon: "list", perms: [], owner: CLN, active: tabActive("procedures") },
+  { id: "triage", href: "/nursing", label: "Triage & Vitals", short: "Triage", icon: "pulse", perms: NURSING, owner: CLN, badge: "triage-urgent", urgent: true, active: tabActive(undefined), keywords: ["vitals", "arrivals"] },
+  { id: "orders", href: "/nursing?tab=administration", label: "Nursing Orders", short: "Orders", icon: "syringe", perms: NURSING, owner: CLN, badge: "nurse-admin", active: tabActive("administration"), keywords: ["administration", "injection"] },
+  { id: "procedures", href: "/nursing?tab=procedures", label: "Today's Procedures", short: "Procedures", icon: "list", perms: NURSING, owner: CLN, active: tabActive("procedures") },
+  { id: "vaccines", href: "/nursing?tab=vaccines", label: "Vaccines & Injections", short: "Vaccines", icon: "syringe", perms: NURSING, owner: CLN, active: tabActive("vaccines"), keywords: ["immunisation", "vaccination"] },
+  { id: "nurse-inbox", href: "/inbox", label: "Clinical Inbox", short: "Inbox", icon: "inbox", perms: ["clinical:view"], owner: CLN, planned: { module: ["lab", "emr_erx"] }, keywords: ["results", "messages"] },
+  { id: "priority", href: "/nursing?tab=priority", label: "Priority Patients", short: "Priority", icon: "alert", perms: NURSING, owner: CLN, badge: "nurse-priority", active: tabActive("priority") },
   { id: "nurse-packages", href: "/packages", label: "Package Sessions", short: "Packages", icon: "package", perms: ["packages:view"], owner: MON },
-  { id: "activity", href: "/nursing?tab=activity", label: "Completed Activity", short: "Activity", icon: "clock", perms: [], owner: CLN, active: tabActive("activity") },
+  { id: "activity", href: "/nursing?tab=activity", label: "Completed Activity", short: "Activity", icon: "clock", perms: NURSING, owner: CLN, active: tabActive("activity") },
 ];
 
 export const NAV: Record<RoleContext, NavItem[]> = { owner: OWNER, doctor: DOCTOR, nurse: NURSE, reception: RECEPTION };

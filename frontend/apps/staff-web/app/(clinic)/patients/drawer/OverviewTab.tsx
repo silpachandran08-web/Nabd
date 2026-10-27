@@ -64,7 +64,7 @@ export default function OverviewTab({ patient, listLastVisit, perms, onRegistryC
                     <div className={styles.muted}>Not available yet. They are saved at registration, but the server does not return them.</div>
                   </div>
 
-      {patientsEdit && <CompleteInChat key={patient.id} patientId={patient.id} />}
+                  {patientsEdit && <CompleteInChat key={patient.id} patientId={patient.id} />}
 
       <GuardianSection patient={patient} patientsEdit={patientsEdit} onRegistryChanged={onRegistryChanged} />
 

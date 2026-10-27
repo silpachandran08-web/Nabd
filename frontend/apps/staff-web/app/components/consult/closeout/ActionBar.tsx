@@ -1,5 +1,6 @@
 "use client";
 
+import { keyHint } from "../../../shell/shortcuts";
 import type { ReactNode } from "react";
 import type { Row } from "../shared";
 import type { Step } from "../workflow/consultWorkflow";
@@ -29,7 +30,7 @@ export default function ActionBar(a: Props) {
         ) : (
           <>
             {!a.locked && a.canEditNote && a.noteLoaded && (
-              <button className={styles.backBtn} onClick={a.onSaveDraft} disabled={a.saveState === "saving" || a.hasConflict || (!a.dirty && a.saveState !== "error")}>
+              <button className={styles.backBtn} {...keyHint("save")} onClick={a.onSaveDraft} disabled={a.saveState === "saving" || a.hasConflict || (!a.dirty && a.saveState !== "error")}>
                 {a.saveState === "saving" ? "Saving…" : "Save draft"}
               </button>
             )}

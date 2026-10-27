@@ -16,6 +16,9 @@ import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
 import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "@nabd/api-client/types";
 import { PRICE_REASONS, reasonLabel } from "../../../components/checkout/priceReasons";
+import { FieldError, useFormErrors } from "../../../lib/formErrors";
+import { useFormValidation, useUnsavedGuard } from "../../../lib/formValidation";
+import { discountSchema } from "../../../lib/formSchemas";
 
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
@@ -63,6 +66,8 @@ export default function CheckoutPage() {
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
   const [discountReason, setDiscountReason] = useState("");
+  const fe = useFormErrors("checkout");
+  const fv = useFormValidation(fe);
   const [editing, setEditing] = useState<string | null>(null); // chargeCode whose override editor is open
   const [ovPrice, setOvPrice] = useState("");
   const [ovReason, setOvReason] = useState("");
@@ -105,6 +110,7 @@ export default function CheckoutPage() {
     }
   }, [queueEntryId]);
 
+  useUnsavedGuard(!invoice && (items.length > 0 || Number(discount) !== 0 || tenders.some((t) => t.amount !== ""))); // FEF-033
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
@@ -168,10 +174,8 @@ export default function CheckoutPage() {
       setCreateError("Add at least one charge.");
       return null;
     }
-    if (discountNum > 0 && !discountReason) {
-      setCreateError("Pick a reason for the discount.");
-      return null;
-    }
+    // FEF-033: a typed discount (even a negative one) is checked against the API's discount schema; errors sit on the fields.
+    if (canDiscount && Number(discount) !== 0 && !fv.submit(discountSchema(subtotal), { value: Number(discount), reasonCode: discountReason }, document.body)) return null;
     setCreating(true);
     try {
       const body = {
@@ -395,18 +399,20 @@ export default function CheckoutPage() {
           {canDiscount && (
             <div className={styles.totalsRow}>
               <span>Discount</span>
-              <input aria-label="Discount amount" className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              <input aria-label="Discount amount" className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => { fe.clearField("value"); setDiscount(e.target.value); }} onBlur={() => Number(discount) !== 0 && fv.blur(discountSchema(subtotal), "value", { value: Number(discount), reasonCode: "x" })} {...fe.attrs("value")} />
             </div>
           )}
+          {canDiscount && <FieldError fe={fe} name="value" className={styles.errorState} />}
           {canDiscount && Number(discount) > 0 && (
             <div className={styles.totalsRow}>
               <span>Discount reason</span>
-              <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
+              <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => { fe.clearField("reasonCode"); setDiscountReason(e.target.value); }} onBlur={() => fv.blur(discountSchema(subtotal), "reasonCode", { value: 1, reasonCode: discountReason })} {...fe.attrs("reasonCode")}>
                 <option value="">Reason…</option>
                 {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
               </select>
             </div>
           )}
+          {canDiscount && <FieldError fe={fe} name="reasonCode" className={styles.errorState} />}
           <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
           <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
           <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>

@@ -22,6 +22,8 @@ import { useArrivals } from "../../components/arrivals/hooks/useArrivals";
 import type { RowHandlers } from "../../components/arrivals/board/RowActions";
 import DoctorBoard from "../../components/arrivals/doctors/DoctorBoard";
 
+const tip = (label: string, key: string) => `${label} (${key})`; // tooltip = label + its key (FEF-034)
+
 // ?tab= deep links (e.g. /arrivals?tab=checkout_pending; the sidebar's Billing & Day Close opens /billing) read
 // useSearchParams, which needs a Suspense boundary or the page's static prerender breaks.
 export default function ArrivalsPage() {
@@ -51,7 +53,7 @@ function ArrivalsPageInner() {
     if (!mounted || (action !== "walkin" && action !== "new" && action !== "checkin")) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot URL signal, consumed and stripped
     if (action === "checkin") { if (can("queue:create")) setDlg({ k: "checkin" }); }
-    else if (can("queue:create") && can("patients:view")) setDlg(action === "new" ? { k: "walkin", mode: "new" } : { k: "walkin" });
+    else if (can("queue:create") && can("patients:view")) setDlg(action === "new" ? { k: "walkin", mode: "new" } : { k: "walkin", q: searchParams.get("q") ?? undefined }); // q: a patient picked in Ctrl+K (FEF-034)
     router.replace("/arrivals");
   }, [mounted, searchParams, router]);
 
@@ -99,9 +101,9 @@ function ArrivalsPageInner() {
       {!forbidden && !byDoctor && hasQuickActions && (
         <div className={styles.quickActions}>
           {/* A token is only ever created as part of check-in, so walk-in and "issue token" are one action. */}
-          {grants.queueCreate && grants.patientsView && <button type="button" className={styles.primaryAction} onClick={() => setDlg({ k: "walkin" })} aria-keyshortcuts="F3">{t("walkInToken")}</button>}
-          {grants.queueCreate && grants.patientsView && grants.patientsCreate && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "walkin", mode: "new" })} aria-keyshortcuts="F2">{t("newPatient")}</button>}
-          {grants.queueCreate && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "checkin" })} aria-keyshortcuts="F4">{t("checkIn")}</button>}
+          {grants.queueCreate && grants.patientsView && <button type="button" className={styles.primaryAction} onClick={() => setDlg({ k: "walkin" })} aria-keyshortcuts="F3" title={tip(t("walkInToken"), "F3")}>{t("walkInToken")}</button>}
+          {grants.queueCreate && grants.patientsView && grants.patientsCreate && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "walkin", mode: "new" })} aria-keyshortcuts="F2" title={tip(t("newPatient"), "F2")}>{t("newPatient")}</button>}
+          {grants.queueCreate && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "checkin" })} aria-keyshortcuts="F4" title={tip(t("checkIn"), "F4")}>{t("checkIn")}</button>}
           {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "move" })}>{t("moveQueue")}</button>}
           {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "delayPicker" })}>{t("notifyDelay")}</button>}
           {grants.checkout && <button type="button" className={styles.actionBtn} onClick={() => setDlg({ k: "checkoutPicker" })}>{t("checkout")}</button>}
