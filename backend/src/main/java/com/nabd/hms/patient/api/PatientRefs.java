@@ -10,8 +10,8 @@ import java.util.UUID;
  */
 public interface PatientRefs {
 
-    /** Household member as the Edge may see it: no date of birth, no full name. {@code age} is an age band ("0-4" .. "60+"). */
-    record HouseholdMember(String patientRef, String firstName, String age, String relation, boolean isGuardian) {
+    /** Household member as the Edge may see it: no date of birth, no full name. {@code age} is an age band ("0-4" .. "60+"); {@code years} is the age in whole years (ACC-042 shows "Aarav (6)"). */
+    record HouseholdMember(String patientRef, String firstName, String age, String relation, boolean isGuardian, Integer years) {
     }
 
     /** The patient's reference, created on first use. */

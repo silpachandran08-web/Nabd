@@ -334,7 +334,7 @@ class Acc038InternalApiTest extends ApiTestBase {
         List<Map<String, Object>> members = (List<Map<String, Object>>) body.get("members");
         assertThat(members).hasSize(2);
         for (Map<String, Object> m : members) {
-            assertThat(m.keySet()).containsExactlyInAnyOrder("patientRef", "firstName", "age", "relation", "isGuardian");
+            assertThat(m.keySet()).containsExactlyInAnyOrder("patientRef", "firstName", "age", "years", "relation", "isGuardian");
         }
         Map<String, Object> guardian = members.stream().filter(m -> "Asha".equals(m.get("firstName"))).findFirst().orElseThrow();
         Map<String, Object> dependant = members.stream().filter(m -> "Chitra".equals(m.get("firstName"))).findFirst().orElseThrow();
