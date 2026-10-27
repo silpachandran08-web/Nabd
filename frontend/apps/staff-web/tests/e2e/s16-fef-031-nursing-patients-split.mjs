@@ -31,7 +31,7 @@ const worklist = Array.from({ length: 40 }, (_, i) => ({
   await page.getByText('Patient 1', { exact: true }).first().waitFor();
   check('N1 40-row worklist renders in one worklist call', log.requests.filter((r) => r.path === '/nursing/worklist').length === 1);
   const t0 = Date.now();
-  await page.getByRole('button', { name: /Capture vitals/ }).first().click();
+  await page.locator('td button', { hasText: 'Capture vitals' }).first().click();
   const dlg = page.getByRole('dialog');
   await dlg.waitFor();
   check('N2 capture dialog names the patient', /Patient 1/.test(await dlg.innerText()));
