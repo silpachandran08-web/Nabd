@@ -30,9 +30,11 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/internal/v1/tenants/:tid/appointments/:id/:action`, () => HttpResponse.json({}, { status: 200 })), // InternalSchedulingController_act
     http.get(`${baseUrl}/internal/v1/tenants/:tid/availability`, () => HttpResponse.json({"doctors":[{"doctorId":"00000000-0000-7000-8000-000000000000","sessions":[]}],"v":0}, { status: 200 })), // InternalSchedulingController_availability
     http.post(`${baseUrl}/internal/v1/tenants/:tid/booking-offers/:offerId/choose`, () => HttpResponse.json({}, { status: 200 })), // InternalBookingRequestController_choose
+    http.get(`${baseUrl}/internal/v1/tenants/:tid/booking-profile`, () => HttpResponse.json({"clinicName":"string","doctors":[{"doctorId":"00000000-0000-7000-8000-000000000000","name":"string"}],"timeZone":"string"}, { status: 200 })), // InternalBookingProfileController_profile
     http.post(`${baseUrl}/internal/v1/tenants/:tid/booking-requests`, () => HttpResponse.json({}, { status: 200 })), // InternalBookingRequestController_route
     http.get(`${baseUrl}/internal/v1/tenants/:tid/eta/appointments/:appointmentId`, () => HttpResponse.json({"display":{},"p50At":"2026-01-01T00:00:00Z","p80At":"2026-01-01T00:00:00Z","position":0,"v":0}, { status: 200 })), // EtaController_one
     http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash`, () => HttpResponse.json({}, { status: 200 })), // InternalHouseholdController_household
+    http.post(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/dependants`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // InternalDependantController_add
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients/consents`, () => HttpResponse.json({"consentIds":["00000000-0000-7000-8000-000000000000"]}, { status: 201 })), // InternalChatConsentController_capture
     http.get(`${baseUrl}/internal/v1/tenants/:tid/privacy-notice/current`, () => HttpResponse.json({"language":"string","path":"string","version":"string"}, { status: 200 })), // InternalChatConsentController_currentNotice
     http.post(`${baseUrl}/v1/abha/enrol`, () => HttpResponse.json({"abhaAddress":"string","abhaLast4":"string","txnId":"string","verified":false}, { status: 200 })), // AbhaController_enrol
@@ -440,4 +442,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 426;
+export const operationCount = 428;

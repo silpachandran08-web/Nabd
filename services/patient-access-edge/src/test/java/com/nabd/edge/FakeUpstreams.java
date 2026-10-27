@@ -24,6 +24,17 @@ final class FakeUpstreams {
     volatile String noticeVersion = "v1";
     volatile int consentStatus = 201;
     final List<String> relayed = new CopyOnWriteArrayList<>();
+    /** ACC-040/042 fakes. profiles: tenant id -> booking-profile JSON (default: one clinic, one doctor). households: phone hash -> member JSON objects. */
+    final Map<String, String> profiles = new ConcurrentHashMap<>();
+    final Map<String, List<String>> households = new ConcurrentHashMap<>();
+    final Map<String, String> rawSessions = new ConcurrentHashMap<>();  // doctorId -> JSON array of sessions (with "date")
+    final List<String> corePaths = new CopyOnWriteArrayList<>();         // every path Core was asked for
+    final List<String> bookCalls = new CopyOnWriteArrayList<>();         // "<Idempotency-Key>|<body>"
+    final List<String> dependantCalls = new CopyOnWriteArrayList<>();    // "<Idempotency-Key>|<hash>|<body>"
+    /** confirmed | requested | taken | drop_once (commit, then lose the answer once) | drop_always (never answer) */
+    volatile String bookMode = "confirmed";
+    volatile int dependantStatus = 201;
+    final Map<String, String> bookResults = new ConcurrentHashMap<>();   // Idempotency-Key -> stored answer
     final HttpServer core;
     final HttpServer comms;
 
@@ -41,6 +52,60 @@ final class FakeUpstreams {
                     reply(ex, consentStatus, consentStatus == 201 ? "{\"consentIds\":[]}" : "{}");
                     return;
                 }
+                corePaths.add(path0);
+                String[] seg = path0.split("/");
+                String tenant = seg.length > 4 ? seg[4] : "";
+                if (path0.endsWith("/booking-profile")) {
+                    reply(ex, 200, profiles.getOrDefault(tenant, profiles.getOrDefault("*",
+                            "{\"clinicName\":\"Test Clinic\",\"timeZone\":\"Asia/Kolkata\",\"doctors\":[]}")));
+                    return;
+                }
+                if (path0.contains("/households/")) {
+                    String hash = seg[6];
+                    if ("POST".equals(ex.getRequestMethod())) {
+                        String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        dependantCalls.add(ex.getRequestHeaders().getFirst("Idempotency-Key") + "|" + hash + "|" + body);
+                        if (dependantStatus == 400) {
+                            reply(ex, 400, "{\"code\":\"NOT_A_MINOR\"}");
+                        } else {
+                            String ref = "child-ref-" + dependantCalls.size();
+                            String first = body.replaceAll(".*\"firstName\":\"([^\"]+)\".*", "$1");
+                            households.computeIfAbsent(hash, h -> new CopyOnWriteArrayList<>()).add(member(ref, first, 3, "dependent"));
+                            reply(ex, 201, "{\"patientRef\":\"" + ref + "\"}");
+                        }
+                        return;
+                    }
+                    List<String> m = households.get(hash);
+                    reply(ex, m == null || m.isEmpty() ? 404 : 200, m == null || m.isEmpty() ? "{}" : "{\"members\":[" + String.join(",", m) + "]}");
+                    return;
+                }
+                if (path0.endsWith("/booking-requests")) {
+                    String key = ex.getRequestHeaders().getFirst("Idempotency-Key");
+                    String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    bookCalls.add(key + "|" + body);
+                    if ("drop_always".equals(bookMode)) {
+                        ex.close();
+                        return;
+                    }
+                    String stored = bookResults.get(key);
+                    if (stored == null && "taken".equals(bookMode)) {
+                        reply(ex, 409, "{\"code\":\"SLOT_TAKEN\"}");
+                        return;
+                    }
+                    if (stored == null) {
+                        stored = "requested".equals(bookMode)
+                                ? "{\"appointmentId\":\"" + UUID.randomUUID() + "\",\"status\":\"REQUESTED\",\"slaDueAt\":\"" + java.time.Instant.now().plusSeconds(600) + "\"}"
+                                : "{\"appointmentId\":\"" + UUID.randomUUID() + "\",\"status\":\"CONFIRMED\"}";
+                        bookResults.put(key, stored);
+                        if ("drop_once".equals(bookMode)) {
+                            bookMode = "confirmed";
+                            ex.close(); // committed, answer lost
+                            return;
+                        }
+                    }
+                    reply(ex, 201, stored);
+                    return;
+                }
                 coreCalls.incrementAndGet();
                 try {
                     Thread.sleep(coreDelayMs);
@@ -49,6 +114,19 @@ final class FakeUpstreams {
                 }
                 String q = ex.getRequestURI().getQuery();
                 String doctor = q.replaceAll(".*doctorId=([^&]+).*", "$1");
+                if (rawSessions.containsKey(doctor)) {
+                    String from = q.replaceAll(".*from=([^&]+).*", "$1"), to = q.replaceAll(".*to=([^&]+).*", "$1");
+                    var sessions = new tools.jackson.databind.ObjectMapper().readTree(rawSessions.get(doctor));
+                    var kept = new StringBuilder();
+                    for (var sn : sessions) {
+                        String d = sn.path("date").asString("");
+                        if (d.compareTo(from) >= 0 && d.compareTo(to) <= 0) {
+                            kept.append(kept.length() == 0 ? "" : ",").append(sn);
+                        }
+                    }
+                    reply(ex, 200, "{\"doctors\":[{\"doctorId\":\"" + doctor + "\",\"sessions\":[" + kept + "]}],\"v\":1}");
+                    return;
+                }
                 String slots = slotsByDoctor.getOrDefault(doctor, "[]");
                 reply(ex, 200, "{\"doctors\":[{\"doctorId\":\"" + doctor + "\",\"sessions\":[{\"id\":\"s1\",\"mode\":\"slots\",\"slots\":" + slots + "}]}],\"v\":1}");
             });
@@ -82,6 +160,10 @@ final class FakeUpstreams {
     void inbound(String messageId, String contactHash, String text, String buttonPayload) {
         messages.put(messageId, "{\"kind\":\"" + (buttonPayload == null ? "text" : "button") + "\",\"text\":\"" + text + "\",\"contactHash\":\""
                 + contactHash + "\"" + (buttonPayload == null ? "" : ",\"buttonPayload\":\"" + buttonPayload + "\"") + "}");
+    }
+
+    static String member(String ref, String first, int years, String relation) {
+        return "{\"patientRef\":\"" + ref + "\",\"firstName\":\"" + first + "\",\"age\":\"x\",\"years\":" + years + ",\"relation\":\"" + relation + "\",\"isGuardian\":false}";
     }
 
     static String id() {

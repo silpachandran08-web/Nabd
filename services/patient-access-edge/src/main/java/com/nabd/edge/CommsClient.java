@@ -47,7 +47,8 @@ public class CommsClient {
         m.put("contactHash", contactHash);
         m.put("text", text);
         if (!buttons.isEmpty()) {
-            m.put("buttons", buttons.stream().map(b -> Map.of("id", b.id(), "title", b.title())).toList());
+            // WhatsApp reply buttons are at most 3; more options go out as a list message (max 10 rows), same id/title pairs
+            m.put(buttons.size() > 3 ? "rows" : "buttons", buttons.stream().map(b -> Map.of("id", b.id(), "title", b.title())).toList());
         }
         http.post(base + "/internal/v1/tenants/" + tenantId + "/messages", json.writeValueAsString(m));
     }
