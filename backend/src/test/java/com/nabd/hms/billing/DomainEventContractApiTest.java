@@ -214,7 +214,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         String appt = id(call(e, HttpMethod.POST, "/v1/appointments", Map.of("patientId", p, "doctorId", doctor.toString(), "startTime", slot)));
         String moved = id(call(e, HttpMethod.POST, "/v1/appointments/" + appt + "/reschedule",
                 Map.of("newStartTime", tomorrow.atTime(10, 15).atZone(zone(t)).toInstant().toString())));
-        call(e, HttpMethod.POST, "/v1/appointments/" + moved + "/cancel", Map.of("reason", "patient called"));
+        call(e, HttpMethod.POST, "/v1/appointments/" + moved + "/cancel", Map.of("reasonCode", "illness"));
 
         // scheduling.appointment.arrived: today's appointment, written directly (a booking must be in the future on the grid)
         UUID today = inTenantTx(t, () -> jdbc.queryForObject("INSERT INTO appointments (tenant_id, patient_id, doctor_id, start_time, end_time) "
@@ -278,6 +278,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.PLATFORM_ENTITLEMENTS_CHANGED.type()); // PLT-059: operator-plane producer, Plt059EntitlementsApiTest
         expected.remove(DomainEventType.PRIVACY_NOTICE_PUBLISHED.type()); // IDC-003: Idc003PrivacyNoticeApiTest
         expected.remove(DomainEventType.BOOKING_ROUTED.type()); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
+        expected.remove(DomainEventType.APPOINTMENT_NO_SHOW.type()); // ACC-025: Acc025NoShowApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
         expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
         expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
