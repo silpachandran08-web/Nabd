@@ -5526,6 +5526,45 @@ paths:
         "403": { description: Forbidden }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: Conflict }
+  /pharmacy/receipts:
+    post:
+      tags: [Pharmacy]
+      summary: >
+        PHL-007. Post a direct supplier bill (no purchase order) in one transaction: the receipt, its lines and one `receipt` stock
+        movement per line (paid + free units, through the pharmacy stock port). `effectivePurchaseRate` = rate x paid / (paid + free),
+        half-up to 2 places (10 paid + 2 free at 50 = 41.67). The supplier is named (`supplierName`; `supplierId` is kept as sent, there is
+        no supplier master yet); the same supplier and bill number twice is 409 duplicate-supplier-bill; any line expiring before the
+        clinic's today rejects the whole bill with 422 batch-expired; an unknown or non-stocked item is 404. Needs the in-house
+        pharmacy entitlement and Hybrid or In-house mode (403 pharmacy-mode-external). `batchId` in the response stays null until the
+        batch tables of PHL-005 exist. Permission is pharmacy:edit (there is no pharmacy:purchase action in the RBAC model).
+      x-required-permission: pharmacy:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/GoodsReceiptRequest" } } }
+      responses:
+        "201": { description: Posted, content: { application/json: { schema: { $ref: "#/components/schemas/GoodsReceiptResponse" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: duplicate-supplier-bill, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: batch-expired, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /billing/checkout/{queueEntryId}/prefill:
+    get:
+      tags: [Billing]
+      summary: >
+        PHL-018. The in-house lines of the visit's signed prescription, ready to tick at checkout: a stocked, active, in-house catalogue item
+        matches the coded drug (or the line's name); external items are not listed. `qty` is what is still to dispense (prescribed minus
+        units on non-void invoices; lines with nothing left or no prescribed quantity are dropped), `onHand` the shelf stock now. Empty in External
+        mode. To dispense more than `onHand`, POST the checkout line with `shortfallReason`: the line takes what is on hand (stock never
+        goes below zero), the rest is recorded in stock_discrepancies for the next count; a blank reason is 422 reason-required, no reason
+        keeps 400 insufficient-stock. Permission is billing:create (there is no billing:checkout action).
+      x-required-permission: billing:create
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/CheckoutPrefill" } } } }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
   /pharmacy/items/{id}/stock-adjustments:
     post:
       tags: [Pharmacy]
@@ -6935,7 +6974,7 @@ components:
         isRx: { type: boolean }
         hsnCode: { type: [string, "null"] }
         price: { type: number, minimum: 0 }
-        taxRatePercent: { type: [number, "null"], minimum: 0, description: Defaults to 0 }
+        taxRatePercent: { type: [number, "null"], minimum: 0, description: "On create, omitted = the market's headline rate (AE 5, SA 15), else 0 (PHL-021)" }
         stockQty: { type: [integer, "null"], minimum: 0, description: Opening stock on POST; ignored on PATCH }
         scheduleClass: { type: [string, "null"], description: "PHL-002: must be valid for the tenant's market, else 422 schedule-not-valid-for-market. Omitted = unchanged (on create: derived from isRx)." }
         drugMasterId: { type: [string, "null"], description: "PHL-002: drug master product to link; its schedule flag sets the class unless scheduleClass is sent. 404 DRUG_NOT_FOUND." }
@@ -6943,6 +6982,9 @@ components:
         packSize: { type: [integer, "null"], minimum: 1 }
         unit: { type: [string, "null"] }
         inHouse: { type: [boolean, "null"], description: "PHL-004: false = buy outside. Omitted = unchanged (true on create)." }
+        priceInclusiveOfTax: { type: [boolean, "null"], description: "PHL-021: true = the price already contains the tax (India MRP pricing); tax is backed out by the billing tax engine. Omitted = unchanged (null = the charge head decides)." }
+        zeroRated: { type: [boolean, "null"], description: "PHL-021: zero-rated medicine, VAT 0% with the reason printed on the invoice. Omitted = unchanged (false on create)." }
+        mrp: { type: [number, "null"], minimum: 0, description: "PHL-021: maximum retail price; billing a higher price is 422 price-above-mrp. Omitted = unchanged. Item level until PHL-005 adds batch MRP." }
     BillingCharge:
       type: object
       description: Row of the checkout / OTC charge lists (ChargeResponse).
@@ -7135,6 +7177,67 @@ components:
         packSize: { type: [integer, "null"] }
         unit: { type: [string, "null"] }
         inHouse: { type: boolean, description: "PHL-004: false = bought outside; listed by GET /pharmacy/buy-outside and never offered at checkout." }
+        priceInclusiveOfTax: { type: [boolean, "null"], description: "PHL-021: null = the charge head decides." }
+        zeroRated: { type: boolean }
+        mrp: { type: [number, "null"] }
+    GoodsReceiptRequest:
+      type: object
+      required: [supplierName, billNumber, billDate, lines]
+      properties:
+        supplierId: { type: [string, "null"], format: uuid }
+        supplierName: { type: string, minLength: 1, maxLength: 200 }
+        billNumber: { type: string, minLength: 1, maxLength: 60 }
+        billDate: { type: string, format: date }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: "#/components/schemas/GoodsReceiptLineRequest" }
+    GoodsReceiptLineRequest:
+      type: object
+      required: [itemId, batchNo, expiryDate, mrp, rate, qty]
+      properties:
+        itemId: { type: string, format: uuid }
+        batchNo: { type: string, minLength: 1, maxLength: 60 }
+        expiryDate: { type: string, format: date, description: "Before the clinic's today = 422 batch-expired; the UI turns MM/YY into the last day of the month." }
+        mrp: { type: number, minimum: 0 }
+        rate: { type: number, minimum: 0 }
+        qty: { type: integer, minimum: 1 }
+        freeQty: { type: [integer, "null"], minimum: 0 }
+        taxRate: { type: [number, "null"], minimum: 0 }
+    GoodsReceiptResponse:
+      type: object
+      properties:
+        receiptId: { type: string, format: uuid }
+        supplierName: { type: string }
+        billNumber: { type: string }
+        billDate: { type: string, format: date }
+        subtotal: { type: number }
+        batches: { type: array, items: { $ref: "#/components/schemas/GoodsReceiptBatch" } }
+    GoodsReceiptBatch:
+      type: object
+      properties:
+        itemId: { type: string, format: uuid }
+        batchId: { type: [string, "null"], format: uuid, description: Null until PHL-005. }
+        batchNo: { type: string }
+        expiryDate: { type: string, format: date }
+        mrp: { type: number }
+        effectivePurchaseRate: { type: number }
+        unitsReceived: { type: integer }
+        stockAfter: { type: integer }
+    CheckoutPrefill:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              chargeCode: { type: string }
+              chargeName: { type: string }
+              qty: { type: integer, minimum: 1 }
+              prescriptionItemId: { type: string, format: uuid }
+              onHand: { type: integer, minimum: 0 }
     PharmacyScheduleClass:
       type: object
       properties:

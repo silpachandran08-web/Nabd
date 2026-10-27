@@ -28,9 +28,18 @@ import java.util.UUID;
 public class CheckoutController {
 
     private final CheckoutService service;
+    private final CheckoutPrefill prefill;
 
-    CheckoutController(CheckoutService service) {
+    CheckoutController(CheckoutService service, CheckoutPrefill prefill) {
         this.service = service;
+        this.prefill = prefill;
+    }
+
+    /** PHL-018: the visit's in-house Rx lines, ready to tick at checkout. */
+    @GetMapping("/checkout/{queueEntryId}/prefill")
+    @PreAuthorize("hasAuthority('billing:create')")
+    public com.nabd.hms.billing.dto.CheckoutPrefillResponse prefill(@PathVariable UUID queueEntryId) {
+        return prefill.prefill(queueEntryId);
     }
 
     @GetMapping("/checkout/{queueEntryId}")

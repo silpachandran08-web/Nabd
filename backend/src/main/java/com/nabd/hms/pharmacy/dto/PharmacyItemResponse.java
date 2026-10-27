@@ -21,6 +21,10 @@ public record PharmacyItemResponse(
         Integer packSize,
         String unit,
         /** PHL-004: false = not dispensed here, shown as "buy outside" on the Rx and never offered at checkout. */
-        boolean inHouse
+        boolean inHouse,
+        /** PHL-021: null = the charge head decides. */
+        Boolean priceInclusiveOfTax,
+        boolean zeroRated,
+        BigDecimal mrp
 ) {
 }

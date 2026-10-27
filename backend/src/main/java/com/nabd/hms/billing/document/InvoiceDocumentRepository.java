@@ -29,6 +29,12 @@ class InvoiceDocumentRepository {
                 (rs, i) -> rs.getString(1), tenantId, invoiceId);
     }
 
+    /** Catalogue head of each line in display order (null for a free-text line). */
+    List<java.util.UUID> catalogueIds(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT charge_catalogue_id FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order",
+                (rs, i) -> rs.getObject(1, java.util.UUID.class), tenantId, invoiceId);
+    }
+
     int invoiceVersion(UUID tenantId, UUID invoiceId) {
         return jdbc.queryForObject("SELECT version FROM invoices WHERE tenant_id = ? AND id = ?", Integer.class, tenantId, invoiceId);
     }

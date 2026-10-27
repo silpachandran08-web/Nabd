@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,10 +52,15 @@ public class PharmacyService {
     private final PharmacySchedules schedules;
     private final PharmacyModes modes;
     private final Entitlements entitlements;
+    private final PharmacyTaxInputsRepository taxInputs;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors,
                     EventPublisher events, DrugMasterLookup drugs, StockCommands stock, PharmacySchedules schedules,
-                    PharmacyModes modes, Entitlements entitlements) {
+                    PharmacyModes modes, Entitlements entitlements, PharmacyTaxInputsRepository taxInputs,
+                    com.nabd.hms.organization.api.RegionRules regions) {
+        this.taxInputs = taxInputs;
+        this.regions = regions;
         this.stock = stock;
         this.schedules = schedules;
         this.modes = modes;
@@ -184,8 +190,12 @@ public class PharmacyService {
         String drugId = linkedDrugId(req);
         String cls = schedules.resolve(req.scheduleClass(), drugId, req.isRx(), null);
         String code = "PHM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        UUID id = repo.insertItem(tenantId, code, req);
+        // PHL-021: an item added without a tax rate takes the market's headline rate (AE 5, SA 15); markets without one (IN slabs, QA) stay 0
+        BigDecimal rate = req.taxRatePercent() != null ? req.taxRatePercent()
+                : java.util.Objects.requireNonNullElse(regions.region(repo.tenantMarket(tenantId)).standardTaxRate(), BigDecimal.ZERO);
+        UUID id = repo.insertItem(tenantId, code, req.withTaxRatePercent(rate));
         repo.upsertProfile(tenantId, id, cls, req.genericName(), req.packSize(), req.unit(), req.inHouse());
+        taxInputs.setInputs(tenantId, id, req.priceInclusiveOfTax(), req.zeroRated(), req.mrp());
         if (drugId != null) {
             repo.setDrug(tenantId, id, drugId);
         }
@@ -208,6 +218,7 @@ public class PharmacyService {
         String cls = schedules.resolve(req.scheduleClass(), drugId, req.isRx(), before.scheduleClass());
         repo.updateItem(tenantId, id, req);
         repo.upsertProfile(tenantId, id, cls, req.genericName(), req.packSize(), req.unit(), req.inHouse());
+        taxInputs.setInputs(tenantId, id, req.priceInclusiveOfTax(), req.zeroRated(), req.mrp());
         if (drugId != null && !drugId.equals(before.drugId())) {
             repo.setDrug(tenantId, id, drugId);
         }
@@ -328,7 +339,7 @@ public class PharmacyService {
     private PharmacyItemResponse toResponse(PharmacyItemRow r) {
         return new PharmacyItemResponse(r.id().toString(), r.code(), r.name(), r.isRx(), r.hsnCode(), r.price(),
                 r.taxRatePercent(), r.stockQty(), r.active(), r.drugId(), r.scheduleClass(), r.registerType(), r.genericName(),
-                r.packSize(), r.unit(), r.inHouse());
+                r.packSize(), r.unit(), r.inHouse(), r.priceInclusiveOfTax(), r.zeroRated(), r.mrp());
     }
 
     /** CLN-019: owner maps an in-house item to a drug master id. is_rx is only SUGGESTED (scheduled product => prescription-only);

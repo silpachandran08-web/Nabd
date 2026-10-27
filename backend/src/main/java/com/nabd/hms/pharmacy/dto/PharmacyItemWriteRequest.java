@@ -23,8 +23,19 @@ public record PharmacyItemWriteRequest(
         @Positive Integer packSize,
         @Size(max = 40) String unit,
         /** PHL-004: false = bought outside. Omitted = unchanged (true on create). */
-        Boolean inHouse
+        Boolean inHouse,
+        /** PHL-021: true = the price already includes tax (India MRP pricing). Omitted = unchanged (the charge head's setting stands). */
+        Boolean priceInclusiveOfTax,
+        /** PHL-021: zero-rated medicine (VAT 0% with the reason on the invoice). Omitted = unchanged (false on create). */
+        Boolean zeroRated,
+        /** PHL-021: maximum retail price; a selling price above it is refused at billing (422 price-above-mrp). Omitted = unchanged. */
+        @PositiveOrZero BigDecimal mrp
 ) {
+    public PharmacyItemWriteRequest withTaxRatePercent(BigDecimal rate) {
+        return new PharmacyItemWriteRequest(name, isRx, hsnCode, price, rate, stockQty, scheduleClass, drugMasterId, genericName, packSize,
+                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp);
+    }
+
     public BigDecimal taxRatePercentOrZero() {
         return taxRatePercent == null ? BigDecimal.ZERO : taxRatePercent;
     }

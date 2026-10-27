@@ -24,20 +24,22 @@ public record LineItemRequest(
         @DecimalMin(value = "0") BigDecimal taxRatePercent,
         @Valid Override override,
         UUID prescriptionItemId,
-        String tier
+        String tier,
+        /** PHL-018: "dispense anyway" for a stocked item when the shelf holds less than {@code quantity}; the missing units become a stock discrepancy. */
+        @jakarta.validation.constraints.Size(max = 200) String shortfallReason
 ) {
+    /** Existing callers: no tier (server default) and no shortfall reason. */
+    public LineItemRequest(String chargeCode, String chargeName, String category, int quantity, BigDecimal unitPrice,
+                           BigDecimal taxRatePercent, Override override, UUID prescriptionItemId) {
+        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, override, prescriptionItemId, null, null);
+    }
+
     public record Override(@DecimalMin(value = "0") BigDecimal unitPrice, String reasonCode, String note) {
     }
 
     /** Server-built lines (package sales): no override. */
     public LineItemRequest(String chargeCode, String chargeName, String category, int quantity,
                            BigDecimal unitPrice, BigDecimal taxRatePercent) {
-        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, null, null, null);
-    }
-
-    /** Pre-FIN-016 shape: no tier (server default). */
-    public LineItemRequest(String chargeCode, String chargeName, String category, int quantity, BigDecimal unitPrice,
-                           BigDecimal taxRatePercent, Override override, UUID prescriptionItemId) {
-        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, override, prescriptionItemId, null);
+        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, null, null, null, null);
     }
 }

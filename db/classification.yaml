@@ -1298,6 +1298,54 @@ schemas:
       phone_last10: pii
       name_search: pii
       change_seq: operational
+    dispenses:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      source: operational
+      lines: operational
+      created_by: operational
+      created_at: operational
+    goods_receipts:
+      id: operational
+      tenant_id: operational
+      supplier_id: operational
+      supplier_name_snapshot: operational
+      supplier_key: operational
+      purchase_order_id: operational
+      bill_number: financial
+      bill_date: financial
+      status: operational
+      subtotal: financial
+      line_count: operational
+      posted_by: operational
+      posted_at: operational
+    goods_receipt_lines:
+      id: operational
+      tenant_id: operational
+      receipt_id: operational
+      line_order: operational
+      item_id: operational
+      batch_id: operational
+      batch_no: operational
+      expiry_date: operational
+      mrp: financial
+      rate: financial
+      qty: operational
+      free_qty: operational
+      tax_rate: financial
+      effective_rate: financial
+      line_total: financial
+    stock_discrepancies:
+      id: operational
+      tenant_id: operational
+      item_id: operational
+      qty: operational
+      reason: operational
+      dispense_id: operational
+      resolved_by_stock_take_id: operational
+      created_by: operational
+      created_at: operational
     pharmacy_item_profiles:
       item_id: operational
       tenant_id: operational
@@ -1307,6 +1355,10 @@ schemas:
       unit: operational
       in_house: operational
       updated_at: operational
+      price_inclusive_of_tax: operational
+      zero_rated: operational
+      hsn_code: operational
+      mrp: financial
     pharmacy_schedule_rules:
       market: operational
       schedule_class: operational

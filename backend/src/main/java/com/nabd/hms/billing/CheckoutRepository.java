@@ -28,8 +28,10 @@ class CheckoutRepository {
 
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.pharmacy.api.StockCommands stock;
+    private final com.nabd.hms.pharmacy.api.RxDispensing dispensing;
 
-    CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock) {
+    CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock, com.nabd.hms.pharmacy.api.RxDispensing dispensing) {
+        this.dispensing = dispensing;
         this.jdbc = jdbc;
         this.stock = stock;
     }
@@ -141,17 +143,18 @@ class CheckoutRepository {
                 number.formatted(), number.seriesId(), number.number());
     }
 
-    void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items) {
-        appendLineItems(tenantId, invoiceId, items, 0);
+    void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, UUID staffId) {
+        appendLineItems(tenantId, invoiceId, items, 0, staffId);
     }
 
     /** NB-355: a department whose flow bills mid-visit (e.g. a consultation fee at an interim
      * billing_pending stop) keeps adding to the SAME invoice at each later billing checkpoint
      * rather than creating a new one — display_order continues from whatever's already there. */
-    void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder) {
+    void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder, UUID staffId) {
         int order = startOrder;
+        List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed = new java.util.ArrayList<>();
         for (LineItemInput item : items) {
-            String scheduleClass = decrementPharmacyStockIfApplicable(invoiceId, item.chargeCode(), item.quantity());
+            String scheduleClass = decrementPharmacyStockIfApplicable(invoiceId, item, dispensed);
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
@@ -162,6 +165,7 @@ class CheckoutRepository {
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
                     item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(), scheduleClass);
         }
+        dispensing.record(invoiceId, staffId, dispensed); // PHL-018: dispenses row + stock discrepancies
     }
 
     int nextLineItemOrder(UUID tenantId, UUID invoiceId) {
@@ -214,9 +218,15 @@ class CheckoutRepository {
 
     /** Billing a stocked pharmacy item takes it off the shelf in the same transaction, through the pharmacy module's
      * StockCommands (PHL-003); an ordinary charge is untouched. Returns the item's schedule class as sold (PHL-002), else null. */
-    private String decrementPharmacyStockIfApplicable(UUID invoiceId, String chargeCode, int quantity) {
-        return stock.stockedItem(chargeCode)
-                .map(item -> stock.issue(item, quantity, invoiceId, "Dispensed at checkout").scheduleClass()).orElse(null);
+    private String decrementPharmacyStockIfApplicable(UUID invoiceId, LineItemInput line, List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed) {
+        return stock.stockedItem(line.chargeCode()).map(item -> {
+            var issued = dispensing.issue(item, line.quantity(), invoiceId, line.shortfallReason()); // PHL-018: a reason lets a shortfall through
+            if (line.prescriptionItemId() != null || issued.shortQty() > 0) {
+                dispensed.add(new com.nabd.hms.pharmacy.api.RxDispensing.Line(line.chargeCode(), item, line.quantity(), issued.shortQty(),
+                        line.shortfallReason(), line.prescriptionItemId()));
+            }
+            return issued.scheduleClass();
+        }).orElse(null);
     }
 
     /** PHA-011: locks the invoice row so two concurrent voids (or a void racing a payment) run one after the other. */
@@ -244,7 +254,8 @@ class CheckoutRepository {
                 (rs, i) -> new Object[]{UUID.fromString(rs.getString("id")), rs.getString("charge_code"), rs.getInt("qty")},
                 tenantId, invoiceId);
         for (Object[] l : lines) {
-            int qty = (Integer) l[2];
+            int qty = (Integer) l[2] - dispensing.shortfallOf(invoiceId, (UUID) l[0]); // PHL-018: units that never left the shelf
+            if (qty <= 0) continue;
             stock.returnIn((UUID) l[0], qty, invoiceId, staffId, reason);
             restored.add(new Object[]{l[1], qty});
         }
