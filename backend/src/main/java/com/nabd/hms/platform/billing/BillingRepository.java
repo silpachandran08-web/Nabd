@@ -61,14 +61,21 @@ class BillingRepository {
                 subscriptionMapper(), Timestamp.from(afterCreatedAt), afterId, limit);
     }
 
-    UUID upsert(UUID tenantId, UUID planId, int mrrCents, String currency, LocalDate renewalDate) {
+    UUID upsert(UUID tenantId, UUID planId, int mrrCents, String currency, LocalDate renewalDate, Instant trialEndsAt) {
+        // ADM-004: a trial_ends_at makes it a trial; without one the subscription is a real, active one (a trial that is converted)
         return jdbc.queryForObject(
-                "INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date, plan_version) " +
-                        "VALUES (?,?,?,?,?,(SELECT version FROM master.plans WHERE id = ?)) " + // ADM-034: sold/moved onto the current version
+                "INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date, plan_version, trial_ends_at, status) " +
+                        "VALUES (?,?,?,?,?,(SELECT version FROM master.plans WHERE id = ?),?,?) " + // ADM-034: sold/moved onto the current version
                         "ON CONFLICT (tenant_id) DO UPDATE SET plan_id = EXCLUDED.plan_id, mrr_cents = EXCLUDED.mrr_cents, plan_version = EXCLUDED.plan_version, " +
-                        "  currency = EXCLUDED.currency, renewal_date = EXCLUDED.renewal_date " +
+                        "  currency = EXCLUDED.currency, renewal_date = EXCLUDED.renewal_date, " +
+                        "  trial_ends_at = EXCLUDED.trial_ends_at, status = EXCLUDED.status, trial_reminded_days = NULL " +
                         "RETURNING id",
-                UUID.class, tenantId, planId, mrrCents, currency, renewalDate, planId);
+                UUID.class, tenantId, planId, mrrCents, currency, renewalDate, planId,
+                trialEndsAt == null ? null : Timestamp.from(trialEndsAt), trialEndsAt == null ? "active" : "trialing");
+    }
+
+    int trialDays(UUID planId) {
+        return jdbc.queryForObject("SELECT trial_days FROM master.plans WHERE id = ?", Integer.class, planId);
     }
 
     /** {pricingBasis, monthly_price_cents} of the plan's current version. */

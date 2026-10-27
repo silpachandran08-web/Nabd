@@ -10,6 +10,7 @@ import { MODE_DESC, ModeChangeDialog, type PharmacyMode } from "../../../compone
 import pharmacyStyles from "../../../components/setup/pharmacy.module.css";
 import { api, ApiError, reasonText } from "../../../lib/api";
 import DpaPanel from "../../../components/setup/DpaPanel";
+import GoLivePanel from "../../../components/setup/GoLivePanel";
 
 // ADM-007: nine steps; progress and drafts live on the server, so a phone and a laptop show the same wizard.
 type ChecklistItem = { step: string; status: "pending" | "current" | "skipped" | "done"; draft?: Record<string, unknown>; version?: number };
@@ -226,30 +227,13 @@ function SetupWizard() {
             <button className={styles.btn} onClick={() => router.push("/setup?tab=data")}>Open Import / Export</button>
           </div>
         );
-      case "go_live": {
-        const blockers: string[] = [];
-        if (statusOf("doctors") !== "done") blockers.push("No doctor added");
-        if (statusOf("whatsapp") !== "done") blockers.push("WhatsApp not connected");
-        if (statusOf("dpa") !== "done") blockers.push("Data processing agreement not signed");
+      case "go_live":
         return (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Go-live check</h2>
-            {blockers.length === 0 ? (
-              <div className={styles.success}>
-                <div className={styles.successIcon}>✅</div>
-                <p className={styles.text}>You&apos;re ready — you can book and bill a real patient now.</p>
-              </div>
-            ) : (
-              <>
-                <p className={styles.text}>The following blockers must be cleared before going live:</p>
-                <ul className={styles.text}>
-                  {blockers.map((b) => <li key={b}>{b}</li>)}
-                </ul>
-              </>
-            )}
+            <GoLivePanel />
           </div>
         );
-      }
       default:
         return null;
     }

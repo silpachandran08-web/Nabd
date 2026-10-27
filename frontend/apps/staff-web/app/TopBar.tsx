@@ -10,6 +10,7 @@ import { useLiveStatus } from "./lib/live";
 import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
 import ShellUserMenu from "./shell/ShellUserMenu";
+import TrialChip from "./components/setup/TrialChip";
 import ThemeToggle from "./shell/ThemeToggle";
 import { formatClinicTime } from "./lib/clinicTime";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
@@ -147,6 +148,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
         <span className={styles.kbd}>⌘K</span>
       </>}
       <div className={styles.spacer} />
+      <TrialChip />
       <LanguagePicker />
       <ThemeToggle />
       {primaryAction && (

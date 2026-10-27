@@ -41,11 +41,13 @@ public class BillingService {
     private final com.nabd.hms.iam.api.ActorDirectory actors;
     private final com.nabd.hms.common.TenantScope tenantScope;
     private final com.nabd.hms.platform.entitlements.EntitlementEvents entitlementEvents;
+    private final java.time.Clock clock;
 
     BillingService(BillingRepository repo, TenantLifecycleService lifecycleService, PlatformAudit audit,
                    com.nabd.hms.organization.api.RegionRules regions, com.nabd.hms.iam.api.ActorDirectory actors,
                    com.nabd.hms.common.TenantScope tenantScope,
-                   com.nabd.hms.platform.entitlements.EntitlementEvents entitlementEvents) {
+                   com.nabd.hms.platform.entitlements.EntitlementEvents entitlementEvents, java.time.Clock clock) {
+        this.clock = clock;
         this.actors = actors;
         this.tenantScope = tenantScope;
         this.entitlementEvents = entitlementEvents;
@@ -82,7 +84,9 @@ public class BillingService {
         int mrr = req.mrrCents() != null ? req.mrrCents()
                 : com.nabd.hms.platform.plans.PlanPricing.mrrCents((String) pricing[0], (Integer) pricing[1],
                         "per_doctor".equals(pricing[0]) ? tenantScope.run(tenantId, () -> actors.listClinicians(tenantId).size()) : 0);
-        repo.upsert(tenantId, req.planId(), mrr, currency, req.renewalDate());
+        java.time.Instant trialEndsAt = Boolean.TRUE.equals(req.startTrial())
+                ? java.time.Instant.now(clock).plus(java.time.Duration.ofDays(repo.trialDays(req.planId()))) : null;
+        repo.upsert(tenantId, req.planId(), mrr, currency, req.renewalDate(), trialEndsAt);
         entitlementEvents.changed(tenantId, java.util.List.of("plan")); // PLT-059: a plan (version) move changes what the clinic may use
         SubscriptionResponse after = getForTenant(tenantId);
         audit.record(tenantId, operatorId, ip, before == null ? "platform_billing.subscription_created"

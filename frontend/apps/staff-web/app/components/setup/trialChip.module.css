@@ -1,0 +1,11 @@
+.chip { display: inline-flex; align-items: center; min-block-size: 32px; padding-inline: var(--nb-space-12); border-radius: 999px; border: 1px solid var(--nb-warn-500); background: var(--nb-warn-tint); color: var(--nb-text-primary); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+span.chip { cursor: default; }
+.body { display: grid; gap: var(--nb-space-8); font-size: 14px; color: var(--nb-text-secondary); }
+.body ul { margin: 0; padding-inline-start: var(--nb-space-20); }
+.h { margin: 0; font-weight: 600; color: var(--nb-text-primary); }
+.row { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; }
+.otp { max-inline-size: 160px; min-block-size: 44px; padding-inline: var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-1); color: var(--nb-text-primary); font: inherit; }
+.btn, .danger { min-block-size: 44px; padding-inline: var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; cursor: pointer; }
+.danger { border-color: var(--nb-danger-500); }
+.btn:disabled, .danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.err { color: var(--nb-danger-500); font-size: 13px; margin: 0; }
