@@ -13,6 +13,10 @@ public enum NotificationPurpose {
     DELAY_NOTICE("delay_notice", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** FIN-014: dues reminder; the template body names the clinic only (no amounts, no line items). */
     DUES_REMINDER("dues_reminder", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-006: the clinic moved the patient's appointment (first name, date, time). */
+    APPT_RESCHEDULED("appt_rescheduled", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-006: the clinic cancelled the patient's appointment (first name, date, time). */
+    APPT_CANCELLED_BY_CLINIC("appt_cancelled_by_clinic", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
     EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),

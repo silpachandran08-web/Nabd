@@ -58,8 +58,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
     /** events.md section 5: data keys besides tenantId + version (required) and the optional ones (suffix ?). */
     private static final Map<String, List<String>> DOCUMENTED = Map.ofEntries(
             Map.entry("scheduling.appointment.booked.v1", List.of("appointmentId", "doctorId", "startTime", "status")),
-            Map.entry("scheduling.appointment.cancelled.v1", List.of("appointmentId", "doctorId", "startTime", "status")),
-            Map.entry("scheduling.appointment.rescheduled.v1", List.of("appointmentId", "doctorId", "startTime", "status", "previousAppointmentId", "previousStartTime")),
+            Map.entry("scheduling.appointment.cancelled.v1", List.of("appointmentId", "doctorId", "startTime", "status", "by?", "reasonCode?")),
+            Map.entry("scheduling.appointment.rescheduled.v1", List.of("appointmentId", "doctorId", "startTime", "status", "previousAppointmentId", "previousStartTime", "by?", "reasonCode?")),
             Map.entry("scheduling.appointment.arrived.v1", List.of("appointmentId", "doctorId", "queueEntryId", "status")),
             Map.entry("visit.queue_entry.created.v1", List.of("entryId", "doctorId", "queueDate", "status")),
             Map.entry("visit.queue_entry.changed.v1", List.of("entryId", "doctorId", "queueDate", "status", "fromStatus?", "priority?")),
