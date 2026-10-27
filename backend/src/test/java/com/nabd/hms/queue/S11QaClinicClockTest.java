@@ -47,7 +47,8 @@ class S11QaClinicClockTest extends ApiTestBase {
 
     private Clinic clinic(String zone, String region) {
         SeededTenant t = seedTenant();
-        jdbc.update("UPDATE tenants SET timezone = ? WHERE id = ?", zone, t.id());
+        // ACC-005: this PLT-028 test is about a day that rolls over at midnight (its Wednesday hours start at 00:00), not the 04:00 default
+        jdbc.update("UPDATE tenants SET timezone = ?, day_start_minute = 0 WHERE id = ?", zone, t.id());
         if (!"IN".equals(region)) forceRegion(t.id(), region);
         String tag = UUID.randomUUID().toString().substring(0, 6);
         SeededStaff doc = seedStaff(t, seedFullAccessRole(t.id()), "q4clk" + tag + "@a.com", "+9196" + (10000000 + Math.abs(tag.hashCode() % 89999999)), false);

@@ -34,7 +34,7 @@ public class EtaPredictionLog {
         }
         UUID tenantId = tenantContext.current();
         Instant now = clock.now();
-        repo.insert(tenantId, queueEntryId, appointmentId, doctorId, clock.today(tenantId), now, p50, p80.isBefore(p50) ? p50 : p80,
+        repo.insert(tenantId, queueEntryId, appointmentId, doctorId, clock.clinicDate(tenantId), now, p50, p80.isBefore(p50) ? p50 : p80,
                 (int) Math.max(0, java.time.Duration.between(now, p50).toMinutes()));
     }
 }

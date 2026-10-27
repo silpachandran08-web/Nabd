@@ -51,20 +51,20 @@ public class SessionAvailabilityService {
         }
         ZoneId zone = clock.zone(tenantId);
         Instant now = clock.now();
-        Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, date.atStartOfDay(zone).toInstant(),
-                date.plusDays(1).atStartOfDay(zone).toInstant()));
+        Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, clock.dayStart(tenantId, date), clock.dayStart(tenantId, date.plusDays(1))));
+        List<int[]> leave = repo.partialLeaves(tenantId, doctorId, date); // ACC-005
         double avg = queueRepo.averageRecentVisitMinutes(tenantId, doctorId, 30).orElse(15.0);
         List<SessionView> out = new ArrayList<>();
         for (WorkingHoursRow wh : repo.findForDay(doctorId, date.getDayOfWeek().getValue() % 7)) {
             String mode = SessionModes.modeOn(wh, date);
-            Instant start = date.atTime(wh.startTime()).atZone(zone).toInstant();
-            Instant end = date.atTime(wh.endTime()).atZone(zone).toInstant();
+            Instant start = clock.atSecond(tenantId, date, wh.startSecond());
+            Instant end = clock.atSecond(tenantId, date, wh.endSecond());
             Integer tokensLeft = null, onlineLeft = null;
             if (wh.maxPatients() != null) {
-                tokensLeft = Math.max(0, wh.maxPatients() - repo.countSessionOccupancy(tenantId, doctorId, date, wh.startTime(), wh.endTime(), zone));
+                tokensLeft = Math.max(0, wh.maxPatients() - repo.countSessionOccupancy(tenantId, doctorId, date, wh));
             }
             if (wh.onlineCap() != null) {
-                onlineLeft = Math.max(0, wh.onlineCap() - repo.countSessionBookings(tenantId, doctorId, date, wh.startTime(), wh.endTime(), zone));
+                onlineLeft = Math.max(0, wh.onlineCap() - repo.countSessionBookings(tenantId, doctorId, date, wh));
             }
             List<Instant> slots = null;
             String range = null;
@@ -72,7 +72,8 @@ public class SessionAvailabilityService {
                 Set<Integer> reserved = repo.reservedMinutes(wh.id());
                 slots = new ArrayList<>();
                 for (Instant s = start; !s.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end); s = s.plus(wh.slotMinutes(), ChronoUnit.MINUTES)) {
-                    if (s.isAfter(now) && !booked.contains(s) && !reserved.contains(ScheduleGrid.minuteOf(s.atZone(zone).toLocalTime()))) {
+                    if (s.isAfter(now) && !booked.contains(s) && !reserved.contains(ScheduleGrid.minuteOf(s.atZone(zone).toLocalTime()))
+                            && !ScheduleRepository.overlapsLeave(leave, clock.secondOfClinicDay(tenantId, date, s), wh.slotMinutes() * 60)) {
                         slots.add(s);
                     }
                 }

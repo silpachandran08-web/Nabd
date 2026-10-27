@@ -119,13 +119,13 @@ class BookingRequestService {
             Instant now = clock.now();
             int minutes = slotValidator.validate(tid, doctorId, slotStart, now);
             ZoneId zone = clock.zone(tid);
-            LocalDate day = slotStart.atZone(zone).toLocalDate();
+            LocalDate day = clock.clinicDate(tid, slotStart);
             queueRepo.lockDoctorDay(tid, doctorId, day); // serialises the cap count against the insert below
             appointments.enforceSessionCapacity(tid, doctorId, slotStart);
             BookingDecision.Policy policy = repo.policy(tid);
             String type = visitType != null && !visitType.equals("new") && !visitType.equals("follow_up") ? visitType
                     : repo.hasHistory(tid, patientId, doctorId) ? "follow_up" : "new";
-            int autoToday = repo.autoConfirmed(tid, doctorId, day.atStartOfDay(zone).toInstant(), day.plusDays(1).atStartOfDay(zone).toInstant());
+            int autoToday = repo.autoConfirmed(tid, doctorId, clock.dayStart(tid, day), clock.dayStart(tid, day.plusDays(1)));
             BookingDecision.Outcome o = BookingDecision.decide(policy, new BookingDecision.Facts(type, !flags.isEmpty(), group, autoToday));
             Instant end = slotStart.plus(minutes, ChronoUnit.MINUTES);
             UUID id;
@@ -164,12 +164,11 @@ class BookingRequestService {
     public Page list(boolean open, UUID doctorId, int limit, String cursor) {
         UUID tid = tenantContext.current();
         int offset = offsetOf(cursor);
-        ZoneId zone = clock.zone(tid);
-        Instant dayStart = clock.today(tid).atStartOfDay(zone).toInstant();
+        Instant dayStart = clock.dayStart(tid, clock.clinicDate(tid));
         List<BookingRequestRepository.ListRow> rows = repo.list(tid, open, doctorId, dayStart, limit + 1, offset);
         boolean more = rows.size() > limit;
         List<Item> items = new ArrayList<>();
-        LocalDate today = clock.today(tid);
+        LocalDate today = clock.clinicDate(tid);
         for (BookingRequestRepository.ListRow r : rows.subList(0, Math.min(limit, rows.size()))) {
             Req q = r.req();
             Instant alt = open ? alternatives.nearest(tid, q.doctorId(), q.start()).orElse(null) : null;
@@ -198,7 +197,7 @@ class BookingRequestService {
         Instant end = start.plus(minutes, ChronoUnit.MINUTES);
         if (repo.overlaps(tid, r.doctorId(), start, end, id)) throw slotTaken(tid, r);
         if (moved && !sameSession(tid, r.doctorId(), r.start(), start)) {
-            queueRepo.lockDoctorDay(tid, r.doctorId(), start.atZone(clock.zone(tid)).toLocalDate());
+            queueRepo.lockDoctorDay(tid, r.doctorId(), clock.clinicDate(tid, start));
             appointments.enforceSessionCapacity(tid, r.doctorId(), start);
         }
         try {
@@ -321,12 +320,9 @@ class BookingRequestService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     boolean sameSession(UUID tid, UUID doctorId, Instant a, Instant b) {
-        ZoneId zone = clock.zone(tid);
-        var za = a.atZone(zone);
-        var zb = b.atZone(zone);
-        if (!za.toLocalDate().equals(zb.toLocalDate())) return false;
-        var ba = scheduleRepo.findBlockCovering(doctorId, za.getDayOfWeek().getValue() % 7, za.toLocalTime());
-        var bb = scheduleRepo.findBlockCovering(doctorId, zb.getDayOfWeek().getValue() % 7, zb.toLocalTime());
+        if (!clock.clinicDate(tid, a).equals(clock.clinicDate(tid, b))) return false;
+        var ba = scheduleRepo.blockAt(tid, doctorId, a);
+        var bb = scheduleRepo.blockAt(tid, doctorId, b);
         return ba.isPresent() && bb.isPresent() && ba.get().id().equals(bb.get().id());
     }
 

@@ -93,25 +93,27 @@ class InternalSchedulingService {
                 List<Session> sessions = new ArrayList<>();
                 for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
                     if (scheduleRepo.isClinicHoliday(tid, day) || scheduleRepo.isOnLeave(d, day)) continue;
-                    Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(d, day.atStartOfDay(zone).toInstant(), day.plusDays(1).atStartOfDay(zone).toInstant()));
+                    Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(d, clock.dayStart(tid, day), clock.dayStart(tid, day.plusDays(1))));
+                    List<int[]> leave = scheduleRepo.partialLeaves(tid, d, day); // ACC-005
                     for (WorkingHoursRow wh : scheduleRepo.findForDay(d, day.getDayOfWeek().getValue() % 7)) {
                         String id = wh.id() + "@" + day;
                         if (wh.maxPatients() != null && !SessionModes.HYBRID.equals(SessionModes.modeOn(wh, day))) {
-                            int used = scheduleRepo.countSessionOccupancy(tid, d, day, wh.startTime(), wh.endTime(), zone);
+                            int used = scheduleRepo.countSessionOccupancy(tid, d, day, wh);
                             int left = wh.maxPatients() - used;
                             if (wh.onlineCap() != null) { // ACC-011: online places are what the Edge may sell
-                                left = Math.min(left, wh.onlineCap() - scheduleRepo.countSessionBookings(tid, d, day, wh.startTime(), wh.endTime(), zone));
+                                left = Math.min(left, wh.onlineCap() - scheduleRepo.countSessionBookings(tid, d, day, wh));
                             }
                             sessions.add(new Session(id, day, "tokens", null, Math.max(0, left)));
                             continue;
                         }
                         Set<Integer> reserved = scheduleRepo.reservedMinutes(wh.id()); // ACC-012: never offered online
                         List<Instant> slots = new ArrayList<>();
-                        Instant start = day.atTime(wh.startTime()).atZone(zone).toInstant();
-                        Instant end = day.atTime(wh.endTime()).atZone(zone).toInstant();
+                        Instant start = clock.atSecond(tid, day, wh.startSecond());
+                        Instant end = clock.atSecond(tid, day, wh.endSecond());
                         for (; !start.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end); start = start.plus(wh.slotMinutes(), ChronoUnit.MINUTES)) {
                             if (start.isAfter(now) && !booked.contains(start)
-                                    && !reserved.contains(ScheduleGrid.minuteOf(start.atZone(zone).toLocalTime()))) slots.add(start);
+                                    && !reserved.contains(ScheduleGrid.minuteOf(start.atZone(zone).toLocalTime()))
+                                    && !ScheduleRepository.overlapsLeave(leave, clock.secondOfClinicDay(tid, day, start), wh.slotMinutes() * 60)) slots.add(start);
                         }
                         sessions.add(new Session(id, day, "slots", slots, null));
                     }

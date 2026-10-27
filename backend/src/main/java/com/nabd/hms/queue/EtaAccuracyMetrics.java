@@ -80,7 +80,7 @@ public class EtaAccuracyMetrics {
         Instant from = clock.now().minus(window);
         List<Row> rows = new ArrayList<>();
         for (UUID tenantId : jdbc.queryForList("SELECT id FROM tenants", UUID.class)) {
-            var live = tenantScope.run(tenantId, () -> repo.live(tenantId, clock.today(tenantId), from));
+            var live = tenantScope.run(tenantId, () -> repo.live(tenantId, clock.clinicDate(tenantId), from));
             if (live.visitsToday() > 0) {
                 rows.add(new Row(hash(tenantId), live));
             }

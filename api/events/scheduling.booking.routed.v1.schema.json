@@ -114,6 +114,14 @@
     "notifyOwner": {
       "type": "boolean"
     },
+    "offerKind": {
+      "type": "string",
+      "enum": [
+        "booking_request",
+        "change"
+      ],
+      "description": "ACC-006: 'change' = alternatives offered because staff moved or blocked a confirmed booking; absent = a booking-request offer (ACC-010)."
+    },
     "version": {
       "type": "integer",
       "minimum": 1,

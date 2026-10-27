@@ -230,9 +230,9 @@ class NursingRepository {
 
     /** Instant range for the clinic's day, not "recorded_at::date = ?" — that cast uses the DB
      * session's timezone (the JVM's, via PgJDBC), which is neither the clinic's nor UTC. */
-    List<ActivityRow> listActivityForStaffToday(UUID tenantId, UUID staffId, LocalDate day, java.time.ZoneId zone) {
-        java.sql.Timestamp from = java.sql.Timestamp.from(day.atStartOfDay(zone).toInstant());
-        java.sql.Timestamp to = java.sql.Timestamp.from(day.plusDays(1).atStartOfDay(zone).toInstant());
+    List<ActivityRow> listActivityForStaffToday(UUID tenantId, UUID staffId, LocalDate day, com.nabd.hms.common.ClinicClock clock) {
+        java.sql.Timestamp from = java.sql.Timestamp.from(clock.dayStart(tenantId, day)); // ACC-005: the clinic day
+        java.sql.Timestamp to = java.sql.Timestamp.from(clock.dayStart(tenantId, day.plusDays(1)));
         return jdbc.query("""
                 SELECT 'vitals' AS kind, 'Vitals recorded' AS activity, patient_id, recorded_by AS staff_id, recorded_at AS occurred_at
                 FROM vitals WHERE tenant_id = ? AND recorded_by = ? AND recorded_at >= ? AND recorded_at < ?

@@ -38,6 +38,19 @@
       "type": "string",
       "const": "cancelled"
     },
+    "by": {
+      "type": "string",
+      "enum": [
+        "staff",
+        "patient",
+        "system"
+      ],
+      "description": "Who made the change (ACC-006). Absent on events from before it."
+    },
+    "reasonCode": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{3,40}$"
+    },
     "version": {
       "type": "integer",
       "minimum": 1,

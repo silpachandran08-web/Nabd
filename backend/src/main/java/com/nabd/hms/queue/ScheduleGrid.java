@@ -26,7 +26,12 @@ final class ScheduleGrid {
     record Block(int start, int end, int slotMinutes) {
     }
 
-    record DoctorInput(UUID id, String name, String department, boolean onLeave, String leaveReason, List<Block> blocks) {
+    /** leaveWindows: part-day leave as [startMinute, endMinute) from the clinic date's midnight (ACC-005). */
+    record DoctorInput(UUID id, String name, String department, boolean onLeave, String leaveReason, List<Block> blocks,
+                       List<int[]> leaveWindows) {
+        DoctorInput(UUID id, String name, String department, boolean onLeave, String leaveReason, List<Block> blocks) {
+            this(id, name, department, onLeave, leaveReason, blocks, List.of());
+        }
     }
 
     /** end == start for walk-ins: they sit in the queue, they don't hold a slot. */
@@ -134,6 +139,9 @@ final class ScheduleGrid {
         if (block == null) {
             return empty(d, "break");
         }
+        if (d.leaveWindows().stream().anyMatch(w -> t < w[1] && t + step > w[0])) {
+            return empty(d, "leave"); // ACC-005: part-day leave inside the doctor's hours
+        }
         boolean insideAppointment = bookings.stream().anyMatch(b ->
                 b.doctorId().equals(d.id()) && b.end() > b.start() && b.start() < t + step && b.end() > t);
         boolean onSlotBoundary = (t - block.start()) % block.slotMinutes() == 0 && t + block.slotMinutes() <= block.end();
@@ -143,7 +151,7 @@ final class ScheduleGrid {
         if (holiday) {
             return empty(d, "closed");
         }
-        Instant slotStart = date.atTime(LocalTime.of(t / 60, t % 60)).atZone(zone).toInstant();
+        Instant slotStart = date.atStartOfDay().plusMinutes(t).atZone(zone).toInstant(); // t may be >= 1440 (after midnight)
         if (!slotStart.isAfter(now)) {
             return empty(d, "past");
         }
@@ -158,8 +166,9 @@ final class ScheduleGrid {
         return startMinute < 12 * 60 ? "Morning" : startMinute < 16 * 60 ? "Afternoon" : "Evening";
     }
 
+    /** ACC-005: minutes past 24:00 are the next calendar day of the same clinic day: 1470 shows as "00:30 (+1)". */
     static String hhmm(int minute) {
-        return minute >= 1440 ? "24:00" : String.format("%02d:%02d", minute / 60, minute % 60);
+        return minute >= 1440 ? String.format("%02d:%02d (+1)", (minute - 1440) / 60, minute % 60) : String.format("%02d:%02d", minute / 60, minute % 60);
     }
 
     static int minuteOf(LocalTime time) {

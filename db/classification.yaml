@@ -66,6 +66,7 @@ schemas:
       decided_at: operational
       session_token: operational
       working_hours_id: operational
+      needs_reschedule_reason: operational
       no_show_at: operational
       no_show_marked_by: operational
       no_show_reason_code: operational
@@ -87,6 +88,18 @@ schemas:
       labels: operational
       hidden: operational
       created_at: operational
+    appointment_change_offers:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      reason_code: operational
+      slots: operational
+      status: operational
+      sent_at: operational
+      expires_at: operational
+      accepted_slot: operational
+      new_appointment_id: operational
+      created_by: operational
     booking_policy_versions:
       id: operational
       tenant_id: operational
@@ -515,6 +528,8 @@ schemas:
       date_from: operational
       date_to: operational
       reason: pii  # uncertain: staff leave reason may be medical (staff health data)
+      start_time: operational
+      end_time: operational
     doctor_working_hours:
       id: operational
       tenant_id: operational
@@ -1631,6 +1646,7 @@ schemas:
       tax_registration_id: operational
       consent_default_deny: operational
       consent_two_witnesses: operational
+      day_start_minute: operational
     vaccine_records:
       id: operational
       tenant_id: operational

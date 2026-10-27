@@ -98,7 +98,7 @@ public class ScheduleService {
         String previous = old.previousSessionMode();
         LocalDate effective = old.effectiveFrom();
         if (!mode.equals(old.sessionMode())) { // ACC-011: a mode change applies to future dates only
-            LocalDate tomorrow = clock.today(tenantId).plusDays(1);
+            LocalDate tomorrow = clock.clinicDate(tenantId).plusDays(1);
             if (req.effectiveFrom() != null && req.effectiveFrom().isBefore(tomorrow)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "effective-from-past", "Change must apply to a future date",
                         "A session mode change takes effect from tomorrow at the earliest.");
@@ -127,11 +127,19 @@ public class ScheduleService {
         log.info("working hours {} of doctor {} deleted by {}", hoursId, doctorId, callerStaffId);
     }
 
-    /** DOC-R7: start before end, and no overlap with the doctor's other blocks on that weekday. */
+    /**
+     * DOC-R7: no overlap with the doctor's other blocks on that weekday. ACC-005: end before start means the block runs past midnight
+     * (same clinic day), and it must end at or before the tenant's day start; end == start is an empty block.
+     */
     private void checkHours(UUID doctorId, UUID exceptHoursId, WorkingHoursWriteRequest req) {
-        if (!req.endTime().isAfter(req.startTime())) {
+        if (req.endTime().equals(req.startTime())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-time-range", "Invalid time range",
-                    "End time must be after start time.");
+                    "End time must differ from start time.");
+        }
+        if (!req.endTime().isAfter(req.startTime())
+                && req.endTime().toSecondOfDay() > clock.dayStartMinute(tenantContext.current()) * 60) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "session-crosses-day-start", "Session crosses the day start",
+                    "An overnight session must end by the clinic day start.", Map.of("code", "SESSION_CROSSES_DAY_START"));
         }
         repo.lockDoctorHours(doctorId);
         if (repo.hoursOverlap(doctorId, req.dayOfWeek(), req.startTime(), req.endTime(), exceptHoursId)) {
@@ -170,7 +178,7 @@ public class ScheduleService {
     public List<DoctorLeaveResponse> listLeave(UUID tenantId, UUID doctorId) {
         tenantContext.set(tenantId);
         return repo.listLeave(doctorId).stream()
-                .map(l -> new DoctorLeaveResponse(l.id(), l.dateFrom(), l.dateTo(), l.reason(), List.of()))
+                .map(l -> new DoctorLeaveResponse(l.id(), l.dateFrom(), l.dateTo(), l.reason(), List.of(), l.startTime(), l.endTime(), List.of()))
                 .toList();
     }
 
@@ -180,11 +188,53 @@ public class ScheduleService {
         if (!repo.doctorInTenant(tenantId, doctorId)) { // OPS-043: a foreign doctor id must not be stored
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Doctor not found", "No such doctor.");
         }
-        UUID id = repo.insertLeave(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.reason());
+        checkLeaveWindow(req);
+        UUID id = repo.insertLeave(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.reason(), req.startTime(), req.endTime());
         List<String> affected = repo.findAffectedPackagePatientNames(tenantId, doctorId);
-        log.info("leave {} added for doctor {} by {} ({} to {}); {} package patient(s) potentially affected",
-                id, doctorId, callerStaffId, req.dateFrom(), req.dateTo(), affected.size());
-        return new DoctorLeaveResponse(id, req.dateFrom(), req.dateTo(), req.reason(), affected);
+        List<DoctorLeaveResponse.AffectedAppointment> bookings = affectedAppointments(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.startTime(), req.endTime());
+        repo.flagNeedsReschedule(tenantId, bookings.stream().map(DoctorLeaveResponse.AffectedAppointment::id).toList(), "doctor_leave"); // ACC-006
+        log.info("leave {} added for doctor {} by {} ({} to {}); {} package patient(s), {} booking(s) potentially affected",
+                id, doctorId, callerStaffId, req.dateFrom(), req.dateTo(), affected.size(), bookings.size());
+        return new DoctorLeaveResponse(id, req.dateFrom(), req.dateTo(), req.reason(), affected, req.startTime(), req.endTime(), bookings);
+    }
+
+    /** ACC-006: the bookings an existing leave block covers (404 when the leave is not this doctor's). */
+    @Transactional
+    public List<DoctorLeaveResponse.AffectedAppointment> leaveBookings(UUID tenantId, UUID doctorId, UUID leaveId) { // the caller's request already bound the tenant
+        var leave = repo.listLeave(doctorId).stream().filter(l -> l.id().equals(leaveId)).findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));
+        return affectedAppointments(tenantId, doctorId, leave.dateFrom(), leave.dateTo(), leave.startTime(), leave.endTime());
+    }
+
+    private static void checkLeaveWindow(DoctorLeaveWriteRequest req) {
+        if (req.dateTo().isBefore(req.dateFrom())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Invalid dates", "dateTo cannot be before dateFrom.");
+        }
+        if ((req.startTime() == null) != (req.endTime() == null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Invalid leave window", "Give both startTime and endTime, or neither.");
+        }
+        if (req.startTime() != null && (req.startTime().equals(req.endTime()) || !req.dateFrom().equals(req.dateTo()))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Invalid leave window",
+                    "Part-day leave covers one clinic day, with an end different from the start.");
+        }
+    }
+
+    /** ACC-005: the doctor's live bookings the leave covers (all of the clinic days, or only the part-day window). */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private List<DoctorLeaveResponse.AffectedAppointment> affectedAppointments(UUID tenantId, UUID doctorId, LocalDate from, LocalDate to,
+                                                                              LocalTime start, LocalTime end) {
+        Instant rangeStart = clock.dayStart(tenantId, from);
+        Instant rangeEnd = clock.dayStart(tenantId, to.plusDays(1));
+        int[] window = start == null ? null : QueueModels.leaveWindow(start, end, clock.dayStartMinute(tenantId) * 60);
+        return repo.liveBookingsBetween(tenantId, doctorId, rangeStart, rangeEnd).stream()
+                .filter(b -> window == null || inWindow(tenantId, from, (Instant) b[1], window))
+                .map(b -> new DoctorLeaveResponse.AffectedAppointment((UUID) b[0], (Instant) b[1]))
+                .toList();
+    }
+
+    private boolean inWindow(UUID tenantId, LocalDate day, Instant at, int[] window) {
+        int second = clock.secondOfClinicDay(tenantId, day, at);
+        return second >= window[0] && second < window[1];
     }
 
     @Transactional
@@ -201,20 +251,20 @@ public class ScheduleService {
         }
 
         ZoneId zone = clock.zone(tenantId); // "09:00" in working hours is the clinic's wall clock
-        Instant dayStart = date.atStartOfDay(zone).toInstant();
-        Instant dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant();
-        Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, dayStart, dayEnd));
+        Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, clock.dayStart(tenantId, date), clock.dayStart(tenantId, date.plusDays(1))));
+        List<int[]> leave = repo.partialLeaves(tenantId, doctorId, date); // ACC-005: part-day leave hides the slots it touches
 
         Instant now = clock.now();
         List<Instant> slots = new ArrayList<>();
         for (WorkingHoursRow wh : hours) {
             if (SessionModes.TOKEN.equals(SessionModes.modeOn(wh, date))) continue; // ACC-011: token sessions sell places, not times
             Set<Integer> reserved = repo.reservedMinutes(wh.id()); // ACC-012: held back for walk-ins, never offered
-            Instant slotStart = date.atTime(wh.startTime()).atZone(zone).toInstant();
-            Instant blockEnd = date.atTime(wh.endTime()).atZone(zone).toInstant();
+            Instant slotStart = clock.atSecond(tenantId, date, wh.startSecond());
+            Instant blockEnd = clock.atSecond(tenantId, date, wh.endSecond());
             while (!slotStart.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(blockEnd)) {
                 if (slotStart.isAfter(now) && !booked.contains(slotStart)
-                        && !reserved.contains(ScheduleGrid.minuteOf(slotStart.atZone(zone).toLocalTime()))) {
+                        && !reserved.contains(ScheduleGrid.minuteOf(slotStart.atZone(zone).toLocalTime()))
+                        && !ScheduleRepository.overlapsLeave(leave, clock.secondOfClinicDay(tenantId, date, slotStart), wh.slotMinutes() * 60)) {
                     slots.add(slotStart);
                 }
                 slotStart = slotStart.plus(wh.slotMinutes(), ChronoUnit.MINUTES);
@@ -230,7 +280,7 @@ public class ScheduleService {
     private WorkingHoursResponse toResponse(WorkingHoursRow row, List<LocalTime> reserved) {
         return new WorkingHoursResponse(row.id(), row.dayOfWeek(), row.startTime(), row.endTime(),
                 row.slotMinutes(), row.maxPatients(), row.sessionMode(), row.onlineCap(), row.label(), row.effectiveFrom(), reserved,
-                row.walkinMode(), row.walkinRatio(), row.lateGraceMinutes());
+                row.walkinMode(), row.walkinRatio(), row.lateGraceMinutes(), row.endsNextDay());
     }
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
@@ -257,10 +307,13 @@ public class ScheduleService {
             return repo.reservedMinutes(hoursId).stream().sorted().map(m -> LocalTime.of(m / 60, m % 60)).toList();
         }
         Set<Integer> minutes = new java.util.TreeSet<>();
+        int startMinute = ScheduleGrid.minuteOf(req.startTime());
+        int endMinute = ScheduleGrid.minuteOf(req.endTime()) + (req.endTime().isAfter(req.startTime()) ? 0 : 1440); // ACC-005: overnight
         for (LocalTime t : times) {
-            int off = ScheduleGrid.minuteOf(t) - ScheduleGrid.minuteOf(req.startTime());
+            int at = ScheduleGrid.minuteOf(t) < startMinute ? ScheduleGrid.minuteOf(t) + 1440 : ScheduleGrid.minuteOf(t);
+            int off = at - startMinute;
             if (t.getSecond() != 0 || off < 0 || off % req.slotMinutesOrDefault() != 0
-                    || ScheduleGrid.minuteOf(t) + req.slotMinutesOrDefault() > ScheduleGrid.minuteOf(req.endTime())) {
+                    || at + req.slotMinutesOrDefault() > endMinute) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "reserved-off-grid", "Reserved walk-in slot off the grid",
                         "Reserved walk-in times must be slot starts inside the session.");
             }
@@ -279,7 +332,7 @@ public class ScheduleService {
     @Transactional
     public DoctorDelayResponse announceDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, DelayAnnounceRequest req) {
         tenantContext.set(tenantId);
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
         if (!repo.doctorInTenant(tenantId, doctorId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Doctor not found", "No such doctor.");
         }
@@ -300,7 +353,7 @@ public class ScheduleService {
     @Transactional
     public void clearDelay(UUID tenantId, UUID callerStaffId, UUID doctorId) {
         tenantContext.set(tenantId);
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
         DoctorDelayRow active = repo.findActiveDelay(doctorId, today).orElse(null);
         if (active == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "no-active-delay", "No active delay",
@@ -316,13 +369,13 @@ public class ScheduleService {
     private void delayChanged(UUID tenantId, UUID doctorId, UUID delayId, int delayMinutes, String status) {
         events.publish(tenantId, com.nabd.hms.common.DomainEventType.DOCTOR_DELAY_CHANGED, doctorId, java.util.Map.of(
                 "doctorId", doctorId, "delayId", delayId, "delayMinutes", delayMinutes, "status", status));
-        etaTrigger.afterCommit(tenantId, doctorId, clock.today(tenantId)); // ACC-017: every waiting and booked ETA shifts
+        etaTrigger.afterCommit(tenantId, doctorId, clock.clinicDate(tenantId)); // ACC-017: every waiting and booked ETA shifts
     }
 
     @Transactional
     public List<DoctorDelayResponse> delayHistory(UUID tenantId, UUID doctorId) {
         tenantContext.set(tenantId);
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
         return repo.delayHistory(doctorId, 20).stream().map(r -> toDelayResponse(r, today)).toList();
     }
 

@@ -49,13 +49,13 @@ public class EtaAccuracyJob {
     }
 
     public int rollupYesterday(UUID tenantId) {
-        return tenantScope.run(tenantId, () -> rollup(tenantId, clock.today(tenantId).minusDays(1)));
+        return tenantScope.run(tenantId, () -> rollup(tenantId, clock.clinicDate(tenantId).minusDays(1)));
     }
 
     /** Public for backfills and tests: rolls one clinic day of the bound tenant. */
     @Transactional(propagation = Propagation.MANDATORY)
     public int rollup(UUID tenantId, LocalDate day) {
-        repo.ensurePartitions(clock.today(tenantId));
+        repo.ensurePartitions(clock.clinicDate(tenantId));
         return repo.rollup(tenantId, day);
     }
 }

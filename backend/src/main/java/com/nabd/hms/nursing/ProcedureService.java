@@ -53,7 +53,7 @@ public class ProcedureService {
     @Transactional
     public List<ProcedureOrderResponse> listToday(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listProcedureOrders(tenantId, clock.today(tenantId)).stream().map(p -> toResponse(tenantId, p)).toList();
+        return repo.listProcedureOrders(tenantId, clock.clinicDate(tenantId)).stream().map(p -> toResponse(tenantId, p)).toList();
     }
 
     @Transactional

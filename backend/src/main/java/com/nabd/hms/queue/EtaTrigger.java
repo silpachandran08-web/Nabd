@@ -92,7 +92,7 @@ public class EtaTrigger {
         for (UUID tenantId : jdbc.queryForList("SELECT id FROM tenants", UUID.class)) {
             try {
                 tenantScope.run(tenantId, () -> {
-                    LocalDate today = clock.today(tenantId);
+                    LocalDate today = clock.clinicDate(tenantId);
                     for (UUID doctor : repo.activeDoctors(tenantId, today)) {
                         request(new Key(tenantId, doctor, today));
                     }

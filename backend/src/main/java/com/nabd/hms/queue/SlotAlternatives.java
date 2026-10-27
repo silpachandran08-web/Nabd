@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.List;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -37,17 +38,19 @@ class SlotAlternatives {
         ZoneId zone = clock.zone(tenantId);
         Instant now = clock.now();
         Instant from = after.isAfter(now) ? after : now;
-        LocalDate first = from.atZone(zone).toLocalDate();
+        LocalDate first = clock.clinicDate(tenantId, from);
         for (LocalDate day = first; day.isBefore(first.plusDays(HORIZON_DAYS)); day = day.plusDays(1)) {
             if (scheduleRepo.isClinicHoliday(tenantId, day) || scheduleRepo.isOnLeave(doctorId, day)) continue;
-            Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(doctorId, day.atStartOfDay(zone).toInstant(), day.plusDays(1).atStartOfDay(zone).toInstant()));
+            Set<Instant> booked = new HashSet<>(scheduleRepo.bookedStartTimes(doctorId, clock.dayStart(tenantId, day), clock.dayStart(tenantId, day.plusDays(1))));
+            List<int[]> leave = scheduleRepo.partialLeaves(tenantId, doctorId, day); // ACC-005
             for (WorkingHoursRow wh : scheduleRepo.findForDay(doctorId, day.getDayOfWeek().getValue() % 7).stream()
                     .sorted(Comparator.comparing(WorkingHoursRow::startTime)).toList()) {
-                if (wh.maxPatients() != null && scheduleRepo.countSessionOccupancy(tenantId, doctorId, day, wh.startTime(), wh.endTime(), zone) >= wh.maxPatients()) continue;
-                Instant end = day.atTime(wh.endTime()).atZone(zone).toInstant();
-                for (Instant s = day.atTime(wh.startTime()).atZone(zone).toInstant(); !s.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end);
+                if (wh.maxPatients() != null && scheduleRepo.countSessionOccupancy(tenantId, doctorId, day, wh) >= wh.maxPatients()) continue;
+                Instant end = clock.atSecond(tenantId, day, wh.endSecond());
+                for (Instant s = clock.atSecond(tenantId, day, wh.startSecond()); !s.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(end);
                      s = s.plus(wh.slotMinutes(), ChronoUnit.MINUTES)) {
-                    if (s.isAfter(from) && !booked.contains(s)) return Optional.of(s);
+                    if (s.isAfter(from) && !booked.contains(s)
+                            && !ScheduleRepository.overlapsLeave(leave, clock.secondOfClinicDay(tenantId, day, s), wh.slotMinutes() * 60)) return Optional.of(s);
                 }
             }
         }

@@ -64,7 +64,7 @@ public class EtaService {
                 ahead.add(new Item(e.id(), e.appointmentId(), d, null));
             }
         }
-        for (var b : repo.bookedNotArrived(tid, doctorId, ClinicClock.startOf(day, zone), ClinicClock.startOf(day.plusDays(1), zone))) {
+        for (var b : repo.bookedNotArrived(tid, doctorId, clock.dayStart(tid, day), clock.dayStart(tid, day.plusDays(1)))) {
             ahead.add(new Item(null, b.appointmentId(), serviceTimes.estimate(doctorId, b.followUp() ? "follow_up" : "new", "default").dist(), b.startTime()));
         }
         int delay = repo.activeDelayMinutes(tid, doctorId, day);

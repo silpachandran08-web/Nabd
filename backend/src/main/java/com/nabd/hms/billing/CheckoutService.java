@@ -106,7 +106,7 @@ public class CheckoutService {
         String patientName = repo.findPatientName(tenantId, ctx.patientId()).orElse("Unknown patient");
         String doctorName = repo.findStaffName(tenantId, ctx.doctorId()).orElse("Unknown doctor");
         boolean followUpEligible = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
-                clock.today(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
+                clock.clinicDate(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
         List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
                 .map(this::toChargeResponse).toList();
@@ -154,7 +154,7 @@ public class CheckoutService {
         }
 
         boolean followUp = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
-                clock.today(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
+                clock.clinicDate(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
         if (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty()) BillingPricing.requireDiscountRight(canDiscount);
         List<LineItemInput> lineItems = pricing.resolveLines(tenantId, req.lineItems(), followUp, canDiscount, false, staffId);
         rxGate.check(tenantId, ctx.patientId(), rxLines(lineItems), staffId, ip); // PHL-001: before anything is written

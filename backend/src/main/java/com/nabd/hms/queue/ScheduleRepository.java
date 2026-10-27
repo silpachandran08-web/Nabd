@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.ClinicClock;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -11,7 +12,6 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,9 +24,11 @@ import static com.nabd.hms.queue.QueueModels.WorkingHoursRow;
 class ScheduleRepository {
 
     private final JdbcTemplate jdbc;
+    private final ClinicClock clock;
 
-    ScheduleRepository(JdbcTemplate jdbc) {
+    ScheduleRepository(JdbcTemplate jdbc, ClinicClock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     /** NB-092: clinic_holidays already existed (CRUD via com.nabd.hms.setup) but nothing in
@@ -65,12 +67,28 @@ class ScheduleRepository {
                 workingHoursMapper(), doctorId, dayOfWeek);
     }
 
-    /** The working-hours block ("session") covering a given time-of-day, if any — shared by slot-duration
-     *  resolution (AppointmentService) and overbooking-cap resolution (both AppointmentService and QueueService). */
-    Optional<WorkingHoursRow> findBlockCovering(UUID doctorId, int dayOfWeek, LocalTime time) {
-        return findForDay(doctorId, dayOfWeek).stream()
-                .filter(wh -> !time.isBefore(wh.startTime()) && time.isBefore(wh.endTime()))
+    /**
+     * The working-hours block ("session") covering an instant, if any: shared by slot-duration resolution and cap resolution.
+     * ACC-005: looked up on the instant's CLINIC date (a 00:30 instant belongs to the evening block that began the day before),
+     * so an overnight block covers seconds up to 86400 + its end.
+     */
+    Optional<WorkingHoursRow> blockAt(UUID tenantId, UUID doctorId, Instant at) {
+        LocalDate date = clock.clinicDate(tenantId, at);
+        int second = clock.secondOfClinicDay(tenantId, date, at);
+        return findForDay(doctorId, date.getDayOfWeek().getValue() % 7).stream()
+                .filter(wh -> second >= wh.startSecond() && second < wh.endSecond())
                 .findFirst();
+    }
+
+    /** ACC-005: overnight blocks that would end after a (new) day start. */
+    int overnightEndingAfter(UUID tenantId, int daySecond) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM doctor_working_hours WHERE tenant_id = ? AND end_time < start_time " +
+                "AND extract(epoch FROM end_time) > ?", Integer.class, tenantId, daySecond);
+        return n == null ? 0 : n;
+    }
+
+    void setDayStart(UUID tenantId, int minute) {
+        jdbc.update("UPDATE tenants SET day_start_minute = ?, updated_at = now() WHERE id = ?", minute, tenantId);
     }
 
     UUID insertWorkingHours(UUID tenantId, UUID doctorId, int dayOfWeek, LocalTime start,
@@ -96,13 +114,12 @@ class ScheduleRepository {
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?))", Object.class, "working-hours:" + doctorId);
     }
 
-    /** Half-open blocks: 09:00-12:00 and 12:00-14:00 touch but don't overlap. excludeId = the row being updated. */
+    /** Half-open blocks: 09:00-12:00 and 12:00-14:00 touch but don't overlap. excludeId = the row being updated. ACC-005: overnight blocks count to 24:00 + their end. */
     boolean hoursOverlap(UUID doctorId, int dayOfWeek, LocalTime start, LocalTime end, UUID excludeId) {
-        Boolean overlap = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM doctor_working_hours WHERE doctor_id = ? AND day_of_week = ? " +
-                        "AND start_time < ? AND end_time > ? AND id IS DISTINCT FROM ?)",
-                Boolean.class, doctorId, dayOfWeek, Time.valueOf(end), Time.valueOf(start), excludeId);
-        return Boolean.TRUE.equals(overlap);
+        int s = start.toSecondOfDay();
+        int e = end.toSecondOfDay() + (end.isAfter(start) ? 0 : 86400);
+        return findForDay(doctorId, dayOfWeek).stream()
+                .anyMatch(wh -> !wh.id().equals(excludeId) && wh.startSecond() < e && wh.endSecond() > s);
     }
 
     void updateWorkingHours(UUID doctorId, UUID hoursId, int dayOfWeek, LocalTime start, LocalTime end,
@@ -121,22 +138,54 @@ class ScheduleRepository {
 
     List<DoctorLeaveRow> listLeave(UUID doctorId) {
         return jdbc.query(
-                "SELECT id, doctor_id, date_from, date_to, reason FROM doctor_leave WHERE doctor_id = ? ORDER BY date_from",
+                "SELECT id, doctor_id, date_from, date_to, reason, start_time, end_time FROM doctor_leave WHERE doctor_id = ? ORDER BY date_from",
                 leaveMapper(), doctorId);
     }
 
+    /** A whole-day leave covers the date; part-day leave is {@link #partialLeaves}. */
     boolean isOnLeave(UUID doctorId, LocalDate date) {
         Boolean onLeave = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM doctor_leave WHERE doctor_id = ? AND ? BETWEEN date_from AND date_to)",
+                "SELECT EXISTS(SELECT 1 FROM doctor_leave WHERE doctor_id = ? AND ? BETWEEN date_from AND date_to AND start_time IS NULL)",
                 Boolean.class, doctorId, Date.valueOf(date));
         return Boolean.TRUE.equals(onLeave);
     }
 
-    UUID insertLeave(UUID tenantId, UUID doctorId, LocalDate from, LocalDate to, String reason) {
+    /** ACC-005: part-day leave windows on a clinic date, as [startSecond, endSecond) from the date's local midnight. */
+    List<int[]> partialLeaves(UUID tenantId, UUID doctorId, LocalDate date) {
+        int dayStartSecond = clock.dayStartMinute(tenantId) * 60;
+        return jdbc.query(
+                "SELECT id, doctor_id, date_from, date_to, reason, start_time, end_time FROM doctor_leave " +
+                        "WHERE doctor_id = ? AND ? BETWEEN date_from AND date_to AND start_time IS NOT NULL",
+                leaveMapper(), doctorId, Date.valueOf(date)).stream().map(l -> l.window(dayStartSecond)).toList();
+    }
+
+    /** The slot [startSecond, startSecond + slotSeconds) touches a leave window. */
+    static boolean overlapsLeave(List<int[]> windows, int startSecond, int slotSeconds) {
+        return windows.stream().anyMatch(w -> startSecond < w[1] && startSecond + slotSeconds > w[0]);
+    }
+
+    UUID insertLeave(UUID tenantId, UUID doctorId, LocalDate from, LocalDate to, String reason, LocalTime start, LocalTime end) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO doctor_leave (id, tenant_id, doctor_id, date_from, date_to, reason) VALUES (?,?,?,?,?,?)",
-                id, tenantId, doctorId, Date.valueOf(from), Date.valueOf(to), reason);
+        jdbc.update("INSERT INTO doctor_leave (id, tenant_id, doctor_id, date_from, date_to, reason, start_time, end_time) VALUES (?,?,?,?,?,?,?,?)",
+                id, tenantId, doctorId, Date.valueOf(from), Date.valueOf(to), reason,
+                start == null ? null : Time.valueOf(start), end == null ? null : Time.valueOf(end));
         return id;
+    }
+
+    /** ACC-006: marks the bookings a leave block covers, so the desk can tag them until they are moved. */
+    void flagNeedsReschedule(UUID tenantId, List<UUID> appointmentIds, String reason) {
+        if (appointmentIds.isEmpty()) return;
+        jdbc.update("UPDATE appointments SET needs_reschedule_reason = ? WHERE tenant_id = ? AND status IN ('requested','scheduled') AND id = ANY(?::uuid[])",
+                reason, tenantId, "{" + String.join(",", appointmentIds.stream().map(UUID::toString).toList()) + "}");
+    }
+
+    /** ACC-005: live bookings of the doctor starting in [from, to); the caller narrows to a part-day window. */
+    List<Object[]> liveBookingsBetween(UUID tenantId, UUID doctorId, Instant from, Instant to) {
+        return jdbc.query(
+                "SELECT id, start_time FROM appointments WHERE tenant_id = ? AND doctor_id = ? AND status IN ('requested','scheduled') " +
+                        "AND start_time >= ? AND start_time < ? ORDER BY start_time",
+                (rs, i) -> new Object[]{rs.getObject("id", UUID.class), rs.getTimestamp("start_time").toInstant()},
+                tenantId, doctorId, Timestamp.from(from), Timestamp.from(to));
     }
 
     /**
@@ -168,15 +217,13 @@ class ScheduleRepository {
     }
 
     /**
-     * NB-098: scheduled appointments and walk-ins share one cap per session. Walk-ins have no
-     * explicit session reference, so they're bucketed by their check-in time-of-day (created_at)
-     * falling inside the block — the same window a scheduled appointment's start_time is compared
-     * against. Both sides are read in the clinic's zone (explicit AT TIME ZONE, never the DB session's
-     * zone) because blockStart/blockEnd are the clinic's wall-clock times.
+     * NB-098: scheduled appointments and walk-ins share one cap per session. Walk-ins have no explicit session reference, so they're
+     * bucketed by their check-in instant (created_at) falling inside the block's window on the CLINIC date (ACC-005: an overnight
+     * block's window runs past midnight, so a 00:30 walk-in still counts against the evening session).
      */
-    int countSessionOccupancy(UUID tenantId, UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
-        Instant rangeStart = date.atTime(blockStart).atZone(zone).toInstant();
-        Instant rangeEnd = date.atTime(blockEnd).atZone(zone).toInstant();
+    int countSessionOccupancy(UUID tenantId, UUID doctorId, LocalDate date, WorkingHoursRow wh) {
+        Timestamp rangeStart = Timestamp.from(clock.atSecond(tenantId, date, wh.startSecond()));
+        Timestamp rangeEnd = Timestamp.from(clock.atSecond(tenantId, date, wh.endSecond()));
         Integer count = jdbc.queryForObject(
                 "SELECT " +
                         // QA-04: a seen booking (completed) still used its place, as a completed walk-in does
@@ -185,20 +232,20 @@ class ScheduleRepository {
                         "+ " +
                         "(SELECT count(*) FROM queue_entries q WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " +
                         "  AND q.appointment_id IS NULL AND q.status != 'no_show' " +
-                        "  AND (q.created_at AT TIME ZONE ?)::time >= ? AND (q.created_at AT TIME ZONE ?)::time < ?)",
+                        "  AND q.created_at >= ? AND q.created_at < ?)",
                 Integer.class,
-                tenantId, doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
-                tenantId, doctorId, Date.valueOf(date), zone.getId(), Time.valueOf(blockStart), zone.getId(), Time.valueOf(blockEnd));
+                tenantId, doctorId, rangeStart, rangeEnd,
+                tenantId, doctorId, Date.valueOf(date), rangeStart, rangeEnd);
         return count == null ? 0 : count;
     }
 
     /** ACC-011: the bookings (appointments) of the session; the rest of countSessionOccupancy is desk walk-ins. Online cap counts these. */
-    int countSessionBookings(UUID tenantId, UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
+    int countSessionBookings(UUID tenantId, UUID doctorId, LocalDate date, WorkingHoursRow wh) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? " +
                         "AND a.status IN ('scheduled','arrived','completed') AND a.start_time >= ? AND a.start_time < ?",
-                Integer.class, tenantId, doctorId, Timestamp.from(date.atTime(blockStart).atZone(zone).toInstant()),
-                Timestamp.from(date.atTime(blockEnd).atZone(zone).toInstant()));
+                Integer.class, tenantId, doctorId, Timestamp.from(clock.atSecond(tenantId, date, wh.startSecond())),
+                Timestamp.from(clock.atSecond(tenantId, date, wh.endSecond())));
         return count == null ? 0 : count;
     }
 
@@ -314,6 +361,8 @@ class ScheduleRepository {
                 UUID.fromString(rs.getString("doctor_id")),
                 rs.getDate("date_from").toLocalDate(),
                 rs.getDate("date_to").toLocalDate(),
-                rs.getString("reason"));
+                rs.getString("reason"),
+                rs.getTime("start_time") == null ? null : rs.getTime("start_time").toLocalTime(),
+                rs.getTime("end_time") == null ? null : rs.getTime("end_time").toLocalTime());
     }
 }
