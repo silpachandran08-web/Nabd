@@ -345,7 +345,7 @@
 .tenderFill:disabled, .tenderRemove:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
 .tenders .backBtn { min-block-size: 44px; }
 .collectBar {
-  position: sticky; inset-block-end: var(--nb-mnav-h, 0px); z-index: 15; /* clears the phone bottom nav (as consult's actionBar) */
+  position: sticky; inset-block-end: var(--nb-mnav-h, 0px); z-index: var(--z-sticky); /* clears the phone bottom nav (as consult's actionBar) */
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--nb-space-12);
   margin-block-start: var(--nb-space-16);
   padding: var(--nb-space-12) var(--nb-space-16);

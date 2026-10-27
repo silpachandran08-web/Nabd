@@ -91,7 +91,7 @@ test("stylelint with the logical-properties rule passes on every CSS file of the
 });
 
 test("directional icons mirror under rtl: flip list on Icon, one global rule, overview chevrons use the icon", () => {
-  assert.match(readFileSync(`${app}app/components/ui/Icon.tsx`, "utf8"), /FLIP_RTL: readonly IconName\[\] = \["chevron", "login"\]/);
+  assert.match(readFileSync(new URL("../../../../packages/ui/src/Icon.tsx", import.meta.url), "utf8"), /FLIP_RTL: readonly IconName\[\] = \["chevron", "login"\]/);
   assert.match(readFileSync(`${app}app/globals.css`, "utf8"), /\[dir="rtl"\] svg\[data-flip\] \{ transform: scaleX\(-1\); \}/);
   const ov = readFileSync(`${app}app/(clinic)/overview/page.tsx`, "utf8");
   assert.ok(!ov.includes("›"), "a text chevron is left in overview");

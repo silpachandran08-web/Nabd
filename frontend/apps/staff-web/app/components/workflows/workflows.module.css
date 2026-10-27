@@ -4,8 +4,8 @@
   min-block-size: 28px;
   padding-inline: var(--nb-space-12);
   border-radius: 999px;
-  border: 1px solid var(--nb-warning-500);
-  color: var(--nb-warning-500);
+  border: 1px solid var(--nb-warn-500);
+  color: var(--nb-warn-500);
   font-size: 12px;
   font-weight: 600;
 }
@@ -64,7 +64,7 @@
 }
 
 .touch {
-  color: var(--nb-warning-500);
+  color: var(--nb-warn-500);
   font-weight: 600;
   white-space: nowrap;
 }

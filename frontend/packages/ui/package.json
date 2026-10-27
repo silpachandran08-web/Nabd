@@ -3,9 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "peerDependencies": { "react": "19.2.8" },
-  "devDependencies": { "@types/react": "^19" },
-  "exports": { ".": "./src/index.ts" },
+  "peerDependencies": {
+    "react": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./ui.css": "./src/ui.css"
+  },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p ."

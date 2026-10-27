@@ -13,6 +13,7 @@ import { usePharmacyCapabilities } from "./lib/pharmacyCapabilities";
 import { pharmacyNavAllowed } from "./lib/pharmacyRules";
 import { useNavBadges } from "./shell/useNavBadges";
 import FacilitySwitcher from "./shell/FacilitySwitcher";
+import { BottomSheet } from "@nabd/ui";
 
 // FEF-052: the sidebar renders whatever shell/navRegistry resolves for the role context (one registry, one badge resolver).
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -41,16 +42,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const moreBtnRef = useRef<HTMLButtonElement>(null);
   const [plan, setPlan] = useState<{ plan: string | null; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
   const [canReturnToWorkspaces, setCanReturnToWorkspaces] = useState(false);
-
-  // Escape closes the mobile More menu and hands focus back to its button.
-  useEffect(() => {
-    if (!showMore) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { setShowMore(false); moreBtnRef.current?.focus(); }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [showMore]);
 
   // Hydration-safe: read the identity after mount, never during render.
   useEffect(() => {
@@ -200,8 +191,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       {overflowEntries.length > 0 && (
         <div className={styles.moreWrap}>
           {showMore && (
-            <>
-              <div className={styles.menuBackdrop} onClick={() => setShowMore(false)} />
+            <BottomSheet title="More" onClose={() => setShowMore(false)}>
               <div className={styles.moreMenu} role="menu">
                 {overflowEntries.map((e) => (
                   <Link key={e.key} href={e.href} role="menuitem" onClick={() => setShowMore(false)}
@@ -229,7 +219,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                   </button>
                 ))}
               </div>
-            </>
+            </BottomSheet>
           )}
           <button type="button" ref={moreBtnRef} className={styles.bottomLink} aria-expanded={showMore} aria-haspopup="menu"
             onClick={() => { setCanReturnToWorkspaces(ownerPendingTokenValid()); setShowMore((v) => !v); }}>

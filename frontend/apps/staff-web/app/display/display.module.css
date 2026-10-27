@@ -1,5 +1,5 @@
 /* ACC-023: full-screen, high contrast, scales with the viewport. Fixed colours on purpose: a TV across the room needs black on white or white on black. */
-.screen { position: fixed; inset: 0; z-index: 1000; overflow: hidden; background: #000; color: #fff; display: flex; flex-direction: column; padding: 2vmin; font-size: clamp(16px, 2.2vmin, 40px); }
+.screen { position: fixed; inset: 0; z-index: var(--z-lock); overflow: hidden; background: #000; color: #fff; display: flex; flex-direction: column; padding: 2vmin; font-size: clamp(16px, 2.2vmin, 40px); }
 .grid { flex: 1; display: grid; gap: 2vmin; grid-template-columns: repeat(auto-fit, minmax(min(100%, 38vmin), 1fr)); align-content: stretch; min-block-size: 0; }
 .grid[data-count="1"] { grid-template-columns: 1fr; }
 .card { border: 0.3vmin solid #fff; border-radius: 2vmin; padding: 2vmin; display: flex; flex-direction: column; justify-content: space-between; min-inline-size: 0; }

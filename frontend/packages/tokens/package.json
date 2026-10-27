@@ -3,9 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./dist/tokens.css",
+    "./custom-media.css": "./dist/custom-media.css",
+    "./theme": "./dist/theme.ts",
+    "./contrast-report.json": "./dist/contrast-report.json"
+  },
   "scripts": {
-    "lint": "eslint .",
+    "build": "node build.mjs",
+    "check": "node build.mjs --check",
+    "lint": "eslint . && node build.mjs --check",
     "typecheck": "tsc --noEmit -p ."
   }
 }

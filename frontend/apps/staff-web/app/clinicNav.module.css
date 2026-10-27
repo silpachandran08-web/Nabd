@@ -17,7 +17,7 @@
 
 .brand {
   padding: var(--nb-space-8) var(--nb-space-12);
-  font-size: 14px;
+  font-size: var(--nb-fs-md);
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--nb-text-primary);
@@ -34,7 +34,7 @@
 
 /* Collapsed desktop = 72px icon rail (DESIGN.md §4). */
 .navRail { width: 72px; padding-inline: var(--nb-space-8); align-items: center; }
-.navRail .brand { padding-inline: 0; font-size: 12px; }
+.navRail .brand { padding-inline: 0; font-size: var(--nb-fs-xs); }
 .navRail .clinicText, .navRail .linkLabel, .navRail .identityText { display: none; }
 .navRail .clinicInfo { padding: var(--nb-space-8); justify-content: center; }
 .navRail .link { justify-content: center; padding-inline: 0; width: 48px; height: 44px; position: relative; }
@@ -53,7 +53,7 @@
 }
 
 .clinicIcon {
-  font-size: 16px;
+  font-size: var(--nb-fs-base);
   flex: none;
 }
 
@@ -63,7 +63,7 @@
 
 .clinicName {
   color: var(--nb-text-primary);
-  font-size: 13px;
+  font-size: var(--nb-fs-sm);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -72,7 +72,7 @@
 
 .clinicRegion {
   color: var(--nb-text-tertiary);
-  font-size: 12px;
+  font-size: var(--nb-fs-xs);
 }
 
 .identityWrap {
@@ -103,7 +103,7 @@
 .menuBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 49;
+  z-index: var(--z-dropdown);
 }
 
 /* Sits just above the identity footer it's triggered from, matching DESIGN.md's signed-in
@@ -113,7 +113,7 @@
   bottom: calc(100% + var(--nb-space-8));
   /* Within the sidebar's width: the nav scrolls (overflow-y), so anything wider is clipped. */
   inset-inline: 0;
-  z-index: 50;
+  z-index: calc(var(--z-dropdown) + 1);
   padding: var(--nb-space-12);
   border-radius: var(--nb-radius-lg);
   background: var(--nb-surface-overlay);
@@ -122,7 +122,7 @@
 }
 
 .menuHeader {
-  font-size: 12px;
+  font-size: var(--nb-fs-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -143,7 +143,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--nb-space-8) var(--nb-space-4);
-  font-size: 12px;
+  font-size: var(--nb-fs-xs);
   color: var(--nb-text-secondary);
   border-top: 1px solid var(--nb-border-subtle);
 }
@@ -162,7 +162,7 @@
   background: transparent;
   color: var(--nb-danger-500);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--nb-fs-sm);
   font-weight: 600;
   text-align: start;
   cursor: pointer;
@@ -187,7 +187,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--nb-fs-xs);
   font-weight: 700;
   flex: none;
 }
@@ -198,7 +198,7 @@
 
 .identityName {
   color: var(--nb-text-primary);
-  font-size: 13px;
+  font-size: var(--nb-fs-sm);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -207,7 +207,7 @@
 
 .identityRole {
   color: var(--nb-text-tertiary);
-  font-size: 12px;
+  font-size: var(--nb-fs-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -230,7 +230,7 @@
   padding: var(--nb-space-8) var(--nb-space-12);
   border-radius: var(--nb-radius-md);
   color: var(--nb-text-secondary);
-  font-size: 13px;
+  font-size: var(--nb-fs-sm);
   font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
@@ -253,7 +253,7 @@
   border-radius: 9px;
   background: var(--nb-accent-tint);
   color: var(--nb-accent-500);
-  font-size: 12px;
+  font-size: var(--nb-fs-xs);
   font-weight: 600;
   line-height: 18px;
   text-align: center;
@@ -270,39 +270,39 @@
 .bottomNav { display: none; }
 
 /* Tablet 768-1024: 88px rail, icon above a short label, >=44px targets (DESIGN.md §4). */
-@media (max-width: 1024px) {
+@media (--bp-tablet) {
   .nav { width: 88px; padding-inline: var(--nb-space-4); align-items: center; }
-  .brand { padding-inline: 0; font-size: 12px; }
+  .brand { padding-inline: 0; font-size: var(--nb-fs-xs); }
   .clinicText, .linkLabel, .identityText { display: none; }
   .clinicInfo { padding: var(--nb-space-8); justify-content: center; }
   .link { flex-direction: column; gap: 2px; justify-content: center; width: 76px; min-height: 52px; padding: var(--nb-space-4); position: relative; overflow: visible; text-align: center; }
-  .linkShort { display: block; font-size: 12px; line-height: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .linkShort { display: block; font-size: var(--nb-fs-xs); line-height: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .badge { position: absolute; top: 2px; inset-inline-end: 4px; margin: 0; }
   .identityFooter { justify-content: center; padding-inline: 0; min-height: 44px; }
 }
 
 /* Mobile <=430: sidebar gives way to a 64px bottom nav, max 5 destinations incl. More. */
-@media (max-width: 430px) {
+@media (--bp-phone) {
   .nav { display: none; }
   .bottomNav {
-    display: flex; position: fixed; inset-inline: 0; bottom: 0; z-index: 40;
+    display: flex; position: fixed; inset-inline: 0; bottom: 0; z-index: var(--z-overlay);
     height: calc(64px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
     background: var(--nb-bg-nav); border-top: 1px solid var(--nb-border-subtle);
   }
   .bottomLink {
     flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    border: none; background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 12px; font-weight: 500; text-decoration: none; cursor: pointer;
+    border: none; background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: var(--nb-fs-xs); font-weight: 500; text-decoration: none; cursor: pointer;
   }
   .bottomLinkActive { color: var(--nb-accent-500); }
   .bottomIcon { position: relative; display: inline-flex; }
-  .bottomBadge { position: absolute; top: -4px; inset-inline-start: 12px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--nb-accent-500); color: var(--nb-on-accent); font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
+  .bottomBadge { position: absolute; top: -4px; inset-inline-start: 12px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--nb-accent-500); color: var(--nb-on-accent); font-size: var(--nb-fs-xs); font-weight: 700; line-height: 16px; text-align: center; }
   .moreWrap { flex: 1; display: flex; position: relative; }
   .moreWrap .bottomLink { width: 100%; }
-  .moreMenu { position: absolute; bottom: calc(100% + 8px); inset-inline-end: 8px; width: 240px; z-index: 50; padding: var(--nb-space-8); border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0,0,0,.55); }
-  .moreItem { display: flex; align-items: center; gap: var(--nb-space-12); min-height: 44px; padding: 0 var(--nb-space-12); border-radius: var(--nb-radius-md); color: var(--nb-text-secondary); font-size: 14px; text-decoration: none; }
+  .moreMenu { display: flex; flex-direction: column; gap: var(--nb-space-2); }
+  .moreItem { display: flex; align-items: center; gap: var(--nb-space-12); min-height: 44px; padding: 0 var(--nb-space-12); border-radius: var(--nb-radius-md); color: var(--nb-text-secondary); font-size: var(--nb-fs-md); text-decoration: none; }
 }
 
-@media (max-width: 1024px) {
+@media (--bp-tablet) {
   .navRail { width: 88px; }
   .navRail .link { flex-direction: column; width: 76px; height: auto; min-height: 52px; }
   .navRail .linkLabel { display: none; }
@@ -312,26 +312,26 @@
 .clinicWrap .clinicInfo { margin-bottom: 0; }
 .clinicButton { width: 100%; border: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
 .clinicChevron { margin-inline-start: auto; color: var(--nb-text-tertiary); display: inline-flex; }
-.clinicMenu { position: absolute; top: calc(100% + var(--nb-space-8)); inset-inline-start: 0; width: 240px; z-index: 50; padding: var(--nb-space-12); border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0,0,0,.55); }
-.clinicCurrent { display: flex; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-4); color: var(--nb-accent-500); font-size: 13px; font-weight: 600; }
-.clinicSwitch { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; min-height: 44px; padding: var(--nb-space-8) var(--nb-space-4); border: none; border-top: 1px solid var(--nb-border-subtle); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 13px; text-align: start; text-decoration: none; cursor: pointer; }
+.clinicMenu { position: absolute; top: calc(100% + var(--nb-space-8)); inset-inline-start: 0; width: 240px; z-index: calc(var(--z-dropdown) + 1); padding: var(--nb-space-12); border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0,0,0,.55); }
+.clinicCurrent { display: flex; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-4); color: var(--nb-accent-500); font-size: var(--nb-fs-sm); font-weight: 600; }
+.clinicSwitch { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; min-height: 44px; padding: var(--nb-space-8) var(--nb-space-4); border: none; border-top: 1px solid var(--nb-border-subtle); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: var(--nb-fs-sm); text-align: start; text-decoration: none; cursor: pointer; }
 .clinicSwitch:disabled { cursor: progress; }
-.moreButton { width: 100%; border: none; background: transparent; font: inherit; font-size: 14px; text-align: start; cursor: pointer; }
+.moreButton { width: 100%; border: none; background: transparent; font: inherit; font-size: var(--nb-fs-md); text-align: start; cursor: pointer; }
 .clinicRowText { display: flex; flex-direction: column; min-width: 0; }
-.clinicRowSub { color: var(--nb-text-tertiary); font-size: 12px; font-weight: 400; }
-.clinicRowTag { margin-inline-start: auto; color: var(--nb-text-tertiary); font-size: 12px; font-weight: 500; }
-.clinicLocked { display: flex; align-items: center; gap: var(--nb-space-8); min-height: 44px; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-tertiary); font-size: 13px; text-decoration: none; }
+.clinicRowSub { color: var(--nb-text-tertiary); font-size: var(--nb-fs-xs); font-weight: 400; }
+.clinicRowTag { margin-inline-start: auto; color: var(--nb-text-tertiary); font-size: var(--nb-fs-xs); font-weight: 500; }
+.clinicLocked { display: flex; align-items: center; gap: var(--nb-space-8); min-height: 44px; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-tertiary); font-size: var(--nb-fs-sm); text-decoration: none; }
 .clinicLocked:hover { color: var(--nb-text-secondary); }
 .clinicSwitch:hover { color: var(--nb-text-primary); }
 .planChip { display: flex; flex-direction: column; gap: 2px; margin-top: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px dashed var(--nb-sync-500); background: var(--nb-sync-tint); text-decoration: none; }
-.planName { color: var(--nb-sync-500); font-size: 12px; font-weight: 600; text-transform: capitalize; }
-.planSub { color: var(--nb-text-secondary); font-size: 12px; text-transform: capitalize; }
-.menuLink { display: block; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-primary); font-size: 13px; font-weight: 500; text-decoration: none; }
+.planName { color: var(--nb-sync-500); font-size: var(--nb-fs-xs); font-weight: 600; text-transform: capitalize; }
+.planSub { color: var(--nb-text-secondary); font-size: var(--nb-fs-xs); text-transform: capitalize; }
+.menuLink { display: block; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-primary); font-size: var(--nb-fs-sm); font-weight: 500; text-decoration: none; }
 .menuLink:hover { background: var(--nb-surface-2); border-radius: var(--nb-radius-md); }
-@media (max-width: 1024px) { .clinicChevron, .planChip { display: none; } }
+@media (--bp-tablet) { .clinicChevron, .planChip { display: none; } }
 /* Rail widths: the nav scrolls (overflow-y), which would clip an absolute popover, so the popover
    is pinned beside the rail instead (wireframe popPos.clinic). */
-@media (max-width: 1024px) {
+@media (--bp-tablet) {
   .clinicMenu { position: fixed; top: 56px; inset-inline-start: 96px; }
   .identityMenu { position: fixed; inset-inline: 96px auto; bottom: 16px; width: 260px; }
 }

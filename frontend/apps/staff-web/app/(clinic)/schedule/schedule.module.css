@@ -407,7 +407,7 @@ button.slot {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: var(--z-modal);
   padding: var(--nb-space-16);
 }
 

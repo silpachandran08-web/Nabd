@@ -1,0 +1,17 @@
+{
+  "bg-root": "#06090c", "bg-canvas": "#0a0e12", "bg-nav": "#080b0e",
+  "surface-1": "#11161b", "surface-2": "#171d23", "surface-3": "#1e262d", "surface-overlay": "#12181e",
+  "scrim": "rgba(3, 6, 9, 0.72)",
+  "border-subtle": "rgba(255, 255, 255, 0.07)", "border-default": "rgba(255, 255, 255, 0.11)", "border-strong": "rgba(255, 255, 255, 0.18)",
+  "accent-500": "#2ed3e0", "accent-gradient": "linear-gradient(90deg, #3ee0c4 0%, #35c9e8 100%)",
+  "accent-tint": "rgba(46, 211, 224, 0.12)", "accent-glow": "0 8px 24px rgba(46, 211, 224, 0.26)", "on-accent": "#04231f",
+  "danger-500": "#ff6b7d", "danger-tint": "rgba(240, 69, 92, 0.13)", "danger-600": "#d8232a",
+  "ok-500": "#34d399", "ok-tint": "rgba(52, 211, 153, 0.14)",
+  "success-500": "#34d399", "success-tint": "rgba(52, 211, 153, 0.14)",
+  "warn-500": "#e8b33c", "warn-tint": "rgba(232, 179, 60, 0.14)",
+  "info-500": "#58b2f5", "info-600": "#3d94db", "info-tint": "rgba(88, 178, 245, 0.14)",
+  "sync-500": "#b49cfb", "sync-tint": "rgba(167, 139, 250, 0.14)",
+  "urgent-500": "#ff7a45", "urgent-tint": "rgba(255, 122, 69, 0.14)",
+  "text-primary": "#ffffff", "text-secondary": "#a6b0b8", "text-tertiary": "#8b97a0", "text-disabled": "#657078",
+  "focus-ring": "#2ed3e0"
+}
