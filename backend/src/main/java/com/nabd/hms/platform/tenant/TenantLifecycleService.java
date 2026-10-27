@@ -70,7 +70,8 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
         repo.markLive(tenantContext.current(), staffId);
     }
 
-    private TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
+    @Transactional
+    TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
                                          String ipAddress) {
         String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(this::notFound);
         Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());

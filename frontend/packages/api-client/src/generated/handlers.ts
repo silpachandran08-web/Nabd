@@ -379,6 +379,9 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/setup/dpa/otp`, () => HttpResponse.json({"expiresAt":"2026-01-01T00:00:00Z","otpChallengeId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // DpaController_requestOtp
     http.get(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json([{"createdAt":"2026-01-01T00:00:00Z","errorMessage":"string","exportType":"string","id":"string","resultUrl":"string","status":"string"}], { status: 200 })), // SetupController_exportJobs
     http.post(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json({"createdAt":"2026-01-01T00:00:00Z","errorMessage":"string","exportType":"string","id":"string","resultUrl":"string","status":"string"}, { status: 200 })), // SetupController_createExportJob
+    http.post(`${baseUrl}/v1/setup/go-live`, () => HttpResponse.json({"bookingUrl":"string","liveAt":"2026-01-01T00:00:00Z","qrPosterUrl":"string"}, { status: 200 })), // GoLiveController_goLive
+    http.get(`${baseUrl}/v1/setup/go-live/checks`, () => HttpResponse.json({"blockers":[{"code":"string","fixUrl":"string","ok":false}],"niceToHave":[{"code":"string","note":"string","ok":false}]}, { status: 200 })), // GoLiveController_checks
+    http.get(`${baseUrl}/v1/setup/go-live/poster`, () => HttpResponse.json("AA==", { status: 200 })), // GoLiveController_poster
     http.get(`${baseUrl}/v1/setup/holidays`, () => HttpResponse.json([{"holidayDate":"2026-01-01","id":"string","name":"string","recurring":false}], { status: 200 })), // SetupController_holidays
     http.post(`${baseUrl}/v1/setup/holidays`, () => HttpResponse.json({"holidayDate":"2026-01-01","id":"string","name":"string","recurring":false}, { status: 200 })), // SetupController_addHoliday
     http.delete(`${baseUrl}/v1/setup/holidays/:id`, () => new HttpResponse(null, { status: 200 })), // SetupController_deleteHoliday
@@ -402,6 +405,9 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/setup/shifts`, () => HttpResponse.json({"effectiveFrom":"2026-01-01","effectiveTo":"2026-01-01","id":"string","patternJson":"string","staffId":"string","staffName":"string"}, { status: 200 })), // SetupController_addShift
     http.get(`${baseUrl}/v1/setup/staff`, () => HttpResponse.json([{"id":"00000000-0000-7000-8000-000000000000","name":"string","roleName":"string"}], { status: 200 })), // SetupController_staff
     http.get(`${baseUrl}/v1/setup/subscription`, () => HttpResponse.json({"activePatientsLimit":0,"activePatientsUsed":0,"branchesLimit":0,"branchesUsed":0,"killedFeatures":["string"],"modules":[{"code":"string","enabled":false}],"plan":"string","seatsLimit":0,"seatsUsed":0,"status":"string","whatsappMessagesLimit":0,"whatsappMessagesUsed":0}, { status: 200 })), // SetupController_subscription
+    http.get(`${baseUrl}/v1/setup/trial`, () => HttpResponse.json({"blockers":["string"],"conversion":{"jobId":"00000000-0000-7000-8000-000000000000","status":"string","syntheticRowsDeleted":0},"daysLeft":0,"endsAt":"2026-01-01T00:00:00Z","status":"string"}, { status: 200 })), // ClinicTrialController_status
+    http.post(`${baseUrl}/v1/setup/trial/convert`, () => HttpResponse.json({"conversionJobId":"00000000-0000-7000-8000-000000000000"}, { status: 202 })), // ClinicTrialController_convert
+    http.post(`${baseUrl}/v1/setup/trial/convert/otp`, () => HttpResponse.json({"expiresAt":"2026-01-01T00:00:00Z","otpChallengeId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // ClinicTrialController_requestOtp
     http.get(`${baseUrl}/v1/setup/whatsapp-templates`, () => HttpResponse.json([{"body":"string","category":"string","headerText":"string","id":"00000000-0000-7000-8000-000000000000","key":"string","language":"string","name":"string","paramCount":0,"qualityRating":"string","rejectionReason":"string","source":"string","status":"string","updatedAt":"2026-01-01T00:00:00Z"}], { status: 200 })), // WhatsAppTemplateController_list
     http.post(`${baseUrl}/v1/setup/whatsapp-templates`, () => HttpResponse.json({"body":"string","category":"string","headerText":"string","id":"00000000-0000-7000-8000-000000000000","key":"string","language":"string","name":"string","paramCount":0,"qualityRating":"string","rejectionReason":"string","source":"string","status":"string","updatedAt":"2026-01-01T00:00:00Z"}, { status: 200 })), // WhatsAppTemplateController_create
     http.patch(`${baseUrl}/v1/setup/whatsapp-templates/:id`, () => HttpResponse.json({"body":"string","category":"string","headerText":"string","id":"00000000-0000-7000-8000-000000000000","key":"string","language":"string","name":"string","paramCount":0,"qualityRating":"string","rejectionReason":"string","source":"string","status":"string","updatedAt":"2026-01-01T00:00:00Z"}, { status: 200 })), // WhatsAppTemplateController_resubmit
@@ -440,4 +446,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 426;
+export const operationCount = 432;

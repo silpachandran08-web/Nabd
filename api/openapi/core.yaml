@@ -14207,6 +14207,100 @@ paths:
       tags:
       - organization
       x-required-permission: setup:view
+  /v1/setup/go-live:
+    post:
+      operationId: GoLiveController_goLive
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoLiveResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/go-live/checks:
+    get:
+      operationId: GoLiveController_checks
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoLiveChecksResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/setup/go-live/poster:
+    get:
+      operationId: GoLiveController_poster
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
   /v1/setup/holidays:
     get:
       operationId: SetupController_holidays
@@ -15077,6 +15171,105 @@ paths:
       tags:
       - organization
       x-required-permission: setup:view
+  /v1/setup/trial:
+    get:
+      operationId: ClinicTrialController_status
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TrialStatusResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/setup/trial/convert:
+    post:
+      operationId: ClinicTrialController_convert
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrialConvertRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TrialConvertResponse"
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/trial/convert/otp:
+    post:
+      operationId: ClinicTrialController_requestOtp
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DpaOtpChallengeResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
   /v1/setup/whatsapp-templates:
     get:
       operationId: WhatsAppTemplateController_list
@@ -19454,6 +19647,45 @@ components:
             $ref: "#/components/schemas/FollowUpItem"
         page:
           $ref: "#/components/schemas/PageMeta"
+    GoLiveBlocker:
+      type: object
+      properties:
+        code:
+          type: string
+        fixUrl:
+          type: string
+        ok:
+          type: boolean
+    GoLiveChecksResponse:
+      type: object
+      properties:
+        blockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/GoLiveBlocker"
+        niceToHave:
+          type: array
+          items:
+            $ref: "#/components/schemas/GoLiveNiceToHave"
+    GoLiveNiceToHave:
+      type: object
+      properties:
+        code:
+          type: string
+        note:
+          type: string
+        ok:
+          type: boolean
+    GoLiveResponse:
+      type: object
+      properties:
+        bookingUrl:
+          type: string
+        liveAt:
+          type: string
+          format: date-time
+        qrPosterUrl:
+          type: string
     GrantResponse:
       type: object
       properties:
@@ -23918,6 +24150,8 @@ components:
         renewalDate:
           type: string
           format: date
+        startTrial:
+          type: boolean
       required:
       - planId
       - renewalDate
@@ -24388,6 +24622,55 @@ components:
       required:
       - reason
       - toStatus
+    TrialConversion:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        syntheticRowsDeleted:
+          type: integer
+          format: int64
+    TrialConvertRequest:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        otp:
+          type: string
+          minLength: 1
+        otpChallengeId:
+          type: string
+          format: uuid
+      required:
+      - confirm
+      - otp
+      - otpChallengeId
+    TrialConvertResponse:
+      type: object
+      properties:
+        conversionJobId:
+          type: string
+          format: uuid
+    TrialStatusResponse:
+      type: object
+      properties:
+        blockers:
+          type: array
+          items:
+            type: string
+        conversion:
+          $ref: "#/components/schemas/TrialConversion"
+        daysLeft:
+          type: integer
+          format: int32
+        endsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
     UiPreferences:
       type: object
       properties:

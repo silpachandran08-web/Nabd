@@ -19,6 +19,8 @@ const handlers = () => [
     if (o.convertFail) return r.fulfill({ status: 400, contentType: 'application/problem+json', body: JSON.stringify({ title: 'x', detail: 'That code is not right.' }) });
     o.converted = true; r.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ conversionJobId: 'j1' }) });
   }],
+  ['GET', /^\/setup\/profile$/, { body: { name: 'QA Clinic', region: 'IN', timezone: 'Asia/Kolkata', taxIdType: null, taxId: null, whatsappNumber: null, specialties: [] } }],
+  ['GET', /^\/setup\/subscription$/, { status: 404, body: { title: 'x' } }],
   ['GET', /^\/setup\/checklist/, { body: [] }],
   ['GET', /^\/setup\/dpa$/, { status: 404, body: { title: 'x' } }],
   ['GET', /^\/setup/, { body: {} }],
