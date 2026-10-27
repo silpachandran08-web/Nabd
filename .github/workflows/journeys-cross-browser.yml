@@ -1,0 +1,63 @@
+# FEF-050.5: weekly cross-browser smoke (J1, J5, J6, J9) on Chrome, Edge, Safari (WebKit) and a low-end Android stand-in
+# (Chromium with 4x CPU throttling; real devices are a device-farm job: Needs external action). Report-only: a red browser opens
+# the run for the owner, it does not block releases (the nightly journeys are the gate).
+name: journeys-cross-browser
+on:
+  schedule:
+    - cron: "43 2 * * 0"           # Sunday, UTC
+  workflow_dispatch: {}
+permissions:
+  contents: read
+env:
+  NODE_VERSION: "22"
+  PLAYWRIGHT_VERSION: "1.64.1"
+  AXE_VERSION: "4.10.2"
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: chrome,  os: ubuntu-latest, install: chromium,       env_browser: "",       env_channel: "",       lowend: "", only: "" }
+          - { name: edge,    os: ubuntu-latest, install: msedge,         env_browser: "",       env_channel: msedge,   lowend: "", only: "" }
+          - { name: safari,  os: macos-latest,  install: webkit,         env_browser: webkit,   env_channel: "",       lowend: "", only: "" }
+          - { name: android-lowend, os: ubuntu-latest, install: chromium, env_browser: "",      env_channel: "",       lowend: "4", only: "J1" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Playwright + axe-core
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e" && cd "$RUNNER_TEMP/e2e" && npm init -y >/dev/null
+          npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" "axe-core@$AXE_VERSION"
+          npx playwright install --with-deps ${{ matrix.install }}
+      - name: build and start the staff web app
+        shell: bash
+        working-directory: frontend/apps/staff-web
+        run: |
+          pnpm install --frozen-lockfile && pnpm exec next build
+          (pnpm exec next start -p 3000 &) ; for i in $(seq 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 1; done
+      - name: smoke on ${{ matrix.name }}
+        shell: bash
+        env:
+          APP: http://localhost:3000
+          SMOKE_TARGET: mock
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/e2e/node_modules/playwright/index.mjs
+          PW_CHROMIUM: ""
+          PW_BROWSER: ${{ matrix.env_browser }}
+          PW_CHANNEL: ${{ matrix.env_channel }}
+          SMOKE_LOWEND: ${{ matrix.lowend }}
+          AXE_CORE_PATH: ${{ runner.temp }}/e2e/node_modules/axe-core/axe.min.js
+        run: |
+          only=""; [ -n "${{ matrix.only }}" ] && only="--only=${{ matrix.only }}"
+          node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --suite=smoke --retries=1 $only --out=smoke-${{ matrix.name }}
+          node frontend/apps/staff-web/tests/e2e/smoke/report.mjs --results=smoke-${{ matrix.name }} --out=smoke-${{ matrix.name }} >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "smoke-${{ matrix.name }}", path: "smoke-${{ matrix.name }}", retention-days: 30 }

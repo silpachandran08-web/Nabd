@@ -57,7 +57,7 @@ export function CheckInResultDialog({ result, onClose }: { result: CheckInResult
   const loading = position === undefined || waitMin === undefined;
   return (
     <Dialog title={sl("title")} onClose={onClose}>
-      <PrintSheet paper={paper} label="Token slip">
+      <PrintSheet paper={paper} label={sl("label")}>
       <div className={styles.result}>
         <span className={styles.srOnly} role="status">{sl("announce", { token: result.tokenNumber, name: result.patientName })}</span>
         <div className={styles.tokenLabel}>{sl("token")}</div>

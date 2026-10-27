@@ -4,12 +4,27 @@ import { readFileSync } from 'node:fs';
 export const ROLES = JSON.parse(readFileSync(new URL('./roles.json', import.meta.url)));
 const FLAGS = ['view', 'create', 'edit', 'delete', 'approve', 'refundDiscount', 'export'];
 
+/** FEF-050 role-absence sweep: a signed-in staff member whose role holds no grant at all. */
+export const NO_GRANTS = 'no_grants';
+export const roleName = (role) => (role === NO_GRANTS ? 'No grants' : ROLES[role].name);
+
+/**
+ * roles.json is the RBAC sheet extract and lacks the nursing / specialty_dental extension rows that RolePresets.java grants
+ * (nurse: nursing view|create|edit; doctor: nursing view|create). Mock sign-in adds them so the J8/J11 journeys can open their
+ * screens; a unit test compares these rows with RolePresets.java. The preview seed (roles.json) is not touched.
+ */
+export const PRESET_SUPPLEMENT = {
+  doctor: { nursing: ['view', 'create'], specialty_dental: ['view', 'create', 'edit'] },
+  nurse: { nursing: ['view', 'create', 'edit'], specialty_dental: ['view'] },
+};
+
 /** Permission strings a role's JWT carries (same flattening as GrantsFlattener: module:flag). */
 export function permsFor(role) {
+  if (role === NO_GRANTS) return [];
   const r = ROLES[role];
   if (!r) throw new Error(`unknown role ${role}`);
   if (r.full) return r.full.flatMap((m) => FLAGS.map((f) => `${m}:${f}`));
-  return Object.entries(r.grants).flatMap(([m, fs]) => fs.map((f) => `${m}:${f}`));
+  return Object.entries({ ...r.grants, ...PRESET_SUPPLEMENT[role] }).flatMap(([m, fs]) => fs.map((f) => `${m}:${f}`));
 }
 
 export const BLOCKING_IMPACTS = ['critical', 'serious'];

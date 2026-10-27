@@ -24,6 +24,11 @@
   },
   "hazards": [
     {
+      "controls": {
+        "existing": "fixture",
+        "planned": "fixture"
+      },
+      "exception": null,
       "hazard": "Fixture hazard one",
       "id": "H-01",
       "log_status": "open",
@@ -37,9 +42,15 @@
           "status": "passed"
         }
       ],
-      "verified": true
+      "verified": true,
+      "verifying_test": "FxClassTest"
     },
     {
+      "controls": {
+        "existing": "fixture",
+        "planned": "fixture"
+      },
+      "exception": null,
       "hazard": "Fixture: controlled drug sold without Rx",
       "id": "H-04",
       "log_status": "open",
@@ -63,9 +74,15 @@
           "status": "failed"
         }
       ],
-      "verified": true
+      "verified": true,
+      "verifying_test": "OTC gate tests (T-056)"
     },
     {
+      "controls": {
+        "existing": "fixture",
+        "planned": "fixture"
+      },
+      "exception": null,
       "hazard": "Fixture hazard verified only by a browser test",
       "id": "H-05",
       "log_status": "open",
@@ -79,13 +96,15 @@
           "status": "passed"
         }
       ],
-      "verified": true
+      "verified": true,
+      "verifying_test": "playwright"
     }
   ],
   "release": "v0.0.0-fixture",
   "report": "safety-test-report",
   "schema": 1,
   "summary": {
+    "excepted": [],
     "tag_errors": [],
     "unverified": [],
     "verified": 3

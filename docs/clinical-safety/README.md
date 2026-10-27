@@ -38,3 +38,13 @@ When a `[CLIN-SAFETY]` task is closed, set `closing_pr` on its row in that PR.
 
 ## Hazard log v1 sign-off
 `signoff/hazard-log-v1.json` holds the CSO's approval record: name, ISO date, link to the signed record, and the sha256 of `hazard-log.csv` that was reviewed. Only the CSO fills it (CODEOWNERS). Any later edit to the log changes the hash and the release gate fails until the CSO re-signs. Status: **unsigned, needs external action** (CSO not yet named; most rows still `TO TRANSCRIBE`).
+
+## Release gate, exceptions and journeys (OPS-044)
+
+A release tag runs `scripts/ci/safety_report.py`. It lists every hazard with its controls (existing and planned), its verifying tests and their latest results, and writes `safety-test-report.json`, `.html` and `.pdf`, all attached to the release together with `journeys-junit.xml` and `journeys-timings.json`.
+
+- A hazard whose verifying test is missing or failing blocks the release.
+- Only the CSO unblocks it: add a record to `docs/clinical-safety/signoff/hazard-exceptions.json` with `hazard`, `release` (the exact tag), `reason`, `cso_name`, `approved_on` (ISO date) and `approval_ref` (link to the signed record). An empty field, another tag or an unknown hazard does not count. Excepted hazards are listed in the report. The file is empty today.
+- A journey (J1-J15) can verify a hazard: the nightly JUnit carries a `hazard` property per test case (J10 -> H-04, J7 -> H-09). A failing journey does not verify.
+- A red nightly journey run on main blocks the next tag (`journey-gate` in `release.yml`).
+- Hazard log v1 CSO signature is still outstanding: Needs clinical sign-off.

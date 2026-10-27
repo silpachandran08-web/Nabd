@@ -1,0 +1,78 @@
+# FEF-050 + OPS-044 stage 8: journeys J1-J15 nightly on main (English desktop 1366 with the time targets asserted; J1/J2/J5/J8/J9 at
+# 768 and 375; J1/J5/J9 in Hindi) plus the generated role-absence sweep, in ONE report. Results are exported as JUnit + timings JSON
+# (artifact "journey-results"), which the release safety test report and the dashboards read. A red journey fails this run;
+# release.yml refuses a tag while the latest run of this workflow on main is red (the journey gate).
+# Runs on the mock back end (the OPS-036 seed has no fixtures for J2-J4, J7, J8, J10-J15 yet: they are "skipped" on a preview, never green).
+name: journeys-nightly
+on:
+  schedule:
+    - cron: "17 21 * * *"          # nightly, UTC (after the day's merges)
+  push:
+    tags: ["v*"]                   # a release tag runs the suite again and exports its results
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: journeys-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  NODE_VERSION: "22"
+  PLAYWRIGHT_VERSION: "1.64.1"
+  AXE_VERSION: "4.10.2"
+
+jobs:
+  journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Playwright Chromium + axe-core (kept out of the app's lockfile)
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e" && cd "$RUNNER_TEMP/e2e" && npm init -y >/dev/null
+          npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" "axe-core@$AXE_VERSION"
+          npx playwright install --with-deps chromium
+      - name: build and start the staff web app
+        working-directory: frontend/apps/staff-web
+        run: |
+          pnpm install --frozen-lockfile && pnpm exec next build
+          (pnpm exec next start -p 3000 &) ; for i in $(seq 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 1; done
+      - name: restore flaky history (quarantine list)
+        uses: actions/cache/restore@v4
+        with: { path: journeys-state, key: "journeys-flaky-${{ github.run_id }}", restore-keys: journeys-flaky- }
+      - name: journeys J1-J15 and the role-absence sweep
+        env:
+          APP: http://localhost:3000
+          SMOKE_TARGET: mock
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/e2e/node_modules/playwright/index.mjs
+          PW_CHROMIUM: ""
+          AXE_CORE_PATH: ${{ runner.temp }}/e2e/node_modules/axe-core/axe.min.js
+        run: |
+          [ -f journeys-state/quarantine.json ] && export SMOKE_QUARANTINE=journeys-state/quarantine.json
+          set +e
+          node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --suite=nightly --retries=1 --out=journey-results
+          node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --suite=sweep --retries=1 --out=journey-results
+          true
+      - name: flaky detection and quarantine
+        run: |
+          mkdir -p journeys-state
+          node frontend/apps/staff-web/tests/e2e/smoke/flaky.mjs --results=journey-results --history=journeys-state/flaky-history.json --out=journeys-state >/dev/null || true
+      - name: export JUnit + timings JSON, job summary, gate
+        id: gate
+        run: |
+          set +e
+          node frontend/apps/staff-web/tests/e2e/smoke/report.mjs --results=journey-results --out=journey-results --sha="${{ github.sha }}" --release="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+          rc=$?
+          cat journey-results/journeys-summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: journey-results, path: journey-results, retention-days: 90 }
+      - if: always()
+        uses: actions/cache/save@v4
+        with: { path: journeys-state, key: "journeys-flaky-${{ github.run_id }}" }
+      - name: a red journey fails the run (and blocks the next release tag)
+        run: exit ${{ steps.gate.outputs.rc }}

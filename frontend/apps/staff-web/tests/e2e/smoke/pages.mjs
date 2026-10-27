@@ -1,25 +1,25 @@
 // FEF-049 page objects: one per screen the smoke journeys drive. Locators are role/label based, the same ones staff see.
-import { APP } from './harness.mjs';
+import { APP, msg } from './harness.mjs';
 
 export class ArrivalsPage {
-  constructor(page) { this.page = page; }
-  async open() { await this.page.goto(`${APP}/arrivals`); await this.page.getByRole('button', { name: 'Walk-in & token' }).waitFor(); }
+  constructor(page, locale = 'en') { this.page = page; this.L = (k) => msg(locale, k); }
+  async open() { await this.page.goto(`${APP}/arrivals`); await this.page.getByRole('button', { name: this.L('arrivals.page.walkInToken') }).waitFor(); }
   async registerWalkIn({ name, phone, dob, gender = 'female' }, doctorName) {
-    const p = this.page;
-    await p.getByRole('button', { name: 'Walk-in & token' }).click();
-    const d = p.getByRole('dialog', { name: 'Register walk-in' });
-    await d.getByLabel('Patient').fill(phone); // search by phone first, as reception does: a new number has no match
-    await d.getByRole('button', { name: /No match — register a new patient/ }).click();
-    await d.getByLabel('Name', { exact: true }).fill(name);
-    await d.getByLabel('Phone', { exact: true }).fill(phone);
-    await d.getByLabel('Date of birth').fill(dob);
-    await d.getByLabel('Gender').selectOption(gender);
-    await d.getByLabel('Doctor').selectOption({ label: doctorName });
-    await d.getByRole('button', { name: 'Check in' }).click();
+    const p = this.page, L = this.L;
+    await p.getByRole('button', { name: L('arrivals.page.walkInToken') }).click();
+    const d = p.getByRole('dialog', { name: L('arrivals.walkIn.title') });
+    await d.getByLabel(L('arrivals.walkIn.patient')).fill(phone); // search by phone first, as reception does: a new number has no match
+    await d.getByRole('button', { name: L('arrivals.walkIn.noMatch') }).click();
+    await d.getByLabel(L('arrivals.walkIn.name'), { exact: true }).fill(name);
+    await d.getByLabel(L('arrivals.walkIn.phone'), { exact: true }).fill(phone);
+    await d.getByLabel(L('arrivals.walkIn.dob')).fill(dob);
+    await d.getByLabel(L('arrivals.walkIn.gender')).selectOption(gender);
+    await d.getByLabel(L('arrivals.walkIn.doctor')).selectOption({ label: doctorName });
+    await d.getByRole('button', { name: L('arrivals.walkIn.submit') }).click();
   }
   /** Token number shown on the "Checked in" slip. */
   async token() {
-    const d = this.page.getByRole('dialog', { name: 'Checked in' });
+    const d = this.page.getByRole('dialog', { name: this.L('arrivals.slip.title') });
     await d.waitFor();
     return (await d.getByText(/^#\d+$/).first().innerText()).trim();
   }
