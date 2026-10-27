@@ -1,0 +1,7 @@
+# OPS-044: deploy windows. A release PR's "Deploy window" must not overlap a freeze or an OPD peak (scripts/ci/release_checklist.py).
+# Needs ops confirmation: the OPD peak hours per region and the freeze dates are clinic-operations facts, not engineering ones. They are
+# left empty on purpose; until they are filled the check prints a warning and only validates the window's format and length.
+# freeze:      [{from: "2026-12-30T00:00Z", to: "2027-01-02T00:00Z", reason: "year end close"}]
+# opd_peaks:   [{region: IN, tz: Asia/Kolkata, days: [1, 2, 3, 4, 5, 6], from: "HH:MM", to: "HH:MM"}]    # days: ISO weekday, Monday = 1
+freeze: []
+opd_peaks: []

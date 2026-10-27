@@ -53,7 +53,7 @@ export function report(results, quarantined, wallMs) {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = (k, d) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3) ?? d;
   const dir = arg('results'), histFile = arg('history'), out = arg('out', dir), now = arg('now', new Date().toISOString());
-  const runs = readdirSync(dir).filter((f) => /^results-\d+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(`${dir}/${f}`, 'utf8')));
+  const runs = readdirSync(dir).filter((f) => /^results-(?:[a-z]+-)?\d+\.json$/.test(f)).map((f) => JSON.parse(readFileSync(`${dir}/${f}`, 'utf8')));
   const results = runs.flatMap((r) => r.results);
   const wallMs = Math.max(0, ...runs.map((r) => r.wallMs));
   const history = record(existsSync(histFile) ? JSON.parse(readFileSync(histFile, 'utf8')) : [], results, now);

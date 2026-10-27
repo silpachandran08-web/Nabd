@@ -237,6 +237,7 @@
     "cancel": "Cancel"
   },
   "slip": {
+    "label": "Token slip",
     "title": "Checked in",
     "token": "Token",
     "doctor": "Doctor",

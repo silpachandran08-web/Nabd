@@ -3,7 +3,8 @@
 # attach the report to the release, and require a manual CSO approval when clinical safety paths changed since the last tag.
 # Needs external action: create environment "clinical-safety-release" with the CSO as required reviewer
 # (Settings > Environments), and set repo variable SAFETY_DICTIONARY_VERSIONS (e.g. "IN=1 SA=1") once CLN-004 ships.
-# Production deploy jobs must `needs: release-gate`.
+# Production deploy jobs must `needs: release-gate`. OPS-044: a CSO-signed exception (docs/clinical-safety/signoff/hazard-exceptions.json) is the only way past an unverified hazard;
+# the latest nightly journey run must be green (journey-gate); the release PR carries the checklist (release-checklist.yml).
 name: release
 on:
   push:
@@ -15,11 +16,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # OPS-044 journey gate: the latest nightly run of the journeys (J1-J15 + role-absence sweep, journeys-nightly.yml) on main must be green.
+  journey-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      run_id: ${{ steps.g.outputs.run_id }}
+    steps:
+      - id: g
+        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+        run: |
+          read -r id conclusion < <(gh run list --workflow journeys-nightly.yml --branch main --status completed --limit 1 --json databaseId,conclusion --jq '.[0] | "\(.databaseId) \(.conclusion)"')
+          echo "latest journeys-nightly run on main: ${id:-none} (${conclusion:-none})" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "run_id=$id" >> "$GITHUB_OUTPUT"
+          [ "$conclusion" = success ] || { echo "a red or missing nightly journey run blocks the release tag"; exit 1; }
+
   safety-report:
+    needs: journey-gate
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: write   # gh release upload
+      actions: read     # gh run download (journey results)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -27,6 +47,9 @@ jobs:
       - name: Backend suite (results feed the report; failures surface as unverified hazards)
         working-directory: backend
         run: mvn -B test -Dmaven.test.failure.ignore=true
+      - name: Journey results of the nightly run (JUnit + timings; hazards link to journeys)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh run download "${{ needs.journey-gate.outputs.run_id }}" -n journey-results -D journey-results
       - name: Safety test report and gate (< 2 min)
         env:
           DICT: ${{ vars.SAFETY_DICTIONARY_VERSIONS }}
@@ -37,11 +60,16 @@ jobs:
           pw=(); [ -f frontend/apps/staff-web/playwright-report.json ] && pw=(--playwright frontend/apps/staff-web/playwright-report.json)
           set +e
           python3 scripts/ci/safety_report.py report --sha "${{ github.sha }}" --release "${{ github.ref_name }}" \
-            --junit backend/target/surefire-reports "${pw[@]}" "${args[@]}" --require-signed --out safety-report | tee gate.txt
+             --junit backend/target/surefire-reports --journeys journey-results/journeys-junit.xml "${pw[@]}" "${args[@]}" --require-signed --out safety-report | tee gate.txt
           rc=${PIPESTATUS[0]}
           set -e
           cat gate.txt >> "$GITHUB_STEP_SUMMARY"
           exit $rc
+      - name: Safety test report as PDF (same content as the HTML)
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/pdf" && cd "$RUNNER_TEMP/pdf" && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.64.1 && npx playwright install --with-deps chromium
+          npx playwright pdf "file://$GITHUB_WORKSPACE/safety-report/safety-test-report.html" "$GITHUB_WORKSPACE/safety-report/safety-test-report.pdf"
       - if: always()
         uses: actions/upload-artifact@v4
         with: { name: safety-test-report, path: safety-report/ }
@@ -49,7 +77,7 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || gh release create "${{ github.ref_name }}" --draft --verify-tag --notes "Draft: see safety-test-report"
-          gh release upload "${{ github.ref_name }}" safety-report/safety-test-report.html safety-report/safety-test-report.json --clobber
+          gh release upload "${{ github.ref_name }}" safety-report/safety-test-report.html safety-report/safety-test-report.json safety-report/safety-test-report.pdf journey-results/journeys-junit.xml journey-results/journeys-timings.json --clobber
 
   safety-paths:
     runs-on: ubuntu-latest
@@ -75,8 +103,8 @@ jobs:
       - run: echo "CSO approved release ${{ github.ref_name }} (${{ github.sha }})"
 
   release-gate:
-    needs: [safety-report, safety-paths, cso-approval]
-    if: always() && needs.safety-report.result == 'success' && (needs.cso-approval.result == 'success' || (needs.cso-approval.result == 'skipped' && needs.safety-paths.outputs.changed == 'false'))
+    needs: [journey-gate, safety-report, safety-paths, cso-approval]
+    if: always() && needs.journey-gate.result == 'success' && needs.safety-report.result == 'success' && (needs.cso-approval.result == 'success' || (needs.cso-approval.result == 'skipped' && needs.safety-paths.outputs.changed == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
