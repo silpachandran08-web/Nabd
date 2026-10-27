@@ -284,7 +284,8 @@
     "needGuardian": "A guardian is required for patients under 18. Search for the guardian's record below.",
     "needConsent": "Confirm the guardian's consent and how it was given.",
     "age": "Age (years)",
-    "ageHint": "Age or date of birth. An age fills the date of birth as 1 January of that year; correct it when known."
+    "ageHint": "Age or date of birth. An age fills the date of birth as 1 January of that year; correct it when known.",
+    "dobEstimated": "Estimated from the age: 1 January of the birth year. Correct it when the real date is known."
   },
   "guardian": {
     "label": "Guardian (required for under-18s)",

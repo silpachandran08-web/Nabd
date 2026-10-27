@@ -12,9 +12,14 @@ import styles from "../arrivals.module.css";
 import Dialog from "../../ui/Dialog";
 import { clinicToday } from "../../../lib/clinicTime";
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
+import { getIdentity } from "../../../lib/session";
+import { useFormErrors } from "../../../lib/formErrors";
+import { useFormValidation, useUnsavedGuard } from "../../../lib/formValidation";
+import { checkInSchema, e164, registerSchema } from "../../../lib/formSchemas";
 import { CheckInIntakeFields, type CheckInResult } from "../CheckInDialog";
 import DuplicateReview from "../duplicate-review/DuplicateReview";
-import type { Grants, Staff } from "../types";
+import type { DoctorQueue, Grants, Row, Staff } from "../types";
+import { defaultDoctor, defaultPayment } from "./smartDefaults";
 import { dobFromAge } from "./ageDob";
 import { readDeskDefault, writeDeskDefault } from "./deskDefaults";
 import GuardianSearch from "./GuardianSearch";
@@ -24,16 +29,21 @@ import { checkInBody, registerBody, walkInProblem } from "./walkInSchema";
 
 const PAYMENTS = ["cash", "card", "upi", "other"];
 
-export default function WalkInDialog({ staff, grants, region, mode = "search", onClose, onCheckedIn }: {
-  staff: Staff[]; grants: Grants; region?: string; mode?: "search" | "new"; onClose: () => void; onCheckedIn: (r: CheckInResult) => void;
+export default function WalkInDialog({ staff, grants, region, mode = "search", doctorQueues = [], rows = [], initialQuery = "", onClose, onCheckedIn }: {
+  staff: Staff[]; grants: Grants; region?: string; mode?: "search" | "new"; doctorQueues?: DoctorQueue[]; rows?: Row[]; initialQuery?: string; onClose: () => void; onCheckedIn: (r: CheckInResult) => void;
 }) {
   const t = useTranslations("arrivals");
   const w = useTranslations("arrivals.walkIn");
+  const fv = useTranslations("common.formErrors");
+  const fe = useFormErrors("walkin");
+  const v = useFormValidation(fe, (k) => fv(k));
+  const country = getIdentity()?.tenantRegion ?? region;
+  const formRef = useRef<HTMLFormElement>(null);
   const [s, dispatch] = useReducer(walkInReducer, undefined, () => {
     const doc = readDeskDefault("doctor");
     const pay = readDeskDefault("payment");
-    return { ...initialWalkIn, newMode: mode === "new" && grants.patientsCreate,
-      doctorId: staff.some((x) => x.id === doc) ? doc : staff.length === 1 ? staff[0].id : "", paymentMode: PAYMENTS.includes(pay) ? pay : initialWalkIn.paymentMode };
+    return { ...initialWalkIn, newMode: mode === "new" && grants.patientsCreate, query: initialQuery,
+      doctorId: defaultDoctor(staff, doctorQueues, doc), paymentMode: defaultPayment(rows, PAYMENTS, pay) };
   });
   const [submitting, setSubmitting] = useState(false);
   const [ageText, setAgeText] = useState("");
@@ -47,10 +57,19 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
   const doctorRef = useRef<HTMLSelectElement>(null);
   const minor = !!s.dob && age(s.dob, clinicToday()) < 18;
   const edited = () => { registeredRef.current = null; };
+  useUnsavedGuard(!!(s.query || s.name || s.phone || s.dob || s.complaint || s.selected));
 
   // Focus lands where typing starts: the name on F2, the search box otherwise; a picked patient moves it to the doctor.
   useEffect(() => { (s.newMode && !s.selected ? nameRef.current : searchRef.current)?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on open
   useEffect(() => { if (s.selected) doctorRef.current?.focus(); }, [s.selected]);
+  // FEF-034: wait estimates arrive after the dialog opens; pick the shortest wait once they do, unless the user already chose a doctor.
+  const doctorTouched = useRef(false);
+  useEffect(() => {
+    if (s.doctorId || doctorTouched.current) return;
+    const d = defaultDoctor(staff, doctorQueues, readDeskDefault("doctor"));
+    if (d) dispatch({ type: "doctor", value: d });
+  }, [doctorQueues, staff, s.doctorId]);
+  useEffect(() => { if (initialQuery) onQuery(initialQuery); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once: a patient picked in the command palette
 
   function onQuery(value: string) {
     edited();
@@ -96,10 +115,13 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
     try {
       let patientId = s.selected?.id ?? registeredRef.current?.id ?? null;
       let patientName = s.selected?.name ?? registeredRef.current?.name ?? "";
+      const fields = { name: s.name, phone: s.phone, dob: s.dob, gender: s.gender };
+      if (!patientId && !v.submit(registerSchema(country, clinicToday()), fields, formRef.current)) return;
+      if (!v.submit(checkInSchema, { doctorId: s.doctorId }, formRef.current)) return;
       const problem = walkInProblem(s, !!patientId, minor);
       if (problem) { dispatch({ type: "error", message: w(problem) }); return; }
       if (!patientId) {
-        const regBody = registerBody(s, minor, confirmedNotDuplicate);
+        const regBody = registerBody({ ...s, phone: e164(s.phone, country) }, minor, confirmedNotDuplicate); // FEF-033: stored as E.164
         try {
           patientId = (await api.post<CreatedPatient>("/patients", regBody, { idempotencyKey: keys.current.get("register", regBody) })).id;
           keys.current.done("register");
@@ -109,7 +131,8 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
             dispatch({ type: "duplicates", candidates, message: candidates.length > 0 ? w("dupFound") : w("dupSimilar") });
             return;
           }
-          dispatch({ type: "error", message: errorText(e, w("registerFail")), fieldErrs: e instanceof ApiError && e.errors.length > 0 ? e.fieldErrors() : undefined });
+          dispatch({ type: "error", message: errorText(e, w("registerFail")) });
+          if (e instanceof ApiError && e.errors.length > 0) fe.fail(e, w("registerFail")); // server field errors land on the same fields
           return;
         }
         patientName = s.name;
@@ -136,15 +159,15 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
   function onAge(value: string) {
     const v = value.replace(/\D/g, "").slice(0, 3);
     setAgeText(v);
-    if (v) onField("dob", dobFromAge(v, clinicToday()));
+    if (v) { fe.clearField("dob"); onField("dob", dobFromAge(v, clinicToday())); }
   }
-  const err = (f: string) => s.fieldErrs[f];
+  const err = (f: string) => fe.fields[f];
   const inv = (f: string) => ({ "aria-invalid": err(f) ? true : undefined, "aria-describedby": err(f) ? `new${f[0].toUpperCase()}${f.slice(1)}-err` : undefined });
   const fieldError = (f: string) => err(f) && <div id={`new${f[0].toUpperCase()}${f.slice(1)}-err`} className={styles.formError}>{err(f)}</div>;
 
   return (
     <Dialog size="drawer" title={w("title")} onClose={onClose}>
-      <form onSubmit={(e) => { e.preventDefault(); void registerAndCheckIn(false); }}>
+      <form ref={formRef} noValidate onSubmit={(e) => { e.preventDefault(); void registerAndCheckIn(false); }}>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="patientSearch">{w("patient")}</label>
           <input id="patientSearch" ref={searchRef} className={styles.input} placeholder={w("search")} value={s.query} onChange={(e) => onQuery(e.target.value)} onKeyDown={onSearchKey}
@@ -174,12 +197,12 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
           <>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="newName">{w("name")}</label>
-              <input id="newName" ref={nameRef} className={styles.input} value={s.name} autoComplete="off" onChange={(e) => onField("name", e.target.value)} {...inv("name")} />
+              <input id="newName" ref={nameRef} className={styles.input} value={s.name} autoComplete="off" onChange={(e) => { fe.clearField("name"); onField("name", e.target.value); }} onBlur={() => v.blur(registerSchema(country, clinicToday()), "name", { name: s.name, phone: s.phone, dob: s.dob, gender: s.gender })} {...inv("name")} />
               {fieldError("name")}
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="newPhone">{w("phone")}</label>
-              <input id="newPhone" className={styles.input} inputMode="tel" autoComplete="off" value={s.phone} onChange={(e) => onField("phone", e.target.value)} {...inv("phone")} />
+              <input id="newPhone" className={styles.input} inputMode="tel" autoComplete="off" value={s.phone} onChange={(e) => { fe.clearField("phone"); onField("phone", e.target.value); }} onBlur={() => v.blur(registerSchema(country, clinicToday()), "phone", { name: s.name, phone: s.phone, dob: s.dob, gender: s.gender })} {...inv("phone")} />
               {fieldError("phone")}
             </div>
             <div className={styles.field}>
@@ -198,7 +221,8 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="newDob">{w("dob")}</label>
-              <input id="newDob" type="date" className={styles.input} value={s.dob} max={clinicToday()} onChange={(e) => { setAgeText(""); onField("dob", e.target.value); }} {...inv("dob")} />
+              <input id="newDob" type="date" className={styles.input} value={s.dob} max={clinicToday()} onChange={(e) => { fe.clearField("dob"); setAgeText(""); onField("dob", e.target.value); }} onBlur={() => v.blur(registerSchema(country, clinicToday()), "dob", { name: s.name, phone: s.phone, dob: s.dob, gender: s.gender })} {...inv("dob")} />
+              {ageText && <div className={styles.muted} data-testid="dob-estimated">{w("dobEstimated")}</div>}
               {fieldError("dob")}
             </div>
             {minor && (
@@ -214,10 +238,11 @@ export default function WalkInDialog({ staff, grants, region, mode = "search", o
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="doctor">{w("doctor")}</label>
-          <select id="doctor" ref={doctorRef} data-shortcut="doctor" aria-keyshortcuts="F6" className={styles.select} value={s.doctorId} onChange={(e) => dispatch({ type: "doctor", value: e.target.value })}>
+          <select id="doctor" ref={doctorRef} data-shortcut="doctor" aria-keyshortcuts="F6" className={styles.select} value={s.doctorId} onChange={(e) => { doctorTouched.current = true; fe.clearField("doctorId"); dispatch({ type: "doctor", value: e.target.value }); }} onBlur={() => v.blur(checkInSchema, "doctorId", { doctorId: s.doctorId })} {...inv("doctorId")}>
             <option value="">{w("selectDoctor")}</option>
             {staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>
+          {fieldError("doctorId")}
         </div>
 
         <CheckInIntakeFields complaint={s.complaint} onComplaint={(v) => dispatch({ type: "complaint", value: v })}

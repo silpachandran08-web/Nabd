@@ -16,7 +16,7 @@ import type { AppointmentOption, DoctorQueue, Grants, Row, Staff } from "./types
 import WalkInDialog from "./walk-in/WalkInDialog";
 
 export type Dlg =
-  | { k: "rail"; id: string } | { k: "walkin"; mode?: "new" } | { k: "vitals"; id: string } | { k: "priority"; id: string }
+  | { k: "rail"; id: string } | { k: "walkin"; mode?: "new"; q?: string } | { k: "vitals"; id: string } | { k: "priority"; id: string }
   | { k: "delay"; doctorId: string } | { k: "delayPicker" } | { k: "checkin" } | { k: "checkinTarget"; a: AppointmentOption }
   | { k: "move" } | { k: "checkoutPicker" } | { k: "result"; r: CheckInResult };
 
@@ -34,7 +34,7 @@ export default function ArrivalsDialogs({ dlg, setDlg, rows, staff, doctorQueues
       return row ? <DetailRail row={row} doctorName={staff.find((s) => s.id === row.doctorId)?.name ?? "—"} grants={grants} sendingId={sendingId} h={h} onClose={close} /> : null;
     }
     case "walkin":
-      return <WalkInDialog staff={staff} grants={grants} region={region} mode={dlg.mode} onClose={close} onCheckedIn={(r) => { setDlg({ k: "result", r }); void invalidateQueue(); }} />;
+      return <WalkInDialog staff={staff} grants={grants} region={region} mode={dlg.mode} doctorQueues={doctorQueues} rows={rows} initialQuery={dlg.q} onClose={close} onCheckedIn={(r) => { setDlg({ k: "result", r }); void invalidateQueue(); }} />;
     case "result": return <CheckInResultDialog result={dlg.r} onClose={close} />;
     case "checkinTarget":
       return (

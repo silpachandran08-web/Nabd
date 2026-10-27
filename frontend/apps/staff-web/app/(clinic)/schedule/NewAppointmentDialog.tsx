@@ -13,6 +13,9 @@ import { getter, key } from "../../lib/query";
 import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
 import { usePatientSearch, type PatientHit } from "../../lib/usePatientSearch";
 import Dialog from "../../components/ui/Dialog";
+import { useFormValidation, useUnsavedGuard } from "../../lib/formValidation";
+import { bookingSchema, e164, registerSchema } from "../../lib/formSchemas";
+import { getIdentity } from "../../lib/session";
 
 type Patient = PatientHit;
 type Candidate = DuplicateCandidate;
@@ -72,6 +75,10 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
   const [registering, setRegistering] = useState(false);
   const [np, setNp] = useState({ name: "", phone: "", dob: "", gender: "male" });
   const [dupes, setDupes] = useState<Candidate[]>([]);
+  const v = useFormValidation(fe);
+  const country = getIdentity()?.tenantRegion;
+  const regSchema = registerSchema(country, clinicToday(timezone));
+  useUnsavedGuard(!!(patient || query || np.name || np.phone || np.dob));
 
   // Free slots for the chosen doctor and day; a pre-selected slot is kept only while it is still free.
   const slotsQ = useQuery({
@@ -87,10 +94,10 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
   async function book(e: React.FormEvent) {
     e.preventDefault();
-    if (!patient || !doctorId || !slot || saving) return;
+    if (saving || !v.submit(bookingSchema, { patientId: patient?.id ?? "", doctorId, startTime: slot }, e.currentTarget)) return; // FEF-033
     setSaving(true);
     fe.clear();
-    const body = { patientId: patient.id, doctorId, startTime: slot, isFollowUp: followUp };
+    const body = { patientId: patient!.id, doctorId, startTime: slot, isFollowUp: followUp };
     try {
       await api.post("/appointments", body, { idempotencyKey: keys.current.get("book", body) });
       keys.current.done("book");
@@ -108,12 +115,14 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
   async function registerPatient(e: React.FormEvent) {
     e.preventDefault();
+    if (!v.submit(regSchema, np, e.currentTarget)) return;
     if (age(np.dob, clinicToday(timezone)) < 18) { fe.set("Patients under 18 need a guardian. Register them from Arrivals, then book here."); return; }
     if (saving) return;
     setSaving(true);
     fe.clear();
+    const reg = { ...np, phone: e164(np.phone, country) }; // FEF-033: stored as E.164
     try {
-      setPatient(await api.post<Patient>("/patients", np, { idempotencyKey: keys.current.get("register", np) }));
+      setPatient(await api.post<Patient>("/patients", reg, { idempotencyKey: keys.current.get("register", reg) }));
       keys.current.done("register");
       setRegistering(false);
     } catch (err) {
@@ -136,7 +145,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
   return (
     <Dialog title="New appointment" onClose={onClose}>
-      <form onSubmit={registering ? registerPatient : book}>
+      <form noValidate onSubmit={registering ? registerPatient : book}>
         <p className={styles.dialogSub}>Times are the clinic&apos;s local time.</p>
 
         <div className={styles.field}>
@@ -149,7 +158,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
           ) : (
             <>
               <input id="appt-patient" className={`${styles.input} ${styles.tap}`} value={query} autoFocus autoComplete="off"
-                placeholder="Search by name or phone" onChange={(e) => setQuery(e.target.value)} />
+                placeholder="Search by name or phone" {...fe.attrs("patientId")} onChange={(e) => { fe.clearField("patientId"); setQuery(e.target.value); }} />
               {results.length > 0 && (
                 <div className={styles.results}>
                   {results.map((p) => (
@@ -172,11 +181,11 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
               {registering && (
                 <fieldset className={styles.quickPatient}>
                   <legend className={styles.label}>New patient</legend>
-                  <input aria-label="Patient name" className={`${styles.input} ${styles.tap}`} required placeholder="Full name" value={np.name} {...fe.attrs("name")} onChange={(e) => { fe.clearField("name"); setNp({ ...np, name: e.target.value }); }} />
+                  <input aria-label="Patient name" className={`${styles.input} ${styles.tap}`} required placeholder="Full name" value={np.name} {...fe.attrs("name")} onBlur={() => v.blur(regSchema, "name", np)} onChange={(e) => { fe.clearField("name"); setNp({ ...np, name: e.target.value }); }} />
                   <FieldError fe={fe} name="name" className={styles.resultSub} />
-                  <input aria-label="Patient phone" className={`${styles.input} ${styles.tap}`} required type="tel" placeholder="Phone" value={np.phone} {...fe.attrs("phone")} onChange={(e) => { fe.clearField("phone"); setNp({ ...np, phone: e.target.value }); }} />
+                  <input aria-label="Patient phone" className={`${styles.input} ${styles.tap}`} required type="tel" placeholder="Phone" value={np.phone} {...fe.attrs("phone")} onBlur={() => v.blur(regSchema, "phone", np)} onChange={(e) => { fe.clearField("phone"); setNp({ ...np, phone: e.target.value }); }} />
                   <FieldError fe={fe} name="phone" className={styles.resultSub} />
-                  <input aria-label="Date of birth" className={`${styles.input} ${styles.tap}`} required type="date" value={np.dob} {...fe.attrs("dob")} onChange={(e) => { fe.clearField("dob"); setNp({ ...np, dob: e.target.value }); }} />
+                  <input aria-label="Date of birth" className={`${styles.input} ${styles.tap}`} required type="date" value={np.dob} {...fe.attrs("dob")} onBlur={() => v.blur(regSchema, "dob", np)} onChange={(e) => { fe.clearField("dob"); setNp({ ...np, dob: e.target.value }); }} />
                   <FieldError fe={fe} name="dob" className={styles.resultSub} />
                   <select aria-label="Sex" className={`${styles.input} ${styles.tap}`} value={np.gender} {...fe.attrs("gender")} onChange={(e) => { fe.clearField("gender"); setNp({ ...np, gender: e.target.value }); }}>
                     <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
@@ -199,7 +208,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="appt-doctor">Doctor</label>
-          <select id="appt-doctor" className={`${styles.input} ${styles.tap}`} value={doctorId} {...fe.attrs("doctorId")} onChange={(e) => { fe.clearField("doctorId"); setDoctorId(e.target.value); }}>
+          <select id="appt-doctor" className={`${styles.input} ${styles.tap}`} value={doctorId} {...fe.attrs("doctorId")} onBlur={() => v.blur(bookingSchema, "doctorId", { patientId: patient?.id ?? "x", doctorId, startTime: "x" })} onChange={(e) => { fe.clearField("doctorId"); setDoctorId(e.target.value); }}>
             {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
           <FieldError fe={fe} name="doctorId" className={styles.resultSub} />
@@ -213,7 +222,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="appt-time">Time</label>
-          <select id="appt-time" className={`${styles.input} ${styles.tap}`} value={slot} {...fe.attrs("startTime")} onChange={(e) => { fe.clearField("startTime"); setSlot(e.target.value); setConflictSlot(null); }} disabled={!slots || slots.length === 0}>
+          <select id="appt-time" className={`${styles.input} ${styles.tap}`} value={slot} {...fe.attrs("startTime")} onBlur={() => v.blur(bookingSchema, "startTime", { patientId: patient?.id ?? "x", doctorId: "x", startTime: slot })} onChange={(e) => { fe.clearField("startTime"); setSlot(e.target.value); setConflictSlot(null); }} disabled={!slots || slots.length === 0}>
             <option value="">{slots === null ? "Loading free slots…" : slotsFailed ? "Couldn't load free slots" : slots.length === 0 ? "No free slots on this day" : "Choose a time"}</option>
             {(slots ?? []).map((s) => <option key={s} value={s}>{clinicTime(s, timezone)}</option>)}
           </select>
@@ -245,7 +254,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
         <div className={styles.actions}>
           <button type="button" className={`${styles.btn} ${styles.tap}`} onClick={onClose}>Cancel</button>
-          <button type="submit" className={`${styles.btnPrimary} ${styles.tap}`} disabled={registering || saving || !patient || !slot}>
+          <button type="submit" className={`${styles.btnPrimary} ${styles.tap}`} disabled={registering || saving}>
             {saving ? "Booking…" : "Book appointment"}
           </button>
         </div>
