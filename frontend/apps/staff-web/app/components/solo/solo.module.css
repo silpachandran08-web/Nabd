@@ -28,3 +28,8 @@
 .notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-12); padding: var(--nb-space-12) var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); font-size: 14px; }
 .noticeBtn { min-block-size: 48px; padding-inline: var(--nb-space-16); border-radius: 999px; border: 1px solid var(--nb-border-default); background: var(--nb-surface-1); color: var(--nb-text-primary); font: inherit; font-weight: 600; cursor: pointer; }
 .nameBtn { min-block-size: 48px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 15px; font-weight: 500; text-align: start; cursor: pointer; }
+/* Bottom nav (<=430px) is 64px tall; keep the action bar above it so it is never covered. */
+@media (max-width: 430px) {
+  .bar { inset-block-end: calc(64px + env(safe-area-inset-bottom, 0px)); padding-block-end: var(--nb-space-8); }
+  .page { padding-block-end: calc(160px + env(safe-area-inset-bottom, 0px)); }
+}
