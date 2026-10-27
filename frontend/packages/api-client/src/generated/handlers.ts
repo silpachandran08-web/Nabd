@@ -34,6 +34,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/internal/v1/tenants/:tid/eta/appointments/:appointmentId`, () => HttpResponse.json({"display":{},"p50At":"2026-01-01T00:00:00Z","p80At":"2026-01-01T00:00:00Z","position":0,"v":0}, { status: 200 })), // EtaController_one
     http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash`, () => HttpResponse.json({}, { status: 200 })), // InternalHouseholdController_household
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients/consents`, () => HttpResponse.json({"consentIds":["00000000-0000-7000-8000-000000000000"]}, { status: 201 })), // InternalChatConsentController_capture
+    http.get(`${baseUrl}/internal/v1/tenants/:tid/patients/:caregiverRef/members`, () => HttpResponse.json({}, { status: 200 })), // InternalChatMemberController_list
+    http.post(`${baseUrl}/internal/v1/tenants/:tid/patients/:caregiverRef/members`, () => HttpResponse.json({"memberRef":"string","proxyStatus":"string"}, { status: 200 })), // InternalChatMemberController_add
     http.get(`${baseUrl}/internal/v1/tenants/:tid/privacy-notice/current`, () => HttpResponse.json({"language":"string","path":"string","version":"string"}, { status: 200 })), // InternalChatConsentController_currentNotice
     http.post(`${baseUrl}/v1/abha/enrol`, () => HttpResponse.json({"abhaAddress":"string","abhaLast4":"string","txnId":"string","verified":false}, { status: 200 })), // AbhaController_enrol
     http.get(`${baseUrl}/v1/abha/status`, () => HttpResponse.json({"enabled":false}, { status: 200 })), // AbhaController_status
@@ -319,6 +321,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.patch(`${baseUrl}/v1/platform/tenants/:tenantId/region`, () => HttpResponse.json({"regionCode":"string","tenantId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // TenantRegionController_change
     http.post(`${baseUrl}/v1/platform/tenants/:tenantId/whatsapp-templates`, () => HttpResponse.json({"body":"string","category":"string","headerText":"string","id":"00000000-0000-7000-8000-000000000000","key":"string","language":"string","name":"string","paramCount":0,"qualityRating":"string","rejectionReason":"string","source":"string","status":"string","updatedAt":"2026-01-01T00:00:00Z"}, { status: 201 })), // TemplateLintController_createWithOverride
     http.get(`${baseUrl}/v1/platform/territories`, () => HttpResponse.json([{"activeClinicCount":0,"clinicCount":0,"currency":"string","kmsKeyCreatedAt":"2026-01-01T00:00:00Z","kmsKeyRotatedAt":"2026-01-01T00:00:00Z","mrrCents":0,"newClinicsLast30d":0,"planMix":[{"planCode":"string","tenantCount":0}],"region":"string","taxIdTypes":["string"],"userCount":0}], { status: 200 })), // TerritoryController_list
+    http.post(`${baseUrl}/v1/public/links/:token/open`, () => HttpResponse.json({"fileUrl":"string","mime":"string","title":"string"}, { status: 200 })), // PublicSecureLinkController_open
+    http.post(`${baseUrl}/v1/public/links/:token/otp`, () => new HttpResponse(null, { status: 200 })), // PublicSecureLinkController_otp
     http.get(`${baseUrl}/v1/public/notices/:tenantSlug/:version`, () => HttpResponse.json("string", { status: 200 })), // PublicNoticeController_page
     http.post(`${baseUrl}/v1/public/trials`, () => HttpResponse.json({}, { status: 202 })), // TrialController_start
     http.get(`${baseUrl}/v1/public/trials/:signupId/status`, () => HttpResponse.json({}, { status: 200 })), // TrialController_status
@@ -359,6 +363,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/roles/:id/reset-to-preset`, () => HttpResponse.json({"builtIn":false,"grants":[{"approve":false,"breakGlass":false,"create":false,"delete":false,"edit":false,"export":false,"module":"string","refundDiscount":false,"view":false}],"id":"00000000-0000-7000-8000-000000000000","mfaRequired":false,"name":"string","presetCode":"string","presetVersion":0}, { status: 200 })), // RoleController_resetToPreset
     http.get(`${baseUrl}/v1/schedule/day`, () => HttpResponse.json({"counts":{"appointments":0,"freeSlots":0,"walkIns":0},"date":"2026-01-01","doctors":[{"department":"string","id":"00000000-0000-7000-8000-000000000000","leaveReason":"string","name":"string","onLeave":false,"worksToday":false}],"holiday":"string","sessions":[{"end":"string","label":"string","rows":[],"start":"string","stepMinutes":0}],"timezone":"string","today":false}, { status: 200 })), // ScheduleBoardController_day
     http.get(`${baseUrl}/v1/schedule/week`, () => HttpResponse.json({"days":[{"date":"2026-01-01","holiday":"string","sessions":[]}],"start":"2026-01-01","today":"2026-01-01"}, { status: 200 })), // ScheduleBoardController_week
+    http.post(`${baseUrl}/v1/secure-links`, () => HttpResponse.json({"expiresAt":"2026-01-01T00:00:00Z","linkId":"00000000-0000-7000-8000-000000000000"}, { status: 201 })), // SecureLinkController_issue
     http.get(`${baseUrl}/v1/settings/integrations/abdm`, () => HttpResponse.json({"enabled":false,"hfrId":"string","hfrVerified":false}, { status: 200 })), // AbdmController_get
     http.put(`${baseUrl}/v1/settings/integrations/abdm`, () => HttpResponse.json({"enabled":false,"hfrId":"string","hfrVerified":false}, { status: 200 })), // AbdmController_put
     http.get(`${baseUrl}/v1/settings/privacy/privacy-notice`, () => HttpResponse.json({"versions":[{"bodyMd":"string","current":false,"effectiveFrom":"2026-01-01T00:00:00Z","language":"string","legalReviewed":false,"lockedClauses":[],"mandatoryHash":"string","templateKey":"string","version":"string"}]}, { status: 200 })), // NoticeController_versions
@@ -440,4 +445,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 426;
+export const operationCount = 431;

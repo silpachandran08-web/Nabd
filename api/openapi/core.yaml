@@ -968,6 +968,89 @@ paths:
       tags:
       - patient
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/patients/{caregiverRef}/members:
+    get:
+      operationId: InternalChatMemberController_list
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: caregiverRef
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ChatMemberListItem"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: authenticated
+    post:
+      operationId: InternalChatMemberController_add
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: caregiverRef
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMemberRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ChatMemberResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/privacy-notice/current:
     get:
       operationId: InternalChatConsentController_currentNotice
@@ -11888,6 +11971,58 @@ paths:
       tags:
       - platform
       x-required-permission: territories:view
+  /v1/public/links/{token}/open:
+    post:
+      operationId: PublicSecureLinkController_open
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecureLinkOpenRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SecureLinkOpenResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
+  /v1/public/links/{token}/otp:
+    post:
+      operationId: PublicSecureLinkController_otp
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
   /v1/public/notices/{tenantSlug}/{version}:
     get:
       operationId: PublicNoticeController_page
@@ -13488,6 +13623,43 @@ paths:
       tags:
       - queue
       x-required-permission: queue:view
+  /v1/secure-links:
+    post:
+      operationId: SecureLinkController_issue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecureLinkIssueRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SecureLinkIssueResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/settings/integrations/abdm:
     get:
       operationId: AbdmController_get
@@ -17577,6 +17749,74 @@ components:
           items:
             type: string
             format: uuid
+    ChatMemberGuardianConsent:
+      type: object
+      properties:
+        noticeVersion:
+          type: string
+          maxLength: 40
+          minLength: 0
+        otpChallengeId:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9_-]{8,64}$"
+      required:
+      - noticeVersion
+      - otpChallengeId
+    ChatMemberListItem:
+      type: object
+      properties:
+        firstName:
+          type: string
+        memberRef:
+          type: string
+        proxyScope:
+          type: string
+        proxyStatus:
+          type: string
+        relation:
+          type: string
+    ChatMemberRequest:
+      type: object
+      properties:
+        dob:
+          type: string
+          format: date
+        gender:
+          type: string
+          pattern: ^(male|female|other)$
+        guardianConsent:
+          $ref: "#/components/schemas/ChatMemberGuardianConsent"
+        language:
+          type: string
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+        memberRef:
+          type: string
+          maxLength: 64
+          minLength: 0
+        name:
+          type: string
+          maxLength: 120
+          minLength: 2
+        phone:
+          type: string
+          maxLength: 20
+          minLength: 0
+        relation:
+          type: string
+          minLength: 1
+          pattern: ^(child|parent|other)$
+      required:
+      - dob
+      - name
+      - relation
+    ChatMemberResponse:
+      type: object
+      properties:
+        memberRef:
+          type: string
+        proxyStatus:
+          type: string
     ChatNoticeCurrent:
       type: object
       properties:
@@ -23343,6 +23583,60 @@ components:
         today:
           type: string
           format: date
+    SecureLinkIssueRequest:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        documentType:
+          type: string
+          minLength: 1
+          pattern: ^(rx|invoice|report|document)$
+        language:
+          type: string
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+        recipientRef:
+          type: string
+          format: uuid
+        sendMessage:
+          type: boolean
+        ttlDays:
+          type: integer
+          format: int32
+          maximum: 30
+          minimum: 1
+      required:
+      - documentId
+      - documentType
+      - recipientRef
+    SecureLinkIssueResponse:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        linkId:
+          type: string
+          format: uuid
+    SecureLinkOpenRequest:
+      type: object
+      properties:
+        otp:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{6}$"
+      required:
+      - otp
+    SecureLinkOpenResponse:
+      type: object
+      properties:
+        fileUrl:
+          type: string
+        mime:
+          type: string
+        title:
+          type: string
     SellPackageRequest:
       type: object
       properties:

@@ -74,6 +74,10 @@ export type ChatConsentDecision = { granted: boolean; purpose: string; };
 export type ChatConsentEvidence = { wamid: string; };
 export type ChatConsentRequest = { decisions: Array<ChatConsentDecision>; evidence: ChatConsentEvidence; language: string; noticeVersion: string; phoneHash: string; };
 export type ChatConsentResponse = { consentIds?: Array<string>; };
+export type ChatMemberGuardianConsent = { noticeVersion: string; otpChallengeId: string; };
+export type ChatMemberListItem = { firstName?: string; memberRef?: string; proxyScope?: string; proxyStatus?: string; relation?: string; };
+export type ChatMemberRequest = { dob: string; gender?: string; guardianConsent?: ChatMemberGuardianConsent; language?: string; memberRef?: string; name: string; phone?: string; relation: string; };
+export type ChatMemberResponse = { memberRef?: string; proxyStatus?: string; };
 export type ChatNoticeCurrent = { language?: string; path?: string; version?: string; };
 export type CheckInRequest = { appointmentId?: string; doctorId: string; patientId: string; paymentMode?: string; presentingComplaint?: string; source?: string; };
 export type Checkout = { outstanding?: number; pending?: number; };
@@ -410,6 +414,10 @@ export type SafetyDictionaryBundle = { classes?: Array<ClassDef>; controlled?: A
 export type SalesDay = { amount?: number; count?: number; date?: string; };
 export type ScheduleDayResponse = { counts?: Counts; date?: string; doctors?: Array<Doctor>; holiday?: string; sessions?: Array<Session>; timezone?: string; today?: boolean; };
 export type ScheduleWeekResponse = { days?: Array<Day>; start?: string; today?: string; };
+export type SecureLinkIssueRequest = { documentId: string; documentType: string; language?: string; recipientRef: string; sendMessage?: boolean; ttlDays?: number; };
+export type SecureLinkIssueResponse = { expiresAt?: string; linkId?: string; };
+export type SecureLinkOpenRequest = { otp: string; };
+export type SecureLinkOpenResponse = { fileUrl?: string; mime?: string; title?: string; };
 export type SellPackageRequest = { packageId: string; patientId: string; paymentMethod: string; };
 export type Service = { name?: string; revenue?: number; };
 export type ServiceTimeItem = { medianMin?: number; n?: number; p80Min?: number; priorSource?: string; visitType?: string; };
@@ -531,6 +539,8 @@ export type Operations = {
   EtaController_one: { method: "get"; path: "/internal/v1/tenants/{tid}/eta/appointments/{appointmentId}"; permission: "authenticated"; pathParams: { tid: string; appointmentId: string; }; query: never; body: never; response: InternalEtaResponse };
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
   InternalChatConsentController_capture: { method: "post"; path: "/internal/v1/tenants/{tid}/patients/consents"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatConsentRequest; response: ChatConsentResponse };
+  InternalChatMemberController_list: { method: "get"; path: "/internal/v1/tenants/{tid}/patients/{caregiverRef}/members"; permission: "authenticated"; pathParams: { tid: string; caregiverRef: string; }; query: never; body: never; response: Record<string, Array<ChatMemberListItem>> };
+  InternalChatMemberController_add: { method: "post"; path: "/internal/v1/tenants/{tid}/patients/{caregiverRef}/members"; permission: "authenticated"; pathParams: { tid: string; caregiverRef: string; }; query: never; body: ChatMemberRequest; response: ChatMemberResponse };
   InternalChatConsentController_currentNotice: { method: "get"; path: "/internal/v1/tenants/{tid}/privacy-notice/current"; permission: "authenticated"; pathParams: { tid: string; }; query: { language?: string; }; body: never; response: ChatNoticeCurrent };
   AbhaController_enrol: { method: "post"; path: "/v1/abha/enrol"; permission: "patients:edit"; pathParams: never; query: never; body: AbhaEnrolRequest; response: AbhaResult };
   AbhaController_status: { method: "get"; path: "/v1/abha/status"; permission: "patients:edit"; pathParams: never; query: never; body: never; response: AbhaStatus };
@@ -816,6 +826,8 @@ export type Operations = {
   TenantRegionController_change: { method: "patch"; path: "/v1/platform/tenants/{tenantId}/region"; permission: "tenant_detail:edit"; pathParams: { tenantId: string; }; query: never; body: RegionChangeRequest; response: TenantRegionResponse };
   TemplateLintController_createWithOverride: { method: "post"; path: "/v1/platform/tenants/{tenantId}/whatsapp-templates"; permission: "messaging_operations:override"; pathParams: { tenantId: string; }; query: never; body: TemplateOverrideRequest; response: TemplateResponse };
   TerritoryController_list: { method: "get"; path: "/v1/platform/territories"; permission: "territories:view"; pathParams: never; query: never; body: never; response: Array<RegionSummaryResponse> };
+  PublicSecureLinkController_open: { method: "post"; path: "/v1/public/links/{token}/open"; permission: "public"; pathParams: { token: string; }; query: never; body: SecureLinkOpenRequest; response: SecureLinkOpenResponse };
+  PublicSecureLinkController_otp: { method: "post"; path: "/v1/public/links/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: void };
   PublicNoticeController_page: { method: "get"; path: "/v1/public/notices/{tenantSlug}/{version}"; permission: "public"; pathParams: { tenantSlug: string; version: string; }; query: { lang?: string; }; body: never; response: string };
   TrialController_start: { method: "post"; path: "/v1/public/trials"; permission: "public"; pathParams: never; query: never; body: StartRequest; response: Record<string, Record<string, unknown>> };
   TrialController_status: { method: "get"; path: "/v1/public/trials/{signupId}/status"; permission: "public"; pathParams: { signupId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
@@ -856,6 +868,7 @@ export type Operations = {
   RoleController_resetToPreset: { method: "post"; path: "/v1/roles/{id}/reset-to-preset"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: never; response: RoleResponse };
   ScheduleBoardController_day: { method: "get"; path: "/v1/schedule/day"; permission: "queue:view"; pathParams: never; query: { date?: string; }; body: never; response: ScheduleDayResponse };
   ScheduleBoardController_week: { method: "get"; path: "/v1/schedule/week"; permission: "queue:view"; pathParams: never; query: { start?: string; }; body: never; response: ScheduleWeekResponse };
+  SecureLinkController_issue: { method: "post"; path: "/v1/secure-links"; permission: "patients:edit"; pathParams: never; query: never; body: SecureLinkIssueRequest; response: SecureLinkIssueResponse };
   AbdmController_get: { method: "get"; path: "/v1/settings/integrations/abdm"; permission: "setup:view"; pathParams: never; query: never; body: never; response: AbdmSettings };
   AbdmController_put: { method: "put"; path: "/v1/settings/integrations/abdm"; permission: "setup:edit"; pathParams: never; query: never; body: AbdmSettingsRequest; response: AbdmSettings };
   NoticeController_versions: { method: "get"; path: "/v1/settings/privacy/privacy-notice"; permission: "setup:view"; pathParams: never; query: never; body: never; response: PrivacyNoticeVersions };

@@ -151,8 +151,15 @@ public class FileService implements FileStore {
     @Override
     @Transactional(readOnly = true)
     public SignedUrl downloadUrl(UUID fileId) {
+        return downloadUrl(fileId, DOWNLOAD_TTL);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SignedUrl downloadUrl(UUID fileId, Duration ttl) {
+        Duration t = ttl.compareTo(DOWNLOAD_TTL) > 0 ? DOWNLOAD_TTL : ttl;
         FileRepository.Row f = repo.find(tenantContext.current(), fileId).filter(r -> "available".equals(r.status())).orElseThrow(FileService::notFound);
-        return new SignedUrl(storage.presign(false, ObjectStorage.Bucket.CLEAN, f.storageKey(), DOWNLOAD_TTL, 0), clock.instant().plus(DOWNLOAD_TTL));
+        return new SignedUrl(storage.presign(false, ObjectStorage.Bucket.CLEAN, f.storageKey(), t, 0), clock.instant().plus(t));
     }
 
     static ApiException notFound() {

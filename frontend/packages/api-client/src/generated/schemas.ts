@@ -82,6 +82,10 @@ export const ChatConsentDecisionSchema = z.object({ granted: z.boolean(), purpos
 export const ChatConsentEvidenceSchema = z.object({ wamid: z.string().min(1) });
 export const ChatConsentRequestSchema = z.object({ decisions: z.array(ChatConsentDecisionSchema), evidence: ChatConsentEvidenceSchema, language: z.string().min(1), noticeVersion: z.string().min(0).max(40), phoneHash: z.string().min(1) });
 export const ChatConsentResponseSchema = z.object({ consentIds: z.array(z.string()).optional() });
+export const ChatMemberGuardianConsentSchema = z.object({ noticeVersion: z.string().min(0).max(40), otpChallengeId: z.string().min(1) });
+export const ChatMemberListItemSchema = z.object({ firstName: z.string().optional(), memberRef: z.string().optional(), proxyScope: z.string().optional(), proxyStatus: z.string().optional(), relation: z.string().optional() });
+export const ChatMemberRequestSchema = z.object({ dob: z.string(), gender: z.string().optional(), guardianConsent: ChatMemberGuardianConsentSchema.optional(), language: z.string().optional(), memberRef: z.string().min(0).max(64).optional(), name: z.string().min(2).max(120), phone: z.string().min(0).max(20).optional(), relation: z.string().min(1) });
+export const ChatMemberResponseSchema = z.object({ memberRef: z.string().optional(), proxyStatus: z.string().optional() });
 export const ChatNoticeCurrentSchema = z.object({ language: z.string().optional(), path: z.string().optional(), version: z.string().optional() });
 export const CheckInRequestSchema = z.object({ appointmentId: z.string().optional(), doctorId: z.string(), patientId: z.string(), paymentMode: z.string().optional(), presentingComplaint: z.string().optional(), source: z.string().optional() });
 export const CheckoutSchema = z.object({ outstanding: z.number().optional(), pending: z.number().int().optional() });
@@ -427,6 +431,10 @@ export const SafetyDictionaryBundleSchema = z.object({ classes: z.array(ClassDef
 export const SessionSchema = z.object({ end: z.string().optional(), label: z.string().optional(), rows: z.array(RowSchema).optional(), start: z.string().optional(), stepMinutes: z.number().int().optional() });
 export const ScheduleDayResponseSchema = z.object({ counts: CountsSchema.optional(), date: z.string().optional(), doctors: z.array(DoctorSchema).optional(), holiday: z.string().optional(), sessions: z.array(SessionSchema).optional(), timezone: z.string().optional(), today: z.boolean().optional() });
 export const ScheduleWeekResponseSchema = z.object({ days: z.array(DaySchema).optional(), start: z.string().optional(), today: z.string().optional() });
+export const SecureLinkIssueRequestSchema = z.object({ documentId: z.string(), documentType: z.string().min(1), language: z.string().optional(), recipientRef: z.string(), sendMessage: z.boolean().optional(), ttlDays: z.number().int().gte(1).lte(30).optional() });
+export const SecureLinkIssueResponseSchema = z.object({ expiresAt: z.string().optional(), linkId: z.string().optional() });
+export const SecureLinkOpenRequestSchema = z.object({ otp: z.string().min(1) });
+export const SecureLinkOpenResponseSchema = z.object({ fileUrl: z.string().optional(), mime: z.string().optional(), title: z.string().optional() });
 export const SellPackageRequestSchema = z.object({ packageId: z.string(), patientId: z.string(), paymentMethod: z.string().min(1) });
 export const ServiceTimeItemSchema = z.object({ medianMin: z.number().optional(), n: z.number().int().optional(), p80Min: z.number().optional(), priorSource: z.string().optional(), visitType: z.string().optional() });
 export const ServiceTimesResponseSchema = z.object({ items: z.array(ServiceTimeItemSchema).optional() });
@@ -533,6 +541,8 @@ export const operationSchemas = {
   EtaController_one: { response: InternalEtaResponseSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   InternalChatConsentController_capture: { body: ChatConsentRequestSchema, response: ChatConsentResponseSchema },
+  InternalChatMemberController_list: { response: z.record(z.string(), z.array(ChatMemberListItemSchema)) },
+  InternalChatMemberController_add: { body: ChatMemberRequestSchema, response: ChatMemberResponseSchema },
   InternalChatConsentController_currentNotice: { response: ChatNoticeCurrentSchema },
   AbhaController_enrol: { body: AbhaEnrolRequestSchema, response: AbhaResultSchema },
   AbhaController_status: { response: AbhaStatusSchema },
@@ -818,6 +828,8 @@ export const operationSchemas = {
   TenantRegionController_change: { body: RegionChangeRequestSchema, response: TenantRegionResponseSchema },
   TemplateLintController_createWithOverride: { body: TemplateOverrideRequestSchema, response: TemplateResponseSchema },
   TerritoryController_list: { response: z.array(RegionSummaryResponseSchema) },
+  PublicSecureLinkController_open: { body: SecureLinkOpenRequestSchema, response: SecureLinkOpenResponseSchema },
+  PublicSecureLinkController_otp: {  },
   PublicNoticeController_page: { response: z.string() },
   TrialController_start: { body: StartRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   TrialController_status: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
@@ -858,6 +870,7 @@ export const operationSchemas = {
   RoleController_resetToPreset: { response: RoleResponseSchema },
   ScheduleBoardController_day: { response: ScheduleDayResponseSchema },
   ScheduleBoardController_week: { response: ScheduleWeekResponseSchema },
+  SecureLinkController_issue: { body: SecureLinkIssueRequestSchema, response: SecureLinkIssueResponseSchema },
   AbdmController_get: { response: AbdmSettingsSchema },
   AbdmController_put: { body: AbdmSettingsRequestSchema, response: AbdmSettingsSchema },
   NoticeController_versions: { response: PrivacyNoticeVersionsSchema },
