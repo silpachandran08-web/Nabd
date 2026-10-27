@@ -15,6 +15,7 @@ import ArrivalsDialogs, { type Dlg } from "../../components/arrivals/ArrivalsDia
 import DialogBoundary from "../../components/arrivals/DialogBoundary";
 import BoardTable from "../../components/arrivals/board/BoardTable";
 import SideColumn from "../../components/arrivals/board/SideColumn";
+import ExceptionsRail from "../../components/exceptions/ExceptionsRail";
 import TabBar from "../../components/arrivals/board/TabBar";
 import { countsOf, filterByTab, isArrivalsTab, type ArrivalsTab } from "../../components/arrivals/board/boardLogic";
 import { useArrivals } from "../../components/arrivals/hooks/useArrivals";
@@ -138,8 +139,11 @@ function ArrivalsPageInner() {
                 <BoardTable rows={filtered} staff={staff} grants={grants} sendingId={a.sendingId} h={h} onOpen={onOpen} />
               )}
             </div>
-            <SideColumn doctors={a.doctorQueues} rosterFailed={a.rosterFailed} onRetryRoster={() => void a.refetchRoster()} callbacks={a.callbackList} grants={grants}
-              onAnnounce={(doctorId) => setDlg({ k: "delay", doctorId })} onClear={(id) => void clearDelay(id)} />
+            <div>
+              <ExceptionsRail compact />
+              <SideColumn doctors={a.doctorQueues} rosterFailed={a.rosterFailed} onRetryRoster={() => void a.refetchRoster()} callbacks={a.callbackList} grants={grants}
+                onAnnounce={(doctorId) => setDlg({ k: "delay", doctorId })} onClear={(id) => void clearDelay(id)} />
+            </div>
           </div>
         </>
       )}
