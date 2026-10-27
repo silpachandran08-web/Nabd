@@ -45,6 +45,11 @@ public class CoreClient {
     /** IDC-005: relays the taps. Idempotent on the wamid at Core, so a re-run after a version conflict stores nothing twice.
      * @return false when Core says the notice version is stale (409): the caller shows the current notice again. */
     public boolean relayConsent(UUID tenantId, String phoneHash, java.util.Map<String, Boolean> decisions, String noticeVersion, String language, String wamid) {
+        return relayConsentRecord(tenantId, phoneHash, decisions, noticeVersion, language, wamid) != null;
+    }
+
+    /** As {@link #relayConsent}, returning the id of the first stored decision (ACC-043 hands it to patient creation); null on a stale notice. */
+    public String relayConsentRecord(UUID tenantId, String phoneHash, java.util.Map<String, Boolean> decisions, String noticeVersion, String language, String wamid) {
         java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("phoneHash", phoneHash);
         m.put("decisions", decisions.entrySet().stream().map(e -> java.util.Map.of("purpose", e.getKey(), "granted", e.getValue())).toList());
@@ -52,11 +57,49 @@ public class CoreClient {
         m.put("language", language);
         m.put("evidence", java.util.Map.of("wamid", wamid));
         try {
-            http.post(base + "/internal/v1/tenants/" + tenantId + "/patients/consents", json.writeValueAsString(m));
-            return true;
+            return json.readTree(http.post(base + "/internal/v1/tenants/" + tenantId + "/patients/consents", json.writeValueAsString(m)))
+                    .path("consentIds").path(0).asString("");
         } catch (Http.UpstreamStatusException e) {
             if (e.status == 409) {
-                return false;
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    /** ACC-043: patientRef when created; otherwise code is POSSIBLE_DUPLICATE, GUARDIAN_REQUIRED or CONSENT_REQUIRED and nothing was stored. */
+    public record Created(String patientRef, String code) {
+    }
+
+    public Created createPatient(UUID tenantId, java.util.Map<String, Object> body, String idempotencyKey) {
+        try {
+            return new Created(json.readTree(http.post(base + "/internal/v1/tenants/" + tenantId + "/patients", json.writeValueAsString(body), idempotencyKey))
+                    .path("patientRef").asString(""), null);
+        } catch (Http.UpstreamStatusException e) {
+            String code = e.status == 409 || e.status == 422 ? json.readTree(e.body).path("code").asString("") : "";
+            if (code.isEmpty()) {
+                throw e;
+            }
+            return new Created(null, code);
+        }
+    }
+
+    /** ACC-043: the fields the patient answered in chat (address, email, language) onto the record. */
+    public void completePatient(UUID tenantId, String patientRef, java.util.Map<String, Object> fields, String idempotencyKey) {
+        http.patch(base + "/internal/v1/tenants/" + tenantId + "/patients/" + patientRef, json.writeValueAsString(fields), idempotencyKey);
+    }
+
+    /** ACC-043: the patient the desk asked to finish in chat on this phone, or null (404). Reference and first name only. */
+    public record Pending(String patientRef, String firstName) {
+    }
+
+    public Pending pendingCompletion(UUID tenantId, String phoneHash) {
+        try {
+            JsonNode n = json.readTree(http.get(base + "/internal/v1/tenants/" + tenantId + "/patients/pending-completion/" + phoneHash));
+            return new Pending(n.path("patientRef").asString(""), n.path("firstName").asString(""));
+        } catch (Http.UpstreamStatusException e) {
+            if (e.status == 404) {
+                return null;
             }
             throw e;
         }

@@ -51,4 +51,18 @@ public class CommsClient {
         }
         http.post(base + "/internal/v1/tenants/" + tenantId + "/messages", json.writeValueAsString(m));
     }
+
+    /** ACC-043 dependency: the verified WhatsApp number of a contact, for creating the patient (the Edge never stores it). Comms must serve
+     * GET /internal/v1/tenants/{tid}/contacts/{contactHash}/phone -> {"phone":"+91..."}; null when it does not know the contact. */
+    public String verifiedPhone(UUID tenantId, String contactHash) {
+        try {
+            String p = json.readTree(http.get(base + "/internal/v1/tenants/" + tenantId + "/contacts/" + contactHash + "/phone")).path("phone").asString("");
+            return p.isEmpty() ? null : p;
+        } catch (Http.UpstreamStatusException e) {
+            if (e.status == 404) {
+                return null;
+            }
+            throw e;
+        }
+    }
 }

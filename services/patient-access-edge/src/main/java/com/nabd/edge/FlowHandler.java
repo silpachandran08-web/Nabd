@@ -11,10 +11,12 @@ import java.util.UUID;
  */
 public interface FlowHandler {
 
-    enum State { START, CHOOSING_DOCTOR, CHOOSING_SLOT, CONFIRMING, DONE, CONSENT_CARE, CONSENT_UPDATES }
+    enum State { START, CHOOSING_DOCTOR, CHOOSING_SLOT, CONFIRMING, DONE, CONSENT_CARE, CONSENT_UPDATES,
+        REG_NAME, REG_SEX, REG_DOB, COMPLETE_ADDRESS, COMPLETE_LANG } // ACC-043: registration and the desk's "complete in chat"
 
     /** Context keys the Edge may keep: ids, first name, age. Anything else is refused (no clinical content in the Edge DB). */
-    Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care");
+    Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care",
+            "sex", "consentId", "patientRef"); // ACC-043: the answers so far (name is firstName, the date of birth is never kept), the consent record id, the new patient's reference
 
     record Conversation(UUID id, UUID tenantId, String channel, String contactHash, State state, Map<String, String> context,
                         int version) {

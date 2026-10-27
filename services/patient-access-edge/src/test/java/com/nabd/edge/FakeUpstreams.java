@@ -26,11 +26,21 @@ final class FakeUpstreams {
     final List<String> relayed = new CopyOnWriteArrayList<>();
     final HttpServer core;
     final HttpServer comms;
+    /** ACC-043: a test may answer first (return true when it did); the defaults above stay for every other test. */
+    interface Hook {
+        boolean handle(com.sun.net.httpserver.HttpExchange ex) throws IOException;
+    }
+
+    volatile Hook coreHook;
+    volatile Hook commsHook;
 
     FakeUpstreams() {
         try {
             core = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             core.createContext("/internal/v1/tenants/", ex -> {
+                if (coreHook != null && coreHook.handle(ex)) {
+                    return;
+                }
                 String path0 = ex.getRequestURI().getPath();
                 if (path0.endsWith("/privacy-notice/current")) {
                     reply(ex, 200, "{\"version\":\"" + noticeVersion + "\",\"language\":\"x\",\"path\":\"/v1/public/notices/clinic/" + noticeVersion + "?lang=x\"}");
@@ -54,6 +64,9 @@ final class FakeUpstreams {
             });
             comms = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             comms.createContext("/internal/v1/tenants/", ex -> {
+                if (commsHook != null && commsHook.handle(ex)) {
+                    return;
+                }
                 String path = ex.getRequestURI().getPath();
                 if ("POST".equals(ex.getRequestMethod())) {
                     sent.add(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
@@ -88,7 +101,7 @@ final class FakeUpstreams {
         return UUID.randomUUID().toString();
     }
 
-    private static void reply(com.sun.net.httpserver.HttpExchange ex, int status, String body) throws IOException {
+    static void reply(com.sun.net.httpserver.HttpExchange ex, int status, String body) throws IOException {
         byte[] b = body.getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().add("Content-Type", "application/json");
         ex.sendResponseHeaders(status, b.length);
