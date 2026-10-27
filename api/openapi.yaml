@@ -2587,18 +2587,47 @@ paths:
   /appointments/{id}/cancel:
     post:
       tags: [Queue]
-      summary: "Reason mandatory; slot released immediately (NB-072)"
+      summary: "Coded reason mandatory; slot released immediately (NB-072, ACC-007)"
+      description: "reasonCode from GET /reason-codes?kind=cancel is required (400 REASON_REQUIRED / REASON_INVALID otherwise). note (max 200) is required with `other` and refused with any other code (NOTE_REQUIRED, NOTE_NOT_ALLOWED, NOTE_TOO_LONG). `reason` is the pre-ACC-007 free text: deprecated, only a fallback for note."
       x-required-permission: queue:edit
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 3 } } }
+            schema: { type: object, properties: { reasonCode: { type: string, pattern: "^[a-z0-9_]{3,40}$" }, note: { type: string, maxLength: 200 }, reason: { type: string, deprecated: true } } }
       responses:
         "200": { description: "Cancelled", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "400": { description: "Problem `invalid-reason` (code REASON_REQUIRED, REASON_INVALID, NOTE_REQUIRED, NOTE_NOT_ALLOWED or NOTE_TOO_LONG)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Problem `appointment-arrived` (code APPOINTMENT_ARRIVED, ACC-003): the patient has checked in", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /appointments/{id}/no-show:
+    post:
+      tags: [Queue]
+      summary: "Mark a never-arrived appointment as no-show (ACC-025, QA-31)"
+      description: "Staff mark; the grace-period job marks automatically where the booking policy has auto-mark on. Repeating the call on a no-show returns it unchanged. Asks for an ETA recompute so the queue pulls forward."
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { reasonCode: { type: string, description: "From GET /reason-codes?kind=no_show" } } } } }
+      responses:
+        "200": { description: "Marked", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "400": { description: "Problem `invalid-reason` (REASON_INVALID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `appointment-arrived` (APPOINTMENT_ARRIVED), `not-yet-due` (NOT_YET_DUE: before the start time; token bookings: before the session end), `not-scheduled` (NOT_SCHEDULED) or `stale-status`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /appointments/{id}/no-show/undo:
+    post:
+      tags: [Queue]
+      summary: "Undo a no-show on the clinic day it was marked (ACC-025)"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Back to scheduled (the booking's own decisionSource is restored)", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `undo-window-passed` (UNDO_WINDOW_PASSED), `not-no-show` (NOT_NO_SHOW), `late-arrival-linked` (LATE_ARRIVAL_LINKED) or `slot-taken` (the freed slot was booked meanwhile)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}/reschedule:
     post:
@@ -2710,6 +2739,66 @@ paths:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, cancelled/completed)" }
         "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + arrived + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking. Also `already-checked-in` (code ALREADY_CHECKED_IN, ACC-003): the appointment is already arrived (a second desk or a retry); extra members tokenNumber, queueEntryId, checkedInAt name the first check-in; no second token is issued. Also `appointment-not-today` (scheduled only): the appointment's date in the clinic timezone is not today's clinic date (ACC-001); nothing is created.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /queue/late-arrival:
+    post:
+      tags: [Queue]
+      summary: "Check in a patient whose booking was marked no-show: a walk-in token linked to the booking (ACC-025)"
+      x-required-permission: queue:create
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [appointmentId], properties: { appointmentId: { type: string, format: uuid } } } } }
+      responses:
+        "201": { description: "Walk-in queue entry created (placed late by the call order)", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `not-no-show` (NOT_NO_SHOW), `already-checked-in` (ALREADY_CHECKED_IN), `appointment-not-today` or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /reason-codes:
+    get:
+      tags: [Queue]
+      summary: "The coded reason list for a kind, in the caller's language (ACC-007)"
+      description: "Platform codes for the clinic's market plus the clinic's own additions, minus the ones it hid. locale: en, hi, kn, te, ar (anything else: English). The same list is served to the Edge at /internal/v1/tenants/{tid}/reason-codes."
+      x-required-permission: queue:view
+      parameters:
+        - { name: kind, in: query, required: true, schema: { type: string, enum: [cancel, no_show, reschedule, override, refusal] } }
+        - { name: locale, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: "Reasons in display order ('other' last)", content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, properties: { code: { type: string }, label: { type: string }, requiresNote: { type: boolean } } } } } } } } }
+        "400": { description: "Problem `invalid-reason` (INVALID_KIND)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    post:
+      tags: [Queue]
+      summary: "Add a clinic reason (ACC-007); platform codes cannot be redefined"
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [kind, code, labels], properties: { kind: { type: string, enum: [cancel, no_show, reschedule, override, refusal] }, code: { type: string, pattern: "^[a-z0-9_]{3,40}$" }, labels: { type: object, description: "en required; hi, kn, te, ar optional; each at most 80 characters", additionalProperties: { type: string } } } } } }
+      responses:
+        "201": { description: "Added", content: { application/json: { schema: { type: object, properties: { code: { type: string } } } } } }
+        "400": { description: "Problem `invalid-reason` (INVALID_KIND, INVALID_CODE, INVALID_LABELS)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `code-exists` (CODE_EXISTS)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /reports/booking-reasons:
+    get:
+      tags: [Reports]
+      summary: "No-show % per doctor per week and the top 5 cancel reasons (ACC-007)"
+      description: "Over [from, to] (clinic dates, to inclusive, at most 366 days). Bookings = appointments starting in the range that are not cancelled, declined or requests; a no-show whose patient came through late arrival is not counted."
+      x-required-permission: reports:view
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: "Report"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  noShowByDoctorWeek: { type: array, items: { type: object, properties: { doctorId: { type: string, format: uuid }, doctorName: { type: [string, "null"] }, weekStart: { type: string, format: date, description: "Monday of the ISO week, clinic zone" }, bookings: { type: integer }, noShows: { type: integer }, noShowPct: { type: number } } } }
+                  topCancelReasons: { type: array, items: { type: object, properties: { code: { type: string }, label: { type: string }, count: { type: integer } } } }
+        "400": { description: "Problem `invalid-range`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /events:
     get:
@@ -6743,7 +6832,11 @@ components:
         isFollowUp: { type: boolean }
         decisionSource: { type: [string, "null"], enum: [auto, staff, system, null], description: "ACC-009: who confirmed the booking; staff for a desk booking" }
         channel: { type: string, enum: [desk, whatsapp, web, widget, app, call_centre, aggregator] }
-        cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
+        cancelReason: { type: [string, "null"], description: "QA-06: the free-text note given on cancel (only with reason `other`, ACC-007; \"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
+        cancelReasonCode: { type: [string, "null"], description: "ACC-007: the coded cancel reason (GET /reason-codes?kind=cancel); null unless cancelled" }
+        noShowAt: { type: [string, "null"], format: date-time, description: "ACC-025: when it was marked no-show" }
+        noShowMarkedBy: { type: [string, "null"], format: uuid, description: "ACC-025: staff who marked it; null = the grace-period job (decisionSource then reads system)" }
+        lateArrivalQueueEntryId: { type: [string, "null"], format: uuid, description: "ACC-025: the walk-in queue entry created when the patient arrived after being marked" }
         bookingKind: { type: string, enum: [slot, token], description: "ACC-011: token = a numbered place in a token session; startTime/endTime are then the session window, not a visit time" }
         sessionToken: { type: [integer, "null"], description: "ACC-011: the reserved token number (token bookings)" }
         expectedRange: { type: [string, "null"], description: "ACC-011: expected visit window like 17:40-18:00 from the average consult time; token bookings only" }

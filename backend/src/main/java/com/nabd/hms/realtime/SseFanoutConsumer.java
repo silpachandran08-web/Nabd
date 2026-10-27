@@ -22,7 +22,7 @@ class SseFanoutConsumer implements EventConsumer {
     private record Route(List<RealtimeTopic> topics, String idField) {
     }
 
-    private static final java.util.Map<String, Route> ROUTES = java.util.Map.of(
+    private static final java.util.Map<String, Route> ROUTES_CORE = java.util.Map.of(
             "comms.message.status_changed.v1", new Route(List.of(RealtimeTopic.MESSAGES), "messageId"), // COM-006
             "visit.queue_entry.created.v1", new Route(List.of(RealtimeTopic.QUEUE, RealtimeTopic.NURSING), "entryId"),
             "visit.queue_entry.changed.v1", new Route(List.of(RealtimeTopic.QUEUE, RealtimeTopic.NURSING), "entryId"),
@@ -33,6 +33,11 @@ class SseFanoutConsumer implements EventConsumer {
             "scheduling.appointment.cancelled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
             "scheduling.appointment.rescheduled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
             "scheduling.booking.routed.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId")); // ACC-009/010
+    /** Map.of holds 10 pairs at most: later additions go here. ACC-025: a no-show is a change on the requests board. */
+    private static final java.util.Map<String, Route> ROUTES = new java.util.HashMap<>(ROUTES_CORE);
+    static {
+        ROUTES.put("scheduling.appointment.no_show.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"));
+    }
     /** Revocation: these end the staff member's open streams (or the tenant's, for a role) so permissions are re-checked on reconnect. */
     private static final Set<String> CLOSERS = Set.of("iam.session.revoked.v1", "iam.staff.changed.v1", "iam.role.changed.v1");
 

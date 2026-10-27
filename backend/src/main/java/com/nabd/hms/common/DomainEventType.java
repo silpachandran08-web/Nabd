@@ -9,6 +9,7 @@ public enum DomainEventType {
     APPOINTMENT_BOOKED("scheduling.appointment.booked.v1", "core/scheduling"),
     APPOINTMENT_CANCELLED("scheduling.appointment.cancelled.v1", "core/scheduling"),
     APPOINTMENT_RESCHEDULED("scheduling.appointment.rescheduled.v1", "core/scheduling"),
+    APPOINTMENT_NO_SHOW("scheduling.appointment.no_show.v1", "core/scheduling"),
     APPOINTMENT_ARRIVED("scheduling.appointment.arrived.v1", "core/scheduling"),
     QUEUE_ENTRY_CREATED("visit.queue_entry.created.v1", "core/visit"),
     QUEUE_ENTRY_CHANGED("visit.queue_entry.changed.v1", "core/visit"),

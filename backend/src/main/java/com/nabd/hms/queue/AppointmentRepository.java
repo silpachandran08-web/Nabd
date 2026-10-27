@@ -19,7 +19,7 @@ import static com.nabd.hms.queue.QueueModels.CallbackEntryRow;
 class AppointmentRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel, booking_kind, session_token ";
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel, booking_kind, session_token, cancel_reason_code, no_show_at, no_show_marked_by, late_arrival_queue_entry_id ";
 
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.organization.api.BookingRules bookingRules;
@@ -94,9 +94,15 @@ class AppointmentRepository {
         return jdbc.query(sql.toString(), mapper(), params.toArray());
     }
 
+    /** ACC-007: reasonCode is the coded reason, note the free text allowed only with 'other'. */
+    void cancel(UUID tenantId, UUID id, String reasonCode, String note) {
+        jdbc.update("UPDATE appointments SET status = 'cancelled', cancel_reason_code = ?, cancel_reason = ? " +
+                "WHERE tenant_id = ? AND id = ? AND status = 'scheduled'", reasonCode, note, tenantId, id);
+    }
+
+    /** System-initiated undo of a booking made a moment ago (waitlist claim lost a race): no desk reason exists, so code 'other' with the cause as note. */
     void cancel(UUID tenantId, UUID id, String reason) {
-        jdbc.update("UPDATE appointments SET status = 'cancelled', cancel_reason = ? " +
-                "WHERE tenant_id = ? AND id = ? AND status = 'scheduled'", reason, tenantId, id);
+        cancel(tenantId, id, "other", reason);
     }
 
     void markTerminal(UUID tenantId, UUID id, String status) {
@@ -123,7 +129,10 @@ class AppointmentRepository {
                 rs.getBoolean("is_follow_up"),
                 rs.getString("cancel_reason"), rs.getString("decision_source"), rs.getString("channel"),
                 rs.getString("booking_kind"),
-                (Integer) rs.getObject("session_token"));
+                (Integer) rs.getObject("session_token"),
+                rs.getString("cancel_reason_code"),
+                rs.getTimestamp("no_show_at") == null ? null : rs.getTimestamp("no_show_at").toInstant(),
+                rs.getObject("no_show_marked_by", UUID.class), rs.getObject("late_arrival_queue_entry_id", UUID.class));
     }
 
     /** ACC-011: a token booking takes the whole session window and a reserved number (no overlap constraint, V312). */

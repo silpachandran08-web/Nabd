@@ -258,7 +258,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         assertThat(data(evs.get(0))).containsEntry("appointmentId", appt[1]).containsEntry("previousAppointmentId", appt[0]);
         seen.addAll(types(evs));
 
-        evs = eventsOf(t, () -> call(e, HttpMethod.POST, "/v1/appointments/" + appt[1] + "/cancel", Map.of("reason", "patient called")));
+        evs = eventsOf(t, () -> call(e, HttpMethod.POST, "/v1/appointments/" + appt[1] + "/cancel", Map.of("reasonCode", "illness")));
         assertThat(types(evs)).containsExactly("scheduling.appointment.cancelled.v1");
         assertThat(data(evs.get(0))).containsEntry("status", "cancelled");
         seen.addAll(types(evs));
@@ -377,6 +377,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("billing.refund.approved.v1"); // FIN-013: Fin013RefundApiTest
         expected.remove("comms.sender.throttled.v1"); // COM-021: produced by services/comms-gateway
         expected.remove("scheduling.booking.routed.v1"); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
+        expected.remove("scheduling.appointment.no_show.v1"); // ACC-025: Acc025NoShowApiTest
         expected.remove("shared.attachment.scanned.v1"); // PLT-029: Plt029FilesApiTest
         assertThat(seen).isEqualTo(expected);
 

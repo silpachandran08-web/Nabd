@@ -50,10 +50,12 @@ class InternalSchedulingService {
     private final ClinicPolicies policies;
     private final AuditService audit;
     private final ClinicClock clock;
+    private final com.nabd.hms.queue.api.ReasonCodes reasons;
 
     InternalSchedulingService(TenantScope tenantScope, AppointmentService appointments, AppointmentRepository appointmentRepo,
                               ScheduleRepository scheduleRepo, PatientRefs patientRefs, ClinicPolicies policies, AuditService audit,
-                              ClinicClock clock) {
+                              ClinicClock clock, com.nabd.hms.queue.api.ReasonCodes reasons) {
+        this.reasons = reasons;
         this.tenantScope = tenantScope;
         this.appointments = appointments;
         this.appointmentRepo = appointmentRepo;
@@ -129,7 +131,7 @@ class InternalSchedulingService {
         });
     }
 
-    Map<String, Object> act(UUID tid, ServiceIdentity edge, UUID id, String action, String patientRef, Instant newStartTime, String reasonCode) {
+    Map<String, Object> act(UUID tid, ServiceIdentity edge, UUID id, String action, String patientRef, Instant newStartTime, String reasonCode, String note) {
         if (!Set.of("confirm", "reschedule", "cancel").contains(action)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
         }
@@ -153,7 +155,7 @@ class InternalSchedulingService {
             if (!"confirm".equals(action)) {
                 requireOutsideWindow(tid, a.startTime());
                 if ("cancel".equals(action)) {
-                    appointments.cancel(tid, null, id, new CancelRequest(reasonCode));
+                    appointments.cancel(tid, null, id, new CancelRequest(reasonCode, note, null));
                     status = "cancelled";
                 } else {
                     resultId = appointments.reschedule(tid, null, id, new RescheduleRequest(newStartTime)).id();
@@ -162,6 +164,10 @@ class InternalSchedulingService {
             record(tid, edge, "appointment." + ("confirm".equals(action) ? "confirmed" : "cancel".equals(action) ? "cancelled" : "rescheduled") + "_via_edge", id, patientRef);
             return Map.of("appointmentId", resultId, "status", status);
         });
+    }
+
+    java.util.List<com.nabd.hms.queue.api.ReasonCodes.Item> reasonCodes(UUID tid, String kind, String locale) {
+        return tenantScope.run(tid, () -> reasons.list(kind, locale));
     }
 
     private void requireOutsideWindow(UUID tid, Instant start) {

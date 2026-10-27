@@ -103,6 +103,12 @@ class BookingPolicyService implements BookingRules {
     }
 
     @Override
+    public NoShowRule noShowRule() {
+        Map<?, ?> ns = (Map<?, ?>) cached().config().get("noShow");
+        return new NoShowRule(((Number) ns.get("graceMinutes")).intValue(), Boolean.TRUE.equals(ns.get("autoMark")), Boolean.TRUE.equals(ns.get("pullForward")));
+    }
+
+    @Override
     public Optional<Integer> publishedVersion() {
         return Optional.ofNullable(cached().version());
     }

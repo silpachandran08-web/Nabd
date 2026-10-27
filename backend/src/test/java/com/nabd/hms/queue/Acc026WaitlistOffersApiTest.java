@@ -64,7 +64,7 @@ class Acc026WaitlistOffersApiTest extends ApiTestBase {
 
     private void cancel(Setup s, String appointmentId) {
         assertThat(exchange("/v1/appointments/" + appointmentId + "/cancel", HttpMethod.POST,
-                authedJsonBody(s.token(), Map.of("reason", "cancelled")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+                authedJsonBody(s.token(), Map.of("reasonCode", "illness")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @SuppressWarnings("unchecked")

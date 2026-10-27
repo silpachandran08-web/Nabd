@@ -188,7 +188,7 @@ class S10QaArrivedTest extends ApiTestBase {
         assertThat(join.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(checkIn(c.token, c.doctor.id(), p, a).getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
-        ResponseEntity<Map> cancel = exchange("/v1/appointments/" + a + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reason", "patient asked")), Map.class);
+        ResponseEntity<Map> cancel = exchange("/v1/appointments/" + a + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(cancel.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(code(cancel)).isEqualTo("APPOINTMENT_ARRIVED");
         ResponseEntity<Map> resched = exchange("/v1/appointments/" + a + "/reschedule", HttpMethod.POST,
@@ -204,7 +204,7 @@ class S10QaArrivedTest extends ApiTestBase {
     void ac3_stillScheduledCancelStillWorks() {
         Ctx c = ctx();
         UUID a = apptNow(c, patient(c));
-        ResponseEntity<Map> r = exchange("/v1/appointments/" + a + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reason", "patient asked")), Map.class);
+        ResponseEntity<Map> r = exchange("/v1/appointments/" + a + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody().get("status")).isEqualTo("cancelled");
     }
@@ -343,7 +343,7 @@ class S10QaArrivedTest extends ApiTestBase {
         assertThat(checkIn(other.token, other.doctor.id(), patient(other), mine).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(sql("SELECT status FROM appointments WHERE id = ?", mine)).isEqualTo("scheduled");
         // other tenant also cannot cancel it
-        assertThat(exchange("/v1/appointments/" + mine + "/cancel", HttpMethod.POST, authedJsonBody(other.token, Map.of("reason", "xxx")), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exchange("/v1/appointments/" + mine + "/cancel", HttpMethod.POST, authedJsonBody(other.token, Map.of("reasonCode", "illness")), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test

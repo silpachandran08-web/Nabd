@@ -118,7 +118,7 @@ class Acc011SessionModesApiTest extends ApiTestBase {
         assertThat(exchange("/v1/doctors/" + c.doctor.id() + "/availability?date=" + c.today, HttpMethod.GET, authed(c.token), List.class)
                 .getBody()).isEmpty();
 
-        exchange("/v1/appointments/" + first + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reason", "changed mind")), Map.class);
+        exchange("/v1/appointments/" + first + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(book(c, c.at(c.today, "10:00")).getBody().get("sessionToken")).isEqualTo(1); // lowest free number
     }
 

@@ -3,44 +3,43 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Dialog from "../../components/ui/Dialog";
+import ReasonPicker from "../../components/ui/ReasonPicker";
+import { reasonReady, type ReasonItem } from "../../lib/reasonPicker";
 import styles from "./schedule.module.css";
 import { clinicTime } from "./NewAppointmentDialog";
 import { hijriLabel } from "../../lib/hijri";
 import { api } from "../../lib/api";
 import { getter, key } from "../../lib/query";
 import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
-import type { AppointmentResponse } from "@nabd/api-client/generated";
-
-// Wireframe CANCEL_REASONS (NabdShell.html L5906). The chosen label is what gets sent.
-export const CANCEL_REASONS = [
-  "Schedule conflict", "Illness", "Cost", "Transport", "Patient went elsewhere", "Clinic initiated", "Other",
-];
+import type { AppointmentResponse, QueueEntryResponse } from "@nabd/api-client/generated";
 
 type Target = { appointmentId: string; patientName: string; doctorId: string; doctorName: string; time: string; dateLabel: string };
 
 /**
- * Cancel an appointment (POST /v1/appointments/{id}/cancel, queue:edit). The reason is mandatory
- * and nothing is sent until one is picked and confirmed — cancelling affects the patient.
- * Body `reason` (CancelRequest, min 3 chars); any refusal is
- * shown verbatim so a mismatch is never silent.
+ * Cancel an appointment (POST /v1/appointments/{id}/cancel, queue:edit). A reason from the coded list (ACC-007) is mandatory,
+ * with a note only for `other`; nothing is sent until one is picked and confirmed — cancelling affects the patient.
+ * Any refusal is shown verbatim so a mismatch is never silent.
  */
 export function CancelAppointmentDialog({ target, onClose, onDone }: {
   target: Target; onClose: () => void; onDone: () => void;
 }) {
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState<ReasonItem | null>(null);
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const fe = useFormErrors("cancel", { reason: "Cancellation reason" });
-  // undefined = not cancelled yet; otherwise the server's recorded cancelReason (QA-06), null when absent.
-  const [recorded, setRecorded] = useState<string | null | undefined>(undefined);
+  const fe = useFormErrors("cancel", { reasonCode: "Cancellation reason", note: "Note" });
+  // undefined = not cancelled yet; otherwise the label of the recorded reason.
+  const [recorded, setRecorded] = useState<string | undefined>(undefined);
+  const ready = reasonReady(reason, note);
 
   async function confirm(e: React.FormEvent) {
     e.preventDefault();
-    if (!reason || saving) return;
+    if (!reason || !ready || saving) return;
     setSaving(true);
     fe.clear();
     try {
-      const body = await api.post<AppointmentResponse | undefined>(`/appointments/${target.appointmentId}/cancel`, { reason });
-      setRecorded(body?.cancelReason ?? null);
+      await api.post<AppointmentResponse | undefined>(`/appointments/${target.appointmentId}/cancel`,
+        reason.requiresNote ? { reasonCode: reason.code, note: note.trim() } : { reasonCode: reason.code });
+      setRecorded(reason.label + (reason.requiresNote ? ` — ${note.trim()}` : ""));
     } catch (err) {
       fe.fail(err, "Couldn't cancel the appointment.");
     } finally {
@@ -62,26 +61,110 @@ export function CancelAppointmentDialog({ target, onClose, onDone }: {
     <Dialog title="Cancel appointment" onClose={onClose}>
       <form onSubmit={confirm}>
         <p className={styles.dialogSub}>{target.patientName} · {target.time} with {target.doctorName} · {target.dateLabel}</p>
-        <fieldset className={styles.reasonSet}>
-          <legend className={styles.label}>Cancellation reason (required)</legend>
-          {CANCEL_REASONS.map((r) => (
-            <label key={r} className={reason === r ? styles.reasonOn : styles.reason}>
-              <input type="radio" name="cancel-reason" value={r} checked={reason === r} {...fe.attrs("reason")} onChange={() => { fe.clearField("reason"); setReason(r); }} /> {r}
-            </label>
-          ))}
-        </fieldset>
-        <FieldError fe={fe} name="reason" className={styles.note} />
+        <ReasonPicker kind="cancel" name="cancel-reason" legend="Cancellation reason (required)" value={reason}
+          onChange={(r) => { fe.clearField("reasonCode"); setReason(r); }} note={note} onNote={setNote} />
+        <FieldError fe={fe} name="reasonCode" className={styles.note} />
         <p className={styles.note}>
           {reason ? "The slot is released once the appointment is cancelled." : "Cancelling affects the patient — one reason is mandatory and is recorded."}
         </p>
         <ErrorSummary fe={fe} className={styles.error} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Keep appointment</button>
-          <button type="submit" className={styles.btnDanger} disabled={!reason || saving}>
-            {saving ? "Cancelling…" : reason ? "Cancel appointment" : "Select a reason"}
+          <button type="submit" className={styles.btnDanger} disabled={!ready || saving}>
+            {saving ? "Cancelling…" : ready ? "Cancel appointment" : "Select a reason"}
           </button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+/**
+ * ACC-025: mark a never-arrived appointment as no-show (POST /v1/appointments/{id}/no-show, queue:edit). The reason is optional;
+ * the server refuses an appointment that has arrived or is not yet due and the message is shown verbatim.
+ */
+export function NoShowDialog({ target, onClose, onDone }: { target: Target; onClose: () => void; onDone: () => void }) {
+  const [reason, setReason] = useState<ReasonItem | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fe = useFormErrors("noshow", { reasonCode: "Reason" });
+
+  async function confirm(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    fe.clear();
+    try {
+      await api.post(`/appointments/${target.appointmentId}/no-show`, reason ? { reasonCode: reason.code } : {});
+      onDone();
+    } catch (err) {
+      fe.fail(err, "Couldn't mark the no-show.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog title="Mark as no-show" onClose={onClose}>
+      <form onSubmit={confirm}>
+        <p className={styles.dialogSub}>{target.patientName} · {target.time} with {target.doctorName} · {target.dateLabel}</p>
+        <ReasonPicker kind="no_show" name="noshow-reason" legend="Reason (optional)" value={reason} onChange={setReason} askNote={false} />
+        <p className={styles.note}>The patients behind move up. You can undo this today.</p>
+        <ErrorSummary fe={fe} className={styles.error} />
+        <div className={styles.actions}>
+          <button type="button" className={styles.btn} onClick={onClose}>Keep as booked</button>
+          <button type="submit" className={styles.btnDanger} disabled={saving}>{saving ? "Marking…" : "Mark no-show"}</button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** ACC-025: one confirm for the two no-show follow-ups — undo (same clinic day) and late arrival (walk-in token linked to the booking). */
+export function NoShowFollowUpDialog({ kind, target, onClose, onDone }: {
+  kind: "undo" | "late"; target: Target; onClose: () => void; onDone: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [token, setToken] = useState<number | null>(null);
+  const fe = useFormErrors("noshow-followup", {});
+  const undo = kind === "undo";
+
+  async function confirm() {
+    if (saving) return;
+    setSaving(true);
+    fe.clear();
+    try {
+      if (undo) {
+        await api.post(`/appointments/${target.appointmentId}/no-show/undo`, {});
+        onDone();
+      } else {
+        const entry = await api.post<QueueEntryResponse | undefined>("/queue/late-arrival", { appointmentId: target.appointmentId });
+        setToken(entry?.tokenNumber ?? 0);
+      }
+    } catch (err) {
+      fe.fail(err, undo ? "Couldn't undo the no-show." : "Couldn't check the patient in.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (token !== null) return (
+    <Dialog title="Checked in" onClose={onDone}>
+      <p className={styles.dialogSub}>{target.patientName} · booked {target.time} with {target.doctorName}</p>
+      <p className={styles.note}>Walk-in token {token ? `T-${token}` : "issued"}, linked to the original booking.</p>
+      <div className={styles.actions}><button type="button" className={styles.btnPrimary} onClick={onDone}>Close</button></div>
+    </Dialog>
+  );
+
+  return (
+    <Dialog title={undo ? "Undo no-show" : "Late arrival"} onClose={onClose}>
+      <p className={styles.dialogSub}>{target.patientName} · {target.time} with {target.doctorName} · {target.dateLabel}</p>
+      <p className={styles.note}>{undo ? "The appointment goes back to booked, as it was." : "The patient arrived after being marked. They join today's queue with a walk-in token linked to this booking."}</p>
+      <ErrorSummary fe={fe} className={styles.error} />
+      <div className={styles.actions}>
+        <button type="button" className={styles.btn} onClick={onClose}>Close</button>
+        <button type="button" className={styles.btnPrimary} disabled={saving} onClick={() => void confirm()}>
+          {saving ? "Working…" : undo ? "Undo no-show" : "Check in as walk-in"}
+        </button>
+      </div>
     </Dialog>
   );
 }

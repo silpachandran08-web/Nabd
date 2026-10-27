@@ -1,0 +1,8 @@
+.set { border: 0; margin: 0 0 var(--nb-space-12); padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.legend { font-size: 12px; color: var(--nb-text-secondary); margin-block-end: 6px; padding: 0; }
+.reason { display: flex; align-items: center; gap: 8px; padding: 8px 10px; min-height: 44px; border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-subtle); background: var(--nb-surface-2); font-size: 13px; cursor: pointer; }
+.on { composes: reason; border-color: var(--nb-accent-500); background: var(--nb-accent-tint); }
+.noteLabel { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--nb-text-secondary); }
+.note { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-1); color: var(--nb-text-primary); font: inherit; font-size: 13px; resize: vertical; }
+.state { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-12); }
+.retry { min-height: 44px; padding: 0 var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; cursor: pointer; }

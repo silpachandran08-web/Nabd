@@ -140,7 +140,7 @@ class NotificationContractApiTest extends ApiTestBase {
         assertThat((Map<String, Object>) ok.getBody().get("recipient")).containsEntry("phoneE164", "+919000000123").containsEntry("patientId", p.toString());
 
         ResponseEntity<Map> cancel = exchange("/v1/appointments/" + appt + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "patient request")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(cancel.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> gone = claim(id, INTERNAL_COMMS_TOKEN);

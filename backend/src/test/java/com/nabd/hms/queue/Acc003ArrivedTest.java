@@ -190,7 +190,7 @@ class Acc003ArrivedTest extends ApiTestBase {
         assertThat(checkIn(c, p, a).getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<Map> cancel = exchange("/v1/appointments/" + a + "/cancel", HttpMethod.POST,
-                authedJsonBody(c.token, Map.of("reason", "changed mind")), Map.class);
+                authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(cancel.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(cancel.getBody().get("code")).isEqualTo("APPOINTMENT_ARRIVED");
         assertThat(cancel.getBody().get("type").toString()).endsWith("appointment-arrived");
@@ -212,7 +212,7 @@ class Acc003ArrivedTest extends ApiTestBase {
         // a still-scheduled appointment can be cancelled as before
         UUID other = appt(c, p, noonToday(30), "scheduled");
         assertThat(exchange("/v1/appointments/" + other + "/cancel", HttpMethod.POST,
-                authedJsonBody(c.token, Map.of("reason", "patient called")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+                authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     // AC4: transfer General -> Dermatology, last leg completes -> appointment completed
