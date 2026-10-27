@@ -7,7 +7,7 @@ const PAGES: [prefix: string, name: string][] = [
   ["/follow-ups", "Follow-ups"], ["/nursing", "Nursing"], ["/overview", "Overview"], ["/compliance", "Support access"],
   ["/documents", "Documents"], ["/security", "Security"], ["/login", "Sign in"], ["/accept-invite", "Accept invitation"],
   ["/requests", "Booking requests"], ["/checkin", "Self check-in"], ["/display", "Display"], ["/messages", "WhatsApp inbox"], ["/results", "Results"],
-  ["/inpatients", "Ward rounds"], ["/records", "Record requests"], ["/specialty", "Specialty workspace"], ["/recalls", "Recalls"], ["/tele", "Teleconsult"],
+  ["/inpatients", "Ward rounds"], ["/records", "Record requests"], ["/specialty", "Specialty workspace"], ["/recalls", "Recalls"], ["/tele", "Teleconsult"], ["/inbox", "Clinical inbox"],
   ["/owner", "Workspaces"], ["/platform", "Platform console"],
 ];
 
