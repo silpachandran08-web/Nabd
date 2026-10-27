@@ -39,18 +39,20 @@ public class StreamConsumer {
     private final MeterRegistry meters;
     private final ConversationEngine engine;
     private final AvailabilityProjection projection;
+    private final EtaNotifications notifications;
     private final ConcurrentHashMap<String, Integer> attempts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> lastPending = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> groups = new ConcurrentHashMap<>();
 
     StreamConsumer(StringRedisTemplate valkey, ObjectMapper json, EdgeProperties props, MeterRegistry meters, ConversationEngine engine,
-                   AvailabilityProjection projection) {
+                   AvailabilityProjection projection, EtaNotifications notifications) {
         this.valkey = valkey;
         this.json = json;
         this.props = props;
         this.meters = meters;
         this.engine = engine;
         this.projection = projection;
+        this.notifications = notifications;
     }
 
     @Scheduled(fixedDelay = 100)
@@ -61,6 +63,11 @@ public class StreamConsumer {
     @Scheduled(fixedDelay = 100)
     void pollScheduling() {
         poll("ev:" + props.region() + ":scheduling", this::onScheduling);
+    }
+
+    @Scheduled(fixedDelay = 100)
+    void pollVisit() {
+        poll("ev:" + props.region() + ":visit", this::onVisit);
     }
 
     private void poll(String stream, java.util.function.Consumer<JsonNode> handler) {
@@ -130,10 +137,25 @@ public class StreamConsumer {
         engine.process(tenant(ce), messageId, d.path("channel").asString("whatsapp"), d.path("contactHash").asString(""));
     }
 
+    /** ACC-044: visit.eta.updated.v1 { tenantId, appointmentId, p50, mode, arrived } drives the leave-now / ETA-shift rules. */
+    private void onVisit(JsonNode ce) {
+        if (!"visit.eta.updated.v1".equals(ce.path("type").asString(""))) {
+            return;
+        }
+        JsonNode d = ce.path("data");
+        String p50 = d.path("p50").asString("");
+        notifications.onEta(tenant(ce), d.path("appointmentId").asString(""), p50.isEmpty() ? null : java.time.Instant.parse(p50),
+                d.path("mode").asString("range"), d.path("arrived").asBoolean(false));
+    }
+
     private void onScheduling(JsonNode ce) {
+        if ("scheduling.appointment.cancelled.v1".equals(ce.path("type").asString(""))) {
+            notifications.untrack(tenant(ce), ce.path("data").path("appointmentId").asString("")); // ACC-044: no alerts for a cancelled visit
+        }
         switch (ce.path("type").asString("")) {
             case "scheduling.appointment.booked.v1", "scheduling.appointment.cancelled.v1", "scheduling.appointment.rescheduled.v1" ->
                     projection.invalidateDoctor(tenant(ce), UUID.fromString(ce.path("data").path("doctorId").asString("")));
+            case "scheduling.appointment.arrived.v1" -> notifications.markArrived(tenant(ce), ce.path("data").path("appointmentId").asString(""));
             case "scheduling.booking_policy.published.v1" -> projection.invalidateTenant(tenant(ce));
             default -> { }
         }

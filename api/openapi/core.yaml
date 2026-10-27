@@ -659,6 +659,51 @@ paths:
       tags:
       - queue
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/appointments/{id}:
+    get:
+      operationId: InternalSchedulingController_detail
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: patientRef
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/appointments/{id}/{action}:
     post:
       operationId: InternalSchedulingController_act
@@ -1006,6 +1051,43 @@ paths:
           description: Error (RFC 7807)
       tags:
       - patient
+      x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/status/{phoneHash}:
+    get:
+      operationId: InternalStatusController_status
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: phoneHash
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InternalVisitStatusList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
       x-required-permission: authenticated
   /v1/abha/enrol:
     post:
@@ -16912,6 +16994,9 @@ components:
           format: uuid
         isFollowUp:
           type: boolean
+        patientConfirmedAt:
+          type: string
+          format: date-time
         patientId:
           type: string
           format: uuid
@@ -19914,6 +19999,32 @@ components:
         tokensLeft:
           type: integer
           format: int32
+    InternalVisitStatus:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        leaveHomeAlert:
+          type: boolean
+        mode:
+          type: string
+        p50:
+          type: string
+          format: date-time
+        patientRef:
+          type: string
+        status:
+          type: string
+        text:
+          type: string
+    InternalVisitStatusList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalVisitStatus"
     InviteResendResponse:
       type: object
       properties:

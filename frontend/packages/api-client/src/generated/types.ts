@@ -26,7 +26,7 @@ export type AllergyStatusResponse = { activeCount?: number; documentedAt?: strin
 export type AllergyWriteRequest = { allergenClassId?: string; allergenIngredientId?: string; category?: string; reaction?: string; severity: string; source?: string; substance: string; };
 export type Answer = { label?: string; nextQuestion?: string; outcome?: string; };
 export type AppointmentPage = { data?: Array<AppointmentResponse>; page?: PageMeta; };
-export type AppointmentResponse = { bookingKind?: string; cancelReason?: string; channel?: string; decisionSource?: string; doctorId?: string; endTime?: string; expectedRange?: string; id?: string; isFollowUp?: boolean; patientId?: string; sessionToken?: number; startTime?: string; status?: string; };
+export type AppointmentResponse = { bookingKind?: string; cancelReason?: string; channel?: string; decisionSource?: string; doctorId?: string; endTime?: string; expectedRange?: string; id?: string; isFollowUp?: boolean; patientConfirmedAt?: string; patientId?: string; sessionToken?: number; startTime?: string; status?: string; };
 export type AppointmentWriteRequest = { doctorId: string; followUpOrDefault?: boolean; isFollowUp?: boolean; patientId: string; startTime: string; };
 export type ApproveRefundRequest = { expectedAmount?: number; };
 export type ApproveRequest = { approvedBy: string; csoApprovalRef: string; };
@@ -220,6 +220,8 @@ export type InternalBookingRequest = { channel: string; doctorId: string; group?
 export type InternalDoctorSessions = { doctorId?: string; sessions?: Array<InternalSession>; };
 export type InternalEtaResponse = { display?: Record<string, Record<string, unknown>>; p50At?: string; p80At?: string; position?: number; v?: number; };
 export type InternalSession = { date?: string; id?: string; mode?: string; slots?: Array<string>; tokensLeft?: number; };
+export type InternalVisitStatus = { appointmentId?: string; leaveHomeAlert?: boolean; mode?: string; p50?: string; patientRef?: string; status?: string; text?: string; };
+export type InternalVisitStatusList = { items?: Array<InternalVisitStatus>; };
 export type InviteResendResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; };
 export type InvoiceListItem = { balanceDue?: number; createdAt?: string; doctorId?: string; id?: string; invoiceNumber?: string; paid?: number; patientId?: string; patientName?: string; status?: string; total?: number; writtenOff?: number; };
 export type InvoiceListResponse = { items?: Array<InvoiceListItem>; nextCursor?: string; };
@@ -524,6 +526,7 @@ export type Operations = {
   SafetyDictionaryController_approveSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve"; permission: "safety_content:edit"; pathParams: { region: string; versionId: string; }; query: never; body: ApproveRequest; response: Record<string, Record<string, unknown>> };
   TemplateCatalogueController_instantiate: { method: "post"; path: "/internal/v1/tenants/{tenantId}/templates:instantiate"; permission: "onboarding_provisioning:view"; pathParams: { tenantId: string; }; query: never; body: InstantiateRequest; response: Record<string, number> };
   InternalSchedulingController_book: { method: "post"; path: "/internal/v1/tenants/{tid}/appointments"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: InternalBookRequest; response: Record<string, Record<string, unknown>> };
+  InternalSchedulingController_detail: { method: "get"; path: "/internal/v1/tenants/{tid}/appointments/{id}"; permission: "authenticated"; pathParams: { tid: string; id: string; }; query: { patientRef: string; }; body: never; response: Record<string, Record<string, unknown>> };
   InternalSchedulingController_act: { method: "post"; path: "/internal/v1/tenants/{tid}/appointments/{id}/{action}"; permission: "authenticated"; pathParams: { tid: string; id: string; action: string; }; query: never; body: InternalAppointmentActionRequest; response: Record<string, Record<string, unknown>> };
   InternalSchedulingController_availability: { method: "get"; path: "/internal/v1/tenants/{tid}/availability"; permission: "authenticated"; pathParams: { tid: string; }; query: { doctorId?: string; specialtyCode?: string; from: string; to: string; }; body: never; response: InternalAvailability };
   InternalBookingRequestController_choose: { method: "post"; path: "/internal/v1/tenants/{tid}/booking-offers/{offerId}/choose"; permission: "authenticated"; pathParams: { tid: string; offerId: string; }; query: never; body: InternalBookingOfferChoice; response: Record<string, Record<string, unknown>> };
@@ -532,6 +535,7 @@ export type Operations = {
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
   InternalChatConsentController_capture: { method: "post"; path: "/internal/v1/tenants/{tid}/patients/consents"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatConsentRequest; response: ChatConsentResponse };
   InternalChatConsentController_currentNotice: { method: "get"; path: "/internal/v1/tenants/{tid}/privacy-notice/current"; permission: "authenticated"; pathParams: { tid: string; }; query: { language?: string; }; body: never; response: ChatNoticeCurrent };
+  InternalStatusController_status: { method: "get"; path: "/internal/v1/tenants/{tid}/status/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: InternalVisitStatusList };
   AbhaController_enrol: { method: "post"; path: "/v1/abha/enrol"; permission: "patients:edit"; pathParams: never; query: never; body: AbhaEnrolRequest; response: AbhaResult };
   AbhaController_status: { method: "get"; path: "/v1/abha/status"; permission: "patients:edit"; pathParams: never; query: never; body: never; response: AbhaStatus };
   AppointmentController_list: { method: "get"; path: "/v1/appointments"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; patientId?: string; date?: string; limit?: number; cursor?: string; }; body: never; response: AppointmentPage };
