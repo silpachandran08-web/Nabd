@@ -92,7 +92,7 @@ export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onMa
         <span className={s.safetyIcon}><Icon name="clock" size={18} /></span>
         <span>
           <span className={s.safetyLabel}>{tx("lastVisit")}</span>
-          <span className={s.safetyValue}>{patient ? daysAgoLabel(patient.lastVisitAt) : "—"}</span>
+          <span className={s.safetyValue}>{patient ? daysAgoLabel(tx, patient.lastVisitAt) : "—"}</span>
         </span>
       </div>
 

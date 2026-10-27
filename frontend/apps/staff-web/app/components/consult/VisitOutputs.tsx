@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useDocText } from "./docText";
 import { useCallback, useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
@@ -10,7 +11,7 @@ import { can } from "../../lib/permissions";
 import { getIdentity } from "../../lib/session";
 import DocumentSheet, { type SheetFallback } from "./DocumentSheet";
 import {
-  DOC_FIELDS, DOC_LABEL, DOC_ORDER, MAX_FIELD, missingForIssue,
+  DOC_FIELDS, DOC_ORDER, MAX_FIELD, missingForIssue,
   type ClinicalDocument, type DocBody, type DocType, type SummaryPrefill,
 } from "./documents";
 import type { AuthedFetch, PatientDetail, Problem } from "./shared";
@@ -33,6 +34,7 @@ export default function VisitOutputs({
   authedFetch, queueEntryId, patientName, patient,
 }: { authedFetch: AuthedFetch; queueEntryId: string; patientName: string; patient: PatientDetail | null }) {
   const tx = useTranslations("consult.visitOutputs");
+  const dt = useDocText();
   const mayView = can("clinical:view");
   const mayEdit = can("clinical:edit");
   const [docs, setDocs] = useState<ClinicalDocument[] | null>(null);
@@ -160,10 +162,10 @@ export default function VisitOutputs({
         return (
           <div key={type} className={v.group}>
             <div className={v.groupHead}>
-              <span className={v.groupTitle}>{DOC_LABEL[type]}</span>
+              <span className={v.groupTitle}>{dt.label(type)}</span>
               {mayEdit && (
                 <button type="button" className={p.btn} onClick={() => void startNew(type)}>
-                  <Icon name="plus" size={14} /> {" "}{tx("new")}{" "}{DOC_LABEL[type].toLowerCase()}
+                  <Icon name="plus" size={14} /> {" "}{tx("new")}{" "}{dt.label(type).toLowerCase()}
                 </button>
               )}
             </div>
@@ -171,7 +173,7 @@ export default function VisitOutputs({
             {list.map((d) => (
               <div key={d.id} className={v.docRow}>
                 <span className={v.grow}>
-                  {DOC_LABEL[d.type]} · {new Date(d.issuedAt ?? d.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {dt.label(d.type)} · {new Date(d.issuedAt ?? d.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>
                 {d.status === "issued" ? <StatusPill tone="ok" label={tx("issued")} /> : <StatusPill tone="warn" label={tx("draft")} />}
                 <button type="button" className={p.btn} onClick={() => openDoc(d)}>
@@ -186,7 +188,7 @@ export default function VisitOutputs({
       <p className={p.muted}>{tx("diagnosticRequestsArenTAvailable")}</p>
 
       {editor && (
-        <Dialog title={tx(editor.id ? "editDoc" : "newDoc", { doc: DOC_LABEL[editor.type].toLowerCase() })} size="lg" onClose={() => { if (!editor.busy) setEditor(null); }}>
+        <Dialog title={tx(editor.id ? "editDoc" : "newDoc", { doc: dt.label(editor.type).toLowerCase() })} size="lg" onClose={() => { if (!editor.busy) setEditor(null); }}>
           <div className={p.stack}>
             {editor.prefillNote && <div className={`${p.notice} ${p.noticeInfo}`} role="status"><Icon name="info" size={16} /><span>{editor.prefillNote}</span></div>}
             <div className={v.tabs} role="group" aria-label={tx("view")}>
@@ -197,7 +199,7 @@ export default function VisitOutputs({
               <div className={p.stack}>
                 {DOC_FIELDS[editor.type].map((f) => (
                   <label key={f.key} className={v.fieldLabel}>
-                    <span>{f.label}{f.required && <span className={v.req}> {" "}{tx("required")}</span>}</span>
+                    <span>{dt.field(f.key)}{f.required && <span className={v.req}> {" "}{tx("required")}</span>}</span>
                     {f.kind === "textarea" ? (
                       <textarea className={p.textarea} rows={3} maxLength={MAX_FIELD} value={editor.body[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)} />
                     ) : (
@@ -233,7 +235,7 @@ export default function VisitOutputs({
       )}
 
       {viewing && (
-        <Dialog title={DOC_LABEL[viewing.type]} size="lg" onClose={() => setViewing(null)}>
+        <Dialog title={dt.label(viewing.type)} size="lg" onClose={() => setViewing(null)}>
           <div className={p.stack}>
             <DocumentSheet type={viewing.type} body={viewing.body} header={viewing.header} issuedAt={viewing.issuedAt} fallback={fallback} />
             <p className={v.share}><Icon name="info" size={16} /><span>{tx("sharingByWhatsappOrA2")}</span></p>

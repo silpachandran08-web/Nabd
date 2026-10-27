@@ -116,7 +116,8 @@ try {
   check('5c register does not claim NKA documented after failure', !/No known allergies \(documented\)/.test(await s.page.locator('body').innerText()));
   st.mode = 'ok';
   await s.page.getByRole('button', { name: 'Document no known allergies' }).click();
-  await s.page.getByText('No known allergies (documented)').waitFor({ timeout: 3000 }).then(() => check('5d NKA saved after retry', true), () => check('5d NKA saved after retry', false));
+  // FEF-039: the strip and the register now share one glossary term for NKA, so the sentence is on screen twice (the strip used to say "No known allergies · documented").
+  await s.page.getByText('No known allergies (documented)').first().waitFor({ timeout: 3000 }).then(() => check('5d NKA saved after retry', true), () => check('5d NKA saved after retry', false));
   await s.browser.close();
 
   // 6 NKA already documented: strip names the documenter

@@ -277,6 +277,108 @@
       "approved": [
         "en"
       ]
+    },
+    "soap.subjective": {
+      "definition": "Heading of the note field where the doctor records the patient's history in their own words.",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.objective": {
+      "definition": "Heading of the note field where the doctor records examination findings.",
+      "approved": [
+        "en"
+      ]
+    },
+    "soap.assessment": {
+      "definition": "Heading of the note field where the doctor records their assessment of the patient.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.oral": {
+      "definition": "Route of administration: taken by mouth.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.sublingual": {
+      "definition": "Route of administration: placed under the tongue.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.topical": {
+      "definition": "Route of administration: applied to the skin.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.inhalation": {
+      "definition": "Route of administration: breathed in.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.nasal": {
+      "definition": "Route of administration: given through the nose.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.ophthalmic": {
+      "definition": "Route of administration: applied to the eye.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.otic": {
+      "definition": "Route of administration: applied to the ear.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.intramuscular": {
+      "definition": "Route of administration: injected into a muscle.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.intravenous": {
+      "definition": "Route of administration: given into a vein.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.subcutaneous": {
+      "definition": "Route of administration: injected under the skin.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.rectal": {
+      "definition": "Route of administration: given through the rectum.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.vaginal": {
+      "definition": "Route of administration: given through the vagina.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.transdermal": {
+      "definition": "Route of administration: absorbed through the skin from a patch.",
+      "approved": [
+        "en"
+      ]
+    },
+    "rx.routes.infusion": {
+      "definition": "Route of administration: given slowly into a vein over a period of time.",
+      "approved": [
+        "en"
+      ]
     }
   }
 }

@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
-import { DOC_FIELDS, DOC_LABEL, obj, registrationNumber, str, type DocBody, type DocType } from "./documents";
+import { useDocText } from "./docText";
+import { DOC_FIELDS, obj, registrationNumber, str, type DocBody, type DocType } from "./documents";
 import s from "./documentSheet.module.css";
 import { formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
@@ -16,6 +17,7 @@ export default function DocumentSheet({
   type, body, header, issuedAt, fallback,
 }: { type: DocType; body: DocBody; header: Record<string, unknown> | null; issuedAt?: string | null; fallback?: SheetFallback }) {
   const t = useTranslations("consult.documentSheet");
+  const dt = useDocText();
   const issued = header !== null;
   const clinic = obj(header, "clinic");
   const patient = obj(header, "patient");
@@ -35,11 +37,11 @@ export default function DocumentSheet({
   const filled = DOC_FIELDS[type].filter((f) => (body[f.key] ?? "").trim());
 
   return (
-    <article className={s.sheet} aria-label={`${DOC_LABEL[type]}${issued ? "" : " preview"}`}>
+    <article className={s.sheet} aria-label={issued ? dt.label(type) : t("previewNotIssued")}>
       <header className={s.letterhead}>
         <div>
           {clinicName && <p className={s.clinic}>{clinicName}</p>}
-          <h2 className={s.docTitle}>{DOC_LABEL[type]}</h2>
+          <h2 className={s.docTitle}>{dt.label(type)}</h2>
         </div>
         {!issued && <span className={s.marker}>{t("previewNotIssued")}</span>}
       </header>
@@ -56,7 +58,7 @@ export default function DocumentSheet({
         <dl className={s.fields}>
           {filled.map((f) => (
             <div key={f.key}>
-              <dt>{f.label}</dt>
+              <dt>{dt.field(f.key)}</dt>
               <dd>{f.kind === "date" ? fmtDate(body[f.key]) : body[f.key]}</dd>
             </div>
           ))}

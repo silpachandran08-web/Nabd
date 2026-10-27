@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
-import { NOTE_FIELD_LABEL } from "@nabd/domain";
+import { useNoteFieldLabels } from "./noteLabels";
 import type { NoteFields } from "./draftStore";
 import s from "./consultParts.module.css";
 
@@ -16,6 +16,7 @@ export default function ConflictDialog({ mine, server, onResolve, onClose }: {
   mine: NoteFields; server: NoteFields; onResolve: (merged: NoteFields) => void; onClose: () => void;
 }) {
   const tx = useTranslations("consult.conflictDialog");
+  const L = useNoteFieldLabels();
   const differing = FIELDS.filter((f) => mine[f] !== server[f]);
   const [choice, setChoice] = useState<Partial<Record<keyof NoteFields, Choice>>>({});
   const allChosen = differing.every((f) => choice[f]);
@@ -36,7 +37,7 @@ export default function ConflictDialog({ mine, server, onResolve, onClose }: {
       <div className={`${s.stack} ${s.mtM}`}>
         {differing.map((f) => (
           <fieldset key={f} className={`${s.card} ${s.m0}`}>
-            <legend className={s.cardTitle}>{NOTE_FIELD_LABEL[f]}</legend>
+            <legend className={s.cardTitle}>{L[f]}</legend>
             <p className={s.muted}><strong>{tx("mineThisDevice")}</strong> {mine[f] || tx("empty")}</p>
             <p className={s.muted}><strong>{tx("server")}</strong> {server[f] || tx("empty")}</p>
             <div className={s.row}>

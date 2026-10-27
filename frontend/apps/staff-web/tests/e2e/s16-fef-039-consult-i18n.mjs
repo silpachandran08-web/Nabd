@@ -12,7 +12,7 @@ const note = { id: 'n1', queueEntryId: 'e1', patientId: 'p1', doctorId: SELF, su
 const warning = { kind: 'allergy', severity: 'severe', message: 'recorded allergy Synthamoxil', matched: 'Synthamoxil', requiresDecision: true, resolved: false, reasonOptions: [{ code: 'benefit', label: 'Benefit outweighs risk' }], decision: null };
 const rx = { id: 'r1', status: 'draft', signedAt: null, unresolvedWarnings: 1, items: [{ id: 'i1', drugName: 'Synthamoxil', dosage: '500 mg', frequency: 'TDS', duration: '3 days', instructions: '', warnings: [warning] }] };
 // data values that come from the mocked API (not catalogue text) and units / abbreviations that are the same in every language
-const DATA = ['Test Patient', 'Synthamoxil', 'Cough', 'Flu', 'Rana Reception', 'QA Clinic', 'Benefit outweighs risk', 'recorded allergy', 'Nabd'];
+const DATA = ['TDS', '3 days', 'Test Patient', 'Synthamoxil', 'Cough', 'Flu', 'Rana Reception', 'QA Clinic', 'Benefit outweighs risk', 'recorded allergy', 'Nabd'];
 const errs = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|preloaded using link preload|ERR_FAILED|net::|status of 40[34]/.test(x))];
 const consoleErrors = [];
 
@@ -68,7 +68,7 @@ try {
       await s.page.getByRole('navigation', { name: P('Consultation steps') }).waitFor({ timeout: 10000 });
       await sleep(400);
       raw = await rawEnglish(s.page);
-      check(`J5 ${label} ${step}: no raw English`, raw.length === 0, JSON.stringify(raw.slice(0, 8)));
+      check(`J5 ${label} ${step}: no raw English`, raw.length === 0, JSON.stringify(raw.slice(0, 25)));
     }
     check(`J5 ${label} close: sign button is the catalogue text`, await s.page.getByRole('button', { name: P('Sign note and send to checkout') }).count() === 1);
     check(`J5 ${label} step rail: SOAP names are glossary terms`, await s.page.getByRole('button', { name: new RegExp(P('Plan').replace(/[[\]]/g, '\\$&')) }).count() === 1);
@@ -83,13 +83,13 @@ try {
     check(`J6 ${label} warning text is not truncated`, (await clipped(card.locator('strong, span, div'))).length === 0, JSON.stringify(await clipped(card.locator('strong, span, div'))));
     check(`J6 ${label} buttons of the warning are not clipped`, (await clipped(card.locator('button'))).length === 0);
     raw = await rawEnglish(s.page);
-    check(`J6 ${label} plan: no raw English`, raw.length === 0, JSON.stringify(raw.slice(0, 8)));
+    check(`J6 ${label} plan: no raw English`, raw.length === 0, JSON.stringify(raw.slice(0, 25)));
     await card.getByRole('button', { name: P('Override with a clinical reason') }).click();
     const dlg = s.page.getByRole('dialog');
     await dlg.waitFor({ timeout: 5000 });
     await dlg.getByRole('radio').first().check();
     raw = await rawEnglish(s.page, '[role=dialog]');
-    check(`J6 ${label} override dialog: no raw English`, raw.length === 0, JSON.stringify(raw.slice(0, 8)));
+    check(`J6 ${label} override dialog: no raw English`, raw.length === 0, JSON.stringify(raw.slice(0, 25)));
     check(`J6 ${label} override dialog text is not truncated`, (await clipped(dlg.locator('strong, legend, li, h3, button'))).length === 0, JSON.stringify(await clipped(dlg.locator('strong, legend, li, h3, button'))));
     consoleErrors.push(...errs(s.log)); await s.browser.close();
   }
@@ -98,7 +98,7 @@ try {
   await s.page.getByRole('button', { name: P('Allergy register') }).first().click();
   const reg = s.page.getByRole('dialog'); await reg.waitFor({ timeout: 5000 }); await sleep(300);
   const raw = await rawEnglish(s.page, '[role=dialog]');
-  check('J6 allergy register dialog: no raw English', raw.length === 0, JSON.stringify(raw.slice(0, 8)));
+  check('J6 allergy register dialog: no raw English', raw.length === 0, JSON.stringify(raw.slice(0, 25)));
   consoleErrors.push(...errs(s.log)); await s.browser.close();
 
   // English: the same screens keep the wording (glossary text equals the former literal)

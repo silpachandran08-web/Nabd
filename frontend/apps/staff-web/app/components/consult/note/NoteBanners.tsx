@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { NOTE_FIELD_LABEL } from "@nabd/domain";
+import { useNoteFieldLabels } from "../noteLabels";
 import Icon from "../../ui/Icon";
 import type { NoteFields } from "../draftStore";
 import styles from "../consult.module.css";
@@ -15,6 +15,7 @@ type Props = {
 // FEF-030: everything that can interrupt the note editor, in the order the old screen showed it.
 export default function NoteBanners(a: Props) {
   const tx = useTranslations("consult.noteBanners");
+  const L = useNoteFieldLabels();
   return (
     <>
       {!a.online && (
@@ -42,7 +43,7 @@ export default function NoteBanners(a: Props) {
           <span>
             {tx("thisNoteWasSignedIn")}
             <ul className={p.noticeList}>
-              {(Object.keys(a.orphanText) as (keyof NoteFields)[]).filter((k) => a.orphanText![k].trim() !== "").map((k) => <li key={k}><strong>{NOTE_FIELD_LABEL[k]}:</strong> {a.orphanText![k]}</li>)}
+              {(Object.keys(a.orphanText) as (keyof NoteFields)[]).filter((k) => a.orphanText![k].trim() !== "").map((k) => <li key={k}><strong>{L[k]}:</strong> {a.orphanText![k]}</li>)}
             </ul>
             <button type="button" className={p.linkBtn} onClick={a.onDismissOrphan}>{tx("dismiss")}</button>
           </span>

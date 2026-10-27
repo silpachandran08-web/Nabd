@@ -216,7 +216,12 @@
     "nowOnThePadIncluding": "now on the pad, including unsaved edits. Allergy, pregnancy and controlled-substance checks run again on every applied line.",
     "cancel": "Cancel",
     "replaceAndApply": "Replace and apply",
-    "couldnTApplySet": "Couldn't apply set."
+    "couldnTApplySet": "Couldn't apply set.",
+    "scope": {
+      "mine": "Mine",
+      "shared": "Shared with clinic",
+      "standard": "Clinic standard"
+    }
   },
   "followUpPanel": {
     "followUp": "Follow-up",
@@ -497,7 +502,10 @@
     "documentedBy": "by {name}",
     "conditionsFailed": "Couldn't load conditions",
     "checking": "Checking…",
-    "noneRecorded": "None recorded"
+    "noneRecorded": "None recorded",
+    "noPreviousVisit": "No previous visit",
+    "visitToday": "Today · {date}",
+    "visitDaysAgo": "{count, plural, one {# day ago} other {# days ago}} · {date}"
   },
   "visitOutputs": {
     "visitOutputs": "Visit outputs",
@@ -539,7 +547,23 @@
     "couldnTReachTheServer3": "Couldn't reach the server. The draft is saved; try issuing again."
   },
   "visitTimeline": {
-    "visitTimeline": "Visit timeline"
+    "visitTimeline": "Visit timeline",
+    "event": {
+      "checkedIn": "Checked in",
+      "vitalsRecorded": "Vitals recorded",
+      "consultStarted": "Consultation started",
+      "draftSaved": "Draft saved",
+      "noteSigned": "Note signed",
+      "visitCompleted": "Visit completed",
+      "sentToCheckout": "Sent to checkout",
+      "transferred": "Transferred to another department",
+      "amendmentAdded": "Amendment added"
+    },
+    "sub": {
+      "notRecordedYet": "not recorded yet",
+      "statusUnavailable": "status unavailable",
+      "onDeviceWaiting": "on this device · waiting to sync"
+    }
   },
   "vitalsCard": {
     "outOfRange": "Out of range",
@@ -611,7 +635,8 @@
   },
   "noteSteps": {
     "noReasonWasRecordedAt": "No reason was recorded at check-in. Ask the patient.",
-    "continueToExamine": "Continue to Examine"
+    "continueToExamine": "Continue to Examine",
+    "consultationNote": "Consultation note"
   },
   "saveBadge": {
     "syncConflictReview": "Sync conflict — review",
@@ -842,5 +867,24 @@
     "offline": "You're offline. The prescription can't be saved, checked or signed until you reconnect; your changes stay on this screen.",
     "saveFailed": "Couldn't save prescription.",
     "unreachable": "Couldn't reach the server. Check your connection and try again."
+  },
+  "documents": {
+    "label": {
+      "visit_summary": "Visit summary",
+      "referral": "Referral letter",
+      "certificate": "Medical certificate"
+    },
+    "field": {
+      "patientInstructions": "Instructions for the patient",
+      "referredTo": "Referred to (name or department)",
+      "department": "Department",
+      "reason": "Reason for referral",
+      "findings": "Findings",
+      "notes": "Notes",
+      "purpose": "Purpose",
+      "restFrom": "Rest from",
+      "restTo": "Rest until",
+      "remarks": "Remarks"
+    }
   }
 }

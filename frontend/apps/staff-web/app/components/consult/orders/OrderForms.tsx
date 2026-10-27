@@ -60,7 +60,7 @@ export function AdminForm({ authedFetch, queueEntryId, onClose, onCreated }: {
             <label htmlFor="doRoute">{g("rx.route")}</label>
             <select id="doRoute" className={s.input} value={f.route} onChange={(e) => setF({ ...f, route: e.target.value })}>
               <option value="">{tx("notSpecified")}</option>
-              {ROUTES.map((r) => <option key={r} value={r}>{r}</option>)}
+              {ROUTES.map((r) => <option key={r} value={r}>{r === r.toUpperCase() ? r : g(`rx.routes.${r}`)}</option>)}
             </select>
           </div>
           <div className={s.field}>

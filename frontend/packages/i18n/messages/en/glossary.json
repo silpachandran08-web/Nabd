@@ -40,7 +40,10 @@
     "examine": "Examine",
     "assess": "Assess",
     "plan": "Plan",
-    "presentingComplaint": "Presenting complaint"
+    "presentingComplaint": "Presenting complaint",
+    "subjective": "History (subjective)",
+    "objective": "Examination (objective)",
+    "assessment": "Assessment"
   },
   "rx": {
     "prescription": "Prescription",
@@ -58,6 +61,22 @@
       "morning": "Morning",
       "noon": "Noon",
       "night": "Night"
+    },
+    "routes": {
+      "oral": "Oral",
+      "sublingual": "Sublingual",
+      "topical": "Topical",
+      "inhalation": "Inhalation",
+      "nasal": "Nasal",
+      "ophthalmic": "Ophthalmic",
+      "otic": "Otic",
+      "intramuscular": "Intramuscular",
+      "intravenous": "Intravenous",
+      "subcutaneous": "Subcutaneous",
+      "rectal": "Rectal",
+      "vaginal": "Vaginal",
+      "transdermal": "Transdermal",
+      "infusion": "Infusion"
     }
   },
   "vitals": {

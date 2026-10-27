@@ -129,7 +129,7 @@ export default function RxPad({
             onChange={(e) => onChange({ route: e.target.value || null })}>
             <option value="">{tx("notSpecified")}</option>
             {!routeKnown && <option value={item.route ?? ""}>{item.route}</option>}
-            {ROUTES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {ROUTES.map((r) => <option key={r} value={r}>{g(`rx.routes.${r.toLowerCase()}`)}</option>)}
           </select>
         </div>
 

@@ -6,7 +6,7 @@ import Dialog from "../ui/Dialog";
 import { can } from "../../lib/permissions";
 import styles from "../ui/rxSets.module.css";
 import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "../ui/RxSetParts";
-import { SCOPE_LABEL, toWriteItem, type RxSet, type RxSetScope } from "@nabd/domain";
+import { toWriteItem, type RxSet, type RxSetScope } from "@nabd/domain";
 import { useRxSets } from "../../lib/useRxSets";
 import type { AuthedFetch, Prescription, PrescriptionItem, Problem } from "./shared";
 
@@ -76,9 +76,9 @@ export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, ite
             <input className={styles.field} aria-label={tx("newSetName")} placeholder={tx("saveCurrentItemsAsSet")} value={name} maxLength={120}
               onChange={(e) => setName(e.target.value)} />
             <select className={`${styles.field} ${styles.fieldScope}`} aria-label={tx("whoCanUseTheNew")} value={scope} onChange={(e) => setScope(e.target.value as RxSetScope)}>
-              <option value="mine">{SCOPE_LABEL.mine}</option>
-              <option value="shared">{SCOPE_LABEL.shared}</option>
-              {canStandard && <option value="standard">{SCOPE_LABEL.standard}</option>}
+              <option value="mine">{tx("scope.mine")}</option>
+              <option value="shared">{tx("scope.shared")}</option>
+              {canStandard && <option value="standard">{tx("scope.standard")}</option>}
             </select>
             <button type="button" className={styles.btn} onClick={() => void save()} disabled={!name.trim() || filled.length === 0}>{tx("saveSet")}</button>
           </div>

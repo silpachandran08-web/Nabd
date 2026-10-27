@@ -88,3 +88,16 @@ test("CODEOWNERS: glossary changes need the clinical reviewer group", () => {
     assert.ok(line && /@nabd\/clinical-owners/.test(line), `${path} needs @nabd/clinical-owners`);
   }
 });
+
+test("shared domain/document labels shown in the consult UI have catalogue entries (timeline, note fields, documents, routes)", () => {
+  const domain = readFileSync(`${repo}frontend/packages/domain/src/consultFlow.ts`, "utf8");
+  const tl = src(`${app}app/components/consult/VisitTimeline.tsx`);
+  const body = domain.slice(domain.indexOf("export function buildTimeline"));
+  for (const m of body.matchAll(/(?:label|sub): "([^"]+)"/g)) assert.ok(tl.includes(`"${m[1]}"`), `timeline text "${m[1]}" has no catalogue mapping in VisitTimeline.tsx`);
+  for (const k of tl.matchAll(/"((?:event|sub)\.\w+)"/g)) assert.ok(`visitTimeline.${k[1]}` in consult, k[1]);
+  const docs = src(`${app}app/components/consult/documents.ts`);
+  for (const m of docs.matchAll(/key: "(\w+)", label:/g)) assert.ok(`documents.field.${m[1]}` in consult || ["diagnosis", "assessment", "plan", "medicines"].includes(m[1]), `document field ${m[1]}`);
+  for (const t of ["visit_summary", "referral", "certificate"]) assert.ok(`documents.label.${t}` in consult, t);
+  const routes = src(`${repo}frontend/packages/domain/src/rxPadLogic.ts`).match(/ROUTES = \[([^\]]+)\]/)[1].match(/"(\w+)"/g).map((r) => r.slice(1, -1).toLowerCase());
+  for (const r of [...routes, "infusion"]) assert.ok(`rx.routes.${r}` in glossary, r);
+});
