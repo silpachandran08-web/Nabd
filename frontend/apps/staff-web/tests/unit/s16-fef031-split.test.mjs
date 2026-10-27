@@ -12,7 +12,7 @@ const dirs = ["(clinic)/nursing", "components/nursing", "(clinic)/patients"];
 const files = dirs.flatMap((d) => walk(join(APP, d))).filter((f) => /\.tsx?$/.test(f));
 
 /** Split a file into top-level function bodies (a component or a hook) and count `useState` calls in each. */
-function useStateCounts(src) {
+function stateCountsPerFn(src) {
   const out = [];
   const re = /^(?:export\s+)?(?:default\s+)?function\s+(\w+)/gm;
   const starts = [...src.matchAll(re)].map((m) => ({ name: m[1], at: m.index }));
@@ -35,7 +35,7 @@ test("AC1: every split file < 300 LOC and no component/hook has more than 8 useS
     const src = readFileSync(f, "utf8");
     if (f.endsWith(".css")) continue;
     assert.ok(src.split("\n").length < 300, `${f} is ${src.split("\n").length} lines`);
-    for (const [name, n] of useStateCounts(src)) assert.ok(n <= 8, `${f}: ${name} has ${n} useState hooks`);
+    for (const [name, n] of stateCountsPerFn(src)) assert.ok(n <= 8, `${f}: ${name} has ${n} useState hooks`);
   }
 });
 

@@ -222,10 +222,10 @@
   overflow-y: auto;
 }
 
-.sectionLabel { margin: var(--nb-space-12) 0 0; padding-inline: var(--nb-space-12); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--nb-text-tertiary, var(--nb-text-secondary)); }
+.sectionLabel { margin: var(--nb-space-12) 0 0; padding-inline: var(--nb-space-12); font-size: var(--nb-fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--nb-text-tertiary, var(--nb-text-secondary)); }
 .sectionLabel:first-child { margin-block-start: 0; }
-.navRail .sectionLabel { font-size: 0; block-size: 1px; margin: var(--nb-space-8) var(--nb-space-8) 0; padding: 0; background: var(--nb-border-default); }
-@media (max-width: 1024px) { .sectionLabel { font-size: 0; block-size: 1px; margin: var(--nb-space-8) var(--nb-space-8) 0; padding: 0; background: var(--nb-border-default); } } /* tablet rail: headings become dividers */
+.navRail .sectionLabel { font-size: var(--nb-fs-xs); line-height: 0; overflow: hidden; color: transparent; block-size: 1px; margin: var(--nb-space-8) var(--nb-space-8) 0; padding: 0; background: var(--nb-border-default); }
+@media (--bp-tablet) { .sectionLabel { font-size: var(--nb-fs-xs); line-height: 0; overflow: hidden; color: transparent; block-size: 1px; margin: var(--nb-space-8) var(--nb-space-8) 0; padding: 0; background: var(--nb-border-default); } } /* tablet rail: headings become dividers */
 
 .link {
   display: flex;
@@ -345,6 +345,6 @@
 
 /* FEF-055: urgent badge (unacknowledged priority flags). Danger tint + icon + word; the word hides on the rail and bottom nav (kept for screen readers). */
 .urgent { display: inline-flex; align-items: center; gap: 2px; background: var(--nb-danger-tint); color: var(--nb-danger-500); white-space: nowrap; }
-@media (max-width: 1024px) {
+@media (--bp-tablet) {
   .urgentText { position: absolute; inset-inline-start: 0; inline-size: 1px; block-size: 1px; clip-path: inset(50%); white-space: nowrap; }
 }

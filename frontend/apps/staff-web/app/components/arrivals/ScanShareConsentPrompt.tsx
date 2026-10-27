@@ -6,13 +6,14 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
+import type { PatientConsentState } from "@nabd/api-client/generated";
 import styles from "../../(clinic)/setup/setup.module.css";
 import { can } from "../../lib/permissions";
 import { getter, key } from "../../lib/query";
 
 export default function ScanShareConsentPrompt({ patientId, mrn }: { patientId: string; mrn?: string | null }) {
   const t = useTranslations("arrivals.rail");
-  const q = useQuery({ queryKey: key("consent-state", { id: patientId }), queryFn: getter<{ needsConsent?: boolean }>(`/patients/${patientId}/consents`), enabled: can("patients:view"), staleTime: 30_000 });
+  const q = useQuery({ queryKey: key("consent-state", { id: patientId }), queryFn: getter<PatientConsentState>(`/patients/${patientId}/consents`), enabled: can("patients:view"), staleTime: 30_000 });
   if (!q.data?.needsConsent) return null;
   return (
     <div className={styles.notice} role="status" data-testid="scan-share-consent">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import type { DoctorDelayResponse } from "@nabd/api-client/generated";
 import styles from "../arrivals.module.css";
 import Dialog from "../../ui/Dialog";
 import StatusPill from "../../ui/StatusPill";
@@ -34,7 +35,7 @@ export function DelayForm({ doctor, waiting, onClose }: { doctor?: Staff; waitin
       } catch (err) {
         // ACC-024: one delay at a time; a second tap changes the active one.
         if (!(err instanceof ApiError && err.status === 409)) throw err;
-        const rows = await api.get<{ delayId?: string; active?: boolean }[]>(`/doctors/${doctor.id}/delay`);
+        const rows = await api.get<DoctorDelayResponse[]>(`/doctors/${doctor.id}/delay`);
         const active = rows.find((r) => r.active);
         if (!active?.delayId) throw err;
         await api.patch(`/doctors/${doctor.id}/delay/${active.delayId}`, { minutes: mins });

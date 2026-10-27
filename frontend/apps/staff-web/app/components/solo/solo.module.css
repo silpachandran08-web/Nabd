@@ -20,7 +20,7 @@
 .stripLine { font-size: 14px; margin: 0; overflow-wrap: anywhere; }
 .banner { background: var(--nb-surface-2); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-12) var(--nb-space-16); font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-12); }
 .bannerDanger { border-color: var(--nb-danger-500); }
-.bar { position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 20; display: flex; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); padding-block-end: calc(var(--nb-space-8) + env(safe-area-inset-bottom, 0px)); background: var(--nb-surface-1); border-block-start: 1px solid var(--nb-border-default); }
+.bar { position: fixed; inset-inline: 0; inset-block-end: 0; z-index: var(--z-nav); display: flex; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); padding-block-end: calc(var(--nb-space-8) + env(safe-area-inset-bottom, 0px)); background: var(--nb-surface-1); border-block-start: 1px solid var(--nb-border-default); }
 .barBtn { flex: 1 1 0; min-block-size: 56px; min-inline-size: 48px; border: 1px solid var(--nb-border-default); border-radius: 14px; background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .barPrimary { background: var(--nb-accent-gradient); color: var(--nb-on-accent); border-color: transparent; }
 .barBtn:disabled { opacity: 0.55; cursor: progress; }
