@@ -6,7 +6,7 @@ export type Entitlements = {
 };
 
 // Nav item -> the plan modules that make it useful (any one is enough). Items not listed are never gated by plan.
-const NAV_MODULES: Record<string, string[]> = {
+export const NAV_MODULES: Record<string, string[]> = {
   "/pharmacy": ["pharmacy_inhouse", "pharmacy_external"],
   "/packages": ["packages"],
   "/billing": ["billing"],

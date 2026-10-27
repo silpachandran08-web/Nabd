@@ -83,9 +83,9 @@ export function getIdentity(): Identity | null {
 // DOCTOR_ITEMS / NAV_ITEMS (same order, same grants, plus each page's own gate); keep them in step.
 type Destination = [href: string, ...permissions: string[]];
 const OWNER_LANDING: Destination[] = [
-  ["/overview", "reports:view"], ["/schedule", "queue:view"], ["/billing", "billing:view"], ["/packages", "packages:view"],
-  ["/reports", "reports:view"], ["/staff", "staff:view"], ["/setup", "setup:view"],
-];
+  ["/overview", "reports:view"], ["/schedule", "queue:view"], ["/setup", "setup:view"], ["/reports", "reports:view"],
+  ["/staff", "staff:view"], ["/billing", "billing:view"], ["/packages", "packages:view"], ["/compliance", "compliance:view"],
+]; // FEF-058: the owner nav order (sections: run, people, money, growth, compliance); planned screens are never a landing page
 // /my-day and /consult both read the queue (AccessGate / forbidden state without queue:view).
 const DOCTOR_LANDING: Destination[] = [
   ["/my-day", "clinical:edit", "queue:view"], ["/patients", "patients:view"], ["/consult", "clinical:edit", "queue:view"],

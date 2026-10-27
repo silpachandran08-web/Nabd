@@ -4,12 +4,14 @@
 // persisted choice: every screen reads it, so a reload re-scopes all of them. Without a valid pending token the old sign-in-again path stays.
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import styles from "../clinicNav.module.css";
 import Icon from "../components/ui/Icon";
 import { publicApi, ApiError } from "../lib/api";
 import { storeTokens } from "../lib/apiClient";
 import { COOKIE_AUTH } from "../lib/bffShim";
 import { ownerPendingTokenValid, regionLabel, signOut } from "../lib/session";
+import { rememberFacilities, setFacilityScope, useFacilityScope } from "./facilityScope";
 
 type Clinic = { id: string; name: string; slug: string; region: string; status: string };
 type Brand = { id: string; name: string; clinics: Clinic[] };
@@ -20,6 +22,8 @@ export default function FacilitySwitcher({ name, region, tenantId, branchLocked,
   name: string; region: string; tenantId: string | null; branchLocked: boolean; onSignInAgain: () => void; signingOut: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const scope = useFacilityScope();
+  const router = useRouter();
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
@@ -42,6 +46,7 @@ export default function FacilitySwitcher({ name, region, tenantId, branchLocked,
     try {
       const body = await publicApi.get<{ brands: Brand[] }>("/owners/me/workspaces", { headers: { Authorization: `Bearer ${pending()}` }, keepSession: true });
       setBrands(body.brands);
+      rememberFacilities(body.brands.flatMap((b) => b.clinics.map((c) => ({ id: c.id, name: c.name, brand: b.name }))));
     } catch (e) {
       setError(e instanceof ApiError && e.status === 401 ? "Your clinic list expired. Sign in again to pick a clinic." : "Couldn't load your clinics.");
       setCanList(false);
@@ -52,6 +57,7 @@ export default function FacilitySwitcher({ name, region, tenantId, branchLocked,
     setBusy(clinicId);
     setError(null);
     try {
+      setFacilityScope("one"); // a picked facility ends the aggregate scope
       if (COOKIE_AUTH) await signOut(); // FEF-009: one cookie session per browser
       const pair = await publicApi.post<TokenPair>("/owners/workspaces/select", { clinicId }, { headers: { Authorization: `Bearer ${pending()}` }, keepSession: true });
       if (!COOKIE_AUTH) await signOut();
@@ -66,9 +72,9 @@ export default function FacilitySwitcher({ name, region, tenantId, branchLocked,
   const all = (brands ?? []).flatMap((b) => b.clinics.map((c) => ({ ...c, brand: b.name })));
   return (
     <div className={styles.clinicWrap}>
-      <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu" aria-expanded={open} aria-label={`Clinic: ${name}`} onClick={() => void toggle()}>
+      <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu" aria-expanded={open} aria-label={scope === "all" ? "Clinic: All facilities" : `Clinic: ${name}`} onClick={() => void toggle()}>
         <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
-        <div className={styles.clinicText}><div className={styles.clinicName}><bdi>{name}</bdi></div></div>
+        <div className={styles.clinicText}><div className={styles.clinicName}>{scope === "all" ? "All facilities" : <bdi>{name}</bdi>}</div></div>
         <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
       </button>
       {open && (
@@ -77,6 +83,13 @@ export default function FacilitySwitcher({ name, region, tenantId, branchLocked,
           <div className={styles.clinicMenu} role="menu" aria-label="Clinic & branch">
             <div className={styles.menuHeader}>Clinic &amp; branch</div>
             {canList && !brands && !error && <div className={styles.clinicRowSub} role="status">Loading your clinics…</div>}
+            {all.length > 1 && (
+              <button type="button" role="menuitemradio" aria-checked={scope === "all"} className={styles.clinicSwitch}
+                onClick={() => { setFacilityScope(scope === "all" ? "one" : "all"); setOpen(false); router.push("/overview"); }}>
+                All facilities
+                <span className={styles.clinicRowSub}>{scope === "all" ? "Showing all · read-only" : "Read-only aggregate"}</span>
+              </button>
+            )}
             {all.length === 0 && (
               <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
                 <Icon name="building" size={14} />

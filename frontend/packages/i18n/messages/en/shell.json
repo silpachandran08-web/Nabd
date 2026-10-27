@@ -18,5 +18,78 @@
   "liveHint": "Changes from other desks appear here within seconds.",
   "online": "Online",
   "language": "Language",
-  "languageSaveFailed": "Could not save your language. It will reset when you reload."
+  "languageSaveFailed": "Could not save your language. It will reset when you reload.",
+  "ownerSection": {
+    "run": "Run the clinic",
+    "people": "People & access",
+    "money": "Money",
+    "growth": "Growth",
+    "compliance": "Compliance"
+  },
+  "ownerNav": {
+    "overview": {
+      "label": "Overview",
+      "short": "Overview"
+    },
+    "ops": {
+      "label": "Clinic Operations",
+      "short": "Clinic"
+    },
+    "workflows": {
+      "label": "Workflows",
+      "short": "Workflows"
+    },
+    "integrations": {
+      "label": "Integrations",
+      "short": "Integrations"
+    },
+    "setup": {
+      "label": "Clinic Setup",
+      "short": "Setup"
+    },
+    "reports": {
+      "label": "Reports",
+      "short": "Reports"
+    },
+    "staff": {
+      "label": "Staff & Access",
+      "short": "Staff"
+    },
+    "hr": {
+      "label": "HR & Payroll",
+      "short": "HR"
+    },
+    "finance": {
+      "label": "Billing & Day Close",
+      "short": "Billing"
+    },
+    "plan": {
+      "label": "Plan & Modules",
+      "short": "Plan"
+    },
+    "prices": {
+      "label": "Prices & Packages",
+      "short": "Prices"
+    },
+    "payouts": {
+      "label": "Payouts",
+      "short": "Payouts"
+    },
+    "growth": {
+      "label": "Growth",
+      "short": "Growth"
+    },
+    "bookingpage": {
+      "label": "Booking page",
+      "short": "Booking"
+    },
+    "privacy": {
+      "label": "Privacy & Support access",
+      "short": "Privacy"
+    },
+    "compliance": {
+      "label": "Compliance & Audit",
+      "short": "Audit"
+    }
+  }
 }

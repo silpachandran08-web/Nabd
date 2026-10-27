@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import styles from "./clinicNav.module.css";
 import Icon from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
@@ -31,6 +32,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("shell");
   const { input, role, roles, items, owner, tenantId } = useShellNav();
   const { badges } = useNavBadges(role, input.perms, pathname);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -78,7 +80,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pharmacyCaps = usePharmacyCapabilities(input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
   if (input.perms.length === 0 || items.length === 0) return null;
   const currentTab = searchParams.get("tab");
-  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined }));
+  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i0) => (i0.section && role === "owner" ? { ...i0, label: t(`ownerNav.${i0.id}.label`), short: t(`ownerNav.${i0.id}.short`) } : i0)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined }));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4): 4 items + "More" when there are more.
   const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
   const overflowEntries = entries.length > 5 ? entries.slice(4) : [];
@@ -114,9 +116,10 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       ))}
 
       <div className={styles.links}>
-        {entries.map((e) => (
+        {entries.map((e, n) => (
+          <Fragment key={e.key}>
+          {e.section && e.section !== entries[n - 1]?.section && <p className={styles.sectionLabel}>{t(`ownerSection.${e.section}`)}</p>}
           <Link
-            key={e.key}
             href={e.href}
             title={e.label}
             aria-current={e.active ? "page" : undefined}
@@ -127,6 +130,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             <span className={styles.linkShort} aria-hidden="true">{e.short}</span>
             {!!e.badgeCount && <span className={styles.badge}>{e.badgeCount}</span>}
           </Link>
+          </Fragment>
         ))}
       </div>
 

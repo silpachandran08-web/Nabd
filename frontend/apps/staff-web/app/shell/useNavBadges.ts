@@ -14,7 +14,7 @@ const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isA
 export function useNavBadges(role: RoleContext | null, perms: readonly string[], pathname: string | null, refresh = true) {
   const me = role ? selfStaffId() : "";
   const q = perms.includes("queue:view");
-  const reception = useQuery({ ...queueQuery(), enabled: role === "reception" && q }).data;
+  const reception = useQuery({ ...queueQuery(), enabled: (role === "reception" || role === "owner") && q }).data; // FEF-058: the owner nav shows the same waiting / checkout counts
   const priority = useQuery({ ...queueQuery(true), enabled: role === "nurse" && q }).data;
   const admin = useQuery({ ...adminOrdersQuery(), enabled: role === "nurse" && perms.includes("nursing:view") }).data;
   const mine = useQuery({ ...doctorQueueQuery(me), enabled: role === "doctor" && !!me && q }).data;

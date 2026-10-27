@@ -1,0 +1,8 @@
+.page { display: flex; flex-direction: column; gap: var(--nb-space-3, 12px); padding: var(--nb-space-4, 16px); max-inline-size: 720px; }
+.title { margin: 0; font-size: var(--nb-text-xl, 1.5rem); color: var(--nb-text, inherit); }
+.h2 { margin: 0; font-size: var(--nb-text-lg, 1.125rem); }
+.sub, .muted { color: var(--nb-text-muted, #9aa3b2); margin: 0; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-2, 8px); }
+.row { display: flex; align-items: center; gap: var(--nb-space-3, 12px); padding: var(--nb-space-3, 12px); min-block-size: 44px; border: 1px solid var(--nb-border, #2a3140); border-radius: var(--nb-radius-md, 8px); }
+.text { display: flex; flex-direction: column; gap: 2px; min-inline-size: 0; overflow-wrap: anywhere; }
+.link { display: inline-flex; align-items: center; min-block-size: 44px; color: var(--nb-accent, #4ea1ff); }
