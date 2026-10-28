@@ -49,14 +49,14 @@ final class FakeUpstreams {
         boolean handle(com.sun.net.httpserver.HttpExchange ex) throws IOException;
     }
 
-    volatile Hook coreHook;
+    volatile Hook coreFirst;
     volatile Hook commsHook;
 
     FakeUpstreams() {
         try {
             core = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             core.createContext("/internal/v1/tenants/", ex -> {
-                if (coreHook != null && coreHook.handle(ex)) {
+                if (coreFirst != null && coreFirst.handle(ex)) {
                     return;
                 }
                 String path0 = ex.getRequestURI().getPath();

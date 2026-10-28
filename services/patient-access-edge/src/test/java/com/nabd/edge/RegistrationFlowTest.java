@@ -40,7 +40,7 @@ class RegistrationFlowTest extends EdgeTestBase {
         pending = false;
         UP.noticeVersion = "v3";
         UP.consentStatus = 201;
-        UP.coreHook = ex -> {
+        UP.coreFirst = ex -> {
             String p = ex.getRequestURI().getPath();
             String m = ex.getRequestMethod();
             if (p.endsWith("/patients/consents")) {
@@ -77,7 +77,7 @@ class RegistrationFlowTest extends EdgeTestBase {
 
     @AfterEach
     void unhook() { // the fakes are shared with the other Edge tests
-        UP.coreHook = null;
+        UP.coreFirst = null;
         UP.commsHook = null;
     }
 

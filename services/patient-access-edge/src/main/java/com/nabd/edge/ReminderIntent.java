@@ -85,7 +85,7 @@ public class ReminderIntent implements Intent {
             case "cancel" -> appointment(arg).map(id -> startCancel(c, id));
             case "callme" -> appointment(arg).map(id -> callMe(c, id, m));
             case "why" -> Optional.of(cancel(c, arg, m));
-            case "slot" -> Optional.of(reschedule(c, arg, m));
+            case "slot" -> contextAppointment(c) == null ? Optional.empty() : Optional.of(reschedule(c, arg, m)); // booking (ACC-040) also sends slot:<epoch>
             case "travel" -> Optional.of("change".equals(arg) ? askTravel(c, firstRef(c), null) : setTravel(c, arg));
             default -> Optional.empty();
         };
