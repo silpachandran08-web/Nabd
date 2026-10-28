@@ -5,6 +5,7 @@ import com.nabd.hms.billing.dto.DayCloseHistoryResponse;
 import com.nabd.hms.billing.dto.DayCloseRequest;
 import com.nabd.hms.billing.dto.DayCloseSummaryResponse;
 import com.nabd.hms.billing.dto.DayReopenRequest;
+import com.nabd.hms.billing.dto.DeskSummaryResponse;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.ClinicClock;
@@ -90,6 +91,23 @@ public class DayCloseService {
                 repo.outstanding(tenantId, start, end), repo.pendingCheckouts(tenantId, day), repo.unbilled(tenantId, day),
                 repo.taxBands(tenantId, start, end), repo.splitPaymentBills(tenantId, start, end), close,
                 voided.count(), voided.total(), repo.refunds(tenantId, start, end));
+    }
+
+    /** ADM-044: the reception desk's end-of-day summary. Scoped to the caller's clinic by tenant id and RLS; collections
+     * and unbilled visits are the same queries as {@link #summary}, so the desk and the close show the same figures. */
+    @Transactional(readOnly = true)
+    public DeskSummaryResponse deskSummary(UUID tenantId, LocalDate date) {
+        tenantContext.set(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
+        LocalDate day = date != null ? date : today;
+        Instant start = clock.dayStart(tenantId, day);
+        Instant end = clock.dayStart(tenantId, day.plusDays(1));
+        List<DayCloseRepository.NoShowRow> noShows = repo.noShows(tenantId, start, end, clock.now());
+        Map<UUID, ActorDirectory.Actor> doctors = actors.findActors(tenantId, noShows.stream().map(DayCloseRepository.NoShowRow::doctorId).toList());
+        return new DeskSummaryResponse(day, day.equals(today), currencyOf(tenantId), repo.visits(tenantId, day),
+                repo.methods(tenantId, start, end), repo.unbilled(tenantId, day),
+                noShows.stream().map(n -> new DeskSummaryResponse.DeskNoShow(n.appointmentId(), n.patientName(),
+                        doctors.containsKey(n.doctorId()) ? doctors.get(n.doctorId()).name() : null, n.startTime())).toList());
     }
 
     /** Closes a clinic day (default today; never a future day). Blocked while any ended consultation has no bill. */
