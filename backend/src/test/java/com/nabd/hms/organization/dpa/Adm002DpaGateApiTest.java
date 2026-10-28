@@ -253,7 +253,10 @@ class Adm002DpaGateApiTest extends ApiTestBase {
                     throw new IllegalStateException(e);
                 }
             }).toList();
-            assertThat(inserting).extracting(p -> p.getFileName().toString()).containsExactlyInAnyOrder("PatientRepository.java", "PatientDirectoryJdbc.java"); // ADM-012: the import path, gated inside createImported
+            assertThat(inserting).extracting(p -> p.getFileName().toString()).containsExactlyInAnyOrder("PatientRepository.java", "PatientDirectoryJdbc.java", "ProxyService.java", "ChatMemberService.java"); // ADM-012: the import path, gated inside createImported; E7/E8: family and chat members, gated at the top of the method
+            for (String gated : List.of("patient/proxy/ProxyService.java", "patient/internal/ChatMemberService.java")) {
+                assertThat(Files.readString(Path.of("src/main/java/com/nabd/hms", gated))).contains("dataGate.requireRealData()");
+            }
             assertThat(Files.readString(Path.of("src/main/java/com/nabd/hms/patient/PatientDirectoryJdbc.java"))).contains("gate.requireRealData()");
         }
         String svc = Files.readString(Path.of("src/main/java/com/nabd/hms/patient/PatientService.java"));

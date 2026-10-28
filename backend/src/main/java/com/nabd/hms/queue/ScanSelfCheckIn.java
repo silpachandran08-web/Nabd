@@ -40,7 +40,7 @@ class ScanSelfCheckIn implements SelfCheckIn {
         if (queueRepo.findCheckInDepartment(tid, doctorId).isEmpty()) {
             return Optional.of(Refusal.NO_DOCTOR);
         }
-        LocalDate today = clock.today(tid);
+        LocalDate today = clock.clinicDate(tid);
         var block = scheduleRepo.blockAt(tid, doctorId, clock.now());
         if (block.isEmpty()) {
             return Optional.of(Refusal.CLOSED);
@@ -58,7 +58,7 @@ class ScanSelfCheckIn implements SelfCheckIn {
         UUID tid = tenantContext.current();
         var open = jdbc.query("SELECT id, token_number FROM queue_entries WHERE tenant_id = ? AND patient_id = ? AND doctor_id = ? AND queue_date = ? " +
                         "AND status NOT IN ('completed', 'no_show', 'transferred_out') ORDER BY created_at LIMIT 1",
-                (rs, i) -> new Token(rs.getObject(1, UUID.class), rs.getInt(2)), tid, patientId, doctorId, clock.today(tid));
+                (rs, i) -> new Token(rs.getObject(1, UUID.class), rs.getInt(2)), tid, patientId, doctorId, clock.clinicDate(tid));
         if (!open.isEmpty()) { // a second scan must not mint a second token
             return open.get(0);
         }

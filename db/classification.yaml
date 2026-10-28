@@ -1072,7 +1072,6 @@ schemas:
       mfa_secret_enc: pii
       mfa_pending_secret_enc: pii
       mfa_last_used_step: operational
-      bookable_online: operational
     package_eligible_doctors:
       package_id: operational
       doctor_id: operational

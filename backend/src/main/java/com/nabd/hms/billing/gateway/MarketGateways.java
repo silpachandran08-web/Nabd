@@ -2,7 +2,7 @@ package com.nabd.hms.billing.gateway;
 
 import org.springframework.stereotype.Component;
 
-/** FIN-019.4: Tap (KSA/UAE) and HyperPay (KSA) sit behind the same port but are switched off until FIN-024 builds them. */
+/** FIN-019.4: Tap and HyperPay (Gulf markets) sit behind the same port but are switched off until FIN-024 builds them. */
 final class MarketGateways {
 
     private MarketGateways() {

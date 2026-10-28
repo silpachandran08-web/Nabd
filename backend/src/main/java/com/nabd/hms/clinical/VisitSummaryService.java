@@ -12,7 +12,6 @@ import com.nabd.hms.clinical.dto.VisitSummaryResponse.VisitPatient;
 import com.nabd.hms.clinical.dto.VisitSummaryResponse.VisitPregnancy;
 import com.nabd.hms.clinical.dto.VisitSummaryResponse.VisitSafety;
 import com.nabd.hms.common.ClinicClock;
-import com.nabd.hms.common.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,10 +37,9 @@ public class VisitSummaryService {
     private final TimelineService timeline;
     private final VitalsService vitals;
     private final ClinicClock clock;
-    private final TenantContext tenantContext;
 
     VisitSummaryService(VisitSummaryRepository repo, AllergyService allergies, PregnancyStatusService pregnancy, ConditionService conditions,
-                        TimelineService timeline, VitalsService vitals, ClinicClock clock, TenantContext tenantContext) {
+                        TimelineService timeline, VitalsService vitals, ClinicClock clock) {
         this.repo = repo;
         this.allergies = allergies;
         this.pregnancy = pregnancy;
@@ -49,14 +47,12 @@ public class VisitSummaryService {
         this.timeline = timeline;
         this.vitals = vitals;
         this.clock = clock;
-        this.tenantContext = tenantContext;
     }
 
     /** The caller has already passed {@link ClinicalReadScope#requireVisit}. */
     @Transactional(readOnly = true)
     public VisitSummaryResponse get(ReadScope scope, UUID queueEntryId) {
         UUID tenantId = scope.tenantId();
-        tenantContext.set(tenantId);
         var head = repo.findHead(tenantId, queueEntryId).orElseThrow(ClinicalReadScope::patientNotFound);
         UUID patientId = head.patientId();
 

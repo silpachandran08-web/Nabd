@@ -3,7 +3,6 @@ package com.nabd.hms.patient.securelink;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.patient.api.ConsentGateSql;
 import com.nabd.hms.shared.FileStore;
@@ -85,13 +84,13 @@ public class SecureLinkService {
     private final Clock clock;
     private final FileStore files;
     private final NotificationPort notifications;
-    private final WhatsAppOtpSender otpSender;
+    private final SecureLinkOtpDelivery otpSender;
     private final AuditService audit;
     private final ActorDirectory actors;
     private final String baseUrl;
 
     SecureLinkService(JdbcTemplate jdbc, TenantContext tenantContext, Clock clock, FileStore files, NotificationPort notifications,
-                      WhatsAppOtpSender otpSender, AuditService audit, ActorDirectory actors,
+                      SecureLinkOtpDelivery otpSender, AuditService audit, ActorDirectory actors,
                       @Value("${app.secure-links.base-url:http://localhost:3810}") String baseUrl) {
         this.jdbc = jdbc;
         this.tenantContext = tenantContext;
@@ -199,11 +198,7 @@ public class SecureLinkService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                try {
-                    otpSender.send(phone, code); // outside the transaction: a slow provider holds no connection
-                } catch (RuntimeException e) {
-                    log.warn("secure link otp delivery failed for link {}", l.id());
-                }
+                otpSender.send(phone, code, l.id()); // outside the transaction: a slow provider holds no connection
             }
         });
         return Result.ok(null);

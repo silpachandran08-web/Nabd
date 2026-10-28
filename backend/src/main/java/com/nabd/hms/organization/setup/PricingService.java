@@ -164,6 +164,7 @@ public class PricingService {
         return sb.toString();
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     private List<PricingRepository.Change> query(UUID tenantId, UUID chargeId, String field, LocalDate from, LocalDate to, String cursor, int limit) {
         if (field != null && !Set.of("base_amount", "follow_up_amount", "emergency_amount", "doctor_fee", "tax_category", "active").contains(field)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "Unknown field filter.");
@@ -185,6 +186,7 @@ public class PricingService {
         return repo.changes(tenantId, chargeId, field, f, t, cAt, cId, limit);
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     private List<ChangeView> views(UUID tenantId, List<PricingRepository.Change> rows) {
         Map<UUID, String> names = repo.chargeNames(tenantId);
         Set<UUID> ids = new HashSet<>();
@@ -199,12 +201,14 @@ public class PricingService {
         return out;
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     private FeesResponse view(UUID tenantId, UUID chargeId) {
         var fees = repo.fees(tenantId, chargeId);
         var who = actors.findActors(tenantId, fees.stream().map(PricingRepository.Fee::doctorId).toList());
         return new FeesResponse(fees.stream().map(f -> new FeeView(f.doctorId(), who.containsKey(f.doctorId()) ? who.get(f.doctorId()).name() : "", f.amount())).toList());
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     private ChargeHeadRow consultationHead(UUID tenantId, UUID chargeId) {
         ChargeHeadRow head = setupRepo.findCharge(tenantId, chargeId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "charge-not-found", "Charge not found", "Charge not found"));

@@ -91,7 +91,7 @@ public class DelayBroadcastService {
         if (pauseId == null) {
             return 0;
         }
-        Plan plan = tenantScope.run(tenantId, () -> plan(tenantId, doctorId, ClinicClock.startOf(clock.today(tenantId).plusDays(1), clock.zone(tenantId))));
+        Plan plan = tenantScope.run(tenantId, () -> plan(tenantId, doctorId, clock.dayStart(tenantId, clock.clinicDate(tenantId).plusDays(1))));
         Outcome o = fanOut(tenantId, doctorId, plan, c -> sendPause(tenantId, doctorId, plan, c, pauseId));
         log.info("doctor {} pause {} broadcast: sent={} held={} noConsent={} failed={}", doctorId, pauseId, o.sent(), o.held(), o.noConsent(), o.failed());
         return o.sent();
@@ -103,7 +103,7 @@ public class DelayBroadcastService {
         if (pauseId == null) {
             return 0;
         }
-        Plan plan = tenantScope.run(tenantId, () -> plan(tenantId, doctorId, ClinicClock.startOf(clock.today(tenantId).plusDays(1), clock.zone(tenantId))));
+        Plan plan = tenantScope.run(tenantId, () -> plan(tenantId, doctorId, clock.dayStart(tenantId, clock.clinicDate(tenantId).plusDays(1))));
         Outcome o = fanOut(tenantId, doctorId, plan, c -> {
             Result r = plan.etaOf(c);
             Instant before = tenantScope.run(tenantId, () -> repo.expectedAt(tenantId, pauseId, c.patientId())).orElse(null);
@@ -119,7 +119,7 @@ public class DelayBroadcastService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     Plan plan(UUID tenantId, UUID doctorId, Instant until) {
-        LocalDate day = clock.today(tenantId);
+        LocalDate day = clock.clinicDate(tenantId);
         ZoneId zone = clock.zone(tenantId);
         Instant now = clock.now();
         eta.recompute(doctorId, day); // the delay or pause just committed: do not read a projection that predates it
@@ -131,7 +131,7 @@ public class DelayBroadcastService {
         }
         String doctor = actors.findActor(tenantId, doctorId).map(ActorDirectory.Actor::name).orElse("The doctor");
         return new Plan(now, zone, modes.resolve(doctorId).mode(), doctor, byEntry, byAppt,
-                repo.candidates(tenantId, doctorId, day, ClinicClock.startOf(day, zone), until));
+                repo.candidates(tenantId, doctorId, day, clock.dayStart(tenantId, day), until));
     }
 
     private interface Send {

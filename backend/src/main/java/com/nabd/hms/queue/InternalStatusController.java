@@ -64,7 +64,7 @@ class InternalStatusController {
         }
         return tenantScope.run(tid, () -> {
             var zone = clock.zone(tid);
-            LocalDate today = clock.today(tid);
+            LocalDate today = clock.clinicDate(tid);
             List<Item> out = new ArrayList<>();
             for (PatientRefs.HouseholdMember m : refs.household(phoneHash)) {
                 UUID patientId = refs.patientIdFor(m.patientRef()).orElse(null);

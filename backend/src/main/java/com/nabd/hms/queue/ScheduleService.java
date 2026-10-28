@@ -364,7 +364,7 @@ public class ScheduleService {
     /** ACC-024: PATCH the minutes of the active delay. */
     @Transactional
     public DoctorDelayResponse changeDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, UUID delayId, int minutes) {
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
         DoctorDelayRow before = repo.findActiveDelay(doctorId, today, clock.now()).filter(r -> r.id().equals(delayId)).orElseThrow(() ->
                 new ApiException(HttpStatus.CONFLICT, "delay-not-active", "Delay not active",
                         "That delay is cleared or has lapsed.", java.util.Map.of("code", "DELAY_NOT_ACTIVE")));

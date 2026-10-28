@@ -121,14 +121,16 @@ public class CheckoutService {
     }
 
     /** FIN-015/016: the follow-up window comes from the clinic policy (default 7 days), the anchor from the last full-price visit, the urgent flag from the check-in. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     private ConsultationTier.Context tierContext(UUID tenantId, UUID queueEntryId, QueueEntryContext ctx) {
         int window = policies.policyValue(tenantId, "follow_up_window_days").map(String::trim).filter(v -> v.matches("\\d{1,2}"))
                 .map(Integer::parseInt).orElse(ConsultationTier.DEFAULT_WINDOW_DAYS);
         java.time.LocalDate last = repo.lastFullPriceVisit(tenantId, ctx.patientId(), ctx.doctorId());
-        Integer days = last == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(last, clock.today(tenantId));
+        Integer days = last == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(last, clock.clinicDate(tenantId));
         return new ConsultationTier.Context(ctx.doctorId(), days, window, repo.isUrgent(tenantId, queueEntryId));
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     private List<CheckoutContextResponse.SuggestedLine> suggestedLines(UUID tenantId, List<ChargeResponse> charges, ConsultationTier.Context tc) {
         List<CheckoutContextResponse.SuggestedLine> out = new java.util.ArrayList<>();
         var heads = repo.findCatalogueCharges(tenantId, charges.stream().filter(c -> ConsultationTier.isConsultation(c.category())).map(ChargeResponse::code).toList());

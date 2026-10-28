@@ -25,7 +25,6 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -119,8 +118,7 @@ class NoShowService {
         if (!"no_show".equals(a.status()) || a.noShowAt() == null) {
             throw conflict("not-no-show", "Not a marked no-show", "Only an appointment marked as a no-show can be undone.", "NOT_NO_SHOW");
         }
-        ZoneId zone = clock.zone(tenant);
-        if (!a.noShowAt().atZone(zone).toLocalDate().equals(clock.today(zone))) {
+        if (!clock.clinicDate(tenant, a.noShowAt()).equals(clock.clinicDate(tenant))) {
             throw conflict("undo-window-passed", "Undo window passed", "A no-show can be undone only on the clinic day it was marked.", "UNDO_WINDOW_PASSED");
         }
         if (a.lateArrivalQueueEntryId() != null) {
@@ -153,8 +151,7 @@ class NoShowService {
         if (a.lateArrivalQueueEntryId() != null) {
             throw conflict("already-checked-in", "Already checked in", "This patient was already checked in through late arrival.", "ALREADY_CHECKED_IN");
         }
-        ZoneId zone = clock.zone(tenant);
-        if (!a.startTime().atZone(zone).toLocalDate().equals(clock.today(zone))) {
+        if (!clock.clinicDate(tenant, a.startTime()).equals(clock.clinicDate(tenant))) {
             throw conflict("appointment-not-today", "Appointment is not for today", "Late arrival applies to today's appointments only.", "APPOINTMENT_NOT_TODAY");
         }
         QueueEntryResponse entry = queue.checkIn(tenant, staffId, new CheckInRequest(null, a.patientId(), a.doctorId(), "walk_in", null, null));
@@ -174,7 +171,6 @@ class NoShowService {
             return 0;
         }
         UUID tenant = tenantContext.current();
-        ZoneId zone = clock.zone(tenant);
         Instant now = clock.now();
         List<UUID> ids = jdbc.queryForList("""
                 UPDATE appointments a SET status = 'no_show', no_show_at = ?, no_show_marked_by = NULL,
@@ -184,7 +180,7 @@ class NoShowService {
                   AND NOT EXISTS (SELECT 1 FROM queue_entries q WHERE q.tenant_id = a.tenant_id AND q.appointment_id = a.id)
                 RETURNING a.id""",
                 UUID.class,
-                Timestamp.from(now), tenant, Timestamp.from(ClinicClock.startOf(clock.today(zone), zone)),
+                Timestamp.from(now), tenant, Timestamp.from(clock.dayStart(tenant, clock.clinicDate(tenant))),
                 Timestamp.from(now.minus(Duration.ofMinutes(rule.graceMinutes()))));
         for (UUID id : ids) {
             marked(tenant, repo.findById(tenant, id).orElseThrow(), null);

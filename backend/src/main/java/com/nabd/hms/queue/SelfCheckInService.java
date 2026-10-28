@@ -131,7 +131,7 @@ class SelfCheckInService {
             repo.recordAttempt(tid, attemptId, appt.id(), channel, null, "duplicate");
             return new Outcome(null, new ApiException(HttpStatus.CONFLICT, "already-checked-in", "Already checked in", "This appointment has already been checked in.", have));
         }
-        LocalDate today = clock.today(tid);
+        LocalDate today = clock.clinicDate(tid);
         boolean liveToday = appt != null && "scheduled".equals(appt.status()) && appt.startTime().atZone(clock.zone(tid)).toLocalDate().equals(today);
         if (appt == null && walkInDoctorId == null || appt != null && !liveToday) {
             String ref = appt == null ? attemptId.toString() : appt.id().toString();
@@ -187,7 +187,7 @@ class SelfCheckInService {
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tenant tx
     private List<SelfCheckInRepository.TodayAppointment> today(UUID tid, UUID patientId) {
-        LocalDate day = clock.today(tid);
+        LocalDate day = clock.clinicDate(tid);
         var zone = clock.zone(tid);
         return repo.appointmentsBetween(tid, patientId, day.atStartOfDay(zone).toInstant(), day.plusDays(1).atStartOfDay(zone).toInstant());
     }
