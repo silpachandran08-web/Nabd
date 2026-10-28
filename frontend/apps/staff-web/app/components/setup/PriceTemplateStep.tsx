@@ -33,12 +33,15 @@ export default function PriceTemplateStep() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after the awaited fetch
   useEffect(() => { void loadExisting(); }, [loadExisting]);
 
+  const latestPick = useRef<string | null>(null);
   const pick = async (sp: string) => {
+    latestPick.current = sp;
     setSpecialty(sp); setTemplate(null); setRows([]); setMsg(null); setLoadError(null);
     try {
       const t = await api.get<PriceTemplate>(`/setup/price-templates?specialty=${encodeURIComponent(sp)}`);
+      if (latestPick.current !== sp) return; // a newer pick won: drop this stale answer (S17-BUG-2)
       setTemplate(t); setRows(rowsOf(t));
-    } catch (e) { setLoadError(reasonText(e, "Could not load the starter list.")); }
+    } catch (e) { if (latestPick.current === sp) setLoadError(reasonText(e, "Could not load the starter list.")); }
   };
 
   const have = useMemo(() => existingCodes(existing ?? []), [existing]);

@@ -21,7 +21,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
   if (pathname === "/platform/login") return <>{children}</>;
 
   let content: React.ReactNode = children; // no session: the page's own call sends the visitor to login
-  if (!mounted || (session && me.isPending && !me.isError)) content = <main className={styles.page}><Skeleton rows={5} label="Loading" /></main>;
+  // Skeleton only until the first answer: a refetch after an error resets status to pending, and swapping the page out then would
+  // remount it, refetch on mount and loop (S17-BUG-3).
+  if (!mounted || (session && !me.isFetched)) content = <main className={styles.page}><Skeleton rows={5} label="Loading" /></main>;
   else if (me.data && !platformRouteAllowed(pathname, me.data.permissions)) {
     content = <main className={styles.page}><RoleDenied surface={platformItemFor(pathname)?.label ?? "This screen"} /></main>;
   }

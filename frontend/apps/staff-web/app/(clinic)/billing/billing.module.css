@@ -29,7 +29,7 @@
 .btnPrimary:disabled { opacity: 0.5; cursor: default; }
 .btnSmall { composes: btnPrimary; height: 32px; padding: 0 var(--nb-space-12); border-radius: 9px; font-size: 12px; }
 
-.btnTap { composes: btnPrimary; height: 44px; font-size: 12px; flex-shrink: 0; }
+.btnTap { composes: btn btnPrimary; height: 44px; font-size: 12px; flex-shrink: 0; }
 
 /* ADM-044 desk summary, above the day close figures */
 .desk { margin-bottom: var(--nb-space-16); }
