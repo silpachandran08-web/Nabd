@@ -29,4 +29,10 @@ class PriceChangeLog {
         if (!PricingService.same(old.emergencyAmount(), req.emergencyAmount())) repo.log(tenantId, chargeId, null, "emergency_amount", PricingService.str(old.emergencyAmount()), PricingService.str(req.emergencyAmount()), actorId);
         if (old.active() != req.active()) repo.log(tenantId, chargeId, null, "active", String.valueOf(old.active()), String.valueOf(req.active()), actorId);
     }
+
+    /** FIN-017: a head created from a starter list gets one entry, its base amount (no old value). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    void logChargeCreated(UUID chargeId, java.math.BigDecimal baseAmount, UUID actorId) {
+        repo.log(tenantContext.current(), chargeId, null, "base_amount", null, PricingService.str(baseAmount), actorId);
+    }
 }

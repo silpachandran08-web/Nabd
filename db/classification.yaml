@@ -1712,6 +1712,15 @@ schemas:
       active: operational
       display_languages: operational
       einvoice_scheme: operational
+    price_templates:
+      id: operational
+      specialty: operational
+      jurisdiction: operational
+      heads: operational
+      version: operational
+      reviewed: operational
+      review_note: operational
+      updated_at: operational
     registry_dirty:
       tenant_id: operational
       patient_id: pii

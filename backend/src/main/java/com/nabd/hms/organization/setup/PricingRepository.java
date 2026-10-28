@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -20,6 +21,13 @@ class PricingRepository {
 
     record Change(UUID id, UUID chargeId, UUID doctorId, String field, String oldValue, String newValue, UUID actorId, Instant at) {
     }
+
+    /** FIN-017: a starter price list (platform reference data, price_templates) with its heads in display order. */
+    record Template(UUID id, String specialty, String jurisdiction, int version, boolean reviewed, String reviewNote,
+                    List<PricingService.TemplateHead> heads) {
+    }
+
+    private static final String TEMPLATE = "SELECT id, specialty, jurisdiction, version, reviewed, review_note FROM price_templates ";
 
     private final JdbcTemplate jdbc;
 
@@ -67,6 +75,37 @@ class PricingRepository {
 
     private static Timestamp ts(Instant i) {
         return i == null ? null : Timestamp.from(i);
+    }
+
+    Optional<Template> template(String specialty, String jurisdiction) {
+        return template(jdbc.query(TEMPLATE + "WHERE specialty = ? AND jurisdiction = ?", PricingRepository::templateRow, specialty, jurisdiction));
+    }
+
+    Optional<Template> template(UUID id) {
+        return template(jdbc.query(TEMPLATE + "WHERE id = ?", PricingRepository::templateRow, id));
+    }
+
+    private Optional<Template> template(List<Template> found) {
+        return found.stream().findFirst().map(t -> new Template(t.id(), t.specialty(), t.jurisdiction(), t.version(), t.reviewed(), t.reviewNote(),
+                jdbc.query("""
+                        SELECT h.code, h.name, h.category, h."baseAmount", h."taxCategory", h."taxRatePercent", h."sacHsn", h."displayOrder"
+                        FROM price_templates t, jsonb_to_recordset(t.heads) AS h(code text, name text, category text, "baseAmount" numeric,
+                             "taxCategory" text, "taxRatePercent" numeric, "sacHsn" text, "displayOrder" int)
+                        WHERE t.id = ? ORDER BY h."displayOrder", h.name""",
+                        (rs, i) -> new PricingService.TemplateHead(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBigDecimal(4),
+                                rs.getString(5), rs.getBigDecimal(6), rs.getString(7), (Integer) rs.getObject(8)), t.id())));
+    }
+
+    private static Template templateRow(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
+        return new Template(rs.getObject("id", UUID.class), rs.getString("specialty"), rs.getString("jurisdiction"), rs.getInt("version"),
+                rs.getBoolean("reviewed"), rs.getString("review_note"), List.of());
+    }
+
+    /** The taxable rates the market's starter lists use (each one is a rate billing already has, see V2910). */
+    List<BigDecimal> templateTaxableRates(String jurisdiction) {
+        return jdbc.query("""
+                SELECT DISTINCT h."taxRatePercent" FROM price_templates t, jsonb_to_recordset(t.heads) AS h("taxCategory" text, "taxRatePercent" numeric)
+                WHERE t.jurisdiction = ? AND h."taxCategory" = 'taxable'""", (rs, i) -> rs.getBigDecimal(1), jurisdiction);
     }
 
     Map<UUID, String> chargeNames(UUID tenantId) {
