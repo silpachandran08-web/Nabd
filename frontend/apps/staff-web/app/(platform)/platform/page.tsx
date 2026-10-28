@@ -1,38 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { useQuery } from "@tanstack/react-query";
 import styles from "./platform.module.css";
 import Icon from "../../components/ui/Icon";
 import { ErrorState, Skeleton } from "../../components/ui/StateViews";
-import { platformApi, platformError } from "./platformApi";
-import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
+import { platformError, platformMeQuery } from "./platformApi";
+import { platformNavFor, ROLE_LABELS } from "./surfaces";
 
 export default function PlatformHomePage() {
-  const [profile, setProfile] = useState<OperatorProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const t = useTranslations("shell.platformNav");
+  const me = useQuery(platformMeQuery()); // same entry the shell already loaded
 
-
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    (async () => {
-      try {
-        setProfile(await platformApi.get<OperatorProfile>("/platform/auth/me"));
-      } catch (e) {
-        setError(platformError(e, "Couldn't load your profile. Try again."));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    void Promise.resolve().then(load);
-  }, [load]);
-
-  if (loading) {
+  if (me.isPending) {
     return (
       <main className={styles.page}>
         <Skeleton rows={5} label="Loading Command Centre" />
@@ -40,16 +21,17 @@ export default function PlatformHomePage() {
     );
   }
 
-  if (error || !profile) {
+  if (me.isError) {
     return (
       <main className={styles.page}>
-        <ErrorState message={error ?? "Something went wrong."} onRetry={load} />
+        <ErrorState message={platformError(me.error, "Couldn't load your profile. Try again.")} onRetry={() => void me.refetch()} />
       </main>
     );
   }
 
-  // Command Centre is the page we're on — list only the other surfaces, grouped as in the nav.
-  const groups = groupBySection(visibleSurfaces(profile.permissions).filter((s) => s.href !== "/platform"));
+  const profile = me.data;
+  // Command Centre is the page we're on — list only the other surfaces, in nav order.
+  const items = platformNavFor(profile.permissions).filter((s) => s.href !== "/platform");
 
   return (
     <main className={styles.page}>
@@ -63,23 +45,18 @@ export default function PlatformHomePage() {
       </div>
 
       <div className={styles.card}>
-        {groups.length === 0 ? (
+        {items.length === 0 ? (
           <div className={styles.state}>Nothing else is available to your role yet.</div>
         ) : (
-          groups.map((g) => (
-            <section key={g.section}>
-              <div className={styles.sectionLabel}>{g.section}</div>
-              <ul className={styles.navList}>
-                {g.items.map((s) => (
-                  <li key={s.href}>
-                    <Link className={styles.navLink} href={s.href}>
-                      <Icon name={s.icon} size={16} /> {s.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))
+          <ul className={styles.navList}>
+            {items.map((s) => (
+              <li key={s.href}>
+                <Link className={styles.navLink} href={s.href}>
+                  <Icon name={s.icon} size={16} /> {t(`${s.id}.label`)}
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </main>

@@ -4,6 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../../(auth)/login/login.module.css";
 import { SESSION_EXPIRED_MESSAGE, storePlatformSession } from "../platformApi";
+import { platformHomeFor } from "../surfaces";
+import { decodeJwtPayload } from "../../../lib/jwt";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError } from "../../../lib/loginFetch";
 import { loginCall } from "../../../lib/loginCall";
 import { ApiError, publicApi } from "../../../lib/api";
@@ -38,7 +40,7 @@ export default function PlatformLoginPage() {
 
   function handleTokens(pair: TokenPair) {
     storePlatformSession(pair);
-    router.replace("/platform");
+    router.replace(platformHomeFor(decodeJwtPayload<{ permissions?: string[] }>(pair.accessToken)?.permissions ?? [])); // FEF-059: the role home
   }
 
   async function submitLogin(e?: FormEvent) {

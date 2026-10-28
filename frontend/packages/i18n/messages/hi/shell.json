@@ -91,5 +91,51 @@
       "label": "अनुपालन और ऑडिट",
       "short": "ऑडिट"
     }
+  },
+  "platformNav": {
+    "tenants": {
+      "label": "क्लिनिक",
+      "short": "क्लिनिक"
+    },
+    "onboard": {
+      "label": "ऑनबोर्डिंग",
+      "short": "ऑनबोर्ड"
+    },
+    "regions": {
+      "label": "क्षेत्र",
+      "short": "क्षेत्र"
+    },
+    "health": {
+      "label": "प्लेटफ़ॉर्म स्वास्थ्य",
+      "short": "स्वास्थ्य"
+    },
+    "support": {
+      "label": "सपोर्ट टिकट",
+      "short": "टिकट"
+    },
+    "supportAccess": {
+      "label": "सपोर्ट एक्सेस",
+      "short": "एक्सेस"
+    },
+    "revenue": {
+      "label": "बिलिंग और राजस्व",
+      "short": "बिलिंग"
+    },
+    "senders": {
+      "label": "WhatsApp प्रेषक",
+      "short": "प्रेषक"
+    },
+    "pricing": {
+      "label": "मूल्य और पैकेज",
+      "short": "मूल्य"
+    },
+    "audit": {
+      "label": "ऑडिट और अनुपालन",
+      "short": "ऑडिट"
+    },
+    "command": {
+      "label": "कमांड सेंटर",
+      "short": "आज"
+    }
   }
 }
