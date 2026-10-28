@@ -137,13 +137,13 @@ class Idc011ActedByApiTest extends S15BillingTestBase {
         assertThat(appt(f, newId)).containsEntry("who", f.daughter()).containsEntry("relation", "daughter");
         assertThat(audits(f, "reschedule")).isEqualTo(1);
         ResponseEntity<Map> cancelled = exchange(f.base() + "/appointments/" + newId + "/cancel", HttpMethod.POST, authedJsonBody(f.edge(),
-                Map.of("patientRef", ref(f, f.father()), "reasonCode", "changed_mind", "actedByRef", ref(f, f.daughter()))), Map.class);
+                Map.of("patientRef", ref(f, f.father()), "reasonCode", "schedule_clash", "actedByRef", ref(f, f.daughter()))), Map.class);
         assertThat(cancelled.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(audits(f, "cancel")).isEqualTo(1);
         // a stranger cannot cancel on the father's behalf
         Object other = edgeBook(f, f.father(), f.slot().plusSeconds(7200), null).getBody().get("appointmentId");
         assertThat(exchange(f.base() + "/appointments/" + other + "/cancel", HttpMethod.POST, authedJsonBody(f.edge(),
-                Map.of("patientRef", ref(f, f.father()), "reasonCode", "changed_mind", "actedByRef", ref(f, f.stranger()))), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                Map.of("patientRef", ref(f, f.father()), "reasonCode", "schedule_clash", "actedByRef", ref(f, f.stranger()))), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

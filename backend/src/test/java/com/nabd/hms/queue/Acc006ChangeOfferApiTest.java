@@ -53,7 +53,7 @@ class Acc006ChangeOfferApiTest extends BookingRequestTestBase {
         assertThat(moved.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requests(c, "appt_rescheduled")).extracting(r -> r.get("status")).containsExactly("requested");
 
-        ResponseEntity<Map> cancelled = post("/v1/appointments/" + b + "/cancel", c.staffToken(), Map.of("reason", "doctor unavailable"));
+        ResponseEntity<Map> cancelled = post("/v1/appointments/" + b + "/cancel", c.staffToken(), Map.of("reasonCode", "doctor_unavailable"));
         assertThat(cancelled.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(requests(c, "appt_cancelled_by_clinic")).as("no messaging consent: recorded as blocked, nothing sent").extracting(r -> r.get("status")).containsExactly("blocked");
 
@@ -155,7 +155,7 @@ class Acc006ChangeOfferApiTest extends BookingRequestTestBase {
         Clinic c = clinic();
         messagingConsent(c, c.patientA());
         UUID a = book(c, c.patientA(), c.slot(0));
-        assertThat(post("/v1/appointments/" + a + "/cancel", c.staffToken(), Map.of("reason", "other reason")).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(post("/v1/appointments/" + a + "/cancel", c.staffToken(), Map.of("reasonCode", "illness")).getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<Map> r = post("/v1/appointments/" + a + "/offer-alternatives", c.staffToken(), Map.of());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(r.getBody()).containsEntry("code", "APPOINTMENT_NOT_SCHEDULED");

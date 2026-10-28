@@ -165,7 +165,7 @@ public class AppointmentService {
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED); // COM-004: reminders about it are void
         log.info("appointment {} cancelled by {}", id, callerStaffId);
         published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled",
-                Map.of("by", callerStaffId == null ? "system" : "staff", "reasonCode", reasonCode(req.reason())));
+                Map.of("by", callerStaffId == null ? "system" : "staff", "reasonCode", req.reasonCode()));
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
         if (callerStaffId != null) {
             changeNotifier.cancelled(tenantId, id, current.patientId(), current.startTime()); // ACC-006
@@ -181,13 +181,6 @@ public class AppointmentService {
         published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, current.id(), current.doctorId(), current.startTime(), "cancelled",
                 Map.of("by", "system", "reasonCode", "clinic_initiated"));
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
-    }
-
-    /** The free-text desk reason as an event code ([a-z0-9_]{3,40}); shortcut: the code is derived, not picked, until the desk sends coded reasons. */
-    static String reasonCode(String reason) {
-        String c = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_+|_+$", "");
-        c = c.length() > 40 ? c.substring(0, 40).replaceAll("_+$", "") : c;
-        return c.length() < 3 ? "other" : c;
     }
 
     @Transactional

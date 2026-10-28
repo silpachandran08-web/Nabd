@@ -128,7 +128,7 @@ class Acc041ConfirmApiTest extends ApiTestBase {
         UUID id = book(c, c.refA(), c.slot());
         String waiter = register(c.staffToken(), "Waiting Wanda", "+9198" + String.format("%08d", Math.abs("acc041-w".hashCode()) % 100000000));
         String entry = (String) post("/v1/waitlist", c.staffToken(), Map.of("doctorId", c.doctorId().toString(), "patientId", waiter)).getBody().get("id");
-        assertThat(post(c.base() + "/appointments/" + id + "/cancel", c.edgeToken(), Map.of("patientRef", c.refA(), "reasonCode", "cant_make_it")).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(post(c.base() + "/appointments/" + id + "/cancel", c.edgeToken(), Map.of("patientRef", c.refA(), "reasonCode", "schedule_clash")).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(su().queryForObject("SELECT status FROM appointments WHERE id = ?", String.class, id)).isEqualTo("cancelled");
         assertThat(su().queryForObject("SELECT status FROM waitlist_entries WHERE id = ?::uuid", String.class, entry)).isEqualTo("offered");
         assertThat(book(c, c.refB(), c.slot().plusSeconds(3600))).as("other slots stay bookable").isNotNull();
@@ -140,7 +140,7 @@ class Acc041ConfirmApiTest extends ApiTestBase {
         Clinic c = clinic("acc041-window");
         UUID id = book(c, c.refA(), c.slot());
         inTenantTx(c.tenant().id(), () -> jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, 'cancellation_window_hours', '72')", c.tenant().id()));
-        ResponseEntity<Map> w = post(c.base() + "/appointments/" + id + "/cancel", c.edgeToken(), Map.of("patientRef", c.refA(), "reasonCode", "cant_make_it"));
+        ResponseEntity<Map> w = post(c.base() + "/appointments/" + id + "/cancel", c.edgeToken(), Map.of("patientRef", c.refA(), "reasonCode", "schedule_clash"));
         assertThat(w.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(w.getBody()).containsEntry("code", "INSIDE_CANCELLATION_WINDOW").containsEntry("windowHours", 72);
 
