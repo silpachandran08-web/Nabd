@@ -67,7 +67,7 @@ class Com021QualityDbTest {
 
     @org.junit.jupiter.api.BeforeEach
     void perTest() {
-        clock = new TestClock(Instant.now());
+        clock = new TestClock(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
         service = new SenderQualityService(app, tx, new QualityEvents(valkey, JSON, clock, "in"), clock);
         var bf = new StaticListableBeanFactory();
         bf.addBean("provider", stub);
