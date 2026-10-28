@@ -11,6 +11,7 @@ import pharmacyStyles from "../../../components/setup/pharmacy.module.css";
 import { api, ApiError, reasonText } from "../../../lib/api";
 import DpaPanel from "../../../components/setup/DpaPanel";
 import GoLivePanel from "../../../components/setup/GoLivePanel";
+import PriceTemplateStep from "../../../components/setup/PriceTemplateStep";
 
 // ADM-007: nine steps; progress and drafts live on the server, so a phone and a laptop show the same wizard.
 type ChecklistItem = { step: string; status: "pending" | "current" | "skipped" | "done"; draft?: Record<string, unknown>; version?: number };
@@ -177,8 +178,9 @@ function SetupWizard() {
       case "prices":
         return (
           <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Prices</h2>
-            <p className={styles.text}>Add service codes, base amounts and tax codes in the Charges tab of Clinic Setup.</p>
+            <h2 className={styles.cardTitle}>Price master</h2>
+            <PriceTemplateStep />
+            <p className={styles.text}>Add or change single heads later in the Charges tab of Clinic Setup.</p>
             <button className={styles.btn} onClick={() => router.push("/setup?tab=charges")}>Open Charges</button>
           </div>
         );

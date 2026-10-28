@@ -73,6 +73,8 @@ export type BreakGlassActivateResponse = { accessToken?: string; expiresAt?: str
 export type BreakGlassAlertResponse = { items?: Array<Item>; };
 export type BreakGlassListResponse = { items?: Array<BreakGlassResponse>; };
 export type BreakGlassResponse = { activatedAt?: string; expiresAt?: string; grantId?: string; reasonCode?: string; staffName?: string; };
+export type BulkChargesRequest = { heads?: Array<PriceTemplateHead>; templateId?: string; };
+export type BulkChargesResponse = { created?: Array<string>; skipped?: Array<string>; };
 export type CallNextRequest = { expectedHeadId?: string; };
 export type CallNextResponse = { entry?: QueueEntryResponse; reason?: string; };
 export type CallbackEntryResponse = { appointmentId?: string; doctorId?: string; patientId?: string; patientName?: string; startTime?: string; status?: string; };
@@ -420,6 +422,8 @@ export type PrescriptionWarningResponse = { itemIndex?: number; kind?: string; m
 export type Preview = { baseMinor?: number; taxMinor?: number; taxableMinor?: number; taxes?: Array<Component>; };
 export type PriceChange = { actor?: string; at?: string; chargeId?: string; chargeName?: string; doctorId?: string; field?: string; id?: string; newValue?: string; oldValue?: string; };
 export type PriceChangePage = { items?: Array<PriceChange>; nextCursor?: string; };
+export type PriceTemplate = { currency?: string; heads?: Array<PriceTemplateHead>; jurisdiction?: string; reviewNote?: string; reviewed?: boolean; specialty?: string; templateId?: string; version?: number; };
+export type PriceTemplateHead = { baseAmount?: number; category?: string; code?: string; displayOrder?: number; name?: string; sacHsn?: string; taxCategory?: string; taxRatePercent?: number; };
 export type PrivacyNoticePublishRequest = { baseVersion?: string; basedOnTemplate: string; bodyMd: string; language: string; };
 export type PrivacyNoticePublished = { version?: string; };
 export type PrivacyNoticeStatus = { acceptedVersion?: string; currentVersion?: string; language?: string; needsReAcknowledgement?: boolean; };
@@ -1047,6 +1051,7 @@ export type Operations = {
   CalendarController_apply: { method: "post"; path: "/v1/setup/calendar/templates/{code}/apply"; permission: "setup:edit"; pathParams: { code: string; }; query: never; body: ApplyTemplateRequest; response: ApplyTemplateResponse };
   SetupController_charges: { method: "get"; path: "/v1/setup/charges"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ChargeHeadResponse> };
   SetupController_addCharge: { method: "post"; path: "/v1/setup/charges"; permission: "setup:edit"; pathParams: never; query: never; body: ChargeHeadWriteRequest; response: ChargeHeadResponse };
+  PricingController_bulk: { method: "post"; path: "/v1/setup/charges/bulk"; permission: "setup:edit"; pathParams: never; query: never; body: BulkChargesRequest; response: BulkChargesResponse };
   PricingController_changes: { method: "get"; path: "/v1/setup/charges/changes"; permission: "setup:view"; pathParams: never; query: { chargeId?: string; field?: string; from?: string; to?: string; cursor?: string; limit?: number; }; body: never; response: PriceChangePage };
   PricingController_export: { method: "get"; path: "/v1/setup/charges/changes/export"; permission: "setup:view"; pathParams: never; query: { chargeId?: string; field?: string; from?: string; to?: string; }; body: never; response: string };
   SetupController_updateCharge: { method: "patch"; path: "/v1/setup/charges/{id}"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: ChargeHeadWriteRequest; response: ChargeHeadResponse };
@@ -1088,6 +1093,7 @@ export type Operations = {
   SetupController_policies: { method: "get"; path: "/v1/setup/policies"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<PolicyResponse> };
   PricingController_followUpWindow: { method: "put"; path: "/v1/setup/policies/follow_up_window_days"; permission: "setup:edit"; pathParams: never; query: never; body: WindowRequest; response: PolicyResponse };
   SetupController_updatePolicy: { method: "patch"; path: "/v1/setup/policies/{key}"; permission: "setup:edit"; pathParams: { key: string; }; query: never; body: PolicyWriteRequest; response: PolicyResponse };
+  PricingController_priceTemplate: { method: "get"; path: "/v1/setup/price-templates"; permission: "setup:view"; pathParams: never; query: { specialty?: string; jurisdiction?: string; }; body: never; response: PriceTemplate };
   SetupController_profile: { method: "get"; path: "/v1/setup/profile"; permission: "setup:view"; pathParams: never; query: never; body: never; response: ClinicProfileResponse };
   SetupController_updateProfile: { method: "patch"; path: "/v1/setup/profile"; permission: "setup:edit"; pathParams: never; query: never; body: ClinicProfileWriteRequest; response: ClinicProfileResponse };
   SetupController_shifts: { method: "get"; path: "/v1/setup/shifts"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<StaffShiftResponse> };

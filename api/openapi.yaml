@@ -1579,6 +1579,45 @@ paths:
       responses:
         "200": { description: "text/csv", content: { text/csv: { schema: { type: string } } } }
 
+  /setup/price-templates:
+    get:
+      tags: [Setup]
+      summary: >
+        FIN-017 - the starter price list for a specialty (dental, derma, gp, paediatric, physio, other) in a market (IN, SA, AE; default the
+        clinic's own). Response `{ templateId, specialty, jurisdiction, version, reviewed, reviewNote, currency, heads: [{ code, name, category,
+        baseAmount, taxCategory, taxRatePercent, sacHsn, displayOrder }] }`. Amounts are suggestions; reviewed=false means the tax categories,
+        rates and SAC/HSN codes still await billing-SME/CA review. 400 validation-failed for an unknown specialty or jurisdiction, 404 template-not-found.
+      x-required-permission: setup:view
+      parameters:
+        - { name: specialty, in: query, required: true, schema: { type: string, enum: [dental, derma, gp, paediatric, physio, other] } }
+        - { name: jurisdiction, in: query, required: false, schema: { type: string, enum: [IN, SA, AE] } }
+      responses:
+        "200": { description: "The starter list", content: { application/json: { schema: { type: object } } } }
+        "400": { description: "validation-failed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /setup/charges/bulk:
+    post:
+      tags: [Setup]
+      summary: >
+        FIN-017 - create charge heads from a starter list (the owner's edited copy), clinic owner only. Body `{ templateId, heads: [{ code, name,
+        category, baseAmount, taxCategory, taxRatePercent, sacHsn, displayOrder }] }`. Add-only: a code the price master already has (any case) is
+        skipped, never overwritten. One transaction; one price change-log entry (base_amount) per created head; audit setup.price_template_applied.
+        Response 201 `{ created: [code], skipped: [code] }`. 400 validation-failed, 403 NOT_OWNER, 404 template-not-found, 409 CODE_EXISTS (the
+        code was added by another request meanwhile), 422 template-market-mismatch | rate-not-allowed. Needs an Idempotency-Key.
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [templateId, heads] } } }
+      responses:
+        "201": { description: "Created and skipped codes", content: { application/json: { schema: { type: object } } } }
+        "400": { description: "validation-failed" }
+        "403": { description: "Forbidden or NOT_OWNER" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "CODE_EXISTS" }
+        "422": { description: "template-market-mismatch | rate-not-allowed" }
+
   /billing/gateway-accounts/current:
     get:
       tags: [Billing]

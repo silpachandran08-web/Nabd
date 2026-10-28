@@ -20,6 +20,7 @@ import { FieldError, useFormErrors } from "../../../lib/formErrors";
 import { useFormValidation, useUnsavedGuard } from "../../../lib/formValidation";
 import { discountSchema } from "../../../lib/formSchemas";
 import TierControl from "../../../components/checkout/TierControl";
+import ChargeButton from "../../../components/ui/ChargeButton";
 import { tierPrice, tierToSend, type TierLine, type TierName } from "../../../lib/pricingTier";
 import RxPrefillBlock from "../../../components/checkout/RxPrefillBlock";
 import { initialTicks, toBillLine, type PrefillLine } from "../../../components/checkout/rxPrefill";
@@ -373,19 +374,16 @@ export default function CheckoutPage() {
         {visibleCharges.map((c) => {
           const price = effectivePrice(c);
           const isFollowUp = price !== c.baseAmount;
-          const body = (
-            <>
-              <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" label="Rx" />} <StockPill qty={c.stockQty} /></span>
-              <span className={styles.chargePrice}>
+          const out = c.stockQty != null && c.stockQty <= 0;
+          // PHA-011: a 0-stock item is flagged and not offered (no button at all).
+          return (
+            <ChargeButton key={c.id} dimmed={out} onClick={out ? undefined : () => addCharge(c)}
+              label={<>{c.name} {c.isRx && <StatusPill tone="danger" label="Rx" />} <StockPill qty={c.stockQty} /></>}
+              price={<>
                 {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{formatMoney(c.baseAmount, context.currency)}</span>}
                 {formatMoney(price, context.currency)}
-              </span>
-            </>
+              </>} />
           );
-          // PHA-011: a 0-stock item is flagged and not offered (no button at all).
-          return c.stockQty != null && c.stockQty <= 0
-            ? <div key={c.id} className={styles.chargeItem} style={{ cursor: "default", opacity: 0.7 }}>{body}</div>
-            : <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>{body}</button>;
         })}
       </div>
 

@@ -129,14 +129,19 @@ class SetupRepository {
     }
 
     UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req) {
+        return insertCharge(tenantId, req, null, null);
+    }
+
+    /** FIN-017: a head from a starter list also carries its tax class and SAC/HSN (FIN-009 columns). */
+    UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req, String taxCategory, String sacHsn) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, follow_up_amount, " +
-                        "emergency_amount, tax_code, tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "emergency_amount, tax_code, tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order, " +
+                        "tax_category, sac_hsn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, tenantId, req.code(), req.name(), req.category(), req.baseAmount(), req.followUpAmount(),
                 req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
                 Date.valueOf(req.effectiveFrom()), req.effectiveTo() == null ? null : Date.valueOf(req.effectiveTo()),
-                req.displayOrder());
+                req.displayOrder(), taxCategory, sacHsn);
         return id;
     }
 
