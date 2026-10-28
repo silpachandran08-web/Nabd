@@ -13,6 +13,8 @@ import { isKsa, paymentMethodLabel } from "@nabd/domain";
 import { api, ApiError } from "../../lib/api";
 import { getter, key } from "../../lib/query";
 import { useHasMounted } from "../../lib/useHasMounted";
+import DeskSummary from "./DeskSummary";
+import { expectedCashOf, prefillCounted } from "./deskSummaryModel";
 import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
 import type { Full } from "../../lib/gen";
 import type { Close as GClose, DayCloseHistoryItem, DayCloseSummaryResponse, Method as GMethod, Totals as GTotals, Outstanding as GOutstanding, TaxBand as GTaxBand, Unbilled as GUnbilled } from "@nabd/api-client/generated";
@@ -44,6 +46,7 @@ export default function BillingPage() {
   const [todayIso, setTodayIso] = useState<string | null>(null);
   const canApprove = mounted && getPermissions().includes("billing:approve");
   const canSetup = mounted && can("setup:view");
+  const canDesk = mounted && can("queue:view"); // ADM-044: the desk summary's grant
   const region = mounted ? getIdentity()?.tenantRegion : undefined;
 
   // PHA-010: counter sales exist only in hybrid/in_house pharmacy mode and need billing:create.
@@ -70,8 +73,11 @@ export default function BillingPage() {
   useEffect(() => {
     if (!s || autoOpened.current) return;
     autoOpened.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot URL signal, consumed once
-    if (new URLSearchParams(window.location.search).get("action") === "close" && canApprove && s.today && s.close?.status !== "closed") setDialog("close");
+    if (new URLSearchParams(window.location.search).get("action") === "close" && canApprove && s.today && s.close?.status !== "closed") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot URL signal, consumed once; pre-fills the close (ADM-044)
+      setCounted((c) => prefillCounted(c, expectedCashOf(s.methods)));
+      setDialog("close");
+    }
   }, [s, canApprove]);
   /** A close or unlock answered with the new summary: show it and re-read the history. */
   const applied = (next: Summary) => {
@@ -89,7 +95,7 @@ export default function BillingPage() {
   const closed = s.close?.status === "closed";
   const reopened = s.close?.status === "reopened";
   const blocked = !closed && s.unbilled.length > 0;
-  const expectedCash = Number(m.cash.amount);
+  const expectedCash = expectedCashOf(s.methods);
   const countedNum = counted.trim() === "" ? null : Number(counted);
   const countValid = countedNum !== null && Number.isFinite(countedNum) && countedNum >= 0;
   const variance = closed ? Number(s.close!.variance) : countValid ? countedNum! - expectedCash : null;
@@ -133,11 +139,13 @@ export default function BillingPage() {
             onChange={(e) => { setCounted(""); setDay(e.target.value && e.target.value !== todayIso ? e.target.value : null); }} />
           {canApprove && (closed
             ? <button type="button" className={styles.btnPrimary} onClick={() => setDialog("reopen")}>Unlock day</button>
-            : <button type="button" className={styles.btnPrimary} onClick={() => setDialog("close")}>{reopened ? "Close again" : "Start day close"}</button>)}
+            : <button type="button" className={styles.btnPrimary} onClick={() => { setCounted(prefillCounted(counted, expectedCash)); setDialog("close"); }}>{reopened ? "Close again" : "Start day close"}</button>)}
         </div>
       </div>
 
       {error && <div className={styles.error} role="alert">{error}</div>}
+
+      {canDesk && <DeskSummary day={day} />}
 
       <div className={styles.kpis}>
         {kpis.map(([label, value, sub, icon, tone], i) => (
@@ -331,6 +339,12 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, on
     <Dialog title={summary.close?.status === "reopened" ? "Close the day again" : "Day close"} onClose={onClose}>
       <form onSubmit={submit}>
         <p className={styles.dialogSub}>{formatDate(summary.date)} · billing locks once the day is closed</p>
+        {/* ADM-044: opens pre-filled with the expected totals; the counted cash starts at the expected cash and stays editable */}
+        <section aria-label="Expected totals">
+          {summary.methods.map((x) => (
+            <div key={x.method} className={styles.step}><span>Expected {paymentMethodLabel(x.method, getIdentity()?.tenantRegion)}</span><span className={styles.amt}>{money.format(Number(x.amount))}</span></div>
+          ))}
+        </section>
         <div className={styles.step}><span>1. Pending issues</span>
           <span className={blocked ? styles.amtBad : styles.amtOk}>{blocked ? `${summary.unbilled.length} blocking` : "None"}</span></div>
         <div className={styles.step}><span>2. Cash count</span>
@@ -341,7 +355,7 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, on
             {variance === null ? "—" : (variance > 0 ? "+" : variance < 0 ? "−" : "") + money.format(Math.abs(variance))}
           </span></div>
         {blocked && <p className={styles.dialogSub} style={{ marginTop: 12 }}>Bill each consultation listed on the page first — the close is blocked until then.</p>}
-        {!blocked && variance === null && (
+        {!blocked && (
           <div className={styles.field}>
             <label className={styles.countLabel} htmlFor="close-counted">Counted cash</label>
             <input id="close-counted" className={styles.input} type="number" min="0" step="0.01" value={counted} autoFocus {...fe.attrs("countedCash")}
