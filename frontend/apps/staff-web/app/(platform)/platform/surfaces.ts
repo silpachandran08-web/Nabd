@@ -1,4 +1,5 @@
-import type { IconName } from "../../components/ui/Icon";
+import { itemVisible, type NavItem } from "../../shell/navRegistry.ts";
+import type { Entitlements } from "../../lib/entitlementRules.ts";
 
 // Matches GET /v1/platform/auth/me (PlatformAuthController) — permissions
 // already come back as "<surface>:view" strings from PlatformPermissions.
@@ -10,49 +11,59 @@ export type OperatorProfile = {
   permissions: string[];
 };
 
-export type Surface = {
-  /** "" = every signed-in operator (Command Centre has no surface permission of its own). */
-  permission: string;
-  label: string;
-  /** Short label for the collapsed / narrow nav rail. */
-  short: string;
-  href: string;
-  icon: IconName;
-  section: string;
-};
-
-// Only surfaces with a built page get a nav entry here — SSA-02's "no access,
-// no button" rule extends to "no page yet, no link yet" for the rest.
-// Shared between the Command Centre landing page and the persistent nav bar
-// (app/platform/layout.tsx) so the two never drift out of sync.
-// Order and grouping follow the wireframe's NAV.platform (Today / Customers / Money / Service /
-// Governance); Growth and the unbuilt Service surfaces join when their pages exist.
-export const SURFACES: Surface[] = [
-  { permission: "", label: "Command Centre", short: "Today", href: "/platform", icon: "chart", section: "Today" },
-  { permission: "clinics_fleet:view", label: "Clinics", short: "Clinics", href: "/platform/fleet", icon: "building", section: "Customers" },
-  { permission: "clinics_fleet:view", label: "WhatsApp Senders", short: "Senders", href: "/platform/senders", icon: "bolt", section: "Customers" },
-  { permission: "onboarding_provisioning:view", label: "Onboarding", short: "Onboard", href: "/platform/provisioning", icon: "plusSquare", section: "Customers" },
-  { permission: "territories:view", label: "Territories", short: "Territories", href: "/platform/territories", icon: "globe", section: "Customers" },
-  { permission: "billing_revenue:view", label: "Billing & Revenue", short: "Billing", href: "/platform/billing", icon: "wallet", section: "Money" },
-  { permission: "pricing_packaging:view", label: "Pricing & Packaging", short: "Pricing", href: "/platform/plans", icon: "sparkle", section: "Money" },
-  { permission: "support_tickets:view", label: "Support Tickets", short: "Tickets", href: "/platform/support", icon: "lifebuoy", section: "Service" },
-  { permission: "support_access:view", label: "Support Access", short: "Access", href: "/platform/access", icon: "shieldUser", section: "Service" },
-  { permission: "audit_compliance:view", label: "Audit & Compliance", short: "Audit", href: "/platform/audit", icon: "scroll", section: "Governance" },
+// FEF-059: the operator console's typed role nav, on the shared NavItem model and gate (shell/navRegistry itemVisible:
+// every grant required, a planned screen only when its module is entitled). Pure, unit-tested; the sidebar, rail,
+// bottom nav, Command Centre and the direct-URL gate (PlatformShell) all read it.
+// Order: the spec's prototype ids for the platform role (S17_SPECS FEF-059 "prototype", source "prototype/js/core.js
+// NB.ROLES"; NB.ROLES itself is not in the repo), then the console screens that exist but are not in that list.
+export const PLATFORM_PROTOTYPE_ORDER = ["tenants", "onboard", "regions", "health", "support", "revenue"];
+/** The spec's "support:grant": the operator authority to request a support-access grant (PlatformPermissions, PLT-056). */
+export const SUPPORT_GRANT = "support_access:request";
+const CP = "Platform & Trust (control-plane)";
+export const PLATFORM_NAV: NavItem[] = [
+  { id: "tenants", href: "/platform/fleet", label: "Clinics", short: "Clinics", icon: "building", perms: ["clinics_fleet:view"], owner: CP },
+  { id: "onboard", href: "/platform/provisioning", label: "Onboarding", short: "Onboard", icon: "plusSquare", perms: ["onboarding_provisioning:view"], owner: CP },
+  { id: "regions", href: "/platform/territories", label: "Territories", short: "Territories", icon: "globe", perms: ["territories:view"], owner: CP },
+  // No screen or API yet: absent until a module for it is entitled (the operator session carries none today).
+  { id: "health", href: "/platform/health", label: "Platform health", short: "Health", icon: "pulse", perms: ["platform_health:view"], owner: "Data & Infra", planned: { module: ["platform_health"] } },
+  { id: "support", href: "/platform/support", label: "Support tickets", short: "Tickets", icon: "lifebuoy", perms: ["support_tickets:view"], owner: CP },
+  { id: "supportAccess", href: "/platform/access", label: "Support access", short: "Access", icon: "shieldUser", perms: ["support_access:view", SUPPORT_GRANT], owner: CP },
+  { id: "revenue", href: "/platform/billing", label: "Billing & Revenue", short: "Billing", icon: "wallet", perms: ["billing_revenue:view"], owner: CP },
+  { id: "senders", href: "/platform/senders", label: "WhatsApp Senders", short: "Senders", icon: "bolt", perms: ["clinics_fleet:view"], owner: CP },
+  { id: "pricing", href: "/platform/plans", label: "Pricing & Packaging", short: "Pricing", icon: "sparkle", perms: ["pricing_packaging:view"], owner: CP },
+  { id: "audit", href: "/platform/audit", label: "Audit & Compliance", short: "Audit", icon: "scroll", perms: ["audit_compliance:view"], owner: CP },
+  { id: "command", href: "/platform", label: "Command Centre", short: "Today", icon: "chart", perms: ["command_centre:view"], owner: CP },
 ];
 
-export function visibleSurfaces(permissions: string[]): Surface[] {
-  return SURFACES.filter((s) => s.permission === "" || permissions.includes(s.permission));
+/** Operator plan entitlements: /platform/auth/me carries none yet (needs backend), so planned screens stay absent. */
+export const OPERATOR_ENTITLEMENTS: Entitlements | null = null;
+
+export const platformNavFor = (perms: readonly string[], ent: Entitlements | null = OPERATOR_ENTITLEMENTS): NavItem[] =>
+  PLATFORM_NAV.filter((i) => itemVisible(i, perms, ent));
+
+/** Role home: the first screen of the operator's nav (Command Centre when nothing else is held). */
+export const platformHomeFor = (perms: readonly string[], ent: Entitlements | null = OPERATOR_ENTITLEMENTS): string =>
+  platformNavFor(perms, ent)[0]?.href ?? "/platform";
+
+/** The nav item a console path belongs to (longest href match); undefined for paths outside the nav (login, unknown). */
+export function platformItemFor(path: string): NavItem | undefined {
+  return PLATFORM_NAV.filter((i) => path === i.href || (i.href !== "/platform" && path.startsWith(`${i.href}/`)))
+    .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-export function groupBySection(surfaces: Surface[]): { section: string; items: Surface[] }[] {
-  const groups: { section: string; items: Surface[] }[] = [];
-  for (const s of surfaces) {
-    const g = groups.find((x) => x.section === s.section);
-    if (g) g.items.push(s);
-    else groups.push({ section: s.section, items: [s] });
-  }
-  return groups;
+/** Direct-URL gate: a path of a nav item the operator may not see gets the no-access state. */
+export function platformRouteAllowed(path: string, perms: readonly string[], ent: Entitlements | null = OPERATOR_ENTITLEMENTS): boolean {
+  const item = platformItemFor(path);
+  return !item || itemVisible(item, perms, ent);
 }
+
+/** Phone bottom nav: the top four destinations; the rest (and Log out) go behind More. */
+export const splitBottomNav = <T,>(items: T[]): { primary: T[]; more: T[] } => ({ primary: items.slice(0, 4), more: items.slice(4) });
+
+/** Operator profile query. Its key sits outside the clinic cache's ["t", tenantId, ...] space, so the sessions never share an entry.
+ * Permissions are fixed by the operator JWT until the next sign-in, so it never goes stale; logout removes the whole prefix. */
+export const PLATFORM_QK = ["platform"] as const;
+export const platformMeKey = [...PLATFORM_QK, "me"] as const;
 
 export const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",

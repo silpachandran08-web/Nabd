@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./fleet.module.css";
 import { isForbidden, platformApi, platformError, useOperatorAccess } from "../platformApi";
+import { SUPPORT_GRANT } from "../surfaces";
 import Link from "next/link";
 import { ErrorState, Skeleton, EmptyState } from "../../../components/ui/StateViews";
 import RoleDenied from "../../../components/platform/RoleDenied";
@@ -84,7 +85,7 @@ export default function FleetPage() {
 
       const me = await platformApi.get<OperatorProfile>("/platform/auth/me").catch(() => null);
       if (!me) return;
-      const allowed = me.permissions.includes("support_access:view");
+      const allowed = me.permissions.includes("support_access:view") && me.permissions.includes(SUPPORT_GRANT); // FEF-059: no support:grant, no Support access
       setCanRequestSupportAccess(allowed);
       if (!allowed) return;
 

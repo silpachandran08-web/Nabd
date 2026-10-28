@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ApiError, TimeoutError } from "@nabd/api-client";
-import { type OperatorProfile } from "./surfaces";
+import { platformMeKey, type OperatorProfile } from "./surfaces";
 import { platformApi } from "./platformSession";
 import { capabilitiesFrom, type OperatorCapabilities } from "./capabilities";
 
@@ -32,24 +32,15 @@ export type OperatorAccess = OperatorCapabilities & {
   ready: boolean;
 };
 
+/** GET /platform/auth/me, shared by the shell (nav + route gate), Command Centre and useOperatorAccess: one request per session. */
+export const platformMeQuery = () => queryOptions({
+  queryKey: platformMeKey,
+  queryFn: ({ signal }) => platformApi.get<OperatorProfile>("/platform/auth/me", { signal }),
+  staleTime: Infinity,
+});
+
 export function useOperatorAccess(): OperatorAccess {
-  const [profile, setProfile] = useState<OperatorProfile | null>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const me = await platformApi.get<OperatorProfile>("/platform/auth/me");
-        if (!cancelled) setProfile(me);
-      } catch {
-        /* leave write controls absent */
-      } finally {
-        if (!cancelled) setReady(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  return { profile, ready, ...capabilitiesFrom(profile?.permissions) };
+  const me = useQuery(platformMeQuery()); // a failed call leaves write controls absent
+  const profile = me.data ?? null;
+  return { profile, ready: me.isFetched, ...capabilitiesFrom(profile?.permissions) };
 }

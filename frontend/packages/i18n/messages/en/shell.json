@@ -91,5 +91,51 @@
       "label": "Compliance & Audit",
       "short": "Audit"
     }
+  },
+  "platformNav": {
+    "tenants": {
+      "label": "Clinics",
+      "short": "Clinics"
+    },
+    "onboard": {
+      "label": "Onboarding",
+      "short": "Onboard"
+    },
+    "regions": {
+      "label": "Territories",
+      "short": "Territories"
+    },
+    "health": {
+      "label": "Platform health",
+      "short": "Health"
+    },
+    "support": {
+      "label": "Support tickets",
+      "short": "Tickets"
+    },
+    "supportAccess": {
+      "label": "Support access",
+      "short": "Access"
+    },
+    "revenue": {
+      "label": "Billing & Revenue",
+      "short": "Billing"
+    },
+    "senders": {
+      "label": "WhatsApp Senders",
+      "short": "Senders"
+    },
+    "pricing": {
+      "label": "Pricing & Packaging",
+      "short": "Pricing"
+    },
+    "audit": {
+      "label": "Audit & Compliance",
+      "short": "Audit"
+    },
+    "command": {
+      "label": "Command Centre",
+      "short": "Today"
+    }
   }
 }
