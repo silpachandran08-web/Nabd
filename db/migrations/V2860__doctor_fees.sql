@@ -31,6 +31,17 @@ ALTER TABLE clinic_policies ADD CONSTRAINT clinic_policies_policy_key_check CHEC
   'print.default_paper.receipt'
 )) NOT VALID;
 ALTER TABLE clinic_policies VALIDATE CONSTRAINT clinic_policies_policy_key_check;
-INSERT INTO clinic_policies (tenant_id, policy_key, value)
-  SELECT id, 'follow_up_window_days', '7' FROM tenants
-  ON CONFLICT (tenant_id, policy_key) DO NOTHING;
+-- RLS is forced and the migrator has no BYPASSRLS, so scope each tenant the way V2500 does.
+DO $$
+DECLARE
+  t record;
+BEGIN
+  FOR t IN SELECT id FROM tenants LOOP
+    PERFORM set_config('app.tenant_id', t.id::text, true);
+    PERFORM set_config('app.visible_tenant_ids', t.id::text, true);
+    INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (t.id, 'follow_up_window_days', '7')
+      ON CONFLICT (tenant_id, policy_key) DO NOTHING;
+  END LOOP;
+  PERFORM set_config('app.tenant_id', '', true);
+  PERFORM set_config('app.visible_tenant_ids', '', true);
+END $$;
