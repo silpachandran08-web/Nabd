@@ -111,6 +111,10 @@ Do these in order; each is one line of work.
 
 ## After upgrading to Sprint 16 (S7) code
 
+- Migrations V2710-V2909 in Core (see `db/migrations/VERSIONS`), Patient Access Edge V6-V17 and Comms Gateway V18-V23. Flyway applies them on start; no manual step.
+- New env: `PATIENT_WEB_BASE_URL` (where a family member opens the consent link; default `http://localhost:3810`). The Edge emergency phrase list is empty until the clinical lead signs a list; do not fill it in without that sign-off.
+- Clinic day now starts at the tenant's day-start offset (default 04:00) in queue, no-show and checkout code instead of local midnight.
+- Sprint 7 left unindexed foreign keys on `patients.guardian_id`, `patients.merged_into_id` and `queue_entries.patient_id`; a bulk delete or merge of patients scans the table once per row (see `kanban/DECISIONS_PENDING.md`).
 - `s16-fef-039-consult-i18n` (consult in the pseudo-locale) needs a build started with `NABD_PSEUDO=1`.
 - Clinical glossary changes (`packages/i18n/glossary`) need review by the `@nabd/clinical-owners` GitHub team; create that team and turn on code-owner reviews in the repository settings.
 
