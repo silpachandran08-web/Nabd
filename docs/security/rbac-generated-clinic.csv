@@ -151,6 +151,7 @@ owner,GET /v1/reason-codes,queue:view,allow
 owner,GET /v1/reports/billing-leakage,reports:view,allow
 owner,GET /v1/reports/booking-reasons,reports:view,allow
 owner,GET /v1/reports/daily-money,reports:view,allow
+owner,GET /v1/reports/desk-summary,queue:view,allow
 owner,GET /v1/reports/doctor-punctuality,reports:view,allow
 owner,GET /v1/reports/eta-accuracy,reports:view,allow
 owner,GET /v1/reports/export,reports:export,allow
@@ -189,6 +190,7 @@ owner,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,allow
 owner,GET /v1/setup/licences,setup:view,allow
 owner,GET /v1/setup/payroll-export,setup:view,allow
 owner,GET /v1/setup/policies,setup:view,allow
+owner,GET /v1/setup/price-templates,setup:view,allow
 owner,GET /v1/setup/profile,setup:view,allow
 owner,GET /v1/setup/shifts,setup:view,allow
 owner,GET /v1/setup/staff,setup:view,allow
@@ -359,6 +361,7 @@ owner,POST /v1/roles/{id}/reset-to-preset,staff:edit,allow
 owner,POST /v1/secure-links,patients:edit,allow
 owner,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,allow
 owner,POST /v1/setup/charges,setup:edit,allow
+owner,POST /v1/setup/charges/bulk,setup:edit,allow
 owner,POST /v1/setup/checklist/{step}/complete,setup:edit,allow
 owner,POST /v1/setup/checklist/{step}/skip,setup:edit,allow
 owner,POST /v1/setup/dpa/accept,setup:edit,allow
@@ -557,6 +560,7 @@ owner_doctor,GET /v1/reason-codes,queue:view,allow
 owner_doctor,GET /v1/reports/billing-leakage,reports:view,allow
 owner_doctor,GET /v1/reports/booking-reasons,reports:view,allow
 owner_doctor,GET /v1/reports/daily-money,reports:view,allow
+owner_doctor,GET /v1/reports/desk-summary,queue:view,allow
 owner_doctor,GET /v1/reports/doctor-punctuality,reports:view,allow
 owner_doctor,GET /v1/reports/eta-accuracy,reports:view,allow
 owner_doctor,GET /v1/reports/export,reports:export,allow
@@ -595,6 +599,7 @@ owner_doctor,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,allow
 owner_doctor,GET /v1/setup/licences,setup:view,allow
 owner_doctor,GET /v1/setup/payroll-export,setup:view,allow
 owner_doctor,GET /v1/setup/policies,setup:view,allow
+owner_doctor,GET /v1/setup/price-templates,setup:view,allow
 owner_doctor,GET /v1/setup/profile,setup:view,allow
 owner_doctor,GET /v1/setup/shifts,setup:view,allow
 owner_doctor,GET /v1/setup/staff,setup:view,allow
@@ -765,6 +770,7 @@ owner_doctor,POST /v1/roles/{id}/reset-to-preset,staff:edit,allow
 owner_doctor,POST /v1/secure-links,patients:edit,allow
 owner_doctor,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,allow
 owner_doctor,POST /v1/setup/charges,setup:edit,allow
+owner_doctor,POST /v1/setup/charges/bulk,setup:edit,allow
 owner_doctor,POST /v1/setup/checklist/{step}/complete,setup:edit,allow
 owner_doctor,POST /v1/setup/checklist/{step}/skip,setup:edit,allow
 owner_doctor,POST /v1/setup/dpa/accept,setup:edit,allow
@@ -963,6 +969,7 @@ doctor,GET /v1/reason-codes,queue:view,allow
 doctor,GET /v1/reports/billing-leakage,reports:view,allow
 doctor,GET /v1/reports/booking-reasons,reports:view,allow
 doctor,GET /v1/reports/daily-money,reports:view,allow
+doctor,GET /v1/reports/desk-summary,queue:view,allow
 doctor,GET /v1/reports/doctor-punctuality,reports:view,allow
 doctor,GET /v1/reports/eta-accuracy,reports:view,allow
 doctor,GET /v1/reports/export,reports:export,deny-403
@@ -1001,6 +1008,7 @@ doctor,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 doctor,GET /v1/setup/licences,setup:view,deny-403
 doctor,GET /v1/setup/payroll-export,setup:view,deny-403
 doctor,GET /v1/setup/policies,setup:view,deny-403
+doctor,GET /v1/setup/price-templates,setup:view,deny-403
 doctor,GET /v1/setup/profile,setup:view,deny-403
 doctor,GET /v1/setup/shifts,setup:view,deny-403
 doctor,GET /v1/setup/staff,setup:view,deny-403
@@ -1171,6 +1179,7 @@ doctor,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
 doctor,POST /v1/secure-links,patients:edit,allow
 doctor,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 doctor,POST /v1/setup/charges,setup:edit,deny-403
+doctor,POST /v1/setup/charges/bulk,setup:edit,deny-403
 doctor,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 doctor,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 doctor,POST /v1/setup/dpa/accept,setup:edit,deny-403
@@ -1369,6 +1378,7 @@ nurse,GET /v1/reason-codes,queue:view,allow
 nurse,GET /v1/reports/billing-leakage,reports:view,deny-403
 nurse,GET /v1/reports/booking-reasons,reports:view,deny-403
 nurse,GET /v1/reports/daily-money,reports:view,deny-403
+nurse,GET /v1/reports/desk-summary,queue:view,allow
 nurse,GET /v1/reports/doctor-punctuality,reports:view,deny-403
 nurse,GET /v1/reports/eta-accuracy,reports:view,deny-403
 nurse,GET /v1/reports/export,reports:export,deny-403
@@ -1407,6 +1417,7 @@ nurse,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 nurse,GET /v1/setup/licences,setup:view,deny-403
 nurse,GET /v1/setup/payroll-export,setup:view,deny-403
 nurse,GET /v1/setup/policies,setup:view,deny-403
+nurse,GET /v1/setup/price-templates,setup:view,deny-403
 nurse,GET /v1/setup/profile,setup:view,deny-403
 nurse,GET /v1/setup/shifts,setup:view,deny-403
 nurse,GET /v1/setup/staff,setup:view,deny-403
@@ -1577,6 +1588,7 @@ nurse,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
 nurse,POST /v1/secure-links,patients:edit,allow
 nurse,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 nurse,POST /v1/setup/charges,setup:edit,deny-403
+nurse,POST /v1/setup/charges/bulk,setup:edit,deny-403
 nurse,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 nurse,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 nurse,POST /v1/setup/dpa/accept,setup:edit,deny-403
@@ -1775,6 +1787,7 @@ receptionist,GET /v1/reason-codes,queue:view,allow
 receptionist,GET /v1/reports/billing-leakage,reports:view,deny-403
 receptionist,GET /v1/reports/booking-reasons,reports:view,deny-403
 receptionist,GET /v1/reports/daily-money,reports:view,deny-403
+receptionist,GET /v1/reports/desk-summary,queue:view,allow
 receptionist,GET /v1/reports/doctor-punctuality,reports:view,deny-403
 receptionist,GET /v1/reports/eta-accuracy,reports:view,deny-403
 receptionist,GET /v1/reports/export,reports:export,deny-403
@@ -1813,6 +1826,7 @@ receptionist,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 receptionist,GET /v1/setup/licences,setup:view,deny-403
 receptionist,GET /v1/setup/payroll-export,setup:view,deny-403
 receptionist,GET /v1/setup/policies,setup:view,deny-403
+receptionist,GET /v1/setup/price-templates,setup:view,deny-403
 receptionist,GET /v1/setup/profile,setup:view,deny-403
 receptionist,GET /v1/setup/shifts,setup:view,deny-403
 receptionist,GET /v1/setup/staff,setup:view,deny-403
@@ -1983,6 +1997,7 @@ receptionist,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
 receptionist,POST /v1/secure-links,patients:edit,allow
 receptionist,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 receptionist,POST /v1/setup/charges,setup:edit,deny-403
+receptionist,POST /v1/setup/charges/bulk,setup:edit,deny-403
 receptionist,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 receptionist,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 receptionist,POST /v1/setup/dpa/accept,setup:edit,deny-403
@@ -2181,6 +2196,7 @@ frontdesk_vitals,GET /v1/reason-codes,queue:view,allow
 frontdesk_vitals,GET /v1/reports/billing-leakage,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/booking-reasons,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/daily-money,reports:view,deny-403
+frontdesk_vitals,GET /v1/reports/desk-summary,queue:view,allow
 frontdesk_vitals,GET /v1/reports/doctor-punctuality,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/eta-accuracy,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/export,reports:export,deny-403
@@ -2219,6 +2235,7 @@ frontdesk_vitals,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 frontdesk_vitals,GET /v1/setup/licences,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/payroll-export,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/policies,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/price-templates,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/profile,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/shifts,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/staff,setup:view,deny-403
@@ -2389,6 +2406,7 @@ frontdesk_vitals,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-403
 frontdesk_vitals,POST /v1/secure-links,patients:edit,allow
 frontdesk_vitals,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/charges,setup:edit,deny-403
+frontdesk_vitals,POST /v1/setup/charges/bulk,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/dpa/accept,setup:edit,deny-403

@@ -97,7 +97,7 @@ public class DayCloseService {
      * and unbilled visits are the same queries as {@link #summary}, so the desk and the close show the same figures. */
     @Transactional(readOnly = true)
     public DeskSummaryResponse deskSummary(UUID tenantId, LocalDate date) {
-        tenantContext.set(tenantId);
+        // tenant bound from the token at transaction start (TenantTransactionBinder); no TenantContext.set (PLT-019)
         LocalDate today = clock.clinicDate(tenantId);
         LocalDate day = date != null ? date : today;
         Instant start = clock.dayStart(tenantId, day);

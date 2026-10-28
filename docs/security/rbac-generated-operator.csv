@@ -151,6 +151,7 @@ super_admin,GET /v1/reason-codes,queue:view,deny-401
 super_admin,GET /v1/reports/billing-leakage,reports:view,deny-401
 super_admin,GET /v1/reports/booking-reasons,reports:view,deny-401
 super_admin,GET /v1/reports/daily-money,reports:view,deny-401
+super_admin,GET /v1/reports/desk-summary,queue:view,deny-401
 super_admin,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 super_admin,GET /v1/reports/eta-accuracy,reports:view,deny-401
 super_admin,GET /v1/reports/export,reports:export,deny-401
@@ -189,6 +190,7 @@ super_admin,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 super_admin,GET /v1/setup/licences,setup:view,deny-401
 super_admin,GET /v1/setup/payroll-export,setup:view,deny-401
 super_admin,GET /v1/setup/policies,setup:view,deny-401
+super_admin,GET /v1/setup/price-templates,setup:view,deny-401
 super_admin,GET /v1/setup/profile,setup:view,deny-401
 super_admin,GET /v1/setup/shifts,setup:view,deny-401
 super_admin,GET /v1/setup/staff,setup:view,deny-401
@@ -359,6 +361,7 @@ super_admin,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 super_admin,POST /v1/secure-links,patients:edit,deny-401
 super_admin,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 super_admin,POST /v1/setup/charges,setup:edit,deny-401
+super_admin,POST /v1/setup/charges/bulk,setup:edit,deny-401
 super_admin,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 super_admin,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 super_admin,POST /v1/setup/dpa/accept,setup:edit,deny-401
@@ -557,6 +560,7 @@ implementation,GET /v1/reason-codes,queue:view,deny-401
 implementation,GET /v1/reports/billing-leakage,reports:view,deny-401
 implementation,GET /v1/reports/booking-reasons,reports:view,deny-401
 implementation,GET /v1/reports/daily-money,reports:view,deny-401
+implementation,GET /v1/reports/desk-summary,queue:view,deny-401
 implementation,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 implementation,GET /v1/reports/eta-accuracy,reports:view,deny-401
 implementation,GET /v1/reports/export,reports:export,deny-401
@@ -595,6 +599,7 @@ implementation,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 implementation,GET /v1/setup/licences,setup:view,deny-401
 implementation,GET /v1/setup/payroll-export,setup:view,deny-401
 implementation,GET /v1/setup/policies,setup:view,deny-401
+implementation,GET /v1/setup/price-templates,setup:view,deny-401
 implementation,GET /v1/setup/profile,setup:view,deny-401
 implementation,GET /v1/setup/shifts,setup:view,deny-401
 implementation,GET /v1/setup/staff,setup:view,deny-401
@@ -765,6 +770,7 @@ implementation,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 implementation,POST /v1/secure-links,patients:edit,deny-401
 implementation,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 implementation,POST /v1/setup/charges,setup:edit,deny-401
+implementation,POST /v1/setup/charges/bulk,setup:edit,deny-401
 implementation,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 implementation,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 implementation,POST /v1/setup/dpa/accept,setup:edit,deny-401
@@ -963,6 +969,7 @@ support_engineer,GET /v1/reason-codes,queue:view,deny-401
 support_engineer,GET /v1/reports/billing-leakage,reports:view,deny-401
 support_engineer,GET /v1/reports/booking-reasons,reports:view,deny-401
 support_engineer,GET /v1/reports/daily-money,reports:view,deny-401
+support_engineer,GET /v1/reports/desk-summary,queue:view,deny-401
 support_engineer,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 support_engineer,GET /v1/reports/eta-accuracy,reports:view,deny-401
 support_engineer,GET /v1/reports/export,reports:export,deny-401
@@ -1001,6 +1008,7 @@ support_engineer,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 support_engineer,GET /v1/setup/licences,setup:view,deny-401
 support_engineer,GET /v1/setup/payroll-export,setup:view,deny-401
 support_engineer,GET /v1/setup/policies,setup:view,deny-401
+support_engineer,GET /v1/setup/price-templates,setup:view,deny-401
 support_engineer,GET /v1/setup/profile,setup:view,deny-401
 support_engineer,GET /v1/setup/shifts,setup:view,deny-401
 support_engineer,GET /v1/setup/staff,setup:view,deny-401
@@ -1171,6 +1179,7 @@ support_engineer,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 support_engineer,POST /v1/secure-links,patients:edit,deny-401
 support_engineer,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 support_engineer,POST /v1/setup/charges,setup:edit,deny-401
+support_engineer,POST /v1/setup/charges/bulk,setup:edit,deny-401
 support_engineer,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 support_engineer,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 support_engineer,POST /v1/setup/dpa/accept,setup:edit,deny-401
@@ -1369,6 +1378,7 @@ billing,GET /v1/reason-codes,queue:view,deny-401
 billing,GET /v1/reports/billing-leakage,reports:view,deny-401
 billing,GET /v1/reports/booking-reasons,reports:view,deny-401
 billing,GET /v1/reports/daily-money,reports:view,deny-401
+billing,GET /v1/reports/desk-summary,queue:view,deny-401
 billing,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 billing,GET /v1/reports/eta-accuracy,reports:view,deny-401
 billing,GET /v1/reports/export,reports:export,deny-401
@@ -1407,6 +1417,7 @@ billing,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 billing,GET /v1/setup/licences,setup:view,deny-401
 billing,GET /v1/setup/payroll-export,setup:view,deny-401
 billing,GET /v1/setup/policies,setup:view,deny-401
+billing,GET /v1/setup/price-templates,setup:view,deny-401
 billing,GET /v1/setup/profile,setup:view,deny-401
 billing,GET /v1/setup/shifts,setup:view,deny-401
 billing,GET /v1/setup/staff,setup:view,deny-401
@@ -1577,6 +1588,7 @@ billing,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 billing,POST /v1/secure-links,patients:edit,deny-401
 billing,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 billing,POST /v1/setup/charges,setup:edit,deny-401
+billing,POST /v1/setup/charges/bulk,setup:edit,deny-401
 billing,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 billing,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 billing,POST /v1/setup/dpa/accept,setup:edit,deny-401
@@ -1775,6 +1787,7 @@ sre,GET /v1/reason-codes,queue:view,deny-401
 sre,GET /v1/reports/billing-leakage,reports:view,deny-401
 sre,GET /v1/reports/booking-reasons,reports:view,deny-401
 sre,GET /v1/reports/daily-money,reports:view,deny-401
+sre,GET /v1/reports/desk-summary,queue:view,deny-401
 sre,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 sre,GET /v1/reports/eta-accuracy,reports:view,deny-401
 sre,GET /v1/reports/export,reports:export,deny-401
@@ -1813,6 +1826,7 @@ sre,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 sre,GET /v1/setup/licences,setup:view,deny-401
 sre,GET /v1/setup/payroll-export,setup:view,deny-401
 sre,GET /v1/setup/policies,setup:view,deny-401
+sre,GET /v1/setup/price-templates,setup:view,deny-401
 sre,GET /v1/setup/profile,setup:view,deny-401
 sre,GET /v1/setup/shifts,setup:view,deny-401
 sre,GET /v1/setup/staff,setup:view,deny-401
@@ -1983,6 +1997,7 @@ sre,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 sre,POST /v1/secure-links,patients:edit,deny-401
 sre,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 sre,POST /v1/setup/charges,setup:edit,deny-401
+sre,POST /v1/setup/charges/bulk,setup:edit,deny-401
 sre,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 sre,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 sre,POST /v1/setup/dpa/accept,setup:edit,deny-401
@@ -2181,6 +2196,7 @@ commercial,GET /v1/reason-codes,queue:view,deny-401
 commercial,GET /v1/reports/billing-leakage,reports:view,deny-401
 commercial,GET /v1/reports/booking-reasons,reports:view,deny-401
 commercial,GET /v1/reports/daily-money,reports:view,deny-401
+commercial,GET /v1/reports/desk-summary,queue:view,deny-401
 commercial,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 commercial,GET /v1/reports/eta-accuracy,reports:view,deny-401
 commercial,GET /v1/reports/export,reports:export,deny-401
@@ -2219,6 +2235,7 @@ commercial,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 commercial,GET /v1/setup/licences,setup:view,deny-401
 commercial,GET /v1/setup/payroll-export,setup:view,deny-401
 commercial,GET /v1/setup/policies,setup:view,deny-401
+commercial,GET /v1/setup/price-templates,setup:view,deny-401
 commercial,GET /v1/setup/profile,setup:view,deny-401
 commercial,GET /v1/setup/shifts,setup:view,deny-401
 commercial,GET /v1/setup/staff,setup:view,deny-401
@@ -2389,6 +2406,7 @@ commercial,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 commercial,POST /v1/secure-links,patients:edit,deny-401
 commercial,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 commercial,POST /v1/setup/charges,setup:edit,deny-401
+commercial,POST /v1/setup/charges/bulk,setup:edit,deny-401
 commercial,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 commercial,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 commercial,POST /v1/setup/dpa/accept,setup:edit,deny-401
@@ -2587,6 +2605,7 @@ compliance_dpo,GET /v1/reason-codes,queue:view,deny-401
 compliance_dpo,GET /v1/reports/billing-leakage,reports:view,deny-401
 compliance_dpo,GET /v1/reports/booking-reasons,reports:view,deny-401
 compliance_dpo,GET /v1/reports/daily-money,reports:view,deny-401
+compliance_dpo,GET /v1/reports/desk-summary,queue:view,deny-401
 compliance_dpo,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 compliance_dpo,GET /v1/reports/eta-accuracy,reports:view,deny-401
 compliance_dpo,GET /v1/reports/export,reports:export,deny-401
@@ -2625,6 +2644,7 @@ compliance_dpo,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-401
 compliance_dpo,GET /v1/setup/licences,setup:view,deny-401
 compliance_dpo,GET /v1/setup/payroll-export,setup:view,deny-401
 compliance_dpo,GET /v1/setup/policies,setup:view,deny-401
+compliance_dpo,GET /v1/setup/price-templates,setup:view,deny-401
 compliance_dpo,GET /v1/setup/profile,setup:view,deny-401
 compliance_dpo,GET /v1/setup/shifts,setup:view,deny-401
 compliance_dpo,GET /v1/setup/staff,setup:view,deny-401
@@ -2795,6 +2815,7 @@ compliance_dpo,POST /v1/roles/{id}/reset-to-preset,staff:edit,deny-401
 compliance_dpo,POST /v1/secure-links,patients:edit,deny-401
 compliance_dpo,POST /v1/setup/calendar/templates/{code}/apply,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/charges,setup:edit,deny-401
+compliance_dpo,POST /v1/setup/charges/bulk,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/dpa/accept,setup:edit,deny-401
