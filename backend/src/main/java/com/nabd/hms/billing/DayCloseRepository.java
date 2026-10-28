@@ -2,6 +2,7 @@ package com.nabd.hms.billing;
 
 import com.nabd.hms.billing.dto.DayCloseHistoryResponse;
 import com.nabd.hms.billing.dto.DayCloseSummaryResponse;
+import com.nabd.hms.billing.dto.DeskSummaryResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -98,6 +99,36 @@ class DayCloseRepository {
                 """, (rs, i) -> new DayCloseSummaryResponse.Unbilled(rs.getObject("id", UUID.class), rs.getInt("token_number"),
                         rs.getString("patient_name"), rs.getString("doctor_name"), rs.getTimestamp("updated_at").toInstant()),
                 tenantId, Date.valueOf(day));
+    }
+
+    /** ADM-044: the day's visits, as ReportsRepository.visitsOn counts them for the owner overview. */
+    DeskSummaryResponse.DeskVisits visits(UUID tenantId, LocalDate day) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS total,
+                       count(*) FILTER (WHERE status = 'completed') AS completed,
+                       count(*) FILTER (WHERE status NOT IN ('completed', 'no_show')) AS in_flow
+                FROM queue_entries WHERE tenant_id = ? AND queue_date = ?
+                """, (rs, i) -> new DeskSummaryResponse.DeskVisits(rs.getInt("total"), rs.getInt("completed"), rs.getInt("in_flow")),
+                tenantId, Date.valueOf(day));
+    }
+
+    record NoShowRow(UUID appointmentId, String patientName, UUID doctorId, Instant startTime) {
+    }
+
+    /** ADM-044: the owner reports' no-show rule (non-cancelled booking in the day, start passed, never checked in),
+     * minus bookings checked in later through late arrival (ACC-025: that token has no appointment_id). */
+    List<NoShowRow> noShows(UUID tenantId, Instant dayStart, Instant dayEnd, Instant now) {
+        return jdbc.query("""
+                SELECT a.id, p.name AS patient_name, a.doctor_id, a.start_time
+                FROM appointments a
+                JOIN patients p ON p.id = a.patient_id
+                WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ? AND a.start_time < ?
+                  AND a.late_arrival_queue_entry_id IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM queue_entries q WHERE q.tenant_id = a.tenant_id AND q.appointment_id = a.id)
+                ORDER BY a.start_time, a.id
+                """, (rs, i) -> new NoShowRow(rs.getObject("id", UUID.class), rs.getString("patient_name"),
+                        rs.getObject("doctor_id", UUID.class), rs.getTimestamp("start_time").toInstant()),
+                tenantId, ts(dayStart), ts(dayEnd), ts(now));
     }
 
     /** FIN-008: the tax column is the stored line taxes (the same figures as the bills); lines from before the tax engine fall back to the old per-line rounding. */

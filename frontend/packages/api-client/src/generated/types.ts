@@ -159,6 +159,9 @@ export type DepartmentWriteRequest = { active?: boolean; name: string; };
 export type DeskExceptionActionResponse = { id?: string; status?: string; };
 export type DeskExceptionItem = { actions?: Array<string>; createdAt?: string; id?: string; kind?: string; params?: Record<string, Record<string, unknown>>; refId?: string; refType?: string; severity?: string; summary?: string; };
 export type DeskExceptionPage = { items?: Array<DeskExceptionItem>; nextCursor?: string; };
+export type DeskNoShow = { appointmentId?: string; doctorName?: string; patientName?: string; startTime?: string; };
+export type DeskSummaryResponse = { collectionsByMode?: Array<Method>; currency?: string; date?: string; noShows?: Array<DeskNoShow>; today?: boolean; unbilled?: Array<Unbilled>; visits?: DeskVisits; };
+export type DeskVisits = { completed?: number; inFlow?: number; total?: number; };
 export type DiscountPage = { data?: Array<DiscountResponse>; page?: PageMeta; };
 export type DiscountRequest = { kind: string; note?: string; reasonCode?: string; value: number; };
 export type DiscountRequestCreate = { percent: number; reason: string; tenantId: string; };
@@ -1016,6 +1019,7 @@ export type Operations = {
   ReportsController_billingLeakage: { method: "get"; path: "/v1/reports/billing-leakage"; permission: "reports:view"; pathParams: never; query: { thresholdAmount?: number; }; body: never; response: BillingLeakageResponse };
   BookingReasonsReportController_report: { method: "get"; path: "/v1/reports/booking-reasons"; permission: "reports:view"; pathParams: never; query: { from: string; to: string; }; body: never; response: BookingReasonsResponse };
   ReportsController_dailyMoney: { method: "get"; path: "/v1/reports/daily-money"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DailyMoneyResponse };
+  DeskSummaryController_deskSummary: { method: "get"; path: "/v1/reports/desk-summary"; permission: "queue:view"; pathParams: never; query: { date?: string; }; body: never; response: DeskSummaryResponse };
   ReportsController_doctorPunctuality: { method: "get"; path: "/v1/reports/doctor-punctuality"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DoctorPunctualityResponse };
   EtaAccuracyController_get: { method: "get"; path: "/v1/reports/eta-accuracy"; permission: "reports:view"; pathParams: never; query: { from?: string; to?: string; doctorId?: string; }; body: never; response: EtaAccuracyResponse };
   ReportsController_export: { method: "get"; path: "/v1/reports/export"; permission: "reports:export"; pathParams: never; query: { reportType: string; days?: number; from?: string; to?: string; }; body: never; response: string };

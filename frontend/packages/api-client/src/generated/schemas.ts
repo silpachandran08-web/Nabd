@@ -182,6 +182,9 @@ export const DepartmentWriteRequestSchema = z.object({ active: z.boolean().optio
 export const DeskExceptionActionResponseSchema = z.object({ id: z.string().optional(), status: z.string().optional() });
 export const DeskExceptionItemSchema = z.object({ actions: z.array(z.string()).optional(), createdAt: z.string().optional(), id: z.string().optional(), kind: z.string().optional(), params: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), refId: z.string().optional(), refType: z.string().optional(), severity: z.string().optional(), summary: z.string().optional() });
 export const DeskExceptionPageSchema = z.object({ items: z.array(DeskExceptionItemSchema).optional(), nextCursor: z.string().optional() });
+export const DeskNoShowSchema = z.object({ appointmentId: z.string().optional(), doctorName: z.string().optional(), patientName: z.string().optional(), startTime: z.string().optional() });
+export const DeskVisitsSchema = z.object({ completed: z.number().int().optional(), inFlow: z.number().int().optional(), total: z.number().int().optional() });
+export const DeskSummaryResponseSchema = z.object({ collectionsByMode: z.array(MethodSchema).optional(), currency: z.string().optional(), date: z.string().optional(), noShows: z.array(DeskNoShowSchema).optional(), today: z.boolean().optional(), unbilled: z.array(UnbilledSchema).optional(), visits: DeskVisitsSchema.optional() });
 export const DiscountResponseSchema = z.object({ createdAt: z.string().optional(), id: z.string().optional(), percent: z.number().optional(), reason: z.string().optional(), requestedBy: z.string().optional(), requestedByName: z.string().optional(), reviewedAt: z.string().optional(), reviewedBy: z.string().optional(), reviewedByName: z.string().optional(), status: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional() });
 export const DiscountPageSchema = z.object({ data: z.array(DiscountResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const DiscountRequestCreateSchema = z.object({ percent: z.number().gte(0.01).lte(100), reason: z.string().min(1), tenantId: z.string() });
@@ -1018,6 +1021,7 @@ export const operationSchemas = {
   ReportsController_billingLeakage: { response: BillingLeakageResponseSchema },
   BookingReasonsReportController_report: { response: BookingReasonsResponseSchema },
   ReportsController_dailyMoney: { response: DailyMoneyResponseSchema },
+  DeskSummaryController_deskSummary: { response: DeskSummaryResponseSchema },
   ReportsController_doctorPunctuality: { response: DoctorPunctualityResponseSchema },
   EtaAccuracyController_get: { response: EtaAccuracyResponseSchema },
   ReportsController_export: { response: z.string() },

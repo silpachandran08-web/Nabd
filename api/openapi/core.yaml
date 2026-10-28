@@ -15054,6 +15054,44 @@ paths:
       tags:
       - reports
       x-required-permission: reports:view
+  /v1/reports/desk-summary:
+    get:
+      operationId: DeskSummaryController_deskSummary
+      parameters:
+      - in: query
+        name: date
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeskSummaryResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: queue:view
   /v1/reports/doctor-punctuality:
     get:
       operationId: ReportsController_doctorPunctuality
@@ -22005,6 +22043,55 @@ components:
             $ref: "#/components/schemas/DeskExceptionItem"
         nextCursor:
           type: string
+    DeskNoShow:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        patientName:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+    DeskSummaryResponse:
+      type: object
+      properties:
+        collectionsByMode:
+          type: array
+          items:
+            $ref: "#/components/schemas/Method"
+        currency:
+          type: string
+        date:
+          type: string
+          format: date
+        noShows:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeskNoShow"
+        today:
+          type: boolean
+        unbilled:
+          type: array
+          items:
+            $ref: "#/components/schemas/Unbilled"
+        visits:
+          $ref: "#/components/schemas/DeskVisits"
+    DeskVisits:
+      type: object
+      properties:
+        completed:
+          type: integer
+          format: int32
+        inFlow:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
     DiscountPage:
       type: object
       properties:
