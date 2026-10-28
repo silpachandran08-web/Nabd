@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** COM-012: starter template catalogue (16 keys x EN/HI/KN/TE), instantiate endpoint, background submission, saga step. */
+/** COM-012: starter template catalogue (16 keys x EN/HI/KN/TE, plus ACC-024 queue_paused (EN only)), instantiate endpoint, background submission, saga step. */
 class TemplateCatalogueApiTest extends ApiTestBase {
 
     private static final String LIST = "/v1/setup/whatsapp-templates";
@@ -31,8 +31,8 @@ class TemplateCatalogueApiTest extends ApiTestBase {
     void everyCatalogueTemplatePassesPhiLintMetaRulesAndRendersWithNoVariableLeft() {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT key, language, category, body, example_values, slot_types FROM template_catalogue ORDER BY key, language");
-        assertThat(rows).hasSize(64);
-        assertThat(rows.stream().map(r -> r.get("key")).distinct()).hasSize(16);
+        assertThat(rows).hasSize(65);
+        assertThat(rows.stream().map(r -> r.get("key")).distinct()).hasSize(17);
         assertThat(rows.stream().map(r -> r.get("language")).distinct()).containsExactlyInAnyOrder("en", "hi", "kn", "te");
         for (Map<String, Object> r : rows) {
             String body = (String) r.get("body");
@@ -76,20 +76,20 @@ class TemplateCatalogueApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resp = exchange(path, HttpMethod.POST, authedJsonBody(op, Map.of("languages", List.of("en", "hi"))), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-        assertThat(resp.getBody().get("submitted")).isEqualTo(32);
+        assertThat(resp.getBody().get("submitted")).isEqualTo(33);
 
         String owner = ownerToken(tenant);
         List<Map<String, Object>> queued = exchange(LIST, HttpMethod.GET, authed(owner), List.class).getBody();
-        assertThat(queued).hasSize(32).allMatch(t -> "catalogue".equals(t.get("source")) && "queued".equals(t.get("status")));
+        assertThat(queued).hasSize(33).allMatch(t -> "catalogue".equals(t.get("source")) && "queued".equals(t.get("status")));
         assertThat(queued).allMatch(t -> ("Test Clinic " + tenant.slug()).equals(t.get("headerText"))); // NB-198: header = clinic name
 
         for (int i = 0; i < 30 && stillQueued(tenant); i++) {
             job.runOnce(); // paced: perRun templates per run, shared with whatever else is queued
         }
         List<Map<String, Object>> done = exchange(LIST, HttpMethod.GET, authed(owner), List.class).getBody();
-        assertThat(done).hasSize(32).allMatch(t -> "approved".equals(t.get("status"))); // LoggingWhatsAppClient auto-approves
+        assertThat(done).hasSize(33).allMatch(t -> "approved".equals(t.get("status"))); // LoggingWhatsAppClient auto-approves
         assertThat(done.stream().map(t -> t.get("language")).distinct()).containsExactlyInAnyOrder("en", "hi");
-        assertThat(done.stream().map(t -> t.get("key")).distinct()).hasSize(16);
+        assertThat(done.stream().map(t -> t.get("key")).distinct()).hasSize(17);
 
         // the second call is refused; bad input and a clinic token are refused
         ResponseEntity<Map> again = exchange(path, HttpMethod.POST, authedJsonBody(op, Map.of("languages", List.of("en"))), Map.class);
@@ -108,7 +108,7 @@ class TemplateCatalogueApiTest extends ApiTestBase {
         SeededTenant b = seedTenant();
         catalogueTemplates.instantiateDefaults(a.id(), "SA");
         assertThat(exchange(LIST, HttpMethod.GET, authed(ownerToken(b)), List.class).getBody()).isEmpty();
-        assertThat(exchange(LIST, HttpMethod.GET, authed(ownerToken(a)), List.class).getBody()).hasSize(16);
+        assertThat(exchange(LIST, HttpMethod.GET, authed(ownerToken(a)), List.class).getBody()).hasSize(17);
     }
 
     @Test
@@ -127,7 +127,7 @@ class TemplateCatalogueApiTest extends ApiTestBase {
         assertThat(last.get("status")).isEqualTo("done");
         UUID tenantId = UUID.fromString((String) last.get("createdTenantId"));
         assertThat(inTenantTx(tenantId, () -> jdbc.queryForObject("SELECT count(*) FROM whatsapp_templates WHERE catalogue_key IS NOT NULL", Integer.class)))
-                .isEqualTo(32); // India: EN + HI (the clinic's state language is not recorded yet)
+                .isEqualTo(33); // India: EN + HI; queue_paused is EN only (the clinic's state language is not recorded yet)
         assertThat(catalogueTemplates.instantiateDefaults(tenantId, "IN")).isZero();
     }
 

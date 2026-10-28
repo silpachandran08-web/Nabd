@@ -190,10 +190,11 @@ class Ops021ConfigCacheApiTest extends ApiTestBase {
         relay.start();
         try {
             String verKey = "nabd:cfg:t:" + t.id() + ":catalogue:ver";
-            while (!"1".equals(valkey.opsForValue().get(verKey)) && System.nanoTime() - t0 < 10_000_000_000L) {
+            // two catalogue events (added, updated) = two bumps; waiting for "1" only raced the second one
+            while (!"2".equals(valkey.opsForValue().get(verKey)) && System.nanoTime() - t0 < 10_000_000_000L) {
                 Thread.sleep(20);
             }
-            assertThat(valkey.opsForValue().get(verKey)).as("version bumped by the consumer").isEqualTo("1");
+            assertThat(valkey.opsForValue().get(verKey)).as("version bumped by the consumer").isEqualTo("2");
             // A serves the new price through checkout; B through its own cache (L2 miss on v1 -> its loader reads the DB)
             assertThat(checkoutPrice(token, owner.id(), "CONS")).isEqualTo(450.0);
             Map<String, Object> afterB = cacheB.get(t.id(), CAT, "CONS", Map.class, () -> Map.of("baseAmount", jdbcPrice(t.id())));

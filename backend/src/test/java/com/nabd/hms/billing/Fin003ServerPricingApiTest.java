@@ -254,9 +254,8 @@ class Fin003ServerPricingApiTest extends ApiTestBase {
         assertThat(suggested.get("tier")).isEqualTo("follow_up");
         assertThat(num(suggested.get("unitPrice"))).isEqualTo(150.0);
         move(e.ownerToken(), second, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
-        Map<String, Object> normal = line("CONS", 1);
-        normal.put("tier", "normal");
-        ResponseEntity<Map> r2 = post(e.ownerToken(), second, Map.of("lineItems", List.of(normal)));
+        // no tier sent: the server default is follow-up when eligible (FIN-016: an explicit "normal" is now honoured)
+        ResponseEntity<Map> r2 = post(e.ownerToken(), second, Map.of("lineItems", List.of(line("CONS", 1))));
         assertThat(num(firstLine(r2).get("unitPrice"))).isEqualTo(150.0);
         assertThat(firstLine(r2).get("tier")).isEqualTo("follow_up");
     }
