@@ -434,3 +434,39 @@
 .printBar .backBtn { min-block-size: 44px; }
 .docActions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); margin-block-start: var(--nb-space-12); }
 .docActions button { min-block-size: 44px; padding-inline: var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-primary); font: inherit; font-size: 13px; cursor: pointer; }
+
+/* FIN-018: awaiting-approval banner actions (44 px targets) */
+.approvalActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nb-space-8);
+  margin-block-start: var(--nb-space-8);
+}
+
+.approvalBtn {
+  min-block-size: 44px;
+  padding-inline: var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-1);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.approvalBtn:disabled {
+  color: var(--nb-text-disabled);
+  cursor: not-allowed;
+}
+
+.pinInput {
+  min-block-size: 44px;
+  inline-size: 9rem;
+  padding-inline: var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  font-family: inherit;
+  font-size: 14px;
+}

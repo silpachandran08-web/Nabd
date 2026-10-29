@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import styles from "./billing.module.css";
-import { getIdentity, getPermissions } from "../../lib/session";
+import { getIdentity, getPermissions, isOwner } from "../../lib/session";
 import { can } from "../../lib/permissions";
 import Dialog from "../../components/ui/Dialog";
 import Icon, { type IconName } from "../../components/ui/Icon";
@@ -14,6 +14,7 @@ import { api, ApiError } from "../../lib/api";
 import { getter, key } from "../../lib/query";
 import { useHasMounted } from "../../lib/useHasMounted";
 import DeskSummary from "./DeskSummary";
+import OwnerFinanceTabs from "./OwnerFinanceTabs";
 import { expectedCashOf, prefillCounted } from "./deskSummaryModel";
 import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
 import type { Full } from "../../lib/gen";
@@ -146,6 +147,8 @@ export default function BillingPage() {
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       {canDesk && <DeskSummary day={day} />}
+
+      {mounted && isOwner() && <OwnerFinanceTabs today={s.today ? s.date : todayIso ?? s.date} />}
 
       <div className={styles.kpis}>
         {kpis.map(([label, value, sub, icon, tone], i) => (
