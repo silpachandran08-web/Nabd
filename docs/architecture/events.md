@@ -109,6 +109,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `pharmacy.stock.batch_changed.v1` | StockCommandsImpl (PHL-005/006): one event per batch movement (receipt, dispense, restock, adjustment, opening); subject = item. Never a name or price. Consumer: log-only handler until the realtime/reporting projections of the stock screen exist (the story names core.realtime and core.reporting; the story's `pharmacy.stock.changed.v1` is this type) | itemId, batchId, delta, kind, onHand |
 | `billing.discount.approval_requested.v1` | DiscountApprovalService.create (FIN-018; subject = approval): a bill's discounts and below-list overrides are above the owner's threshold. Consumers: `sse-fanout` (topic `billing`) and the comms-gateway owner notification (separate story; log-only until then) | approvalId, amountMinor, percent |
 | `billing.discount.approval_decided.v1` | DiscountApprovalService.decide (FIN-018; subject = approval), in app or by owner PIN at the desk. Consumer: `sse-fanout` (topic `billing`), so the desk banner updates | approvalId, decision (approved, rejected) |
+| `pharmacy.stock_take.posted.v1` | StockTakeService.post (PHL-010): once when a stock-take session is posted (subject = the session); the per-batch adjustments also publish `pharmacy.stock.batch_changed.v1`. Ids and counts only. Consumer core.reporting: log-only handler until the reporting projection exists | stockTakeId, variances, value |
 
 The following producers belong to other stories and should publish against this catalogue when they land:
 

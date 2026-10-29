@@ -18,7 +18,7 @@ export type Problem = G.Problem;
 export type WaitEstimate = G.WaitEstimateResponse;
 
 // ---- augmentation entries (gap: grants checked in services, not in x-required-permission; owner: billing squad, CheckoutController) ----
-export type AppPermission = G.Permission | "billing.discount";
+export type AppPermission = G.Permission | "billing.discount" | "pharmacy:adjust_approve"; // PHL-010: derived from pharmacy approve, checked in StockTakeService
 
 // ---- augmentation entries (gap: required / nullable not in the spec; owner: billing-pharmacy squad, CheckoutController / RxLineController DTOs) ----
 export type Charge = Patch<G.ChargeResponse, "id" | "code" | "name" | "category" | "baseAmount" | "followUpAmount" | "taxRatePercent", "followUpAmount" | "stockQty">;

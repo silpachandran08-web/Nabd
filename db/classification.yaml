@@ -266,6 +266,31 @@ schemas:
       created_at: operational
       updated_at: operational
       change_seq: operational
+    stock_takes:
+      id: operational
+      tenant_id: operational
+      scope: operational
+      scope_value: operational
+      status: operational
+      snapshot_at: operational
+      created_by: operational
+      posted_by: operational
+      approved_by: operational
+      posted_at: operational
+    stock_take_counts:
+      stock_take_id: operational
+      tenant_id: operational
+      batch_id: operational
+      item_id: operational
+      system_qty_at_snapshot: operational
+      snapshot_seq: operational
+      counted_qty: operational
+      counted_seq: operational
+      counted_by: operational
+      counted_at: operational
+      reason_code: operational
+      note: operational
+      posted_delta: operational
     visit_attachments:
       id: operational
       tenant_id: operational
@@ -1401,6 +1426,8 @@ schemas:
       source_type: operational
       source_id: operational
       fefo_override_reason: operational
+      reason_code: operational
+      approved_by: operational
       id: operational
       seq: operational
       tenant_id: operational

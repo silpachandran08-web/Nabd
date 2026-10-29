@@ -260,6 +260,10 @@ public class PharmacyService {
                     "A reason is required for every stock change.");
         }
         PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        if (item.registerType() != null) { // PHL-010: a controlled drug changes per batch with a second signer, never here
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "approval-required", "Second sign-off required",
+                    "Stock of a controlled drug is adjusted by batch, with a second sign-off.");
+        }
         long target = req.setTo() != null ? req.setTo() : (long) item.stockQty() + req.delta();
         if (target < 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Stock cannot go below zero",
