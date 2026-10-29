@@ -3307,9 +3307,9 @@ paths:
       tags: [Queue]
       summary: "The coded reason list for a kind, in the caller's language (ACC-007)"
       description: "Platform codes for the clinic's market plus the clinic's own additions, minus the ones it hid. locale: en, hi, kn, te, ar (anything else: English). The same list is served to the Edge at /internal/v1/tenants/{tid}/reason-codes."
-      x-required-permission: queue:view
+      x-required-permission: queue:view | billing:create
       parameters:
-        - { name: kind, in: query, required: true, schema: { type: string, enum: [cancel, no_show, reschedule, override, refusal] } }
+        - { name: kind, in: query, required: true, schema: { type: string, enum: [cancel, no_show, reschedule, override, refusal, discount] } }
         - { name: locale, in: query, required: false, schema: { type: string } }
       responses:
         "200": { description: "Reasons in display order ('other' last)", content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, properties: { code: { type: string }, label: { type: string }, requiresNote: { type: boolean } } } } } } } } }

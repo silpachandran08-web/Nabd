@@ -15427,7 +15427,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: queue:view
+      x-required-permission: queue:view | billing:create
     post:
       operationId: ReasonCodeController_add
       requestBody:

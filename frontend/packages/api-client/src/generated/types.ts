@@ -1053,7 +1053,7 @@ export type Operations = {
   QueueController_reorder: { method: "post"; path: "/v1/queue/{id}/reorder"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueReorderRequest; response: QueueEntryResponse };
   QueueController_updateStatus: { method: "patch"; path: "/v1/queue/{id}/status"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueStatusUpdateRequest; response: QueueEntryResponse };
   QueueController_transfer: { method: "post"; path: "/v1/queue/{id}/transfer"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: TransferRequest; response: TransferResponse };
-  ReasonCodeController_list: { method: "get"; path: "/v1/reason-codes"; permission: "queue:view"; pathParams: never; query: { kind: string; locale?: string; }; body: never; response: ReasonCodeList };
+  ReasonCodeController_list: { method: "get"; path: "/v1/reason-codes"; permission: "queue:view | billing:create"; pathParams: never; query: { kind: string; locale?: string; }; body: never; response: ReasonCodeList };
   ReasonCodeController_add: { method: "post"; path: "/v1/reason-codes"; permission: "setup:edit"; pathParams: never; query: never; body: ReasonCodeAddRequest; response: Record<string, Record<string, unknown>> };
   RegionController_list_1: { method: "get"; path: "/v1/regions"; permission: "authenticated"; pathParams: never; query: never; body: never; response: RegionListResponse };
   ReportsController_billingLeakage: { method: "get"; path: "/v1/reports/billing-leakage"; permission: "reports:view"; pathParams: never; query: { thresholdAmount?: number; }; body: never; response: BillingLeakageResponse };

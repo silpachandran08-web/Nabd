@@ -152,7 +152,7 @@ owner,GET /v1/queue,queue:view,allow
 owner,GET /v1/queue/board,queue:view,allow
 owner,GET /v1/queue/eta,queue:view,allow
 owner,GET /v1/queue/wait-estimate,queue:view,allow
-owner,GET /v1/reason-codes,queue:view,allow
+owner,GET /v1/reason-codes,billing:create|queue:view,allow
 owner,GET /v1/reports/billing-leakage,reports:view,allow
 owner,GET /v1/reports/booking-reasons,reports:view,allow
 owner,GET /v1/reports/daily-money,reports:view,allow
@@ -574,7 +574,7 @@ owner_doctor,GET /v1/queue,queue:view,allow
 owner_doctor,GET /v1/queue/board,queue:view,allow
 owner_doctor,GET /v1/queue/eta,queue:view,allow
 owner_doctor,GET /v1/queue/wait-estimate,queue:view,allow
-owner_doctor,GET /v1/reason-codes,queue:view,allow
+owner_doctor,GET /v1/reason-codes,billing:create|queue:view,allow
 owner_doctor,GET /v1/reports/billing-leakage,reports:view,allow
 owner_doctor,GET /v1/reports/booking-reasons,reports:view,allow
 owner_doctor,GET /v1/reports/daily-money,reports:view,allow
@@ -996,7 +996,7 @@ doctor,GET /v1/queue,queue:view,allow
 doctor,GET /v1/queue/board,queue:view,allow
 doctor,GET /v1/queue/eta,queue:view,allow
 doctor,GET /v1/queue/wait-estimate,queue:view,allow
-doctor,GET /v1/reason-codes,queue:view,allow
+doctor,GET /v1/reason-codes,billing:create|queue:view,allow
 doctor,GET /v1/reports/billing-leakage,reports:view,allow
 doctor,GET /v1/reports/booking-reasons,reports:view,allow
 doctor,GET /v1/reports/daily-money,reports:view,allow
@@ -1418,7 +1418,7 @@ nurse,GET /v1/queue,queue:view,allow
 nurse,GET /v1/queue/board,queue:view,allow
 nurse,GET /v1/queue/eta,queue:view,allow
 nurse,GET /v1/queue/wait-estimate,queue:view,allow
-nurse,GET /v1/reason-codes,queue:view,allow
+nurse,GET /v1/reason-codes,billing:create|queue:view,allow
 nurse,GET /v1/reports/billing-leakage,reports:view,deny-403
 nurse,GET /v1/reports/booking-reasons,reports:view,deny-403
 nurse,GET /v1/reports/daily-money,reports:view,deny-403
@@ -1840,7 +1840,7 @@ receptionist,GET /v1/queue,queue:view,allow
 receptionist,GET /v1/queue/board,queue:view,allow
 receptionist,GET /v1/queue/eta,queue:view,allow
 receptionist,GET /v1/queue/wait-estimate,queue:view,allow
-receptionist,GET /v1/reason-codes,queue:view,allow
+receptionist,GET /v1/reason-codes,billing:create|queue:view,allow
 receptionist,GET /v1/reports/billing-leakage,reports:view,deny-403
 receptionist,GET /v1/reports/booking-reasons,reports:view,deny-403
 receptionist,GET /v1/reports/daily-money,reports:view,deny-403
@@ -2262,7 +2262,7 @@ frontdesk_vitals,GET /v1/queue,queue:view,allow
 frontdesk_vitals,GET /v1/queue/board,queue:view,allow
 frontdesk_vitals,GET /v1/queue/eta,queue:view,allow
 frontdesk_vitals,GET /v1/queue/wait-estimate,queue:view,allow
-frontdesk_vitals,GET /v1/reason-codes,queue:view,allow
+frontdesk_vitals,GET /v1/reason-codes,billing:create|queue:view,allow
 frontdesk_vitals,GET /v1/reports/billing-leakage,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/booking-reasons,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/daily-money,reports:view,deny-403
