@@ -193,6 +193,10 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         // the owner (has billing.discount) may do all four
         for (var a : attempts.entrySet()) {
             ResponseEntity<Map> r = exchange("/v1/billing/checkout/" + atCheckout(e), HttpMethod.POST, authedJsonBody(owner, a.getValue()), Map.class);
+            if (a.getKey().equals("legacy discount")) { // FIN-018: the scalar form carries no reason code
+                assertThat(r.getStatusCode()).as("owner / legacy").isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+                continue;
+            }
             assertThat(r.getStatusCode().is2xxSuccessful()).as("owner / " + a.getKey() + " " + r.getBody()).isTrue();
         }
     }

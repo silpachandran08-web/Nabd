@@ -761,6 +761,25 @@ schemas:
       note: financial
       written_by: operational
       created_at: operational
+    discount_approvals:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      draft_ref: operational
+      requested_by: operational
+      amount_minor: financial
+      percent: financial
+      currency: operational
+      reason_code: operational
+      cart: financial  # charge codes, prices, discounts; free-text charge names and notes typed by staff, no patient fields
+      status: operational
+      approver_id: operational
+      method: operational
+      decided_at: operational
+      consumed_at: operational
+      pay_later_at: operational
+      created_at: operational
+      expires_at: operational
     invoice_discounts:
       id: operational
       tenant_id: operational

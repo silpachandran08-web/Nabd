@@ -330,6 +330,48 @@ public class AuthService {
         return new StepUpTokenResponse(token, 300);
     }
 
+    /**
+     * FIN-018: an owner types their PIN at someone else's desk to approve one action there. The PIN is checked against the
+     * bound tenant's active owners (lockout and attempts as for an idle unlock; a miss counts against every owner it was
+     * tried on); the token names the owner it matched, is bound to the desk's session and tenant, lives 5 minutes and is
+     * only accepted by StepUpVerifier.requirePinAssertion. The PIN itself is never stored or logged.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public StepUpTokenResponse issuePinAssertion(Jwt callerJwt, String pin) {
+        List<Staff> owners = repo.findActiveOwners();
+        List<Staff> open = new java.util.ArrayList<>();
+        for (Staff o : owners) {
+            try {
+                guard.enforceLockout(o.id());
+                open.add(o);
+            } catch (ApiException locked) {
+                // a locked owner is not tried; when every owner is locked the 423 below says so
+            }
+        }
+        if (open.isEmpty()) {
+            if (owners.isEmpty()) throw new ApiException(HttpStatus.FORBIDDEN, "pin-invalid", "PIN not accepted", "No owner PIN matched.", java.util.Map.of("code", "PIN_INVALID"));
+            guard.enforceLockout(owners.get(0).id());
+        }
+        Staff owner = open.stream().filter(o -> o.pinHash() != null && pinEncoder.matches(pin, o.pinHash())).findFirst().orElse(null);
+        if (owner == null) {
+            open.forEach(o -> guard.recordAttempt(o.tenantId(), o.id(), o.email(), "pin", false));
+            throw new ApiException(HttpStatus.FORBIDDEN, "pin-invalid", "PIN not accepted", "No owner PIN matched.", java.util.Map.of("code", "PIN_INVALID"));
+        }
+        guard.recordAttempt(owner.tenantId(), owner.id(), owner.email(), "pin", true);
+        Instant now = Instant.now(clock);
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
+                .issuer(ISSUER)
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(300))
+                .subject(owner.id().toString())
+                .claim("purpose", "pin_step_up")
+                .claim("sid", callerJwt.getClaimAsString("sid"))
+                .claim("tenantId", callerJwt.getClaimAsString("tenantId"));
+        TokenType.STEP_UP.stamp(claimsB, Audience.STEP_UP);
+        log.info("owner {} confirmed a desk action by PIN in the session of staff {}", owner.id(), callerJwt.getSubject());
+        return new StepUpTokenResponse(jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue(), 300);
+    }
+
     // ── MFA enrollment (NB-042) ──────────────────────────────────────────
     // Works from either a normal access token (self-service, already logged in) or the
     // mfa_setup_required token issued above (policy forced this staff member to enroll before

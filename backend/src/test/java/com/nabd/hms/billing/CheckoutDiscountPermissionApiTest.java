@@ -18,10 +18,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CheckoutDiscountPermissionApiTest extends ApiTestBase {
 
     private ResponseEntity<Map> otc(String token, int discount) {
-        return exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
-                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)),
-                "discount", discount)), Map.class);
+        return otc(token, discount == 0 ? Map.of("discount", 0) : Map.of("discounts", List.of(Map.of("kind", "amount", "value", discount, "reasonCode", "goodwill"))));
+    }
+
+    private ResponseEntity<Map> otc(String token, Map<String, Object> discount) {
+        Map<String, Object> body = new java.util.HashMap<>(discount);
+        body.put("lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service", "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)));
+        return exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, body), Map.class);
     }
 
     private String tokenFor(boolean refundDiscount, String email, String phone) {
@@ -47,6 +50,14 @@ class CheckoutDiscountPermissionApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = otc(tokenFor(true, "disc@a.com", "+919700000102"), 10);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) resp.getBody().get("discount")).doubleValue()).isEqualTo(10.0);
+    }
+
+    @Test
+    void legacyScalarDiscountWithoutAReasonIsRefusedEvenWithPermission() { // FIN-018: every discount has a reason
+        ResponseEntity<Map> resp = otc(tokenFor(true, "legacy@a.com", "+919700000104"), Map.of("discount", 10));
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(resp.getBody().get("code")).isEqualTo("REASON_REQUIRED");
+        assertThat(otc(tokenFor(false, "legacy2@a.com", "+919700000105"), Map.of("discount", 10)).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

@@ -231,7 +231,7 @@ class PaymentIntegrityApiTest extends ApiTestBase {
         moveTo(c.token(), entry, "checkout_pending");
 
         ResponseEntity<Map> r = exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(c.token(), Map.of(
-                "lineItems", List.of(), "discount", 100)), Map.class);
+                "lineItems", List.of(), "discounts", List.of(Map.of("kind", "amount", "value", 100, "reasonCode", "goodwill")))), Map.class);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(r.getBody().get("type")).asString().contains("total-below-paid");
         assertThat(dbInvoice(c.tenant().id(), inv).get("status")).isEqualTo("paid");

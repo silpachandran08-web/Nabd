@@ -253,7 +253,7 @@ class CheckoutApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
                 "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)),
-                "discount", 500)), Map.class);
+                "discounts", List.of(Map.of("kind", "amount", "value", 500, "reasonCode", "goodwill")))), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(resp.getBody().get("type")).asString().contains("discount-exceeds-subtotal");

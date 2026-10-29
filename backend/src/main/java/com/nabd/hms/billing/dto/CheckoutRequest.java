@@ -13,15 +13,23 @@ import java.util.List;
  * annotation. otcCheckout/sellPackageInvoice (always a brand-new standalone invoice) still get an
  * empty list rejected the same way, via that same service-level check.
  * FIN-003: discounts[] are ledger rows (each needs a reason code). The scalar {@code discount} is the legacy form,
- * kept so older clients keep working; it is booked as one ledger row with reason code "unspecified". */
+ * kept so a zero discount from older clients still parses; since FIN-018 a non-zero one is refused (422 REASON_REQUIRED),
+ * because it carries no reason code.
+ * FIN-018: discountApprovalId is the owner's approval (POST /v1/billing/discount-approvals) for a bill whose discounts and
+ * below-list overrides are above the clinic's threshold; without it such a bill is refused with 409 APPROVAL_REQUIRED. */
 public record CheckoutRequest(
         @NotNull @Valid List<LineItemRequest> lineItems,
         @DecimalMin(value = "0") BigDecimal discount,
         @Valid List<DiscountRequest> discounts,
-        String buyerGstin
+        String buyerGstin,
+        java.util.UUID discountApprovalId
 ) {
     public CheckoutRequest(List<LineItemRequest> lineItems, BigDecimal discount) {
-        this(lineItems, discount, null, null);
+        this(lineItems, discount, null, null, null);
+    }
+
+    public CheckoutRequest(List<LineItemRequest> lineItems, BigDecimal discount, List<DiscountRequest> discounts, String buyerGstin) {
+        this(lineItems, discount, discounts, buyerGstin, null);
     }
 
     public record DiscountRequest(@NotNull String kind, @NotNull @DecimalMin(value = "0.01") BigDecimal value,

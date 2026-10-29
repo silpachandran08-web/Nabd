@@ -196,6 +196,12 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         if ("cash_variance_tolerance".equals(policyKey) && !req.value().matches("^\\d{1,9}$")) { // FIN-005: minor units
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
         }
+        if ("discount_threshold_amount".equals(policyKey) && !req.value().matches("^(off|\\d{1,12})$")) { // FIN-018: minor units
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "The discount threshold is a whole number of minor currency units, or off.");
+        }
+        if ("discount_threshold_percent".equals(policyKey) && !req.value().matches("^(off|100(\\.0{1,2})?|\\d{1,2}(\\.\\d{1,2})?)$")) { // FIN-018
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "The discount threshold is a percent from 0 to 100 (two decimals at most), or off.");
+        }
         if (policyKey.startsWith("print.default_paper.") && !req.value().matches("^(a4|a5|80mm)$")) { // FEF-046
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Default paper must be a4, a5 or 80mm");
         }

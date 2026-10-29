@@ -253,7 +253,7 @@ class ReportsApiTest extends ApiTestBase {
         String e = checkIn(token, registerPatient(token, "S2a", "+919999970133"), owner.id(), null);
         moveTo(token, e, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         ResponseEntity<Map> invoice = exchange("/v1/billing/checkout/" + e, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "discount", 10, "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
+                "discounts", List.of(Map.of("kind", "amount", "value", 10, "reasonCode", "goodwill")), "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 200, "taxRatePercent", 0)))), Map.class);
         exchange("/v1/billing/invoices/" + invoice.getBody().get("id") + "/payments", HttpMethod.POST,
                 authedJsonBody(token, Map.of("method", "cash", "amount", 190)), Map.class);
