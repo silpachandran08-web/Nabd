@@ -9,6 +9,7 @@ import com.nabd.hms.auth.dto.MfaVerifyRequest;
 import com.nabd.hms.auth.dto.OtpRequestRequest;
 import com.nabd.hms.auth.dto.OtpVerifyRequest;
 import com.nabd.hms.auth.dto.PinResetConfirmRequest;
+import com.nabd.hms.auth.dto.StepUpTokenResponse;
 import com.nabd.hms.auth.dto.PinResetRequestRequest;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
@@ -124,6 +125,12 @@ public class AuthController {
     public ResponseEntity<Void> confirmPinReset(@Valid @RequestBody PinResetConfirmRequest req, HttpServletRequest http) {
         authService.confirmPinReset(req, RequestMeta.clientIp(http));
         return ResponseEntity.noContent().build();
+    }
+
+    /** FIN-018: an owner confirms an action at this desk with their PIN; the token goes to that action (e.g. a discount approval). */
+    @PostMapping("/pin-assertion")
+    public StepUpTokenResponse pinAssertion(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UnlockRequest req) {
+        return authService.issuePinAssertion(jwt, req.pin());
     }
 
     @PostMapping("/unlock")

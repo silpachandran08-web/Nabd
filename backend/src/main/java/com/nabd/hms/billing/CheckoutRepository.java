@@ -199,10 +199,11 @@ class CheckoutRepository {
         return out;
     }
 
-    void insertDiscounts(UUID tenantId, UUID invoiceId, List<BillingPricing.DiscountInput> discounts, UUID staffId) {
+    /** FIN-018: approvalId = the owner approval the rows were issued under (null below the threshold). */
+    void insertDiscounts(UUID tenantId, UUID invoiceId, List<BillingPricing.DiscountInput> discounts, UUID staffId, UUID approvalId) {
         for (var d : discounts) {
-            jdbc.update("INSERT INTO invoice_discounts (tenant_id, invoice_id, kind, value, amount, reason_code, note, applied_by) " +
-                    "VALUES (?,?,?,?,?,?,?,?)", tenantId, invoiceId, d.kind(), d.value(), d.amount(), d.reasonCode(), d.note(), staffId);
+            jdbc.update("INSERT INTO invoice_discounts (tenant_id, invoice_id, kind, value, amount, reason_code, note, applied_by, approval_id) " +
+                    "VALUES (?,?,?,?,?,?,?,?,?)", tenantId, invoiceId, d.kind(), d.value(), d.amount(), d.reasonCode(), d.note(), staffId, approvalId);
         }
     }
 

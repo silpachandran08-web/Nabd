@@ -25,7 +25,7 @@ import java.util.UUID;
 @Transactional
 class ReasonCodeService implements ReasonCodes {
 
-    static final Set<String> KINDS = Set.of("cancel", "no_show", "reschedule", "override", "refusal");
+    static final Set<String> KINDS = Set.of("cancel", "no_show", "reschedule", "override", "refusal", "discount"); // FIN-018: discount = billing price changes
     private static final Set<String> LANGS = Set.of("en", "hi", "kn", "te", "ar");
     private static final int NOTE_MAX = 200;
 
@@ -49,7 +49,7 @@ class ReasonCodeService implements ReasonCodes {
     @Override
     public List<Item> list(String kind, String locale) {
         if (!KINDS.contains(kind)) {
-            throw bad("INVALID_KIND", "kind must be one of cancel, no_show, reschedule, override, refusal.");
+            throw bad("INVALID_KIND", "kind must be one of cancel, no_show, reschedule, override, refusal, discount.");
         }
         UUID tenant = tenantContext.current();
         String lang = locale == null ? "en" : locale.toLowerCase().split("[-_]")[0];
@@ -100,7 +100,7 @@ class ReasonCodeService implements ReasonCodes {
     /** POST /v1/reason-codes: the tenant adds an entry; platform codes (and the tenant's own) cannot be redefined. */
     Map<String, Object> add(UUID staffId, String kind, String code, Map<String, String> labels) {
         if (!KINDS.contains(kind)) {
-            throw bad("INVALID_KIND", "kind must be one of cancel, no_show, reschedule, override, refusal.");
+            throw bad("INVALID_KIND", "kind must be one of cancel, no_show, reschedule, override, refusal, discount.");
         }
         if (code == null || !code.matches("[a-z0-9_]{3,40}")) {
             throw bad("INVALID_CODE", "code must be 3 to 40 characters: lower-case letters, digits and _.");

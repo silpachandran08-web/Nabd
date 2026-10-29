@@ -13,20 +13,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 /**
  * FIN-003: the one place a bill line gets its price. The client sends chargeCode + quantity; name, category, tier price
  * and tax come from charge_catalogue. Changing any price-bearing field (override, free-text line, discount) needs
- * billing.discount; an override or discount also needs a coded reason.
+ * billing.discount; an override, free-text line or discount also needs a coded reason from the ACC-007 list, kind 'discount' (FIN-018).
  */
 @Component
 class BillingPricing {
 
-    // shortcut: billing-local reason list until the shared T-321 list lands; swap this set for that list then.
-    static final Set<String> REASON_CODES = Set.of("goodwill", "staff", "price_match", "waiver", "pricing_error", "other");
-    static final String LEGACY_REASON = "unspecified";
+    static final String REASON_KIND = "discount";
 
     record DiscountInput(String kind, BigDecimal value, BigDecimal amount, String reasonCode, String note) {
     }
@@ -35,9 +32,11 @@ class BillingPricing {
     private final com.nabd.hms.organization.api.RegionRules regions;
     private final ConfigCache configCache;
     private final com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy;
+    private final com.nabd.hms.queue.api.ReasonCodes reasons;
 
     BillingPricing(CheckoutRepository repo, com.nabd.hms.organization.api.RegionRules regions, ConfigCache configCache,
-                   com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy) {
+                   com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy, com.nabd.hms.queue.api.ReasonCodes reasons) {
+        this.reasons = reasons;
         this.pharmacy = pharmacy;
         this.repo = repo;
         this.regions = regions;
@@ -125,9 +124,9 @@ class BillingPricing {
     /** Ledger rows for this request. remaining = combined subtotal minus discounts already on the invoice. */
     List<DiscountInput> resolveDiscounts(BigDecimal legacyDiscount, List<DiscountRequest> discounts, boolean canDiscount, BigDecimal remaining) {
         List<DiscountInput> out = new ArrayList<>();
-        if (legacyDiscount.signum() > 0) {
+        if (legacyDiscount.signum() > 0) { // FIN-018: every discount has a coded reason; the scalar form carries none
             requireDiscountRight(canDiscount);
-            out.add(new DiscountInput("amount", legacyDiscount, legacyDiscount, LEGACY_REASON, null));
+            requireReason(null);
         }
         for (DiscountRequest d : discounts) {
             requireDiscountRight(canDiscount);
@@ -155,14 +154,14 @@ class BillingPricing {
         }
     }
 
-    private static String requireReason(String code) {
+    private String requireReason(String code) {
         if (code == null || code.isBlank()) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "reason-required", "Reason required",
-                    "Pick a reason for this price change or discount.");
+                    "Pick a reason for this price change or discount.", java.util.Map.of("code", "REASON_REQUIRED"));
         }
-        if (!REASON_CODES.contains(code)) {
+        if (reasons.list(REASON_KIND, "en").stream().noneMatch(r -> r.code().equals(code))) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "invalid-reason", "Unknown reason",
-                    "'" + code + "' is not a valid reason code.");
+                    "'" + code + "' is not a valid reason code.", java.util.Map.of("code", "REASON_INVALID"));
         }
         return code;
     }

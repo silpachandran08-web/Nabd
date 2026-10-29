@@ -95,3 +95,6 @@
   .header { flex-direction: column; }
 }
 .history { list-style: none; margin: 0; padding: 0; }
+/* FIN-018: owner finance (approvals inbox, thresholds, leakage): 44 px targets */
+.btnTapAlt { composes: btn; height: 44px; flex-shrink: 0; }
+.inputTall { composes: input; height: 44px; }

@@ -3,7 +3,7 @@ package com.nabd.hms.queue.api;
 import java.util.List;
 
 /**
- * ACC-007: the one coded reason list (cancel, no_show, reschedule, override, refusal) for the bound tenant's market plus the
+ * ACC-007: the one coded reason list (cancel, no_show, reschedule, override, refusal; FIN-018 discount) for the bound tenant's market plus the
  * tenant's own additions. Other modules and stories read and validate reasons only through this interface.
  */
 public interface ReasonCodes {

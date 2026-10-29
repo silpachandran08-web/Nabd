@@ -15,7 +15,10 @@ import TenderRows from "../../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../../components/checkout/tender";
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
 import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "@nabd/api-client/types";
-import { PRICE_REASONS, reasonLabel } from "../../../components/checkout/priceReasons";
+import { usePriceReasons } from "../../../components/checkout/priceReasons";
+import ApprovalBanner from "../../../components/checkout/ApprovalBanner";
+import { bannerApproval, needsApproval, type DiscountApproval } from "../../../components/checkout/discountApproval";
+import { useLiveRefresh } from "../../../lib/live";
 import { FieldError, useFormErrors } from "../../../lib/formErrors";
 import { useFormValidation, useUnsavedGuard } from "../../../lib/formValidation";
 import { discountSchema } from "../../../lib/formSchemas";
@@ -58,6 +61,9 @@ export default function CheckoutPage() {
   const canPay = can("billing:edit");      // POST /billing/invoices/{id}/payments
   const canAdvance = can("queue:edit");    // PATCH /queue/{id}/status
   const canDiscount = can("billing.discount"); // REC-043: input absent, and discount not sent, without it
+  const canApprove = can("billing:approve"); // FIN-018: 'Enter owner PIN' (POST /billing/discount-approvals/{id}/decide)
+  const reasons = usePriceReasons();
+  const reasonLabel = reasons.label;
   const params = useParams<{ queueEntryId: string }>();
   const queueEntryId = params.queueEntryId;
 
@@ -92,7 +98,8 @@ export default function CheckoutPage() {
   // PHL-018: the visit's in-house Rx lines, which are ticked into `items`, and the "dispense anyway" reasons
   const [prefill, setPrefill] = useState<PrefillLine[]>([]);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
-  const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [rxReasons, setReasons] = useState<Record<string, string>>({});
+  const [approval, setApproval] = useState<DiscountApproval | null>(null); // FIN-018: this bill's owner-approval request
 
   const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused on a retry of the same bill/payment/step
 
@@ -109,6 +116,30 @@ export default function CheckoutPage() {
     });
     if (add.length > 0) setItems((prev) => [...prev, ...add.filter((a) => !prev.some((i) => i.chargeCode === a.chargeCode))]);
   }, [queueEntryId, canBill]);
+
+  // FIN-018: the newest approval request for this bill. On a fresh page it also puts the waiting cart back.
+  const loadApproval = useCallback(async (ctx?: CheckoutContext) => {
+    const res = await api.get<{ items: DiscountApproval[] }>(`/billing/discount-approvals?invoiceDraftId=${queueEntryId}`).catch(() => null);
+    if (!res) return;
+    const a = bannerApproval(res.items);
+    setApproval(a);
+    if (a && ctx && a.billStatus !== "rejected") {
+      const lines = (a.cart.lineItems ?? []).flatMap((l): LineItem[] => {
+        const c = ctx.charges.find((x) => x.code === l.chargeCode);
+        if (!c && !l.chargeName) return [];
+        const price = l.override?.unitPrice ?? c?.baseAmount ?? l.unitPrice ?? 0;
+        return [{ chargeCode: l.chargeCode, chargeName: c?.name ?? l.chargeName ?? l.chargeCode, category: c?.category ?? l.category ?? "Service",
+          quantity: l.quantity ?? 1, unitPrice: price, taxRatePercent: c?.taxRatePercent ?? l.taxRatePercent ?? 0,
+          ...(l.override ? { override: { unitPrice: price, reasonCode: l.override.reasonCode ?? "" } } : {}),
+          ...(l.prescriptionItemId ? { prescriptionItemId: l.prescriptionItemId } : {}) }];
+      });
+      setItems(lines);
+      const d = (a.cart.discounts ?? []).find((x) => x.kind === "amount");
+      setDiscount(d ? String(d.value) : "0");
+      setDiscountReason(d?.reasonCode ?? "");
+    }
+  }, [queueEntryId]);
+  useLiveRefresh(["discount-approvals"], () => loadApproval()); // SSE `billing` topic: the owner's decision lands here
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,13 +158,15 @@ export default function CheckoutPage() {
       const inv = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
       if (inv) setInvoice(inv);
       await loadPrefill(ctx, !inv);
+      if (canBill) await loadApproval(ctx);
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setForbidden(true);
       else setError(e instanceof ApiError ? "Couldn't load checkout details. Try again." : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [queueEntryId, loadPrefill]);
+  }, [queueEntryId, loadPrefill, loadApproval, canBill]);
+
 
   useUnsavedGuard(!invoice && (items.length > 0 || Number(discount) !== 0 || tenders.some((t) => t.amount !== ""))); // FEF-033
   useEffect(() => {
@@ -176,7 +209,7 @@ export default function CheckoutPage() {
     const c = context?.charges.find((x) => x.code === l.chargeCode);
     setItems((prev) => {
       const rest = prev.filter((i) => i.chargeCode !== l.chargeCode);
-      return on && c ? [...rest, toBillLine(l, c, reason ?? reasons[l.chargeCode])] : rest;
+      return on && c ? [...rest, toBillLine(l, c, reason ?? rxReasons[l.chargeCode])] : rest;
     });
   }
 
@@ -228,17 +261,19 @@ export default function CheckoutPage() {
     // FEF-033: a typed discount (even a negative one) is checked against the API's discount schema; errors sit on the fields.
     if (canDiscount && Number(discount) !== 0 && !fv.submit(discountSchema(subtotal), { value: Number(discount), reasonCode: discountReason }, document.body)) return null;
     setCreating(true);
-    try {
-      const body = {
+    const body = {
         // codes only: the server prices every line from the catalogue (FIN-003)
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}),
           ...(() => { const tl = tierLineOf(i.chargeCode); const t = tl ? tierToSend(tl, tierPicks[i.chargeCode]) : undefined; return t ? { tier: t } : {}; })(),
           ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}), ...(i.shortfallReason ? { shortfallReason: i.shortfallReason } : {}) })),
         ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
+        ...(approval?.billStatus === "approved" ? { discountApprovalId: approval.approvalId } : {}),
       };
+    try {
       const inv = await api.post<Invoice>(`/billing/checkout/${queueEntryId}`, body, { idempotencyKey: keys.current.get("bill", body) });
       keys.current.done("bill");
       setInvoice(inv);
+      setApproval(null);
       setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
       if (context) void loadPrefill(context, false);
       setDiscount("0");
@@ -246,11 +281,26 @@ export default function CheckoutPage() {
       setShowAddMore(false);
       return inv;
     } catch (e) {
+      // FIN-018: above the owner's threshold the bill waits; ask the owner (push + in-app inbox) with the same cart.
+      if (e instanceof ApiError && e.status === 409 && needsApproval(e.problem)) {
+        await requestApproval(body);
+        return null;
+      }
       // A server answer is a refusal; no answer (or a timeout) leaves the outcome unknown.
       setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : "Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
       return null;
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function requestApproval(body: { lineItems: unknown[]; discounts?: unknown[] }) {
+    const req = { invoiceDraftId: queueEntryId, lineItems: body.lineItems, ...(body.discounts ? { discounts: body.discounts } : {}) };
+    try {
+      setApproval(await api.post<DiscountApproval>("/billing/discount-approvals", req, { idempotencyKey: keys.current.get("approval", req) }));
+      keys.current.done("approval");
+    } catch (e) {
+      setCreateError(errorText(e, "Couldn't send the discount to the owner for approval."));
     }
   }
 
@@ -362,7 +412,7 @@ export default function CheckoutPage() {
 
   const picker = (
     <>
-    <RxPrefillBlock lines={prefill} ticked={ticked} reasons={reasons} onToggle={(l, on) => toggleRx(l, on)} onReason={setRxReason} />
+    <RxPrefillBlock lines={prefill} ticked={ticked} reasons={rxReasons} onToggle={(l, on) => toggleRx(l, on)} onReason={setRxReason} />
     <div className={styles.layout}>
       <div className={styles.card}>
         <h2 className={styles.cardTitle}>Charges</h2>
@@ -432,7 +482,7 @@ export default function CheckoutPage() {
                         <input aria-label="Override unit price" className={styles.discountInput} type="number" step="0.01" min="0" value={ovPrice} onChange={(e) => setOvPrice(e.target.value)} />
                         <select aria-label="Override reason" className={styles.discountInput} value={ovReason} onChange={(e) => setOvReason(e.target.value)}>
                           <option value="">Reason…</option>
-                          {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                          {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
                         </select>
                         <button type="button" className={styles.removeBtn} disabled={!ovReason || ovPrice === ""} onClick={() => applyOverride(i.chargeCode)}>Apply</button>
                         <button type="button" className={styles.removeBtn} onClick={() => setEditing(null)}>Cancel</button>
@@ -464,7 +514,7 @@ export default function CheckoutPage() {
               <span>Discount reason</span>
               <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => { fe.clearField("reasonCode"); setDiscountReason(e.target.value); }} onBlur={() => fv.blur(discountSchema(subtotal), "reasonCode", { value: 1, reasonCode: discountReason })} {...fe.attrs("reasonCode")}>
                 <option value="">Reason…</option>
-                {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
               </select>
             </div>
           )}
@@ -618,6 +668,11 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      {approval && canBill && (
+        <ApprovalBanner approval={approval} currency={context.currency} canPin={canApprove} canPayLater={canBill} reasonLabel={reasonLabel}
+          onChange={setApproval} onPayLater={() => router.push("/arrivals")} reload={() => loadApproval()} />
+      )}
+      {canDiscount && reasons.error && <div className={styles.errorState} role="alert">Couldn&apos;t load the price-change reasons, so discounts and overrides can&apos;t be applied. Reload to try again.</div>}
       {!canBill && !invoice && <div className={styles.state}>No invoice has been generated for this visit yet.</div>}
       {canBill && (!invoice || showAddMore) && <>{picker}{collectBar}</>}
     </main>

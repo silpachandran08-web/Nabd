@@ -2580,6 +2580,37 @@ paths:
       tags:
       - auth
       x-required-permission: public
+  /v1/auth/pin-assertion:
+    post:
+      operationId: AuthController_pinAssertion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnlockRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StepUpTokenResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - auth
+      x-required-permission: authenticated
   /v1/auth/pin/change:
     post:
       operationId: PinChangeController_change
@@ -3087,6 +3118,167 @@ paths:
       tags:
       - billing
       x-required-permission: billing:approve
+  /v1/billing/discount-approvals:
+    get:
+      operationId: DiscountApprovalController_list
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: invoiceDraftId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApprovalList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+    post:
+      operationId: DiscountApprovalController_request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscountApprovalCreateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApproval"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:create
+  /v1/billing/discount-approvals/{id}/decide:
+    post:
+      operationId: DiscountApprovalController_decide
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscountApprovalDecideRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApproval"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:approve
+  /v1/billing/discount-approvals/{id}/pay-later:
+    post:
+      operationId: DiscountApprovalController_payLater
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApproval"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:create
   /v1/billing/dues:
     get:
       operationId: DuesController_dues
@@ -3773,6 +3965,55 @@ paths:
       tags:
       - billing
       x-required-permission: billing:approve
+  /v1/billing/leakage:
+    get:
+      operationId: DiscountApprovalController_leakage
+      parameters:
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: type
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LeakageResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: reports:view
   /v1/billing/otc-charges:
     get:
       operationId: CheckoutController_otcCharges
@@ -21300,6 +21541,9 @@ components:
           type: number
           exclusiveMinimum: false
           minimum: 0
+        discountApprovalId:
+          type: string
+          format: uuid
         discounts:
           type: array
           items:
@@ -22192,6 +22436,112 @@ components:
         total:
           type: integer
           format: int32
+    DiscountApproval:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        approvalId:
+          type: string
+          format: uuid
+        approverId:
+          type: string
+          format: uuid
+        approverName:
+          type: string
+        billStatus:
+          type: string
+        cart:
+          $ref: "#/components/schemas/CheckoutRequest"
+        createdAt:
+          type: string
+          format: date-time
+        currency:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        invoiceDraftId:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        method:
+          type: string
+        payLater:
+          type: boolean
+        percent:
+          type: number
+        reasonCode:
+          type: string
+        requestedBy:
+          type: string
+          format: uuid
+        requestedByName:
+          type: string
+        status:
+          type: string
+      required:
+      - amountMinor
+      - approvalId
+      - billStatus
+      - cart
+      - createdAt
+      - currency
+      - expiresAt
+      - payLater
+      - percent
+      - reasonCode
+      - requestedBy
+      - requestedByName
+      - status
+    DiscountApprovalCreateRequest:
+      type: object
+      properties:
+        buyerGstin:
+          type: string
+        discounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountRequest"
+        invoiceDraftId:
+          type: string
+          format: uuid
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineItemRequest"
+      required:
+      - invoiceDraftId
+      - lineItems
+    DiscountApprovalDecideRequest:
+      type: object
+      properties:
+        decision:
+          type: string
+          minLength: 1
+        method:
+          type: string
+          minLength: 1
+        pinAssertion:
+          type: string
+      required:
+      - decision
+      - method
+    DiscountApprovalList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountApproval"
+      required:
+      - items
     DiscountPage:
       type: object
       properties:
@@ -24399,6 +24749,106 @@ components:
           format: uuid
       required:
       - appointmentId
+    LeakageItem:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        appliedBy:
+          type: string
+          format: uuid
+        appliedByName:
+          type: string
+        approvalMethod:
+          type: string
+        approverId:
+          type: string
+          format: uuid
+        approverName:
+          type: string
+        at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        reasonCode:
+          type: string
+        type:
+          type: string
+      required:
+      - amountMinor
+      - approvalMethod
+      - at
+      - id
+      - invoiceId
+      - reasonCode
+      - type
+    LeakageResponse:
+      type: object
+      properties:
+        currency:
+          type: string
+        from:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeakageItem"
+        to:
+          type: string
+          format: date
+        totals:
+          $ref: "#/components/schemas/LeakageTotals"
+      required:
+      - currency
+      - from
+      - items
+      - to
+      - totals
+    LeakageTotals:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int32
+        discountMinor:
+          type: integer
+          format: int64
+        overrideMinor:
+          type: integer
+          format: int64
+        ownerApprovedMinor:
+          type: integer
+          format: int64
+        refundMinor:
+          type: integer
+          format: int64
+        totalMinor:
+          type: integer
+          format: int64
+        withoutOwnerApprovalMinor:
+          type: integer
+          format: int64
+        writeOffMinor:
+          type: integer
+          format: int64
+      required:
+      - count
+      - discountMinor
+      - overrideMinor
+      - ownerApprovedMinor
+      - refundMinor
+      - totalMinor
+      - withoutOwnerApprovalMinor
+      - writeOffMinor
     LeaveAffectedAppointment:
       type: object
       properties:
@@ -28617,6 +29067,14 @@ components:
         mobile:
           type: string
         specialty:
+          type: string
+    StepUpTokenResponse:
+      type: object
+      properties:
+        expiresIn:
+          type: integer
+          format: int64
+        stepUpToken:
           type: string
     StockBatch:
       type: object

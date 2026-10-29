@@ -167,7 +167,8 @@ class SetupRepository {
         ensurePoliciesSeeded(tenantId);
         int n = jdbc.update("UPDATE clinic_policies SET value = ?, version = version + 1, updated_at = now() WHERE tenant_id = ? AND policy_key = ?",
                 value, tenantId, policyKey);
-        if (n == 0 && ("session.idle_lock_minutes".equals(policyKey) || "cash_variance_tolerance".equals(policyKey) || policyKey.startsWith("print.default_paper."))) { // FEF-005/FIN-005/FEF-046: not seeded, first write creates it
+        if (n == 0 && ("session.idle_lock_minutes".equals(policyKey) || "cash_variance_tolerance".equals(policyKey) || policyKey.startsWith("print.default_paper.")
+                || "discount_threshold_amount".equals(policyKey) || "discount_threshold_percent".equals(policyKey))) { // FEF-005/FIN-005/FEF-046/FIN-018: not seeded, first write creates it
             jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, ?, ?)", tenantId, policyKey, value);
         }
     }

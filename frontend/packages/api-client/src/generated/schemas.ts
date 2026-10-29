@@ -121,7 +121,7 @@ export const CheckoutPrefillResponseSchema = z.object({ lines: z.array(CheckoutP
 export const DiscountRequestSchema = z.object({ kind: z.string(), note: z.string().optional(), reasonCode: z.string().optional(), value: z.number().gte(0.01) });
 export const OverrideSchema = z.object({ note: z.string().optional(), reasonCode: z.string().optional(), unitPrice: z.number().gte(0).optional() });
 export const LineItemRequestSchema = z.object({ category: z.string().optional(), chargeCode: z.string().min(1), chargeName: z.string().optional(), override: OverrideSchema.optional(), prescriptionItemId: z.string().optional(), quantity: z.number().int().gte(1).optional(), shortfallReason: z.string().min(0).max(200).optional(), taxRatePercent: z.number().gte(0).optional(), tier: z.string().optional(), unitPrice: z.number().gte(0).optional() });
-export const CheckoutRequestSchema = z.object({ buyerGstin: z.string().optional(), discount: z.number().gte(0).optional(), discounts: z.array(DiscountRequestSchema).optional(), lineItems: z.array(LineItemRequestSchema) });
+export const CheckoutRequestSchema = z.object({ buyerGstin: z.string().optional(), discount: z.number().gte(0).optional(), discountApprovalId: z.string().optional(), discounts: z.array(DiscountRequestSchema).optional(), lineItems: z.array(LineItemRequestSchema) });
 export const ClassDefSchema = z.object({ crossReactsTo: z.array(z.string()).optional(), id: z.string().optional() });
 export const ClinicDayStartRequestSchema = z.object({ dayStart: z.string().optional() });
 export const ClinicDayStartResponseSchema = z.object({ dayStart: z.string().optional(), effectiveFromClinicDate: z.string().optional() });
@@ -188,6 +188,10 @@ export const DeskExceptionPageSchema = z.object({ items: z.array(DeskExceptionIt
 export const DeskNoShowSchema = z.object({ appointmentId: z.string().optional(), doctorName: z.string().optional(), patientName: z.string().optional(), startTime: z.string().optional() });
 export const DeskVisitsSchema = z.object({ completed: z.number().int().optional(), inFlow: z.number().int().optional(), total: z.number().int().optional() });
 export const DeskSummaryResponseSchema = z.object({ collectionsByMode: z.array(MethodSchema).optional(), currency: z.string().optional(), date: z.string().optional(), noShows: z.array(DeskNoShowSchema).optional(), today: z.boolean().optional(), unbilled: z.array(UnbilledSchema).optional(), visits: DeskVisitsSchema.optional() });
+export const DiscountApprovalSchema = z.object({ amountMinor: z.number().int(), approvalId: z.string(), approverId: z.string().optional(), approverName: z.string().optional(), billStatus: z.string(), cart: CheckoutRequestSchema, createdAt: z.string(), currency: z.string(), decidedAt: z.string().optional(), expiresAt: z.string(), invoiceDraftId: z.string().optional(), invoiceId: z.string().optional(), method: z.string().optional(), payLater: z.boolean(), percent: z.number(), reasonCode: z.string(), requestedBy: z.string(), requestedByName: z.string(), status: z.string() });
+export const DiscountApprovalCreateRequestSchema = z.object({ buyerGstin: z.string().optional(), discounts: z.array(DiscountRequestSchema).optional(), invoiceDraftId: z.string(), lineItems: z.array(LineItemRequestSchema) });
+export const DiscountApprovalDecideRequestSchema = z.object({ decision: z.string().min(1), method: z.string().min(1), pinAssertion: z.string().optional() });
+export const DiscountApprovalListSchema = z.object({ items: z.array(DiscountApprovalSchema) });
 export const DiscountResponseSchema = z.object({ createdAt: z.string().optional(), id: z.string().optional(), percent: z.number().optional(), reason: z.string().optional(), requestedBy: z.string().optional(), requestedByName: z.string().optional(), reviewedAt: z.string().optional(), reviewedBy: z.string().optional(), reviewedByName: z.string().optional(), status: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional() });
 export const DiscountPageSchema = z.object({ data: z.array(DiscountResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const DiscountRequestCreateSchema = z.object({ percent: z.number().gte(0.01).lte(100), reason: z.string().min(1), tenantId: z.string() });
@@ -332,6 +336,9 @@ export const InvoiceSeriesResponseSchema = z.object({ fiscalYear: z.string().opt
 export const InvoiceSeriesListResponseSchema = z.object({ items: z.array(InvoiceSeriesResponseSchema).optional() });
 export const KillRequestSchema = z.object({ active: z.boolean().optional(), reason: z.string().min(0).max(500) });
 export const LateArrivalRequestSchema = z.object({ appointmentId: z.string() });
+export const LeakageItemSchema = z.object({ amountMinor: z.number().int(), appliedBy: z.string().optional(), appliedByName: z.string().optional(), approvalMethod: z.string(), approverId: z.string().optional(), approverName: z.string().optional(), at: z.string(), id: z.string(), invoiceId: z.string(), invoiceNumber: z.string().optional(), reasonCode: z.string(), type: z.string() });
+export const LeakageTotalsSchema = z.object({ count: z.number().int(), discountMinor: z.number().int(), overrideMinor: z.number().int(), ownerApprovedMinor: z.number().int(), refundMinor: z.number().int(), totalMinor: z.number().int(), withoutOwnerApprovalMinor: z.number().int(), writeOffMinor: z.number().int() });
+export const LeakageResponseSchema = z.object({ currency: z.string(), from: z.string(), items: z.array(LeakageItemSchema), to: z.string(), totals: LeakageTotalsSchema });
 export const LiabilityResponseSchema = z.object({ activePatientPackages: z.number().int().optional(), expiringIn30Days: z.number().int().optional(), inGracePeriod: z.number().int().optional(), potentialExpiryLoss: z.number().optional(), refundsAwaitingApproval: z.number().int().optional(), remainingAllocatedValue: z.number().optional(), remainingListValue: z.number().optional(), sessionsOwed: z.number().int().optional() });
 export const LicenceOverrideRequestSchema = z.object({ reason: z.string().min(0).max(200), until: z.string() });
 export const LicenceRequestSchema = z.object({ isClinician: z.boolean(), licenceExpiresOn: z.string().optional() });
@@ -563,6 +570,7 @@ export const StaffShiftResponseSchema = z.object({ effectiveFrom: z.string().opt
 export const StaffShiftWriteRequestSchema = z.object({ effectiveFrom: z.string(), effectiveTo: z.string().optional(), patternJson: z.string().min(1), staffId: z.string() });
 export const StaffSummaryResponseSchema = z.object({ id: z.string().optional(), name: z.string().optional(), roleName: z.string().optional() });
 export const StartRequestSchema = z.object({ clinicName: z.string().optional(), consentToContact: z.boolean().optional(), market: z.string().optional(), mobile: z.string().optional(), specialty: z.string().optional() });
+export const StepUpTokenResponseSchema = z.object({ expiresIn: z.number().int().optional(), stepUpToken: z.string().optional() });
 export const StockBatchSchema = z.object({ batchId: z.string().optional(), batchNo: z.string().optional(), expiryDate: z.string().optional(), expiryUnknown: z.boolean().optional(), location: z.string().optional(), mrp: z.number().optional(), purchaseRate: z.number().optional(), qtyOnHand: z.number().int().optional(), status: z.string().optional() });
 export const StockBatchMovementSchema = z.object({ delta: z.number().int().optional(), id: z.string().optional(), kind: z.string().optional(), occurredAt: z.string().optional(), qtyAfter: z.number().int().optional(), qtyBefore: z.number().int().optional(), reason: z.string().optional() });
 export const StockBatchPatchRequestSchema = z.object({ batchNo: z.string().min(0).max(80).optional(), expiryDate: z.string().min(0).max(10).optional(), location: z.string().min(0).max(80).optional(), reason: z.string().min(3).max(200) });
@@ -703,6 +711,7 @@ export const operationSchemas = {
   AuthController_verifyMfa: { body: MfaVerifyRequestSchema, response: z.record(z.string(), z.unknown()) },
   AuthController_requestOtp: { body: OtpRequestRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   AuthController_verifyOtp: { body: OtpVerifyRequestSchema, response: z.record(z.string(), z.unknown()) },
+  AuthController_pinAssertion: { body: UnlockRequestSchema, response: StepUpTokenResponseSchema },
   PinChangeController_change: { body: PinChangeRequestSchema },
   AuthController_confirmPinReset: { body: PinResetConfirmRequestSchema },
   AuthController_requestPinReset: { body: PinResetRequestRequestSchema },
@@ -718,6 +727,10 @@ export const operationSchemas = {
   DayCloseController_close: { body: DayCloseRequestSchema, response: DayCloseSummaryResponseSchema },
   DayCloseController_history: { response: DayCloseHistoryResponseSchema },
   DayCloseController_reopen: { body: DayReopenRequestSchema, response: DayCloseSummaryResponseSchema },
+  DiscountApprovalController_list: { response: DiscountApprovalListSchema },
+  DiscountApprovalController_request: { body: DiscountApprovalCreateRequestSchema, response: DiscountApprovalSchema },
+  DiscountApprovalController_decide: { body: DiscountApprovalDecideRequestSchema, response: DiscountApprovalSchema },
+  DiscountApprovalController_payLater: { response: DiscountApprovalSchema },
   DuesController_dues: { response: DuesResponseSchema },
   DuesController_remind: { body: DuesRemindRequestSchema, response: z.record(z.string(), z.string()) },
   GatewayAccountController_connect: { body: ConnectRequestSchema, response: AccountViewSchema },
@@ -733,6 +746,7 @@ export const operationSchemas = {
   RefundController_request: { body: RefundRequestRequestSchema, response: RefundRequestResponseSchema },
   CheckoutController_voidInvoice: { body: VoidInvoiceRequestSchema, response: InvoiceResponseSchema },
   DuesController_writeOff: { body: WriteOffRequestSchema, response: InvoiceListItemSchema },
+  DiscountApprovalController_leakage: { response: LeakageResponseSchema },
   CheckoutController_otcCharges: { response: OtcChargesResponseSchema },
   CheckoutController_otcCheckout: { body: CheckoutRequestSchema, response: InvoiceResponseSchema },
   PaymentIntentController_status: { response: PaymentIntentStatusSchema },

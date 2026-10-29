@@ -13,6 +13,7 @@ import StatusPill from "../../../components/ui/StatusPill";
 import RxLinkPicker from "../../../components/checkout/RxLinkPicker";
 import { rxErrorMessage, unlinkedRx } from "../../../components/checkout/rxLink";
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
+import { usePriceReasons } from "../../../components/checkout/priceReasons";
 import type { Charge, Invoice, LineItem, OtcContext, RxLine } from "@nabd/api-client/types";
 
 // NB-186: a counter sale — no patient record, no queue token (GET /billing/otc-charges, POST /billing/otc-checkout).
@@ -48,6 +49,8 @@ function OtcCheckoutInner() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
+  const [discountReason, setDiscountReason] = useState(""); // FIN-018: every discount carries a coded reason
+  const reasons = usePriceReasons();
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [linking, setLinking] = useState<string | null>(null); // PHL-001: chargeCode whose prescription picker is open
@@ -123,17 +126,21 @@ function OtcCheckoutInner() {
       setCreateError("Add at least one charge.");
       return;
     }
+    if (discountNum > 0 && !discountReason) {
+      setCreateError("Pick a reason for the discount.");
+      return;
+    }
     setCreating(true);
     try {
       const body = {
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent,
           ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
-        ...(canDiscount ? { discount: discountNum } : {}),
+        ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
       };
       setInvoice(await api.post<Invoice>("/billing/otc-checkout", body, { idempotencyKey: keys.current.get("sale", body) }));
       keys.current.done("sale");
     } catch (e) {
-      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : errorText(e, ""));
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : errorText(e, ""));
     } finally {
       setCreating(false);
     }
@@ -314,6 +321,15 @@ function OtcCheckoutInner() {
                 <div className={styles.totalsRow}>
                   <span>Discount</span>
                   <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                </div>
+              )}
+              {canDiscount && discountNum > 0 && (
+                <div className={styles.totalsRow}>
+                  <span>Discount reason</span>
+                  <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
+                    <option value="">{reasons.error ? "Couldn't load reasons" : "Reason…"}</option>
+                    {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                  </select>
                 </div>
               )}
               <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>

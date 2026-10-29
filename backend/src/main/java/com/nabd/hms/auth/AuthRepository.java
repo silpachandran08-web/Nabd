@@ -93,6 +93,12 @@ class AuthRepository {
         ).stream().findFirst();
     }
 
+    /** FIN-018: active staff of the bound tenant on the built-in Owner role (RefundService.OWNER_ROLE). */
+    List<Staff> findActiveOwners() {
+        return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = app_tenant_id() AND status = 'active' "
+                + "AND role_id IN (SELECT id FROM roles WHERE built_in AND name = 'Owner') ORDER BY id", staffMapper());
+    }
+
     /** WhatsApp OTP request — hash stored, 5-minute expiry, mirrors the invite-token pattern. */
     void setWhatsAppOtp(UUID staffId, String otpHash, Instant expiresAt) {
         jdbc.update("UPDATE staff SET whatsapp_otp_hash = ?, whatsapp_otp_expires_at = ? WHERE id = ?",
