@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { navFor, homeFor, rolesFor, blockedRoute, bottomNavSplit, findItem, isActive, jumpTargets, NAV, COUNTER_ROLES, COUNTER_PROTOTYPE_ORDER, LAB_GRANT } from "../../app/shell/navRegistry.ts";
+import { navFor, homeFor, rolesFor, counterRouteState, bottomNavSplit, findItem, isActive, jumpTargets, NAV, COUNTER_ROLES, COUNTER_PROTOTYPE_ORDER, LAB_GRANT } from "../../app/shell/navRegistry.ts";
 import { landingPathFor } from "../../app/lib/session.ts";
 import { createWedge, registerScanTarget, activeScanTarget, WEDGE_MAX_GAP_MS } from "../../app/shell/barcodeWedge.ts";
 
@@ -69,7 +69,7 @@ test("module not entitled: the item is absent, and a role left with nothing fall
   assert.ok(!ids(noLab).some((x) => x.startsWith("lab-")));
   // Unknown entitlements (loading, failed): built screens stay, planned skeletons stay absent.
   assert.deepEqual(ids(nav(BILLING, null)), ["billing-checkout", "billing-packages", "billing-dayclose"]);
-  assert.deepEqual(ids(nav(PHARMACIST, null)), ["ph-dispense", "ph-pos"]);
+  assert.deepEqual(ids(nav(PHARMACIST, null)), ["ph-dispense", "ph-pos", "ph-stock"]);
   const off = { modules: [{ code: "lab", enabled: false }], killedFeatures: [], seatLimit: null };
   assert.equal(nav(LAB, off).role, "reception", "lab module switched off: no lab shell");
   assert.deepEqual(ids(nav(LAB, off)), ["account"]);
@@ -78,7 +78,14 @@ test("module not entitled: the item is absent, and a role left with nothing fall
 test("permission missing: the item is absent, also from Ctrl+K", () => {
   const noQueue = nav(BILLING.filter((p) => p !== "queue:view"), ALL);
   assert.ok(!ids(noQueue).includes("billing-checkout"), "the checkout queue reads /queue");
-  assert.equal(homeFor({ perms: BILLING.filter((p) => p !== "queue:view"), owner: false, ent: ALL }), "/billing/invoices");
+  // S18-BUG-9: without the checkout queue, the first built billing screen in the prototype order (invoices, pre-auth and claims are
+  // skeletons, never a home), with or without entitlements loaded; login lands there too.
+  const noQ = BILLING.filter((p) => p !== "queue:view");
+  for (const ent of [null, ALL]) assert.equal(homeFor({ perms: noQ, owner: false, ent }), "/packages");
+  assert.equal(landingPathFor(noQ, false), "/packages");
+  const desk = noQ.filter((p) => p !== "packages:view");
+  for (const ent of [null, ALL]) assert.equal(homeFor({ perms: desk, owner: false, ent }), "/billing");
+  assert.equal(landingPathFor(desk, false), "/billing", "a billing-only desk lands on Day Close");
   assert.ok(!ids(nav(BILLING.filter((p) => p !== "packages:view"), ALL)).includes("billing-packages"));
   assert.ok(!ids(nav(PHARMACIST.filter((p) => p !== "billing:create"), ALL)).includes("ph-pos"), "no counter sale without billing:create");
   assert.deepEqual(jumpTargets({ perms: PHARMACIST.filter((p) => !p.startsWith("billing:")), owner: false, ent: ALL }, "otc"), []);
@@ -86,24 +93,54 @@ test("permission missing: the item is absent, also from Ctrl+K", () => {
   assert.deepEqual(rolesFor(["pharmacy:view"], false), ["reception"], "no lab or pharmacy grant: no counter shell");
 });
 
+// gate(role, input, path, settled, tab) -> "open" | "wait" | "unverified" | "blocked:<item>"
+const gate = (role, perms, ent, path, settled = true, tab = null) => {
+  const g = counterRouteState(role, { perms, owner: false, ent }, path, settled, tab);
+  return g.kind === "open" ? "open" : `${g.kind}:${g.item.id}`;
+};
+
 test("direct URL: a route of an item the session may not see gets the no-access state; built sub-routes stay reachable", () => {
-  const input = (perms, ent) => ({ perms, owner: false, ent });
-  const b = input(BILLING, without("billing"));
-  assert.equal(blockedRoute("billing", b, "/billing")?.id, "billing-dayclose");
-  assert.equal(blockedRoute("billing", b, "/checkout/abc")?.id, "billing-checkout");
-  assert.equal(blockedRoute("billing", b, "/arrivals", "checkout_pending")?.id, "billing-checkout");
-  assert.equal(blockedRoute("billing", b, "/billing/invoices")?.id, "billing-invoices");
-  assert.equal(blockedRoute("billing", b, "/billing/invoices/inv-1"), undefined, "the built invoice view is not the planned list");
-  assert.equal(blockedRoute("billing", input(BILLING, ALL), "/billing"), undefined);
-  assert.equal(blockedRoute("billing", input(BILLING, null), "/billing/preauth")?.id, "billing-preauth", "planned: absent until entitled");
-  assert.equal(blockedRoute("pharmacist", input(PHARMACIST.filter((p) => p !== "billing:create"), ALL), "/checkout/otc")?.id, "ph-pos");
-  assert.equal(blockedRoute("pharmacist", input(PHARMACIST, without("pharmacy_inhouse", "pharmacy_external")), "/pharmacy")?.id, "ph-dispense");
-  assert.equal(blockedRoute("pharmacist", input(PHARMACIST, ALL), "/pharmacy/receipt/x"), undefined);
-  assert.equal(blockedRoute("lab", input(LAB, without("lab")), "/lab/validate")?.id, "lab-validate");
-  assert.equal(blockedRoute("reception", input([], without("billing")), "/billing"), undefined, "other shells keep their page gates (unchanged)");
+  const off = without("billing");
+  assert.equal(gate("billing", BILLING, off, "/billing"), "blocked:billing-dayclose");
+  assert.equal(gate("billing", BILLING, off, "/checkout/abc"), "blocked:billing-checkout");
+  assert.equal(gate("billing", BILLING, off, "/arrivals", true, "checkout_pending"), "blocked:billing-checkout");
+  assert.equal(gate("billing", BILLING, off, "/billing/invoices"), "blocked:billing-invoices");
+  assert.equal(gate("billing", BILLING, off, "/billing/invoices/inv-1"), "open", "the built invoice view is not the planned list");
+  assert.equal(gate("billing", BILLING, ALL, "/billing"), "open");
+  assert.equal(gate("pharmacist", PHARMACIST.filter((p) => p !== "billing:create"), ALL, "/checkout/otc"), "blocked:ph-pos");
+  assert.equal(gate("pharmacist", PHARMACIST, without("pharmacy_inhouse", "pharmacy_external"), "/pharmacy"), "blocked:ph-dispense");
+  assert.equal(gate("pharmacist", PHARMACIST, without("pharmacy_inhouse", "pharmacy_external"), "/pharmacy/stock-take"), "blocked:ph-stock");
+  assert.equal(gate("pharmacist", PHARMACIST, ALL, "/pharmacy/receipt/x"), "open");
+  assert.equal(gate("lab", LAB, without("lab"), "/lab/validate"), "blocked:lab-validate");
+  assert.equal(gate("reception", [], off, "/billing"), "open", "other shells keep their page gates (unchanged)");
   assert.match(src("AppShell.tsx"), /<RouteGate>\{children\}<\/RouteGate>/);
-  assert.match(src("shell/RouteGate.tsx"), /blockedRoute\(role, input, pathname\)/);
-  assert.doesNotMatch(src("shell/RouteGate.tsx"), /Skeleton/, "the gate never swaps the page for a skeleton (S17-BUG-3)");
+});
+
+test("S18-BUG-6: while the first entitlements answer is pending a module-gated route waits (page not mounted); a failure is fail-closed", () => {
+  // Pending: the page must not mount (no feature fetch), whatever the grant.
+  assert.equal(gate("billing", BILLING, null, "/billing", false), "wait:billing-dayclose");
+  assert.equal(gate("billing", BILLING, null, "/checkout/q1", false), "wait:billing-checkout");
+  assert.equal(gate("billing", BILLING, null, "/packages", false), "wait:billing-packages", "NAV_MODULES-gated built screen");
+  assert.equal(gate("billing", BILLING, null, "/billing/preauth", false), "wait:billing-preauth");
+  assert.equal(gate("pharmacist", PHARMACIST, null, "/pharmacy", false), "wait:ph-dispense");
+  // A missing grant needs no entitlements: blocked at once. A route of no counter item is never held back.
+  assert.equal(gate("billing", BILLING.filter((p) => p !== "billing:view"), null, "/billing", false), "blocked:billing-dayclose");
+  assert.equal(gate("billing", BILLING, null, "/patients", false), "open");
+  assert.equal(gate("billing", BILLING, null, "/billing/invoices/inv-1", false), "open");
+  assert.equal(gate("reception", ["billing:view"], null, "/billing", false), "open", "other shells unchanged");
+  // Answered: entitled opens, module off blocks; a failed answer (settled, no entitlements) is fail-closed with Retry.
+  assert.equal(gate("billing", BILLING, ALL, "/billing", true), "open");
+  assert.equal(gate("billing", BILLING, null, "/billing", true), "unverified:billing-dayclose");
+  const gateSrc = src("shell/RouteGate.tsx");
+  assert.match(gateSrc, /useEntitlementsStatus\(\)/);
+  assert.match(gateSrc, /gate\.kind === "wait"\) return <main><Skeleton/);
+  assert.match(gateSrc, /gate\.kind === "unverified"\) return <main><ErrorState message=.* onRetry=\{retry\} \/><\/main>;/);
+  // The S17 lesson: `settled` is set once and never reset (a retry or refetch never swaps the page back to the skeleton); no auto retry.
+  const hook = src("lib/entitlements.ts");
+  assert.match(hook, /setS\(\(p\) => \(\{ ent: e \?\? p\.ent, settled: true \}\)\)/);
+  assert.equal((hook.match(/settled: false/g) ?? []).length, 1, "only the initial state is unsettled");
+  assert.match(hook, /const retry = useCallback\(\(\) => \{ inflight = null; setAttempt\(\(a\) => a \+ 1\); \}, \[\]\);/);
+  assert.doesNotMatch(hook, /setInterval|retry\(\)/, "nothing calls retry by itself");
 });
 
 test("route skeletons: every planned counter item has its thin page on the PlannedScreen gate; built items keep their screens", () => {
@@ -116,7 +153,7 @@ test("route skeletons: every planned counter item has its thin page on the Plann
       }
     }
   }
-  for (const href of ["/arrivals", "/packages", "/billing", "/pharmacy", "/checkout/otc"]) assert.ok(existsSync(new URL(`../../app/(clinic)${href}/page.tsx`, import.meta.url)), href);
+  for (const href of ["/arrivals", "/packages", "/billing", "/pharmacy", "/checkout/otc", "/pharmacy/stock-take"]) assert.ok(existsSync(new URL(`../../app/(clinic)${href}/page.tsx`, import.meta.url)), href);
   assert.equal(findItem("ph-dispense").planned, undefined);
   assert.match(src("lib/routeTitle.ts"), /\["\/lab", "Lab"\]/);
 });
@@ -126,6 +163,12 @@ test("active item: the checkout queue covers the checkout tab and a visit's chec
   assert.ok(isActive(co, "/arrivals", "checkout_pending") && !isActive(co, "/arrivals", null));
   assert.ok(isActive(co, "/checkout/q1") && !isActive(co, "/checkout/otc"));
   assert.ok(isActive(findItem("ph-pos"), "/checkout/otc", null));
+  // S18-BUG-8: PHL-010's stock take is the Stock item's screen.
+  const ph = nav(PHARMACIST, ALL).items;
+  assert.deepEqual(ph.filter((i) => isActive(i, "/pharmacy/stock-take", null)).map((i) => i.id), ["ph-stock"]);
+  assert.equal(findItem("ph-stock").href, "/pharmacy/stock-take");
+  assert.ok(!existsSync(new URL("../../app/(clinic)/pharmacy/stock/page.tsx", import.meta.url)), "no duplicate skeleton");
+  assert.deepEqual(ph.filter((i) => isActive(i, "/pharmacy", null)).map((i) => i.id), ["ph-dispense"]);
   assert.ok(isActive(dc, "/billing", null) && !isActive(dc, "/billing/invoices", null) && isActive(inv, "/billing/invoices", null));
   assert.ok(isActive(findItem("lab-worklist"), "/lab", null) && !isActive(findItem("lab-worklist"), "/lab/collect", null));
 });

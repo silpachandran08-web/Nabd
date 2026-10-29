@@ -129,7 +129,8 @@ const BILLING: NavItem[] = [
 const PHARMACIST: NavItem[] = [
   { id: "ph-dispense", href: "/pharmacy", label: "e-Rx queue & Dispense", short: "Dispense", icon: "syringe", perms: ["pharmacy:view"], owner: MON, active: (p) => p === "/pharmacy" || p.startsWith("/pharmacy/receipt"), keywords: ["e-rx", "prescriptions", "dispensing"] },
   { id: "ph-pos", href: "/checkout/otc", label: "Counter sale (POS)", short: "POS", icon: "card", perms: ["billing:view", "billing:create"], modules: PHARMACY_MODULES, owner: MON, keywords: ["otc", "sale"] },
-  { id: "ph-stock", href: "/pharmacy/stock", label: "Stock & expiry", short: "Stock", icon: "package", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["inventory", "stock take", "expiry"] },
+  // pharmacist.stock is PHL-010's stock take (built, opened from the Pharmacy panel too); same grant as its page gate.
+  { id: "ph-stock", href: "/pharmacy/stock-take", label: "Stock take", short: "Stock", icon: "package", perms: ["pharmacy:view", "pharmacy:edit"], modules: PHARMACY_MODULES, owner: MON, keywords: ["inventory", "stock take", "count", "adjustment"] },
   { id: "ph-purchase", href: "/pharmacy/purchase", label: "Purchase & GRN", short: "Purchase", icon: "plusSquare", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["goods receipt", "supplier"] },
   { id: "ph-registers", href: "/pharmacy/registers", label: "Controlled registers", short: "Registers", icon: "scroll", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
   { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
@@ -183,7 +184,11 @@ export function navFor({ perms, owner, ent, override, specialty }: NavInput): { 
 }
 
 /** The role home: the first screen of the role's nav. */
-export const homeFor = (input: NavInput): string => navFor(input).items[0]?.href ?? "/account";
+/** Planned skeletons are never a home while a built screen is visible (FEF-058 landing rule), so home and login landing agree. */
+export const homeFor = (input: NavInput): string => {
+  const items = navFor(input).items;
+  return (items.find((i) => !i.planned) ?? items[0])?.href ?? "/account";
+};
 
 /** Ctrl+K: permitted screens of every role context this session can use, matched on label, id and keywords. */
 export function jumpTargets(input: NavInput, query: string): NavItem[] {
@@ -203,10 +208,17 @@ export function jumpTargets(input: NavInput, query: string): NavItem[] {
 export const isActive = (i: NavItem, path: string | null, tab: string | null): boolean =>
   !!path && (i.active ? i.active(path, tab) : path === i.href.split("?")[0] || path.startsWith(`${i.href.split("?")[0]}/`));
 
-/** FEF-057: direct-URL gate of the counter shells: the item of the role's nav this path belongs to, when the session may not see it. */
-export function blockedRoute(role: RoleContext, input: NavInput, path: string | null, tab: string | null = null): NavItem | undefined {
-  if (!COUNTER_ROLES.includes(role)) return undefined;
-  return NAV[role].find((i) => isActive(i, path, tab) && !itemVisible(i, input.perms, input.ent));
+/** FEF-057: direct-URL gate of the counter shells, for the item of the role's nav this path belongs to.
+ * open: render the page. wait: the item depends on a plan module and the first entitlements answer has not arrived (the page must not
+ * mount and fetch yet). unverified: that answer failed: fail-closed, the module cannot be confirmed. blocked: no grant, or module off. */
+export type RouteGateState = { kind: "open" } | { kind: "wait" | "unverified" | "blocked"; item: NavItem };
+export function counterRouteState(role: RoleContext, input: NavInput, path: string | null, settled: boolean, tab: string | null = null): RouteGateState {
+  const item = COUNTER_ROLES.includes(role) ? NAV[role].find((i) => isActive(i, path, tab)) : undefined;
+  if (!item) return { kind: "open" };
+  if (!item.perms.every((p) => input.perms.includes(p))) return { kind: "blocked", item };
+  const moduleGated = !!(item.planned || item.modules || NAV_MODULES[item.href.split("?")[0]]);
+  if (moduleGated && !input.ent) return { kind: settled ? "unverified" : "wait", item };
+  return itemVisible(item, input.perms, input.ent) ? { kind: "open" } : { kind: "blocked", item };
 }
 
 /** Phone bottom nav: at most 5 destinations (DESIGN.md §4), so more than 5 items become the top 4 + More. */

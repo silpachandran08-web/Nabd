@@ -172,7 +172,7 @@
       "short": "POS"
     },
     "ph-stock": {
-      "label": "Stock & expiry",
+      "label": "Stock take",
       "short": "Stock"
     },
     "ph-purchase": {
