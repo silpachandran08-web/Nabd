@@ -30,8 +30,9 @@ public interface StockCommands {
     /** Goods received: adds {@code qty}. */
     StockResult receive(UUID itemId, int qty, UUID actorId, String reason);
 
-    /** Manual correction by a signed delta (stock-take callers compute the delta from the locked count). */
-    StockResult adjust(UUID itemId, int delta, UUID actorId, String reason);
+    /** Manual correction by a signed delta (stock-take callers compute the delta from the locked count).
+     * @param reasonCode PHL-010 fixed list: damaged, count_correction, theft_loss, expired or other (the caller validates it) */
+    StockResult adjust(UUID itemId, int delta, UUID actorId, String reasonCode, String reason);
 
     /** Puts {@code qty} back after a void or return of an invoice. */
     StockResult returnIn(UUID itemId, int qty, UUID invoiceId, UUID actorId, String reason);
@@ -54,7 +55,7 @@ public interface StockCommands {
     BatchStockResult receiveBatch(UUID itemId, BatchReceipt receipt, UUID actorId, String reason);
 
     /** Signed correction of one named batch (stock take). */
-    StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reason);
+    StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reasonCode, String reason);
 
     // ---- PHL-010: stock take and reasoned batch adjustments ----
 

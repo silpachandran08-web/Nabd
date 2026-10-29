@@ -148,11 +148,11 @@ class StockCommandsImpl implements StockCommands {
     }
 
     @Override
-    public StockResult adjust(UUID itemId, int delta, UUID actorId, String reason) {
+    public StockResult adjust(UUID itemId, int delta, UUID actorId, String reasonCode, String reason) {
         requireNonZero(delta);
         int have = lock(itemId);
         if (delta > 0) {
-            return apply(itemId, have, List.of(new Leg(implicitBatch(itemId), delta)), "adjustment", reason, actorId, null, null, null);
+            return apply(itemId, have, List.of(new Leg(implicitBatch(itemId), delta)), "adjustment", reason, reasonCode, actorId, null, null, null);
         }
         // shortcut: a stock-take reduction with several batches drains earliest expiry first (expired stock goes first); name a batch with adjustBatch to choose
         List<Leg> legs = new ArrayList<>();
@@ -168,15 +168,15 @@ class StockCommandsImpl implements StockCommands {
         if (left > 0) {
             throw insufficient(have, -delta);
         }
-        return apply(itemId, have, legs, "adjustment", reason, actorId, null, null, null);
+        return apply(itemId, have, legs, "adjustment", reason, reasonCode, actorId, null, null, null);
     }
 
     @Override
-    public StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reason) {
+    public StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reasonCode, String reason) {
         requireNonZero(delta);
         int have = lock(itemId);
         batches.itemOf(tenant.current(), batchId).filter(itemId::equals).orElseThrow(StockCommandsImpl::notFound);
-        return apply(itemId, have, List.of(new Leg(batchId, delta)), "adjustment", reason, actorId, null, null, null);
+        return apply(itemId, have, List.of(new Leg(batchId, delta)), "adjustment", reason, reasonCode, actorId, null, null, null);
     }
 
     @Override
@@ -323,6 +323,11 @@ class StockCommandsImpl implements StockCommands {
     /** The one write: item cache (guarded), then each batch (guarded) with its movement row and event. */
     private StockResult apply(UUID itemId, int have, List<Leg> legs, String kind, String reason, UUID actorId, UUID invoiceId,
                               String overrideReason, String[] source) {
+        return apply(itemId, have, legs, kind, reason, null, actorId, invoiceId, overrideReason, source);
+    }
+
+    private StockResult apply(UUID itemId, int have, List<Leg> legs, String kind, String reason, String reasonCode, UUID actorId, UUID invoiceId,
+                              String overrideReason, String[] source) {
         UUID t = tenant.current();
         int total = legs.stream().mapToInt(Leg::delta).sum();
         int after = repo.applyDelta(t, itemId, total).orElseThrow(() -> insufficient(have, -total));
@@ -330,7 +335,7 @@ class StockCommandsImpl implements StockCommands {
         for (Leg l : legs) {
             int batchAfter = batches.applyDelta(t, l.batchId(), l.delta()).orElseThrow(() -> insufficient(0, -l.delta()));
             running += l.delta();
-            batches.insertMovement(t, itemId, l.batchId(), kind, l.delta(), batchAfter - l.delta(), batchAfter, reason, actorId, invoiceId,
+            batches.insertMovement(t, itemId, l.batchId(), kind, l.delta(), batchAfter - l.delta(), batchAfter, reason, reasonCode, actorId, invoiceId,
                     source == null ? null : source[0], source == null ? null : UUID.fromString(source[1]), overrideReason);
             events.publish(t, DomainEventType.PHARMACY_STOCK_BATCH_CHANGED, itemId,
                     Map.of("itemId", itemId, "batchId", l.batchId(), "delta", l.delta(), "kind", kind, "onHand", running));

@@ -26921,13 +26921,14 @@ components:
           type: string
           maxLength: 500
           minLength: 0
+        reasonCode:
+          type: string
+          pattern: damaged|count_correction|theft_loss|expired|other
         setTo:
           type: integer
           format: int32
           maximum: 10000000
           minimum: 0
-      required:
-      - reason
     PharmacyStockMovementResponse:
       type: object
       properties:

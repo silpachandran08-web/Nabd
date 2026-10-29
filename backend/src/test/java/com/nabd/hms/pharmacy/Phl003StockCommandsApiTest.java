@@ -100,7 +100,7 @@ class Phl003StockCommandsApiTest extends ApiTestBase {
         Clinic c = hybridClinic("ops");
         UUID item = UUID.fromString((String) addItem(c, "Ops item", 20).get("id"));
         // adjust -1 x 50 on 20 units
-        assertThat(race(c, 50, k -> stock.adjust(item, -1, c.staffId(), "count"))).containsEntry("ok", 20).containsEntry("insufficient-stock", 30);
+        assertThat(race(c, 50, k -> stock.adjust(item, -1, c.staffId(), "count_correction", "count"))).containsEntry("ok", 20).containsEntry("insufficient-stock", 30);
         assertThat(stockOf(c, item)).isZero();
         // receive +1 x 50 and returnIn +1 x 50: nothing is lost
         assertThat(race(c, 50, k -> stock.receive(item, 1, c.staffId(), "grn"))).containsEntry("ok", 50);
@@ -141,7 +141,7 @@ class Phl003StockCommandsApiTest extends ApiTestBase {
                 .isInstanceOf(ApiException.class).extracting(e -> ((ApiException) e).status()).isEqualTo(HttpStatus.NOT_FOUND);
         UUID item = UUID.fromString((String) addItem(c, "Bad qty", 5).get("id"));
         assertThatThrownBy(() -> inTenantTx(c.tenant().id(), () -> stock.receive(item, 0, c.staffId(), "x"))).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> inTenantTx(c.tenant().id(), () -> stock.adjust(item, 0, c.staffId(), "x"))).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> inTenantTx(c.tenant().id(), () -> stock.adjust(item, 0, c.staffId(), "count_correction", "x"))).isInstanceOf(ApiException.class);
     }
 
     @Test
