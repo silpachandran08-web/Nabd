@@ -1,7 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 import DrugCombobox from "./DrugCombobox";
+import StatusPill from "../ui/StatusPill";
 import { formatQty, formatSig, parseSig, ROUTES, SIG_STEPS, suggestQuantity, type SigSlots } from "@nabd/domain";
 import type { PrescriptionItem } from "./shared";
 import s from "./RxPad.module.css";
@@ -21,6 +23,8 @@ export default function RxPad({
   /** The remove button, owned by the page. */
   children?: ReactNode;
 }) {
+  const tx = useTranslations("consult.rxPad");
+  const g = useTranslations("glossary");
   const [partial, setPartial] = useState<[string, string, string]>(["", "", ""]);
   const [lastAuto, setLastAuto] = useState<number | null>(null);
   const [qtyText, setQtyText] = useState("");
@@ -71,92 +75,102 @@ export default function RxPad({
 
   return (
     <div className={s.lineRow}>
-      <div className={s.pad} role="group" aria-label={`Prescription line ${index + 1}`}>
+      <div className={s.pad} role="group" aria-label={tx("prescriptionLine", { number: index + 1 })}>
         <div className={`${s.cell} ${s.c6}`}>
           <DrugCombobox
-            id={`rx-drug-${index}`} label="Generic name" placeholder="Type the generic name" disabled={locked}
+            id={`rx-drug-${index}`} label={tx("genericName")} placeholder={tx("typeTheGenericName")} disabled={locked}
             authedFetch={authedFetch} value={item.drugName}
-            hint="Suggestions come from your pharmacy list and past prescriptions. Any text you type is kept as is."
-            onType={(t) => onChange({ drugName: t })} onPick={(n) => onChange({ drugName: n })}
+            hint={tx("suggestionsComeFromTheDrug")}
+            onType={(t) => onChange({ drugName: t, drugId: null, genericName: null })}
+            onPick={(n, it) => onChange(it.drugId
+              ? { drugName: [it.generic ?? it.brand, it.strength, it.form].filter(Boolean).join(" "), brandName: it.brand ?? "", drugId: it.drugId, genericName: it.generic ?? null }
+              : { drugName: n, drugId: null, genericName: null })}
           />
+          {item.drugName.trim() !== "" && !item.drugId && (
+            <p className={s.hint} data-testid="uncoded-badge"><StatusPill tone="neutral" label={tx("uncoded")} /> {" "}{tx("notLinkedToTheDrug")}</p>
+          )}
         </div>
         <div className={`${s.cell} ${s.c6}`}>
           <DrugCombobox
-            id={id("brand")} label="Brand (optional)" placeholder="Type or pick a brand" disabled={locked}
+            id={id("brand")} label={tx("brandOptional")} placeholder={tx("typeOrPickABrand")} disabled={locked}
             authedFetch={authedFetch} value={item.brandName ?? ""}
-            hint="Safety checks run on the generic name and the brand."
-            onType={(t) => onChange({ brandName: t })} onPick={(n) => onChange({ brandName: n })}
+            hint={tx("safetyChecksRunOnThe")}
+            onType={(t) => onChange({ brandName: t })}
+            onPick={(n, it) => onChange(it.drugId
+              ? { brandName: it.brand ?? n, drugId: it.drugId, genericName: it.generic ?? null,
+                  ...(item.drugName.trim() === "" ? { drugName: [it.generic ?? it.brand, it.strength, it.form].filter(Boolean).join(" ") } : {}) }
+              : { brandName: n })}
           />
         </div>
 
         <div className={`${s.cell} ${s.c4}`}>
-          <span className={s.label} id={id("sig-l")}>Sig: morning, noon, night</span>
+          <span className={s.label} id={id("sig-l")}>{tx("sigMorningNoonNight")}</span>
           <div className={s.slots} role="group" aria-labelledby={id("sig-l")}>
-            {(["Morning", "Noon", "Night"] as const).map((name, i) => (
-              <div key={name} className={s.slot}>
+            {(["morning", "noon", "night"] as const).map((slot, i) => { const name = g(`rx.slot.${slot}`); return (
+              <div key={slot} className={s.slot}>
                 <span aria-hidden="true">{name}</span>
-                <select className={s.field} aria-label={`${name} dose`} value={slots[i]} disabled={locked} onChange={(e) => setSlot(i, e.target.value)}>
+                <select className={s.field} aria-label={tx("doseOf", { name })} value={slots[i]} disabled={locked} onChange={(e) => setSlot(i, e.target.value)}>
                   <option value="">-</option>
                   {SIG_STEPS.map((v) => <option key={v} value={v}>{v}</option>)}
                 </select>
               </div>
-            ))}
+            ); })}
           </div>
-          <p className={s.hint}>{item.sigPattern ? `Pattern ${item.sigPattern} (units per dose).` : "Pick all three, for example 1-0-1."}</p>
+          <p className={s.hint}>{item.sigPattern ? tx("pattern", { pattern: item.sigPattern }) : tx("pickAllThreeForExample")}</p>
         </div>
         <div className={`${s.cell} ${s.c4}`}>
-          <label className={s.label} htmlFor={id("freq")}>Sig / timing (free text)</label>
-          <input id={id("freq")} className={s.field} placeholder="e.g. after food, SOS" value={item.frequency} disabled={locked}
+          <label className={s.label} htmlFor={id("freq")}>{tx("sigTimingFreeText")}</label>
+          <input id={id("freq")} className={s.field} placeholder={tx("eGAfterFoodSos")} value={item.frequency} disabled={locked}
             onChange={(e) => onChange({ frequency: e.target.value })} />
         </div>
         <div className={`${s.cell} ${s.c4}`}>
-          <label className={s.label} htmlFor={id("route")}>Route</label>
+          <label className={s.label} htmlFor={id("route")}>{g("rx.route")}</label>
           <select id={id("route")} className={s.field} value={item.route ?? ""} disabled={locked}
             onChange={(e) => onChange({ route: e.target.value || null })}>
-            <option value="">Not specified</option>
+            <option value="">{tx("notSpecified")}</option>
             {!routeKnown && <option value={item.route ?? ""}>{item.route}</option>}
-            {ROUTES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {ROUTES.map((r) => <option key={r} value={r}>{g(`rx.routes.${r.toLowerCase()}`)}</option>)}
           </select>
         </div>
 
         <div className={`${s.cell} ${s.c3}`}>
-          <label className={s.label} htmlFor={id("dose")}>Dosage</label>
-          <input id={id("dose")} className={s.field} placeholder="e.g. 500 mg" value={item.dosage} disabled={locked}
+          <label className={s.label} htmlFor={id("dose")}>{g("rx.dosage")}</label>
+          <input id={id("dose")} className={s.field} placeholder={tx("eG500Mg")} value={item.dosage} disabled={locked}
             onChange={(e) => onChange({ dosage: e.target.value })} />
         </div>
         <div className={`${s.cell} ${s.c3}`}>
-          <label className={s.label} htmlFor={id("dur")}>Duration</label>
-          <input id={id("dur")} className={s.field} placeholder="e.g. 5 days" value={item.duration} disabled={locked}
+          <label className={s.label} htmlFor={id("dur")}>{g("rx.duration")}</label>
+          <input id={id("dur")} className={s.field} placeholder={tx("eG5Days")} value={item.duration} disabled={locked}
             onChange={(e) => change({ duration: e.target.value })} />
         </div>
         <div className={`${s.cell} ${s.c6}`}>
-          <span className={s.label} id={id("qty-l")}>Quantity to dispense</span>
+          <span className={s.label} id={id("qty-l")}>{tx("quantityToDispense")}</span>
           <div className={s.qtyRow} role="group" aria-labelledby={id("qty-l")}>
-            <input className={s.field} inputMode="decimal" aria-label="Quantity" placeholder="Quantity" value={qtyShown} disabled={locked}
+            <input className={s.field} inputMode="decimal" aria-label={g("rx.quantity")} placeholder={g("rx.quantity")} value={qtyShown} disabled={locked}
               onChange={(e) => onQty(e.target.value)} />
-            <input className={s.field} aria-label="Quantity unit" placeholder="Unit (tablets, ml...)" maxLength={40}
+            <input className={s.field} aria-label={tx("quantityUnit")} placeholder={tx("unitTabletsMl")} maxLength={40}
               value={item.quantityUnit ?? ""} disabled={locked} onChange={(e) => onChange({ quantityUnit: e.target.value })} />
           </div>
           {suggestion && item.quantity != null && quantityIsAuto && (
             <p className={s.hint} data-testid={`rx-${index}-qty-note`}>
-              Suggested from sig × duration: {formatQty(suggestion.perDay)} per day × {suggestion.days} days = {formatQty(suggestion.quantity)}. Edit it if needed and check the unit.
+              {tx("suggestedFromSigDuration")}{" "}{formatQty(suggestion.perDay)} {" "}{tx("perDayDays", { days: suggestion.days })}{" "}{formatQty(suggestion.quantity)}{tx("editItIfNeededAnd")}
             </p>
           )}
           {suggestion && !locked && item.quantity != null && !quantityIsAuto && item.quantity !== suggestion.quantity && (
             <div className={s.suggest}>
-              <span>Sig × duration would give {formatQty(suggestion.quantity)}.</span>
+              <span>{tx("sigDurationWouldGive")}{" "}{formatQty(suggestion.quantity)}.</span>
               <button type="button" className={s.suggestBtn}
                 onClick={() => { setLastAuto(suggestion.quantity); onChange({ quantity: suggestion.quantity }); }}>
-                Use {formatQty(suggestion.quantity)}
+                {tx("use")}{" "}{formatQty(suggestion.quantity)}
               </button>
             </div>
           )}
-          {item.quantity != null && !item.quantityUnit?.trim() && <p className={s.hint}>Add the unit so the quantity is unambiguous.</p>}
+          {item.quantity != null && !item.quantityUnit?.trim() && <p className={s.hint}>{tx("addTheUnitSoThe")}</p>}
         </div>
 
         <div className={`${s.cell} ${s.c12}`}>
-          <label className={s.label} htmlFor={id("ins")}>Instructions</label>
-          <input id={id("ins")} className={s.field} placeholder="Instructions for the patient or pharmacist" value={item.instructions} disabled={locked}
+          <label className={s.label} htmlFor={id("ins")}>{g("rx.instructions")}</label>
+          <input id={id("ins")} className={s.field} placeholder={tx("instructionsForThePatientOr")} value={item.instructions} disabled={locked}
             onChange={(e) => onChange({ instructions: e.target.value })} />
         </div>
       </div>

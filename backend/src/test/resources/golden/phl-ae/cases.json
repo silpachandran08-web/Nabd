@@ -1,0 +1,1498 @@
+{
+ "pack": {
+  "id": "PHL-AE",
+  "jurisdiction": "AE",
+  "taxRegime": "VAT",
+  "currency": "AED",
+  "minorUnits": 2,
+  "ruleSetVersion": "PHL-AE-1",
+  "minCases": 20
+ },
+ "cases": [
+  {
+   "id": "PHL-AE-001",
+   "title": "Medicine at 10.00 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 1000,
+        "amountMinor": 50
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1000,
+    "discountMinor": 0,
+    "taxMinor": 50,
+    "roundOffMinor": 0,
+    "totalMinor": 1050
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 1000,
+      "taxMinor": 50
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-002",
+   "title": "Medicine at 25.00 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 2500,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 2500,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 2500,
+        "amountMinor": 125
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 2500,
+    "discountMinor": 0,
+    "taxMinor": 125,
+    "roundOffMinor": 0,
+    "totalMinor": 2625
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 2500,
+      "taxMinor": 125
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-003",
+   "title": "Medicine at 49.99 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4999,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4999,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 4999,
+        "amountMinor": 250
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 4999,
+    "discountMinor": 0,
+    "taxMinor": 250,
+    "roundOffMinor": 0,
+    "totalMinor": 5249
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 4999,
+      "taxMinor": 250
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-004",
+   "title": "Medicine at 100.00 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 10000,
+        "amountMinor": 500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 500,
+    "roundOffMinor": 0,
+    "totalMinor": 10500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 10000,
+      "taxMinor": 500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-005",
+   "title": "Medicine at 123.45 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 12345,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 12345,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 12345,
+        "amountMinor": 617
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 12345,
+    "discountMinor": 0,
+    "taxMinor": 617,
+    "roundOffMinor": 0,
+    "totalMinor": 12962
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 12345,
+      "taxMinor": 617
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-006",
+   "title": "Medicine at 3.33 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 333,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 333,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 333,
+        "amountMinor": 17
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 333,
+    "discountMinor": 0,
+    "taxMinor": 17,
+    "roundOffMinor": 0,
+    "totalMinor": 350
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 333,
+      "taxMinor": 17
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-007",
+   "title": "Medicine at 750.00 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 75000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 75000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 75000,
+        "amountMinor": 3750
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 75000,
+    "discountMinor": 0,
+    "taxMinor": 3750,
+    "roundOffMinor": 0,
+    "totalMinor": 78750
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 75000,
+      "taxMinor": 3750
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-008",
+   "title": "Medicine at 1.50 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 150,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 150,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 150,
+        "amountMinor": 8
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 150,
+    "discountMinor": 0,
+    "taxMinor": 8,
+    "roundOffMinor": 0,
+    "totalMinor": 158
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 150,
+      "taxMinor": 8
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-009",
+   "title": "Medicine at 99.99 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 9999,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 9999,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 9999,
+        "amountMinor": 500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 9999,
+    "discountMinor": 0,
+    "taxMinor": 500,
+    "roundOffMinor": 0,
+    "totalMinor": 10499
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 9999,
+      "taxMinor": 500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-010",
+   "title": "Medicine at 200.01 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 20001,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 20001,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 20001,
+        "amountMinor": 1000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 20001,
+    "discountMinor": 0,
+    "taxMinor": 1000,
+    "roundOffMinor": 0,
+    "totalMinor": 21001
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 20001,
+      "taxMinor": 1000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-011",
+   "title": "Medicine at 5.25 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 525,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 525,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 525,
+        "amountMinor": 26
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 525,
+    "discountMinor": 0,
+    "taxMinor": 26,
+    "roundOffMinor": 0,
+    "totalMinor": 551
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 525,
+      "taxMinor": 26
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-012",
+   "title": "Medicine at 88.00 AED, VAT 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 8800,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 8800,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 8800,
+        "amountMinor": 440
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 8800,
+    "discountMinor": 0,
+    "taxMinor": 440,
+    "roundOffMinor": 0,
+    "totalMinor": 9240
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 8800,
+      "taxMinor": 440
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-013",
+   "title": "Tax-inclusive shelf price of 105.00 AED",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10500,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 10000,
+        "amountMinor": 500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 500,
+    "roundOffMinor": 0,
+    "totalMinor": 10500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 10000,
+      "taxMinor": 500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-014",
+   "title": "Three units of a taxable medicine",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 3,
+      "grossMinor": 3000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 3000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 3000,
+        "amountMinor": 150
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 3000,
+    "discountMinor": 0,
+    "taxMinor": 150,
+    "roundOffMinor": 0,
+    "totalMinor": 3150
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 3000,
+      "taxMinor": 150
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-015",
+   "title": "Invoice discount on two medicines",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 500,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 6000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 200,
+      "taxableMinor": 3800,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 3800,
+        "amountMinor": 190
+       }
+      ]
+     },
+     {
+      "key": "b",
+      "discountMinor": 300,
+      "taxableMinor": 5700,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 5700,
+        "amountMinor": 285
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 500,
+    "taxMinor": 475,
+    "roundOffMinor": 0,
+    "totalMinor": 9975
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 9500,
+      "taxMinor": 475
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-016",
+   "title": "Exempt line next to a taxable medicine",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "EXEMPT",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 6000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     },
+     {
+      "key": "b",
+      "discountMinor": 0,
+      "taxableMinor": 6000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 6000,
+        "amountMinor": 300
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 300,
+    "roundOffMinor": 0,
+    "totalMinor": 10300
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 6000,
+      "taxMinor": 300
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-017",
+   "title": "Pharmacy flag zero-rated overrides the head rate",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 4000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": true
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 4000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 4000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-018",
+   "title": "Tax-inclusive line with a discount",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 1050,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10500,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 1050,
+      "taxableMinor": 9000,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 9000,
+        "amountMinor": 450
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10050,
+    "discountMinor": 1050,
+    "taxMinor": 450,
+    "roundOffMinor": 0,
+    "totalMinor": 9450
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 9000,
+      "taxMinor": 450
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-019",
+   "title": "One fils above a round number",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1001,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1001,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 1001,
+        "amountMinor": 50
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1001,
+    "discountMinor": 0,
+    "taxMinor": 50,
+    "roundOffMinor": 0,
+    "totalMinor": 1051
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 1001,
+      "taxMinor": 50
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-AE-020",
+   "title": "Small amount rounds half up",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 190,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 190,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "5.00",
+        "taxableMinor": 190,
+        "amountMinor": 10
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 190,
+    "discountMinor": 0,
+    "taxMinor": 10,
+    "roundOffMinor": 0,
+    "totalMinor": 200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "5.00",
+      "taxableMinor": 190,
+      "taxMinor": 10
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-AE-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  }
+ ]
+}

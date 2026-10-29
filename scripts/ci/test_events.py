@@ -37,8 +37,8 @@ class Events(unittest.TestCase):
         json.dump(env, open(f"{self.samples}/s.json", "w"))
         return run("--root", self.root, "--samples", self.samples)
 
-    def test_repo_catalogue_passes_with_28_types(self):
-        r = run(); self.assertEqual(r.returncode, 0, r.stdout); self.assertIn("28 type(s), 0 problem(s)", r.stdout)
+    def test_repo_catalogue_passes_with_36_types(self):
+        r = run(); self.assertEqual(r.returncode, 0, r.stdout); self.assertIn("36 type(s), 0 problem(s)", r.stdout)
 
     def test_good_sample_passes(self):
         r = self.sample(self.envelope()); self.assertEqual(r.returncode, 0, r.stdout)

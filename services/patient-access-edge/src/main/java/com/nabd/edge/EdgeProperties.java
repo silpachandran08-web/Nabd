@@ -19,5 +19,15 @@ public record EdgeProperties(
         @DefaultValue("30") int projectionTtlSeconds,
         @DefaultValue("300") int holdSeconds,
         @DefaultValue("2000") int coreTimeoutMs,
-        @DefaultValue("edge-1") String consumerName) {
+        @DefaultValue("edge-1") String consumerName,
+        /** IDC-005: public origin of the notice page (the Core public API); the consent message links {origin}{path from Core}. */
+        @DefaultValue("") String noticeBaseUrl,
+        /** ACC-040: soft hold taken when the patient picks a time (the offer itself holds nothing). */
+        @DefaultValue("120") int pickHoldSeconds,
+        /** ACC-040: lower-case phrases that bring the local emergency number at once. The list is clinically signed content: empty until signed. */
+        @DefaultValue java.util.List<String> emergencyPhrases,
+        /** ACC-040: region code (this cell's) to the emergency number the bot sends (108 IN, 997 SA, 998 AE, 999 QA). */
+        @DefaultValue java.util.Map<String, String> emergencyNumbers,
+        /** ACC-040: region code to the languages the patient may choose once (IN en/hi/kn/te, Gulf ar/en). */
+        @DefaultValue java.util.Map<String, java.util.List<String>> languages) {
 }

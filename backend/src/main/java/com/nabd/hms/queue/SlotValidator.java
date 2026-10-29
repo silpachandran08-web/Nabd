@@ -25,41 +25,86 @@ class SlotValidator {
 
     private final ScheduleRepository scheduleRepo;
     private final ClinicClock clock;
+    private final WaitlistRepository waitlistRepo;
+    private final QueueRepository queueRepo;
 
-    SlotValidator(ScheduleRepository scheduleRepo, ClinicClock clock) {
+    SlotValidator(ScheduleRepository scheduleRepo, ClinicClock clock, WaitlistRepository waitlistRepo, QueueRepository queueRepo) {
         this.scheduleRepo = scheduleRepo;
         this.clock = clock;
+        this.waitlistRepo = waitlistRepo;
+        this.queueRepo = queueRepo;
+    }
+
+    /**
+     * ACC-026: every booking path (desk book, Edge booking, reschedule, waitlist chosen slot) refuses a slot that is on a live
+     * waitlist offer to someone else: 409 SLOT_ON_OFFER with the offer's expiry. Takes the doctor-day lock first, the same one
+     * offers and walk-in tokens use, so the check and the insert that follows cannot interleave with a new offer.
+     */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    void requireNoLiveOffer(UUID tenantId, UUID doctorId, Instant start, UUID exceptEntryId) {
+        queueRepo.lockDoctorDay(tenantId, doctorId, clock.clinicDate(tenantId, start));
+        waitlistRepo.liveOfferExpiry(tenantId, doctorId, start, exceptEntryId).ifPresent(expiresAt -> {
+            throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
+                    "This slot is currently offered to a patient on the waitlist.",
+                    java.util.Map.of("code", "SLOT_ON_OFFER", "expiresAt", expiresAt.toString()));
+        });
     }
 
     /** Returns the slot length in minutes, or throws the Problem naming the first broken rule. */
     int validate(UUID tenantId, UUID doctorId, Instant start, Instant now) {
-        ZoneId zone = clock.zone(tenantId);
-        ZonedDateTime local = start.atZone(zone);
-        LocalDate date = local.toLocalDate();
+        LocalDate date = clock.clinicDate(tenantId, start); // ACC-005: 00:30 after an evening session is still the session's day
         if (scheduleRepo.isOnLeave(doctorId, date)) {
             throw refuse("doctor-on-leave", "DOCTOR_ON_LEAVE", "Doctor on leave", "The doctor is on leave on " + date + ".");
         }
-        LocalTime time = local.toLocalTime();
-        WorkingHoursRow block = scheduleRepo.findBlockCovering(doctorId, local.getDayOfWeek().getValue() % 7, time)
+        WorkingHoursRow block = scheduleRepo.blockAt(tenantId, doctorId, start)
                 .orElseThrow(() -> refuse("outside-hours", "OUTSIDE_HOURS", "Outside working hours",
                         "The doctor does not work at that time."));
-        int offset = ScheduleGrid.minuteOf(time) - ScheduleGrid.minuteOf(block.startTime());
-        boolean onGrid = time.getSecond() == 0 && time.getNano() == 0 && offset % block.slotMinutes() == 0;
+        if (SessionModes.TOKEN.equals(SessionModes.modeOn(block, date))) { // ACC-011: token sessions are booked by place (AppointmentService.bookToken)
+            throw refuse("token-session", "TOKEN_SESSION", "Token session", "This session sells numbered places, not times.");
+        }
+        int second = clock.secondOfClinicDay(tenantId, date, start);
+        int offset = second - block.startSecond();
+        boolean onGrid = start.getNano() == 0 && offset % (block.slotMinutes() * 60) == 0;
         if (!onGrid) {
             throw refuse("off-grid", "OFF_GRID", "Not on the slot grid",
                     "Slots start every " + block.slotMinutes() + " minutes from " + block.startTime() + ".");
         }
-        if (ScheduleGrid.minuteOf(time) + block.slotMinutes() > ScheduleGrid.minuteOf(block.endTime())) {
+        if (second + block.slotMinutes() * 60 > block.endSecond()) {
             throw refuse("outside-hours", "OUTSIDE_HOURS", "Outside working hours",
                     "A full slot does not fit before the session ends at " + block.endTime() + ".");
         }
+        if (ScheduleRepository.overlapsLeave(scheduleRepo.partialLeaves(tenantId, doctorId, date), second, block.slotMinutes() * 60)) { // ACC-005
+            throw refuse("doctor-on-leave", "DOCTOR_ON_LEAVE", "Doctor on leave", "The doctor is on leave at that time on " + date + ".");
+        }
         if (scheduleRepo.isClinicHoliday(tenantId, date)) {
             throw refuse("clinic-closed", "CLINIC_CLOSED", "Clinic closed", "The clinic is closed on " + date + ".");
+        }
+        var time = start.atZone(clock.zone(tenantId)).toLocalTime();
+        if (!ScheduleRepository.inWindows(scheduleRepo.shortWindows(tenantId, date), time, time.plusMinutes(block.slotMinutes()))) { // ADM-028
+            throw refuse("clinic-closed", "CLINIC_CLOSED", "Clinic closed", "The clinic has short hours on " + date + " and is closed at that time.");
+        }
+        if (scheduleRepo.reservedMinutes(block.id()).contains(ScheduleGrid.minuteOf(time))) { // ACC-012
+            throw refuse("reserved-for-walkin", "RESERVED_FOR_WALKIN", "Reserved for walk-ins",
+                    "This slot is kept for walk-in patients; check the patient in at the desk instead.");
         }
         if (!start.isAfter(now)) {
             throw refuse("in-past", "IN_PAST", "Time in the past", "The chosen time has already passed.");
         }
         return block.slotMinutes();
+    }
+
+    /** ACC-011: a token booking needs a working day (not leave, not a holiday) and a session that has not ended. */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    void validateToken(UUID tenantId, UUID doctorId, WorkingHoursRow block, LocalDate date, Instant sessionEnd, Instant now) {
+        if (scheduleRepo.isOnLeave(doctorId, date)) {
+            throw refuse("doctor-on-leave", "DOCTOR_ON_LEAVE", "Doctor on leave", "The doctor is on leave on " + date + ".");
+        }
+        if (scheduleRepo.isClinicHoliday(tenantId, date)) {
+            throw refuse("clinic-closed", "CLINIC_CLOSED", "Clinic closed", "The clinic is closed on " + date + ".");
+        }
+        if (!sessionEnd.isAfter(now)) {
+            throw refuse("in-past", "IN_PAST", "Time in the past", "The session has already ended.");
+        }
     }
 
     /** The exclusion constraint is the only integrity failure here that means "slot taken"; anything else stays a 500. */

@@ -15,7 +15,7 @@ final class CheckoutModels {
 
     /** V3-004 / QA-OI-2: the authoritative catalogue row behind a charge code (stocked = pharmacy item). */
     record PharmacyChargeRow(UUID id, String name, String category, BigDecimal baseAmount, BigDecimal followUpAmount, BigDecimal taxRatePercent,
-                              boolean active, boolean doctorOverride, boolean stocked, boolean isRx) {
+                              boolean active, boolean doctorOverride, boolean stocked, boolean isRx, BigDecimal emergencyAmount) {
     }
 
     record VoidableInvoice(String invoiceNumber, String status, java.math.BigDecimal paid) {
@@ -42,11 +42,11 @@ final class CheckoutModels {
     record LineItemInput(String chargeCode, String chargeName, String category, int quantity,
                           BigDecimal unitPrice, BigDecimal taxRatePercent, UUID catalogueId, BigDecimal listUnitPrice,
                           String tier, String overrideReasonCode, String overrideNote, UUID overriddenBy,
-                          boolean isRx, UUID prescriptionItemId) {
+                          boolean isRx, UUID prescriptionItemId, String shortfallReason) {
         /** FIN-008: the tax engine decides the rate (head class, effective-dated rule); the line then stores that rate. */
         LineItemInput withTaxRate(BigDecimal rate) {
             return new LineItemInput(chargeCode, chargeName, category, quantity, unitPrice, rate, catalogueId, listUnitPrice, tier,
-                    overrideReasonCode, overrideNote, overriddenBy, isRx, prescriptionItemId);
+                    overrideReasonCode, overrideNote, overriddenBy, isRx, prescriptionItemId, shortfallReason);
         }
     }
 

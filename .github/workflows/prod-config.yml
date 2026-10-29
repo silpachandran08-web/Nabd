@@ -10,7 +10,7 @@ on:
 jobs:
   prod-config:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -21,7 +21,11 @@ jobs:
       - name: Role bootstrap and migrations apply on an empty Postgres 16 (migrator, not superuser)
         run: |
           docker run -d --name pg -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=nabd -p 5433:5432 postgres:16-alpine
-          for i in $(seq 30); do docker exec pg pg_isready -U postgres -d nabd && break; sleep 1; done
+          # -h 127.0.0.1: the image's init-time server listens on the unix socket only, so a TCP check passes only once the final
+          # server is up (a socket check passed early and the next psql failed with exit code 2: connection refused)
+          ready=0
+          for i in $(seq 60); do docker exec pg pg_isready -h 127.0.0.1 -U postgres -d nabd && ready=1 && break; sleep 1; done
+          [ "$ready" = 1 ] || { docker logs pg | tail -30; exit 1; }
           docker exec -i pg psql -v ON_ERROR_STOP=1 -U postgres -d nabd -v migrator_pw=ci_m -v app_pw=ci_a -v reports_pw=ci_r < infra/db/bootstrap-roles.sql
           cd backend && mvn -B -q -DskipTests package
           MIGRATE_DB_URL=jdbc:postgresql://localhost:5433/nabd MIGRATE_DB_USER=nabd_migrator MIGRATE_DB_PASSWORD=ci_m \
@@ -43,3 +47,23 @@ jobs:
       - name: API suite as nabd_app (RlsSelfCheck runs at every context boot)
         working-directory: backend
         run: mvn -B test
+      # Logs cannot be read through the REST API; annotations and artifacts can. Report each failing test as an error annotation.
+      - name: Surefire failures as annotations
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob("backend/target/surefire-reports/TEST-*.xml"):
+              for tc in ET.parse(f).getroot().iter("testcase"):
+                  for k in ("failure", "error"):
+                      e = tc.find(k)
+                      if e is not None:
+                          msg = (e.get("message") or "").replace("\n", " ")[:300]
+                          print(f"::error title={tc.get('classname')}.{tc.get('name')}::{msg}".replace("%", "%25"))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports
+          retention-days: 7

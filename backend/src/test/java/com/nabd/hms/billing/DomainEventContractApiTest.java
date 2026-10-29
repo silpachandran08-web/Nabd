@@ -214,7 +214,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         String appt = id(call(e, HttpMethod.POST, "/v1/appointments", Map.of("patientId", p, "doctorId", doctor.toString(), "startTime", slot)));
         String moved = id(call(e, HttpMethod.POST, "/v1/appointments/" + appt + "/reschedule",
                 Map.of("newStartTime", tomorrow.atTime(10, 15).atZone(zone(t)).toInstant().toString())));
-        call(e, HttpMethod.POST, "/v1/appointments/" + moved + "/cancel", Map.of("reason", "patient called"));
+        call(e, HttpMethod.POST, "/v1/appointments/" + moved + "/cancel", Map.of("reasonCode", "illness"));
 
         // scheduling.appointment.arrived: today's appointment, written directly (a booking must be in the future on the grid)
         UUID today = inTenantTx(t, () -> jdbc.queryForObject("INSERT INTO appointments (tenant_id, patient_id, doctor_id, start_time, end_time) "
@@ -247,6 +247,9 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         call(e, HttpMethod.POST, "/v1/doctors/" + doctor + "/delay", Map.of("delayMinutes", 20, "reason", "surgery overran"));
         assertThat(exchange("/v1/doctors/" + doctor + "/delay/clear", HttpMethod.POST, authed(e.token()), Void.class).getStatusCode().is2xxSuccessful()).isTrue();
 
+        // organization.calendar.changed (ADM-028: a holiday added)
+        call(e, HttpMethod.POST, "/v1/setup/holidays", Map.of("holidayDate", "2031-01-02", "name", "Contract day", "recurring", false));
+
         // organization.config.changed, billing.catalogue.changed
         call(e, HttpMethod.PATCH, "/v1/setup/policies/session.idle_lock_minutes", Map.of("value", "10"));
         Map<String, Object> charge = new HashMap<>(Map.of("code", "ECG", "name", "ECG", "category", "Procedure", "baseAmount", 300,
@@ -277,6 +280,13 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.DRUG_MASTER_VERSION_ACTIVATED.type()); // CLN-019: published on drug master activation (DrugMasterApiTest)
         expected.remove(DomainEventType.PLATFORM_ENTITLEMENTS_CHANGED.type()); // PLT-059: operator-plane producer, Plt059EntitlementsApiTest
         expected.remove(DomainEventType.PRIVACY_NOTICE_PUBLISHED.type()); // IDC-003: Idc003PrivacyNoticeApiTest
+        expected.remove(DomainEventType.BOOKING_ROUTED.type()); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
+        expected.remove(DomainEventType.APPOINTMENT_NO_SHOW.type()); // ACC-025: Acc025NoShowApiTest
+        expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
+        expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
+        expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
+        expected.remove(DomainEventType.PATIENT_LINK_OPENED.type()); // PLT-041: written by LinkOpenRecorder when the secure-link service reports an open, Plt041LinkOpenApiTest
+        expected.remove(DomainEventType.PHARMACY_STOCK_BATCH_CHANGED.type()); // PHL-005: Phl005StockBatchesApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

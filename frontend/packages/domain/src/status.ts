@@ -7,13 +7,13 @@ export const QUEUE_STATUSES = [
 ] as const;
 export type QueueStatus = (typeof QUEUE_STATUSES)[number];
 
-export const VISIT_SOURCES = ["walk_in", "referral", "online", "social_media", "returning", "other", "internal_transfer"] as const;
+export const VISIT_SOURCES = ["walk_in", "referral", "online", "social_media", "returning", "other", "internal_transfer", "abdm_scan_share"] as const;
 export type VisitSource = (typeof VISIT_SOURCES)[number];
 
 // Indexed with the raw API string (an unknown source falls back to the code at the call site); `satisfies` keeps it complete.
 export const VISIT_LABEL: Record<string, string> = {
   walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
+  returning: "Returning", other: "Other", internal_transfer: "Internal transfer", abdm_scan_share: "via ABHA",
 } satisfies Record<VisitSource, string>;
 
 // readonly string[] so a raw API status can be looked up; `satisfies` keeps the entries valid statuses.

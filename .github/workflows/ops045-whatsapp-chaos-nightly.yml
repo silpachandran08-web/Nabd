@@ -1,0 +1,30 @@
+name: ops045-whatsapp-chaos-nightly
+# OPS-045 (T-135): nightly WhatsApp chaos suite (provider outage, 429 storm, 5xx, latency, duplicate webhooks, STOP under outage,
+# check-in latency, dead letters). Time-compressed: well under 20 minutes. Testcontainers needs Docker, which ubuntu-latest has.
+# Needs external action: Toxiproxy faults and the run against a staging cluster / the extracted Comms Gateway.
+on:
+  schedule: [{ cron: "10 2 * * *" }]
+  pull_request:
+    paths: ['backend/src/test/java/com/nabd/hms/messaging/Ops045*', 'backend/src/test/java/com/nabd/hms/support/Chaos*', 'infra/observability/whatsapp-dead-letter.rules*', '.github/workflows/ops045-whatsapp-chaos-nightly.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  PROMETHEUS_VERSION: "2.55.1"
+jobs:
+  chaos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - name: Chaos suite (known-defect tests stay excluded; the strict latency gate is on)
+        working-directory: backend
+        run: mvn -B -q test -Dtest=Ops045WhatsAppChaosApiTest -Dchaos.latency.strict=true
+      - name: Alert rule and workflow checks
+        run: python3 scripts/ci/test_ops045_chaos.py
+      - name: promtool unit test of the dead-letter alerts
+        run: |
+          curl -sSL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" | tar -xz --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          cd infra/observability && "$GITHUB_WORKSPACE/promtool" test rules whatsapp-dead-letter.rules.test.yml

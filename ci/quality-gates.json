@@ -33,5 +33,18 @@
       "backend/src/main/java/com/nabd/hms/billing/",
       "backend/src/main/java/com/nabd/hms/auth/"
     ]
+  },
+  "pit_packages": {
+    "_note": "FIN-010: per-package mutation gate (quality.py pit-pkg). Classes are matched by outer class name; every listed class must have mutants.",
+    "billing-tax": {
+      "min_score": 85,
+      "classes": [
+        "com.nabd.hms.billing.tax.RuleBasedTaxEngine",
+        "com.nabd.hms.billing.tax.TaxEngine",
+        "com.nabd.hms.billing.tax.IndiaGst",
+        "com.nabd.hms.billing.tax.FlatVat",
+        "com.nabd.hms.billing.CreditNoteMath"
+      ]
+    }
   }
 }

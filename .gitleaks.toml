@@ -10,3 +10,9 @@ keywords = ["eaa"]
 
 [allowlist]
 paths = ['''docs/.*\.pdf''']
+# Identifiers (test class names, template ids, job names, flags) that the generic-api-key rule's entropy check mistakes for
+# secrets. Exact values only (anchored), so a real credential next to them is still found. Reviewed S15: none is a credential.
+regexes = [
+  '''^(Acc010BookingRequestsApiTest|S12QaOps035ContractGateTest|appt_reminder_24h|variables_ops058\.tf|stage6-build-and-scan)$''',
+  '''^(EP19-uploads-secure-links|aws_s3_bucket_versioning|clinic-shared-[12]|--app\.crypto\.active-kid=1)$''',
+]

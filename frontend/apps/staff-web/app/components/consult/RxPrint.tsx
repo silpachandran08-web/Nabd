@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "../ui/Icon";
@@ -7,6 +8,8 @@ import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { age, type Allergy, type AllergyStatus, type PatientDetail, type Prescription, type PrescriptionAllergySnapshot } from "./shared";
+import { PrintSheet } from "@nabd/ui";
+import { usePrintPaper } from "../../lib/usePrintPaper";
 import r from "./rxPrint.module.css";
 import { responseFetch } from "../../lib/responseFetch";
 
@@ -21,6 +24,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 type PrintHeader = {
   prescriptionId: string; signedAt: string | null; clinicName: string; clinicRegion: string; clinicPhone: string | null;
   prescriberId: string | null; prescriberName: string | null; professionalRegistrationNo: string | null;
+  genericFirst?: boolean; // CLN-021: print the generic (salt) first, the brand in brackets only if one was chosen
 };
 type RxFull = Prescription & { patientId: string };
 type AllergyView =
@@ -55,11 +59,14 @@ function validSnapshot(x: unknown): x is PrescriptionAllergySnapshot {
 }
 
 export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
+  const tx = useTranslations("consult.rxPrint");
+  const g = useTranslations("glossary");
   const router = useRouter();
   const mounted = useHasMounted();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [tick, setTick] = useState(0);
   const allowed = mounted && can("clinical:view");
+  const paper = usePrintPaper("rx"); // FEF-046: clinic default, no prompt
 
   const get = useCallback(async (path: string): Promise<Response> => {
     const res = await responseFetch(path);
@@ -75,8 +82,8 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
       setState({ kind: "loading" });
       try {
         const rxRes = await get(`/clinical/prescriptions/${queueEntryId}`);
-        if (rxRes.status === 404) throw new LoadError("There is no prescription for this visit.");
-        if (!rxRes.ok) throw new LoadError("Couldn't load the prescription.");
+        if (rxRes.status === 404) throw new LoadError(tx("thereIsNoPrescriptionFor"));
+        if (!rxRes.ok) throw new LoadError(tx("couldnTLoadThePrescription"));
         const rx: RxFull = await rxRes.json();
         if (rx.status !== "signed") {
           if (!cancelled) setState({ kind: "draft" });
@@ -87,7 +94,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         // undefined = the server predates the field; null = legacy signed row; anything else must be a valid snapshot.
         const snapshot = rx.allergySnapshot ?? null;
         if (snapshot !== null && !validSnapshot(snapshot)) {
-          throw new LoadError("The allergy statement saved at signing couldn't be read, so the prescription can't be printed.");
+          throw new LoadError(tx("theAllergyStatementSavedAt"));
         }
         const [hRes, pRes, aRes, sRes] = await Promise.all([
           get(`/clinical/prescriptions/${queueEntryId}/print-header`),
@@ -99,20 +106,20 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
           if (!cancelled) setState({ kind: "draft" });
           return;
         }
-        if (!hRes.ok) throw new LoadError("Couldn't load the clinic and prescriber details.");
-        if (!pRes.ok) throw new LoadError("Couldn't load the patient details.");
+        if (!hRes.ok) throw new LoadError(tx("couldnTLoadTheClinic"));
+        if (!pRes.ok) throw new LoadError(tx("couldnTLoadThePatient"));
         let allergy: AllergyView;
         if (snapshot) {
           allergy = { kind: "atSigning", snapshot };
         } else {
-          if (!aRes || !sRes || !aRes.ok || !sRes.ok) throw new LoadError("Couldn't confirm the allergy register, so the prescription can't be printed yet.");
+          if (!aRes || !sRes || !aRes.ok || !sRes.ok) throw new LoadError(tx("couldnTConfirmTheAllergy"));
           allergy = { kind: "currentRegister", allergies: await aRes.json(), allergyStatus: await sRes.json() };
         }
         const data: Loaded = { rx, header: await hRes.json(), patient: await pRes.json(), allergy };
         if (!cancelled) setState({ kind: "ok", data });
       } catch (e) {
         if (cancelled || (e instanceof LoadError && e.message === "signed out")) return;
-        setState({ kind: "error", message: e instanceof LoadError ? e.message : "Couldn't reach the server. Check your connection and retry." });
+        setState({ kind: "error", message: e instanceof LoadError ? e.message : tx("couldnTReachTheServer") });
       }
     });
     return () => { cancelled = true; };
@@ -120,15 +127,15 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
 
   if (!mounted) return null;
   if (!allowed) {
-    return <main className={r.page}><EmptyState icon="shield" title="Your role doesn't have access to prescriptions." /></main>;
+    return <main className={r.page}><EmptyState icon="shield" title={tx("yourRoleDoesnTHave")} /></main>;
   }
-  if (state.kind === "loading") return <main className={r.page}><Skeleton rows={6} label="Loading prescription" /></main>;
+  if (state.kind === "loading") return <main className={r.page}><Skeleton rows={6} label={tx("loadingPrescription")} /></main>;
   if (state.kind === "error") return <main className={r.page}><ErrorState message={state.message} onRetry={() => setTick((t) => t + 1)} /></main>;
   if (state.kind === "draft") {
     return (
       <main className={r.page}>
-        <EmptyState title="This prescription isn't signed yet." hint="Only a signed prescription can be printed. Sign it in the consultation first."
-          action={<button type="button" className={r.btn} onClick={() => router.back()}>Back to consultation</button>} />
+        <EmptyState title={tx("thisPrescriptionIsnTSigned")} hint={tx("onlyASignedPrescriptionCan")}
+          action={<button type="button" className={r.btn} onClick={() => router.back()}>{tx("backToConsultation")}</button>} />
       </main>
     );
   }
@@ -145,49 +152,50 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
   return (
     <main className={r.page}>
       <div className={r.toolbar}>
-        <h1 className={r.toolbarTitle}>Print prescription</h1>
+        <h1 className={r.toolbarTitle}>{tx("printPrescription")}</h1>
         <div className={r.toolbarActions}>
-          <button type="button" className={r.btn} onClick={() => router.back()}>Back</button>
-          <button type="button" className={`${r.btn} ${r.btnPrimary}`} onClick={() => window.print()}><Icon name="receipt" size={14} /> Print</button>
+          <button type="button" className={r.btn} onClick={() => router.back()}>{tx("back")}</button>
+          <button type="button" className={`${r.btn} ${r.btnPrimary}`} onClick={() => window.print()}><Icon name="receipt" size={14} /> {" "}{tx("print")}</button>
         </div>
       </div>
       {!header.professionalRegistrationNo && (
         <div className={r.notice} role="status">
           <Icon name="alert" size={16} />
-          <span>Registration number not set for {header.prescriberName ?? "the prescriber"}. It will be left off the printout. Ask a staff administrator to add it in Staff &amp; Access.</span>
+          <span>{tx("registrationNumberNotSetFor")}{" "}{header.prescriberName ?? tx("thePrescriber")}{tx("itWillBeLeftOff")}</span>
         </div>
       )}
       <div className={`${r.notice} ${r.noticeInfo}`} role="note">
         <Icon name="info" size={16} />
-        <span>Medicines are printed exactly as the prescriber typed them. No name is added or substituted.</span>
+        <span>{tx("medicinesArePrintedExactlyAs")}</span>
       </div>
 
-      <article className={r.sheet} aria-label="Prescription">
+      <PrintSheet paper={paper} label={g("rx.prescription")} bare>
+      <article className={r.sheet} aria-label={g("rx.prescription")}>
         <header className={r.letterhead}>
           <div>
             <h2 className={r.clinicName}><bdi>{header.clinicName}</bdi></h2>
             {header.clinicPhone && <div className={r.muted}>{header.clinicPhone}</div>}
           </div>
           <div className={r.prescriber}>
-            <div className={r.prescriberName}><bdi>{header.prescriberName ?? "Prescriber"}</bdi></div>
-            {header.professionalRegistrationNo && <div>Reg. No. {header.professionalRegistrationNo}</div>}
+            <div className={r.prescriberName}><bdi>{header.prescriberName ?? tx("prescriber")}</bdi></div>
+            {header.professionalRegistrationNo && <div>{tx("regNo", { professionalRegistrationNo: header.professionalRegistrationNo })}</div>}
           </div>
         </header>
 
         <div className={r.metaRow}>
-          <div className={r.metaItem}><span className={r.metaLabel}>Patient</span><span>{patient.name}</span></div>
-          <div className={r.metaItem}><span className={r.metaLabel}>MRN</span><span>{patient.mrn}</span></div>
-          <div className={r.metaItem}><span className={r.metaLabel}>Age / sex</span><span>{patient.dob ? `${age(patient.dob)} y` : "—"} · {patient.gender}</span></div>
-          <div className={r.metaItem}><span className={r.metaLabel}>Date</span><span>{signedDay}</span></div>
+          <div className={r.metaItem}><span className={r.metaLabel}>{tx("patient")}</span><span>{patient.name}</span></div>
+          <div className={r.metaItem}><span className={r.metaLabel}>{tx("mrn")}</span><span>{patient.mrn}</span></div>
+          <div className={r.metaItem}><span className={r.metaLabel}>{tx("ageSex")}</span><span>{patient.dob ? `${age(patient.dob)} y` : "—"} · {patient.gender}</span></div>
+          <div className={r.metaItem}><span className={r.metaLabel}>{tx("date")}</span><span>{signedDay}</span></div>
         </div>
 
-        <section className={r.allergyBox} aria-label="Allergies">
+        <section className={r.allergyBox} aria-label={g("allergy.plural")}>
           {allergy.kind === "atSigning" ? (
-            <h3 className={r.sectionTitle}>Allergies at signing ({when(rx.signedAt)})</h3>
+            <h3 className={r.sectionTitle}>{tx("allergiesAtSigning")}{when(rx.signedAt)})</h3>
           ) : (
             <>
-              <p className={r.muted} role="note">Allergy status at signing not recorded (signed {signedDay}, before it was captured with the prescription).</p>
-              <h3 className={r.sectionTitle}>Allergies (as recorded in the register, {printedOn})</h3>
+              <p className={r.muted} role="note">{tx("allergyStatusAtSigningNot", { signedDay })}</p>
+              <h3 className={r.sectionTitle}>{tx("allergiesAsRecordedInThe", { printedOn })}</h3>
             </>
           )}
           {statement.entries.length > 0 ? (
@@ -197,30 +205,34 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
               ))}
             </ul>
           ) : statement.state === "none_documented" ? (
-            <div>No known allergies, documented{statement.documentedByName ? ` by ${statement.documentedByName}` : ""}{statement.documentedAt ? ` on ${when(statement.documentedAt)}` : ""}.</div>
+            <div>{g("allergy.nkaDocumented")}{statement.documentedByName ? ` by ${statement.documentedByName}` : ""}{statement.documentedAt ? ` on ${when(statement.documentedAt)}` : ""}.</div>
           ) : (
-            <div>No allergy information recorded. Allergies have not been asked or documented.</div>
+            <div>{tx("noAllergyInformationRecordedAllergies")}</div>
           )}
         </section>
 
-        <section aria-label="Medicines">
-          <h3 className={r.sectionTitle}>Medicines</h3>
+        <section aria-label={g("rx.medicines")}>
+          <h3 className={r.sectionTitle}>{g("rx.medicines")}</h3>
           <ol className={r.meds}>
             {rx.items.map((m, i) => (
               <li key={m.id ?? i} className={r.med}>
                 <span className={r.medNo}>{i + 1}.</span>
                 <div>
-                  <div className={r.medName}>{m.drugName}</div>
-                  {m.brandName && <div className={r.medInstructions}><span className={r.muted}>Brand </span>{m.brandName}</div>}
+                  {header.genericFirst
+                    ? <div className={r.medName} data-testid="med-line">{m.brandName ? `${m.drugName} (${m.brandName})` : m.drugName}</div>
+                    : <>
+                        <div className={r.medName}>{m.drugName}</div>
+                        {m.brandName && <div className={r.medInstructions}><span className={r.muted}>{tx("brand")}{" "}</span>{m.brandName}</div>}
+                      </>}
                   <div className={r.medFields}>
-                    {m.route && <span className={r.medField}><span className={r.muted}>Route</span>{m.route}</span>}
-                    {m.dosage && <span className={r.medField}><span className={r.muted}>Dose</span>{m.dosage}</span>}
-                    {m.sigPattern && m.sigPattern !== m.frequency && <span className={r.medField}><span className={r.muted}>Pattern</span>{m.sigPattern}</span>}
-                    {m.frequency && <span className={r.medField}><span className={r.muted}>Frequency</span>{m.frequency}</span>}
-                    {m.duration && <span className={r.medField}><span className={r.muted}>Duration</span>{m.duration}</span>}
-                    {m.quantity != null && <span className={r.medField}><span className={r.muted}>Quantity</span>{m.quantity}{m.quantityUnit ? ` ${m.quantityUnit}` : ""}</span>}
+                    {m.route && <span className={r.medField}><span className={r.muted}>{g("rx.route")}</span>{m.route}</span>}
+                    {m.dosage && <span className={r.medField}><span className={r.muted}>{g("rx.dose")}</span>{m.dosage}</span>}
+                    {m.sigPattern && m.sigPattern !== m.frequency && <span className={r.medField}><span className={r.muted}>{tx("pattern")}</span>{m.sigPattern}</span>}
+                    {m.frequency && <span className={r.medField}><span className={r.muted}>{g("rx.frequency")}</span>{m.frequency}</span>}
+                    {m.duration && <span className={r.medField}><span className={r.muted}>{g("rx.duration")}</span>{m.duration}</span>}
+                    {m.quantity != null && <span className={r.medField}><span className={r.muted}>{g("rx.quantity")}</span>{m.quantity}{m.quantityUnit ? ` ${m.quantityUnit}` : ""}</span>}
                   </div>
-                  {m.instructions && <div className={r.medInstructions}><span className={r.muted}>Instructions </span>{m.instructions}</div>}
+                  {m.instructions && <div className={r.medInstructions}><span className={r.muted}>{g("rx.instructions")}{" "}</span>{m.instructions}</div>}
                 </div>
               </li>
             ))}
@@ -229,22 +241,23 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
 
         <footer className={r.signature}>
           <div>
-            <div className={r.metaLabel}>Signed electronically by</div>
-            <div className={r.prescriberName}><bdi>{header.prescriberName ?? "Prescriber"}</bdi></div>
-            {header.professionalRegistrationNo && <div>Reg. No. {header.professionalRegistrationNo}</div>}
+            <div className={r.metaLabel}>{tx("signedElectronicallyBy")}</div>
+            <div className={r.prescriberName}><bdi>{header.prescriberName ?? tx("prescriber")}</bdi></div>
+            {header.professionalRegistrationNo && <div>{tx("regNo", { professionalRegistrationNo: header.professionalRegistrationNo })}</div>}
           </div>
           <div>
-            <div className={r.metaLabel}>Signed at</div>
+            <div className={r.metaLabel}>{tx("signedAt")}</div>
             <div>{when(rx.signedAt)}</div>
           </div>
           {rx.safetyDictionaryVersion && (
             <div>
-              <div className={r.metaLabel}>Safety checks</div>
-              <div>Nabd safety dictionary {rx.safetyDictionaryVersion}</div>
+              <div className={r.metaLabel}>{g("rx.safetyChecks")}</div>
+              <div>{tx("nabdSafetyDictionary", { safetyDictionaryVersion: rx.safetyDictionaryVersion })}</div>
             </div>
           )}
         </footer>
       </article>
+      </PrintSheet>
     </main>
   );
 }

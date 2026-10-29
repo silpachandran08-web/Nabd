@@ -28,6 +28,7 @@ jobs:
           ok=true
           python3 scripts/ci/quality.py pit backend/target/pit-reports/mutations.xml > score.json || ok=false
           cat score.json >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci/quality.py pit-pkg backend/target/pit-reports/mutations.xml | tee -a "$GITHUB_STEP_SUMMARY" || ok=false  # FIN-010: billing tax package >= 85%
           python3 scripts/ci/quality.py pit-drop score.json pit-state/state.json || { ok=false; echo dropped=true >> "$GITHUB_OUTPUT"; }
           echo ok=$ok >> "$GITHUB_OUTPUT"
           if [ "$ok" = true ]; then python3 -c "import json;json.dump({'last_green':json.load(open('score.json'))},open('pit-state/state.json','w'))"; fi

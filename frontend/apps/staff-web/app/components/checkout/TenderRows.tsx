@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "../../checkout/checkout.module.css";
+import styles from "../../(clinic)/checkout/checkout.module.css";
 import { PAYMENT_METHODS, paymentMethodLabel } from "@nabd/domain";
 import { tenderTotalMinor, type Tender } from "./tender";
 

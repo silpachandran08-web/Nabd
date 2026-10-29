@@ -43,8 +43,11 @@ public class TaxService {
     private final RegionRules regions;
     private final ClinicClock clock;
     private final TenantContext tenantContext;
+    private final com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy;
 
-    TaxService(TaxRepository repo, RegionRules regions, ClinicClock clock, TenantContext tenantContext) {
+    TaxService(TaxRepository repo, RegionRules regions, ClinicClock clock, TenantContext tenantContext,
+               com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy) {
+        this.pharmacy = pharmacy;
         this.tenantContext = tenantContext;
         this.repo = repo;
         this.regions = regions;
@@ -70,10 +73,12 @@ public class TaxService {
 
         Map<UUID, TaxRepository.Head> heads = repo.heads(tenantId, lines.stream().filter(l -> !l.existing() && l.catalogueId() != null)
                 .map(InLine::catalogueId).distinct().toList());
+        var pharmacyInputs = pharmacy.inputs(heads.keySet()); // PHL-021: zero-rated / tax-inclusive price of stocked items
         List<TaxEngine.Line> engineLines = new ArrayList<>();
         List<LineMeta> out = new ArrayList<>();
         for (InLine l : lines) {
-            LineMeta m = l.existing() ? stored(l) : resolve(l, heads.get(l.catalogueId()), region.code(), today, clinicGstin, buyer);
+            LineMeta m = l.existing() ? stored(l)
+                    : PharmacyTaxLines.apply(resolve(l, heads.get(l.catalogueId()), region.code(), today, clinicGstin, buyer), pharmacyInputs.get(l.catalogueId()));
             if (BILL_OF_SUPPLY.equals(docType) && !l.existing()) { // no tax is charged, so the line must not show a rate
                 m = new LineMeta(BigDecimal.ZERO, m.category(), null, false, false, m.sacHsn());
             }

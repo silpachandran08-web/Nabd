@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { LOCALES, LOCALE_LABELS, isLocale } from "@nabd/i18n";
 import { api } from "./lib/api";
+import styles from "./topBar.module.css";
 
 export default function LanguagePicker() {
   const t = useTranslations("shell");
@@ -27,8 +28,8 @@ export default function LanguagePicker() {
 
   return (
     <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minBlockSize: 44 }}>
-      <span style={{ fontSize: 12 }}>{t("language")}</span>
-      <select value={current} onChange={(e) => void choose(e.target.value)} aria-label={t("language")} style={{ minBlockSize: 44 }}>
+      <span className={styles.langLabel} style={{ fontSize: 12 }}>{t("language")}</span>
+      <select value={current} onChange={(e) => void choose(e.target.value)} aria-label={t("language")} className={styles.langSelect} style={{ minBlockSize: 44 }}>
         {LOCALES.map((l) => <option key={l} value={l} lang={l}>{LOCALE_LABELS[l]}</option>)}
       </select>
       {failed && <span role="alert" style={{ fontSize: 12 }}>{t("languageSaveFailed")}</span>}

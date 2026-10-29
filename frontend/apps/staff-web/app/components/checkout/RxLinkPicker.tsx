@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import styles from "../../checkout/checkout.module.css";
+import styles from "../../(clinic)/checkout/checkout.module.css";
 import { api, errorText } from "../../lib/api";
 import type { RxLine } from "@nabd/api-client/types";
 

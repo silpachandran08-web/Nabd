@@ -1,0 +1,4 @@
+{
+  "_how": "OPS-044. A release can ship with a hazard that has no passing verifying test only while this file holds a record for that hazard AND that release tag, with every field filled by the CSO (CODEOWNERS @nabd/clinical-safety; engineers never fill it). approved_on is an ISO date, approval_ref links the signed record. One record covers one hazard on one tag; the safety test report lists it under 'Released on a CSO-signed exception'. Empty list = no exceptions.",
+  "exceptions": []
+}

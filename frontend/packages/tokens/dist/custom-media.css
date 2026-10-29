@@ -1,0 +1,5 @@
+/* GENERATED. Needs postcss-custom-media. */
+@custom-media --bp-phone (max-width: 430px);
+@custom-media --bp-tablet-portrait (max-width: 768px);
+@custom-media --bp-tablet (max-width: 1024px);
+@custom-media --bp-desktop (min-width: 1440px);

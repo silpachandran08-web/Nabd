@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createApplier, createLiveStream, LIVE_RESOURCES, type LiveStatus } from "@nabd/api-client/sse";
 import { COOKIE_AUTH } from "./bffShim";
 import { prefix } from "./query";
-import { getPermissions, SHELL_SKIP_PREFIXES } from "./session";
+import { getPermissions } from "./session";
 
 export type LiveState = LiveStatus | "off";
 type Listener = (resources: readonly string[]) => void;
@@ -21,7 +21,8 @@ const LiveCtx = createContext<Ctx>({ status: "off", subscribe: () => () => {} })
 function topicsFor(): string[] {
   const perms = getPermissions();
   const t: string[] = [];
-  if (perms.includes("queue:view")) t.push("queue", "doctor-status");
+  if (perms.includes("queue:view")) t.push("queue", "doctor-status", "exceptions"); // ACC-032: the desk exceptions inbox
+  if (perms.includes("queue:create")) t.push("requests"); // ACC-010: held booking requests
   if (perms.includes("nursing:view")) t.push("nursing");
   if (perms.includes("patients:view")) t.push("messages"); // COM-006: delivery ticks on the patient file
   return t;
@@ -33,14 +34,13 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<LiveState>("off");
   const listeners = useRef(new Set<Listener>());
   const [subscribe] = useState(() => (l: Listener) => { listeners.current.add(l); return () => { listeners.current.delete(l); }; });
-  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const [topics, setTopics] = useState("");
 
   // Re-read the grants on navigation (sign-in, role change); the stream restarts only when the topic set changes.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTopics(COOKIE_AUTH && !skip && localStorage.getItem("nabd_access_token") ? topicsFor().join(",") : "");
-  }, [pathname, skip]);
+    setTopics(COOKIE_AUTH && localStorage.getItem("nabd_access_token") ? topicsFor().join(",") : "");
+  }, [pathname]);
 
   useEffect(() => {
     if (!topics) { setStatus("off"); return; } // eslint-disable-line react-hooks/set-state-in-effect

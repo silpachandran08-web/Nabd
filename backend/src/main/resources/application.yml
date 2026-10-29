@@ -120,6 +120,7 @@ app:
   # inside the email body server-side (the frontend builds the same link client-side from
   # window.location.origin for the manual-relay banner; this is that same value for SmtpEmailSender).
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  patient-web-base-url: ${PATIENT_WEB_BASE_URL:http://localhost:3810} # IDC-009: where the family member opens the consent link (/proxy-invite/<token>)
   auth:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 30
@@ -185,6 +186,7 @@ app:
     circuit-open-seconds: 30
     providers:
       comms-gateway: { connect-timeout-ms: 1000, read-timeout-ms: 2000 } # COM-009: OTP budget 3 s
+      abdm: { connect-timeout-ms: 2000, read-timeout-ms: 8000 } # IDC-017: ABHA at the desk, 8 s then a graceful skip (503 abdm-unavailable)
   # IDC-016 ABDM bridge (DEC-33: off per clinic by default). Endpoints only; the bridge credentials live in the regional secret
   # store (platform secrets abdm-client-id / abdm-client-secret). Blank base-url or lookup template = "not configured" (503).
   abdm:
@@ -193,6 +195,12 @@ app:
     hfr-lookup: ${ABDM_HFR_LOOKUP:}
     hpr-lookup: ${ABDM_HPR_LOOKUP:}
     jwks-uri: ${ABDM_JWKS_URI:}
+    abha: # IDC-017 M1 paths below base-url; blank = not configured (503). Sandbox contract: Needs external action (DEP-05).
+      cert-path: ${ABDM_ABHA_CERT_PATH:}
+      login-otp-path: ${ABDM_ABHA_LOGIN_OTP_PATH:}
+      login-verify-path: ${ABDM_ABHA_LOGIN_VERIFY_PATH:}
+      enrol-otp-path: ${ABDM_ABHA_ENROL_OTP_PATH:}
+      enrol-path: ${ABDM_ABHA_ENROL_PATH:}
   whatsapp:
     # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
     # every local/test run, same as spring.mail.host above.

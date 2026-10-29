@@ -1,0 +1,20 @@
+# OPS-045: operator alerts for WhatsApp dead letters. A dead letter is an outbox event (outbox_dead_events{region}, OPS-014) or a
+# webhook row (whatsapp_inbound_dead, COM-001) that exhausted its retries: the message exists, the patient has not been told.
+# Wiring this file into the cell's Prometheus/Alertmanager is Needs external action (see docs/runbooks/whatsapp-chaos.md).
+groups:
+  - name: nabd-whatsapp-dead-letters
+    rules:
+      - alert: NabdOutboxDeadLetters
+        expr: max by (region) (outbox_dead_events) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "Outbox events are dead-lettered (WhatsApp sends included): check the provider, then redrive"
+          runbook: docs/runbooks/whatsapp-chaos.md
+      - alert: NabdWhatsAppInboundDeadLetters
+        expr: max(whatsapp_inbound_dead) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "WhatsApp webhook rows are dead-lettered: status updates or replies (STOP) were not applied"
+          runbook: docs/runbooks/whatsapp-chaos.md

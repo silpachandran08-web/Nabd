@@ -20,17 +20,26 @@ class ScheduleBoardRepository {
     }
 
     record BlockRow(UUID doctorId, LocalTime start, LocalTime end, int slotMinutes) {
+        /** ACC-005: minutes from the clinic date's midnight; an overnight block ends after 1440. */
+        int startMinute() {
+            return start.toSecondOfDay() / 60;
+        }
+
+        int endMinute() {
+            return end.toSecondOfDay() / 60 + (end.isAfter(start) ? 0 : 1440);
+        }
     }
 
-    record LeaveRow(UUID doctorId, String reason) {
+    /** start/end both null = the whole day. */
+    record LeaveRow(UUID doctorId, String reason, LocalTime start, LocalTime end) {
     }
 
     record AppointmentRow(UUID id, UUID doctorId, UUID patientId, String patientName, Instant start, Instant end,
-                          String status, boolean followUp, UUID queueEntryId, Integer token, String queueStatus) {
+                          String status, boolean followUp, UUID queueEntryId, Integer token, String queueStatus, String actedByRelation) {
     }
 
     record WalkInRow(UUID queueEntryId, UUID doctorId, UUID patientId, String patientName, Instant createdAt,
-                     String source, int token, String status) {
+                     String source, int token, String status, String actedByRelation) {
     }
 
     private final JdbcTemplate jdbc;
@@ -42,7 +51,7 @@ class ScheduleBoardRepository {
     /** Same match rules as ScheduleRepository.isClinicHoliday (recurring = same month and day). */
     Optional<String> holidayName(UUID tenantId, LocalDate date) {
         return jdbc.query("""
-                SELECT name FROM clinic_holidays WHERE tenant_id = ? AND (
+                SELECT name FROM clinic_holidays WHERE tenant_id = ? AND effect = 'closed' AND (
                   (NOT recurring AND holiday_date = ?) OR
                   (recurring AND EXTRACT(MONTH FROM holiday_date) = ? AND EXTRACT(DAY FROM holiday_date) = ?))
                 ORDER BY name LIMIT 1
@@ -84,8 +93,10 @@ class ScheduleBoardRepository {
     }
 
     List<LeaveRow> leaveOn(UUID tenantId, LocalDate date) {
-        return jdbc.query("SELECT doctor_id, reason FROM doctor_leave WHERE tenant_id = ? AND ? BETWEEN date_from AND date_to",
-                (rs, i) -> new LeaveRow(rs.getObject("doctor_id", UUID.class), rs.getString("reason")),
+        return jdbc.query("SELECT doctor_id, reason, start_time, end_time FROM doctor_leave WHERE tenant_id = ? AND ? BETWEEN date_from AND date_to",
+                (rs, i) -> new LeaveRow(rs.getObject("doctor_id", UUID.class), rs.getString("reason"),
+                        rs.getTime("start_time") == null ? null : rs.getTime("start_time").toLocalTime(),
+                        rs.getTime("end_time") == null ? null : rs.getTime("end_time").toLocalTime()),
                 tenantId, Date.valueOf(date));
     }
 
@@ -93,32 +104,32 @@ class ScheduleBoardRepository {
     List<AppointmentRow> appointmentsBetween(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.query("""
                 SELECT a.id, a.doctor_id, a.patient_id, p.name AS patient_name, a.start_time, a.end_time, a.status,
-                       a.is_follow_up, q.id AS queue_entry_id, q.token_number, q.status AS queue_status
+                       a.is_follow_up, q.id AS queue_entry_id, q.token_number, q.status AS queue_status, a.acted_by_relation
                 FROM appointments a
                 JOIN patients p ON p.id = a.patient_id
                 LEFT JOIN LATERAL (SELECT id, token_number, status FROM queue_entries
                                    WHERE appointment_id = a.id ORDER BY created_at DESC LIMIT 1) q ON true
-                WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ?
+                WHERE a.tenant_id = ? AND a.status NOT IN ('cancelled','declined') AND a.start_time >= ? AND a.start_time < ?
                 ORDER BY a.start_time
                 """, (rs, i) -> new AppointmentRow(rs.getObject("id", UUID.class), rs.getObject("doctor_id", UUID.class),
                         rs.getObject("patient_id", UUID.class), rs.getString("patient_name"),
                         rs.getTimestamp("start_time").toInstant(), rs.getTimestamp("end_time").toInstant(),
                         rs.getString("status"), rs.getBoolean("is_follow_up"), rs.getObject("queue_entry_id", UUID.class),
-                        (Integer) rs.getObject("token_number"), rs.getString("queue_status")),
+                        (Integer) rs.getObject("token_number"), rs.getString("queue_status"), rs.getString("acted_by_relation")),
                 tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
     }
 
     /** Queue entries that didn't come from an appointment: walk-ins and department transfers. */
     List<WalkInRow> walkInsOn(UUID tenantId, LocalDate date) {
         return jdbc.query("""
-                SELECT q.id, q.doctor_id, q.patient_id, p.name AS patient_name, q.created_at, q.source, q.token_number, q.status
+                SELECT q.id, q.doctor_id, q.patient_id, p.name AS patient_name, q.created_at, q.source, q.token_number, q.status, q.acted_by_relation
                 FROM queue_entries q JOIN patients p ON p.id = q.patient_id
                 WHERE q.tenant_id = ? AND q.queue_date = ? AND q.appointment_id IS NULL
                 ORDER BY q.created_at
                 """, (rs, i) -> new WalkInRow(rs.getObject("id", UUID.class), rs.getObject("doctor_id", UUID.class),
                         rs.getObject("patient_id", UUID.class), rs.getString("patient_name"),
                         rs.getTimestamp("created_at").toInstant(), rs.getString("source"), rs.getInt("token_number"),
-                        rs.getString("status")),
+                        rs.getString("status"), rs.getString("acted_by_relation")),
                 tenantId, Date.valueOf(date));
     }
 }

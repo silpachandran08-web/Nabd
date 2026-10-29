@@ -28,9 +28,18 @@ import java.util.UUID;
 public class CheckoutController {
 
     private final CheckoutService service;
+    private final CheckoutPrefill prefill;
 
-    CheckoutController(CheckoutService service) {
+    CheckoutController(CheckoutService service, CheckoutPrefill prefill) {
         this.service = service;
+        this.prefill = prefill;
+    }
+
+    /** PHL-018: the visit's in-house Rx lines, ready to tick at checkout. */
+    @GetMapping("/checkout/{queueEntryId}/prefill")
+    @PreAuthorize("hasAuthority('billing:create')")
+    public com.nabd.hms.billing.dto.CheckoutPrefillResponse prefill(@PathVariable UUID queueEntryId) {
+        return prefill.prefill(queueEntryId);
     }
 
     @GetMapping("/checkout/{queueEntryId}")
@@ -78,8 +87,10 @@ public class CheckoutController {
 
     @GetMapping("/invoices/{id}")
     @PreAuthorize("hasAuthority('billing:view')")
-    public InvoiceResponse getInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.getInvoice(tenantId(jwt), id);
+    public org.springframework.http.ResponseEntity<InvoiceResponse> getInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                                               @org.springframework.web.bind.annotation.RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        java.util.List<Long> seq = service.invoiceChangeSeq(id); // OPS-006: 304 without loading the invoice
+        return com.nabd.hms.shared.ETags.respond(!seq.isEmpty(), seq.isEmpty() ? null : seq.get(0), ifNoneMatch, () -> service.getInvoice(tenantId(jwt), id));
     }
 
     @com.nabd.hms.shared.Idempotent

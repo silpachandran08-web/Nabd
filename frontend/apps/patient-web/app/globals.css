@@ -1,0 +1,56 @@
+/* FEF-061: --nb-* tokens, light by default (data-theme="dark" on request). Same names as staff-web, values for a phone in daylight. */
+:root {
+  --nb-bg-canvas: #f6f8fa;
+  --nb-surface-1: #ffffff;
+  --nb-border-default: #d0d7de;
+  --nb-accent-500: #0a7f8c;
+  --nb-on-accent: #ffffff;
+  --nb-danger-500: #b4232f;
+  --nb-danger-tint: #fdecee;
+  --nb-ok-500: #17724a;
+  --nb-ok-tint: #e6f5ee;
+  --nb-warn-500: #8a5a00;
+  --nb-warn-tint: #fff4d6;
+  --nb-text-primary: #14202b;
+  --nb-text-secondary: #46535f;
+  --nb-focus-ring: #0a5fb4;
+  --nb-radius-md: 12px;
+  --nb-space-4: 4px;
+  --nb-space-8: 8px;
+  --nb-space-12: 12px;
+  --nb-space-16: 16px;
+  --nb-space-24: 24px;
+  --nb-space-32: 32px;
+}
+:root[data-theme="dark"] {
+  --nb-bg-canvas: #0a0e12;
+  --nb-surface-1: #11161b;
+  --nb-border-default: rgba(255, 255, 255, 0.18);
+  --nb-accent-500: #2ed3e0;
+  --nb-on-accent: #04231f;
+  --nb-danger-500: #ff8f9c;
+  --nb-danger-tint: rgba(240, 69, 92, 0.16);
+  --nb-ok-500: #34d399;
+  --nb-ok-tint: rgba(52, 211, 153, 0.14);
+  --nb-warn-500: #e8b33c;
+  --nb-warn-tint: rgba(232, 179, 60, 0.14);
+  --nb-text-primary: #ffffff;
+  --nb-text-secondary: #b4bec6;
+  --nb-focus-ring: #2ed3e0;
+}
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+body {
+  margin: 0;
+  min-block-size: 100dvh;
+  background: var(--nb-bg-canvas);
+  color: var(--nb-text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, var(--font-deva), var(--font-knda), var(--font-telu), sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+:lang(te) body, body:lang(te) { font-family: var(--font-telu), system-ui, sans-serif; }
+:lang(kn) body, body:lang(kn) { font-family: var(--font-knda), system-ui, sans-serif; }
+:lang(hi) body, body:lang(hi) { font-family: var(--font-deva), system-ui, sans-serif; }
+:focus-visible { outline: 3px solid var(--nb-focus-ring); outline-offset: 2px; }

@@ -26,6 +26,7 @@ public class ConversationEngine {
 
     static final String WAIT_TEXT = "Please wait a moment";
     private static final int MAX_ATTEMPTS = 25;
+    private static final java.time.Duration BUTTON_TTL = java.time.Duration.ofHours(24); // the conversation's own resume window
     private static final Logger log = LoggerFactory.getLogger(ConversationEngine.class);
 
     private final ConversationStore store;
@@ -34,15 +35,17 @@ public class ConversationEngine {
     private final ButtonTokens buttons;
     private final MeterRegistry meters;
     private final Map<State, FlowHandler> handlers = new EnumMap<>(State.class);
+    private final java.util.List<Intent> intents;
 
     ConversationEngine(ConversationStore store, RateLimiter limiter, CommsClient comms, ButtonTokens buttons, MeterRegistry meters,
-                       ObjectProvider<FlowHandler> flows) {
+                       ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents) {
         this.store = store;
         this.limiter = limiter;
         this.comms = comms;
         this.buttons = buttons;
         this.meters = meters;
         flows.orderedStream().forEach(h -> handlers.put(h.state(), h));
+        this.intents = intents.orderedStream().toList();
     }
 
     /** contactHash may be null when the event does not carry it; it then comes from the fetched message. */
@@ -60,7 +63,7 @@ public class ConversationEngine {
         RateLimiter.Decision d = limiter.phone(tenantId, contact);
         if (d != RateLimiter.Decision.ALLOW) {
             if (d == RateLimiter.Decision.NOTIFY) {
-                reply(tenantId, channel, contact, WAIT_TEXT, messageId);
+                reply(tenantId, channel, contact, WAIT_TEXT, messageId, java.util.List.of());
             }
             result("rate_limited");
             return;
@@ -77,11 +80,12 @@ public class ConversationEngine {
             }
             action = a.get();
         }
-        Message msg = new Message(in.kind(), in.text(), action);
+        Message msg = new Message(in.kind(), in.text(), action, messageId);
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             Conversation c = store.load(tenantId, channel, contact);
-            FlowHandler h = handlers.get(c.state());
-            Outcome o = h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg);
+            FlowHandler h = handlers.get(CheckInFlow.claims(msg) ? State.CHECKIN : c.state()); // ACC-033: CHECKIN <code> and "I'm here" win in any state
+            Outcome o = intents.stream().map(i -> i.handle(c, msg)).flatMap(Optional::stream).findFirst()
+                    .orElseGet(() -> h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg));
             checkContext(o);
             switch (store.commit(c, o, messageId)) {
                 case DUPLICATE -> {
@@ -91,7 +95,7 @@ public class ConversationEngine {
                 case OK -> {
                     result("processed");
                     if (o.reply() != null) {
-                        reply(tenantId, channel, contact, o.reply(), messageId);
+                        reply(tenantId, channel, contact, o.reply(), messageId, o.buttons());
                     }
                     return;
                 }
@@ -100,6 +104,28 @@ public class ConversationEngine {
         }
         result("conflict_exhausted");
         throw new IllegalStateException("conversation version conflict not resolved for message " + messageId);
+    }
+
+    /** Entry point for a flow that starts without an inbound message (the consent step, called by registration); commits the first step, then sends its question. */
+    public void open(UUID tenantId, String channel, String contact, java.util.function.Function<Conversation, Outcome> first, String key) {
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            Conversation c = store.load(tenantId, channel, contact);
+            Outcome o = first.apply(c);
+            checkContext(o);
+            switch (store.commit(c, o, key)) {
+                case DUPLICATE -> {
+                    return;
+                }
+                case OK -> {
+                    if (o.reply() != null) {
+                        reply(tenantId, channel, contact, o.reply(), key, o.buttons());
+                    }
+                    return;
+                }
+                case CONFLICT -> backoff(attempt);
+            }
+        }
+        throw new IllegalStateException("conversation version conflict not resolved for " + key);
     }
 
     private static void checkContext(Outcome o) {
@@ -117,9 +143,10 @@ public class ConversationEngine {
     }
 
     /** The step is committed; a failed answer must not make the event retry (it would be seen as a duplicate anyway). */
-    private void reply(UUID tenantId, String channel, String contact, String text, String messageId) {
+    private void reply(UUID tenantId, String channel, String contact, String text, String messageId, java.util.List<FlowHandler.Button> buttons) {
         try {
-            comms.send(tenantId, channel, contact, text);
+            comms.send(tenantId, channel, contact, text, buttons.stream()
+                    .map(b -> new CommsClient.SignedButton(this.buttons.issue(tenantId, b.action(), BUTTON_TTL), b.title())).toList());
         } catch (RuntimeException e) {
             meters.counter("edge_reply_failed_total").increment();
             log.warn("reply failed for message {}", messageId);

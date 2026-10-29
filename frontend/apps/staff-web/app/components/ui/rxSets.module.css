@@ -12,11 +12,13 @@
 .btn:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
 .btnPrimary { background: var(--nb-accent-gradient); color: var(--nb-on-accent); border-color: transparent; font-weight: 600; }
 .btnDanger { color: var(--nb-danger-500); border-color: var(--nb-danger-500); background: transparent; }
+.fieldScope { flex: 0 1 180px; }
 .field { inline-size: 100%; box-sizing: border-box; min-block-size: 36px; background: var(--nb-surface-3); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding-inline: var(--nb-space-12); color: var(--nb-text-primary); font: inherit; font-size: 14px; }
 .label { display: block; font-size: 11px; font-weight: 600; color: var(--nb-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-block-end: var(--nb-space-4); }
 .formRow { margin-block-end: var(--nb-space-12); }
 .saveRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; margin-block-start: var(--nb-space-8); }
-.saveRow .field { flex: 1 1 160px; inline-size: auto; }
+.saveRow .fieldScope { flex: 0 1 180px; }
+.field { flex: 1 1 160px; inline-size: auto; }
 .editItems { list-style: none; margin: 0 0 var(--nb-space-12); padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-8); }
 .editItem { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); font-size: 13px; }
 .editItemText { min-inline-size: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: var(--nb-space-2); }

@@ -40,11 +40,11 @@ public class OpenApiConfig {
             "/v1/staff/invitations/*/accept", "/v1/owners/auth/login", "/v1/owners/invitations/*/accept",
             "/v1/owners/auth/mfa/*", "/v1/platform/auth/mfa/enroll", "/v1/platform/auth/mfa/confirm", // PLT-005: challenge/setup token in the body
             "/v1/platform/auth/login", "/v1/platform/auth/mfa/verify", "/v1/platform/auth/refresh",
-            "/.well-known/jwks.json", "/.well-known/jwks/*.json", "/v1/webhooks/whatsapp",
+            "/.well-known/jwks.json", "/.well-known/jwks/*.json", "/v1/webhooks/whatsapp", "/v1/billing/gateway-webhooks/*/*",
             "/internal/v1/notification-requests/*", // COM-004: service token, not a bearer
             "/internal/v1/consents:export", // COM-008: same service token
             "/v1/plans/catalogue", // ADM-034: public plan comparison
-            "/v1/public/notices/*/*", "/abdm/v3/callbacks/**"); // IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
+            "/v1/public/notices/*/*", "/v1/proxy-invites/*", "/v1/proxy-invites/*/otp", "/v1/proxy-invites/*/accept", "/v1/public/links/*/otp", "/v1/public/links/*/open", "/v1/public/trials", "/v1/public/trials/*/verify", "/v1/public/trials/*/status", "/abdm/v3/callbacks/**", "/abdm/v3/hip/patient/share", "/v1/display/pair", "/v1/display/stream", "/files-blob/object"); // PLT-029 signed object URLs (FilesBlobSecurityConfig); ACC-023 lobby TV (own device token), ADM-003 trials, IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
 
     private static final Pattern AUTHORITY = Pattern.compile("'([^']+)'");
     /** OPS-035: only a plain OR-chain of hasAuthority/hasAnyAuthority becomes "a | b"; any other SpEL is written verbatim. */

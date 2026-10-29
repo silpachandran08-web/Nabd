@@ -28,11 +28,11 @@ import java.util.UUID;
 class InternalSchedulingController {
 
     @Schema(name = "InternalBookRequest")
-    record BookRequest(@NotBlank String patientRef, @NotNull UUID doctorId, @NotNull Instant startTime) {
+    record BookRequest(@NotBlank String patientRef, @NotNull UUID doctorId, @NotNull Instant startTime, @jakarta.validation.constraints.Size(max = 64) String actedByRef) {
     }
 
     @Schema(name = "InternalAppointmentActionRequest")
-    record ActionRequest(@NotBlank String patientRef, Instant newStartTime, String reasonCode) {
+    record ActionRequest(@NotBlank String patientRef, Instant newStartTime, String reasonCode, String note, @jakarta.validation.constraints.Size(max = 64) String actedByRef) {
     }
 
     private final InternalSchedulingService service;
@@ -53,13 +53,26 @@ class InternalSchedulingController {
     @Idempotent
     @PostMapping("/internal/v1/tenants/{tid}/appointments")
     ResponseEntity<Map<String, Object>> book(@PathVariable UUID tid, @Valid @RequestBody BookRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.book(tid, caller(tid), req.patientRef(), req.doctorId(), req.startTime()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.book(tid, caller(tid), req.patientRef(), req.doctorId(), req.startTime(), req.actedByRef()));
+    }
+
+    @GetMapping("/internal/v1/tenants/{tid}/appointments/{id}")
+    Map<String, Object> detail(@PathVariable UUID tid, @PathVariable UUID id, @RequestParam String patientRef) {
+        caller(tid);
+        return service.detail(tid, id, patientRef);
     }
 
     @Idempotent
     @PostMapping("/internal/v1/tenants/{tid}/appointments/{id}/{action}")
     Map<String, Object> act(@PathVariable UUID tid, @PathVariable UUID id, @PathVariable String action, @Valid @RequestBody ActionRequest req) {
-        return service.act(tid, caller(tid), id, action, req.patientRef(), req.newStartTime(), req.reasonCode());
+        return service.act(tid, caller(tid), id, action, req.patientRef(), req.newStartTime(), req.reasonCode(), req.note(), req.actedByRef());
+    }
+
+    /** ACC-007: the same coded list the desk uses, in the patient's language, for the bot's one-tap cancel reasons. */
+    @GetMapping("/internal/v1/tenants/{tid}/reason-codes")
+    Map<String, Object> reasonCodes(@PathVariable UUID tid, @RequestParam String kind, @RequestParam(required = false) String locale) {
+        caller(tid);
+        return Map.of("items", service.reasonCodes(tid, kind, locale));
     }
 
     /** Second line behind InternalCallerFilter: only a service identity, and only for a clinic its token names. */

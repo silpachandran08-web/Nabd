@@ -25,8 +25,7 @@ public interface ConsentRegistry {
 
     /**
      * Default-deny: true only when the newest row for this purpose is a grant. No row = false, for EVERY purpose.
-     * shortcut: the legacy patient read gate (PatientRepository.CONSENT_GATE) still treats "no data_processing row" as
-     * allowed until IDC-004 captures consent at registration; do not use this method to gate those reads yet.
+     * IDC-006: the patient read gate (ConsentGateSql) uses the same newest-row rule on default-deny clinics.
      */
     boolean isGranted(UUID patientId, Purpose purpose);
 

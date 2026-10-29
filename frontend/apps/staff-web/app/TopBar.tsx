@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
-import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
+import { getPermissions, isOwner } from "./lib/session";
 import { can } from "./lib/permissions";
 import type { AppPermission } from "@nabd/api-client/types";
 import { useLiveStatus } from "./lib/live";
 import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
+import ShellUserMenu from "./shell/ShellUserMenu";
+import TrialChip from "./components/setup/TrialChip";
+import ThemeToggle from "./shell/ThemeToggle";
+import { keyHint } from "./shell/shortcuts";
 import { formatClinicTime } from "./lib/clinicTime";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
 
@@ -41,7 +45,6 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
   const t = useTranslations("shell");
   const pathname = usePathname();
   const router = useRouter();
-  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const [hasSession, setHasSession] = useState(false);
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(true);
@@ -49,8 +52,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHasSession(!skip && !!localStorage.getItem("nabd_access_token"));
-  }, [pathname, skip]);
+    setHasSession(!!localStorage.getItem("nabd_access_token"));
+  }, [pathname]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -82,9 +85,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-      const isShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k";
       const isSlash = e.key === "/" && !typing;
-      if ((isShortcut || isSlash) && can("patients:view")) {
+      if (isSlash && can("patients:view")) {
         e.preventDefault();
         document.getElementById(SEARCH_INPUT_ID)?.focus();
       }
@@ -112,6 +114,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   // Patient search lands on /patients, so a role without patients:view gets no search box at all.
   const canSearch = can("patients:view");
+  const canWalkIn = can("queue:create") && canSearch;
   const lastSync = conn.lastOkAt ? formatClinicTime(conn.lastOkAt) : null;
   const lastSyncText = lastSync ? t("lastSync", { time: lastSync }) : t("noServerContact");
   const [pillLabel, pillWarn, pillHint] = !online
@@ -140,14 +143,25 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
             className={styles.searchInput}
             placeholder={t("searchPatient")}
             value={query}
+            {...keyHint("search")}
+            aria-label={t("searchPatient")}
             onChange={(e) => setQuery(e.target.value)}
           />
           <span className={styles.kbd}>/</span>
         </form>
-        <span className={styles.kbd}>⌘K</span>
+        <button type="button" className={`${styles.kbd} ${styles.kbdBtn}`} {...keyHint("palette")} aria-label={keyHint("palette").title}
+          onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}>⌘K</button>
       </>}
       <div className={styles.spacer} />
+      <TrialChip />
       <LanguagePicker />
+      <ThemeToggle />
+      {/* FEF-034: Register walk-in from any screen (also Ctrl+K and W); the schedule board already carries it as its primary action. */}
+      {canWalkIn && !primaryAction?.href.includes("action=walkin") && (
+        <button type="button" className={`${styles.primaryAction} ${styles.walkInBtn}`} {...keyHint("walkin")} onClick={() => router.push("/arrivals?action=walkin")}>
+          {t("registerWalkIn")}
+        </button>
+      )}
       {primaryAction && (
         <button type="button" className={styles.primaryAction} onClick={() => router.push(primaryAction.href)}>
           {t(primaryAction.label)}
@@ -160,6 +174,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
         <span className={styles.syncTime}>{!pillWarn && lastSync ? `· ${lastSync}` : ""}</span>
         <span className={styles.srOnly}>{[pillHint, lastSyncText].filter(Boolean).join(" ")}</span>
       </div>
+      <ShellUserMenu />
     </div>
   );
 }

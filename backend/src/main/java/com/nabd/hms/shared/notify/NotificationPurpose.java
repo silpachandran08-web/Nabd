@@ -11,9 +11,31 @@ public enum NotificationPurpose {
     REVIEW_REQUEST("review_request", ConsentClass.MARKETING, Priority.BULK, ChannelPolicy.WHATSAPP_ONLY),
     SECURE_LINK("secure_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     DELAY_NOTICE("delay_notice", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-024: the doctor is running late (catalogue template doctor_delay: first name, doctor, new expected time). */
+    DOCTOR_DELAY("doctor_delay", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-024: the queue is paused; neutral text, no parameters and never a reason. */
+    QUEUE_PAUSED("queue_paused", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** FIN-014: dues reminder; the template body names the clinic only (no amounts, no line items). */
+    DUES_REMINDER("dues_reminder", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-006: the clinic moved the patient's appointment (first name, date, time). */
+    APPT_RESCHEDULED("appt_rescheduled", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-006: the clinic cancelled the patient's appointment (first name, date, time). */
+    APPT_CANCELLED_BY_CLINIC("appt_cancelled_by_clinic", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ACC-043: the desk asks the patient to finish registering in chat (no params, no names in the body). */
+    PROFILE_COMPLETION("profile_completion", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** IDC-009: consent link to an adult family member's own number (no names in the body; the link is the only parameter). */
+    PROXY_INVITE("proxy_invite", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** FIN-020: UPI payment link; slots are clinic name, amount and link only (no line items, no diagnosis). */
+    PAYMENT_LINK("payment_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
-    EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-018: owner asks a staff member to finish authenticator enrolment (staff recipient, no params). */
+    MFA_ENROL_REMINDER("mfa_enrol_reminder", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ADM-032: licence expiry reminder to the holder and the owners (staff recipients, no patient consent); 4 params: holder, kind, expiry date, days left. */
+    LICENCE_EXPIRING("licence_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-004: the owner is told how many trial days are left (one param: the number; no clinical content). */
+    TRIAL_EXPIRING("trial_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS);
 
     private final String code;
     private final ConsentClass consentClass;

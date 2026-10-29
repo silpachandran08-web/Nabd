@@ -20,6 +20,20 @@ variable "pgbouncer_ami_id" {
 variable "db_allocated_storage_gb" { type = number }
 variable "db_max_allocated_storage_gb" { type = number }
 
+# OPS-059: warm standby in Hyderabad (off unless the tfvars say so)
+variable "dr_standby_enabled" {
+  type    = bool
+  default = false
+}
+variable "dr_vpc_cidr" {
+  type    = string
+  default = "10.42.0.0/16"
+}
+variable "dr_azs" {
+  type    = list(string)
+  default = []
+}
+
 # No credentials here: CI gets short-lived ones via GitHub OIDC (bootstrap/aws), operators via SSO.
 provider "aws" {
   region = "ap-south-1"
@@ -49,6 +63,11 @@ module "cell" {
   pgbouncer_ami_id            = var.pgbouncer_ami_id
   db_allocated_storage_gb     = var.db_allocated_storage_gb
   db_max_allocated_storage_gb = var.db_max_allocated_storage_gb
+
+  # OPS-059
+  dr_standby_enabled = var.dr_standby_enabled
+  dr_vpc_cidr        = var.dr_vpc_cidr
+  dr_azs             = var.dr_azs
 }
 
 output "cell" { value = module.cell.cell }
@@ -60,3 +79,4 @@ output "dns" { value = module.cell.dns }
 output "backup" { value = module.cell.backup }
 output "dr" { value = module.cell.dr }
 output "data_tier" { value = module.cell.data_tier }
+output "dr_standby" { value = module.cell.dr_standby }

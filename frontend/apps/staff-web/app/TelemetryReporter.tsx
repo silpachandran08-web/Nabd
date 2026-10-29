@@ -5,7 +5,7 @@ import { useReportWebVitals } from "next/web-vitals";
 import { api } from "./lib/api.ts";
 import { errorReport, vitalReport, type TelemetryReport } from "./lib/telemetryScrub.ts";
 
-function send(r: TelemetryReport) {
+export function send(r: TelemetryReport) {
   if (!localStorage.getItem("nabd_access_token")) return; // endpoint needs a session; never queue reports for later
   if (location.pathname.startsWith("/platform")) return; // operator pages run on the operator session; never send a clinic token there
   api.post("/client-telemetry", r).catch(() => {}); // best effort: telemetry must never raise its own error

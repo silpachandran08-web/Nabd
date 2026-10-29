@@ -9,7 +9,7 @@ final class SetupModels {
     private SetupModels() {
     }
 
-    record SetupProgressRow(UUID id, String step, String status, Instant skippedAt, Instant doneAt) {
+    record SetupProgressRow(UUID id, String step, String status, Instant skippedAt, Instant doneAt, String draftJson, int version, Instant updatedAt) {
     }
 
     record TenantProfileRow(UUID id, String name, String region, String timezone,
@@ -29,7 +29,7 @@ final class SetupModels {
     record ConsentContactRow(String name, String email, String phone) {
     }
 
-    record HolidayRow(UUID id, LocalDate holidayDate, String name, boolean recurring) {
+    record HolidayRow(UUID id, LocalDate holidayDate, String name, boolean recurring, String effect, String hours, String source) {
     }
 
     record StaffShiftRow(UUID id, UUID staffId, String staffName, String patternJson,
@@ -50,7 +50,8 @@ final class SetupModels {
 
     record LicenceRow(UUID id, String licenceType, UUID holderId, String holderName,
                       String number, String issuingBody, LocalDate expiryDate,
-                      String region, String status) {
+                      String region, String status, java.util.Set<Integer> remindersSent, LocalDate overrideUntil, String overrideReason,
+                      UUID certificateUploadId) {
     }
 
     record StaffSummaryRow(UUID id, String name, String roleName) {

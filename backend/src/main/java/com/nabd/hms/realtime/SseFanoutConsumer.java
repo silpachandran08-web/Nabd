@@ -22,7 +22,7 @@ class SseFanoutConsumer implements EventConsumer {
     private record Route(List<RealtimeTopic> topics, String idField) {
     }
 
-    private static final java.util.Map<String, Route> ROUTES = java.util.Map.of(
+    private static final java.util.Map<String, Route> BASE_ROUTES = java.util.Map.of(
             "comms.message.status_changed.v1", new Route(List.of(RealtimeTopic.MESSAGES), "messageId"), // COM-006
             "visit.queue_entry.created.v1", new Route(List.of(RealtimeTopic.QUEUE, RealtimeTopic.NURSING), "entryId"),
             "visit.queue_entry.changed.v1", new Route(List.of(RealtimeTopic.QUEUE, RealtimeTopic.NURSING), "entryId"),
@@ -31,7 +31,18 @@ class SseFanoutConsumer implements EventConsumer {
             "scheduling.doctor_delay.changed.v1", new Route(List.of(RealtimeTopic.DOCTOR_STATUS), "doctorId"),
             "scheduling.appointment.booked.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
             "scheduling.appointment.cancelled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
-            "scheduling.appointment.rescheduled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"));
+            "scheduling.appointment.rescheduled.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"),
+            "scheduling.booking.routed.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId")); // ACC-009/010
+    /** Map.of holds 10 pairs at most: later additions go here. ACC-025: a no-show is a change on the requests board. FIN-020: the checkout screen sees an invoice turn paid. */
+    private static final Route BILLING_ROUTE = new Route(List.of(RealtimeTopic.BILLING), "invoiceId");
+    private static final java.util.Map<String, Route> ROUTES;
+    static {
+        java.util.Map<String, Route> all = new java.util.HashMap<>(BASE_ROUTES);
+        all.put("scheduling.appointment.no_show.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"));
+        all.put("billing.payment.recorded.v1", BILLING_ROUTE);
+        all.put("billing.invoice.paid.v1", BILLING_ROUTE);
+        ROUTES = java.util.Map.copyOf(all);
+    }
     /** Revocation: these end the staff member's open streams (or the tenant's, for a role) so permissions are re-checked on reconnect. */
     private static final Set<String> CLOSERS = Set.of("iam.session.revoked.v1", "iam.staff.changed.v1", "iam.role.changed.v1");
 

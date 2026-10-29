@@ -238,8 +238,8 @@ public class SetupController {
 
     @GetMapping("/licences")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<LicenceResponse> licences(@AuthenticationPrincipal Jwt jwt) {
-        return service.listLicences(tenantId(jwt));
+    public List<LicenceResponse> licences(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) String kind, @RequestParam(required = false) String status) {
+        return service.listLicences(tenantId(jwt), kind, status);
     }
 
     @PostMapping("/licences")

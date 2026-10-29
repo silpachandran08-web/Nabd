@@ -50,6 +50,24 @@ class ClinicClockUsageTest {
         }
     }
 
+    /** ACC-005: scheduling, the queue (visit) and day close count the clinic date (day start), not the calendar date. */
+    @Test
+    void queueAndDayCloseUseTheClinicDateNotTheCalendarDate() throws IOException {
+        List<String> offenders = new java.util.ArrayList<>();
+        try (Stream<Path> files = Stream.concat(Files.walk(Path.of("src/main/java/com/nabd/hms/queue")),
+                Stream.of(Path.of("src/main/java/com/nabd/hms/billing/DayCloseService.java"), Path.of("src/main/java/com/nabd/hms/billing/CheckoutService.java")))) {
+            for (Path p : files.filter(f -> f.toString().endsWith(".java")).toList()) {
+                List<String> lines = Files.readAllLines(p);
+                for (int i = 0; i < lines.size(); i++) {
+                    if (lines.get(i).matches(".*\\bclock\\.today\\(.*") && !lines.get(i).strip().startsWith("//")) {
+                        offenders.add(p.getFileName() + ":" + (i + 1));
+                    }
+                }
+            }
+        }
+        assertThat(offenders).as("use clock.clinicDate(tenant) in the queue module and day close").isEmpty();
+    }
+
     /** PLT-028: java.time X.now() / X.now(ZoneId) read the system clock and cannot be frozen; only X.now(Clock) is allowed. */
     static final ArchRule NO_SYSTEM_CLOCK_NOW = noClasses().should().callMethodWhere(
             new DescribedPredicate<JavaMethodCall>("java.time *.now() without a Clock argument") {

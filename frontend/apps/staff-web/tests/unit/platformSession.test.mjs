@@ -14,7 +14,7 @@ const realFetch = globalThis.fetch;
 after(() => { globalThis.fetch = realFetch; });
 
 const { platformApi, platformLoginPath, storePlatformSession, hasPlatformSession } =
-  await import("../../app/platform/platformSession.ts");
+  await import("../../app/(platform)/platform/platformSession.ts");
 
 let calls;
 // Routes requests: the refresh endpoint answers `refresh`, everything else answers `api(authHeader)`.

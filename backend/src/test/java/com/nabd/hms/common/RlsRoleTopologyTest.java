@@ -35,18 +35,17 @@ class RlsRoleTopologyTest extends ApiTestBase {
     }
 
     @Test
-    void widenedVisibilityReadsSiblingRowsButTheWithCheckRejectsWritingThem() {
+    void aWidenedVisibleListNoLongerShowsOrTouchesSiblingRows() {
+        // PLT-021 (V2521) removed brand visibility: policies are single-tenant whatever app.visible_tenant_ids holds.
         SeededTenant a = seedTenant();
         SeededTenant b = seedTenant();
         insertPatient(b.id(), "Patient B");
         String both = a.id() + "," + b.id();
 
         assertThat(asTenantWithVisible(a.id(), both, () -> jdbc.queryForList("SELECT name FROM patients", String.class)))
-                .containsExactly("Patient B"); // visible
-
-        assertThatThrownBy(() -> asTenantWithVisible(a.id(), both,
-                () -> jdbc.update("UPDATE patients SET name = 'hijacked' WHERE tenant_id = ?", b.id())))
-                .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("row-level security");
+                .as("sibling row is not visible").isEmpty();
+        assertThat(asTenantWithVisible(a.id(), both, () -> jdbc.update("UPDATE patients SET name = 'hijacked' WHERE tenant_id = ?", b.id())))
+                .as("update cannot reach it").isZero();
         assertThatThrownBy(() -> asTenantWithVisible(a.id(), both, () -> jdbc.update(
                 "INSERT INTO patients (tenant_id, name, phone, dob, gender) VALUES (?,'x','+919000000001','1990-01-01','other')", b.id())))
                 .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("row-level security");

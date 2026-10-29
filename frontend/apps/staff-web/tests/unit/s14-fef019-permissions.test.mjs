@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 const APP = join(import.meta.dirname, "../..");
 const JAVA = join(APP, "../../../backend/src/main/java/com/nabd/hms/platform/PlatformPermissions.java");
-const { capabilitiesFrom } = await import("../../app/platform/capabilities.ts");
+const { capabilitiesFrom } = await import("../../app/(platform)/platform/capabilities.ts");
 
 function operatorPermissions() {
   const src = readFileSync(JAVA, "utf8");
@@ -51,6 +51,6 @@ test("capabilities are all false before the profile has loaded", () => {
 });
 
 test("operator code no longer reads role codes", () => {
-  for (const f of ["app/platform/platformApi.ts", "app/platform/audit/page.tsx", "app/platform/capabilities.ts"])
+  for (const f of ["app/(platform)/platform/platformApi.ts", "app/(platform)/platform/audit/page.tsx", "app/(platform)/platform/capabilities.ts"])
     assert.doesNotMatch(readFileSync(join(APP, f), "utf8"), /role === "|\.role\?|=== "(super_admin|billing|compliance_dpo)/, f);
 });

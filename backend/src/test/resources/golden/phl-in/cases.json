@@ -1,0 +1,2452 @@
+{
+ "pack": {
+  "id": "PHL-IN",
+  "jurisdiction": "IN",
+  "taxRegime": "GST",
+  "currency": "INR",
+  "minorUnits": 2,
+  "ruleSetVersion": "PHL-IN-1",
+  "minCases": 20
+ },
+ "cases": [
+  {
+   "id": "PHL-IN-001",
+   "title": "MRP 112.00 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1200,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-002",
+   "title": "MRP 112.00 inclusive of 18% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 9492,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9492,
+        "amountMinor": 854
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9492,
+        "amountMinor": 854
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 9492,
+    "discountMinor": 0,
+    "taxMinor": 1708,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 9492,
+      "taxMinor": 854
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 9492,
+      "taxMinor": 854
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-003",
+   "title": "MRP 55.50 inclusive of 5% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 5550,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 5286,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 5286,
+        "amountMinor": 132
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 5286,
+        "amountMinor": 132
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 5286,
+    "discountMinor": 0,
+    "taxMinor": 264,
+    "roundOffMinor": 50,
+    "totalMinor": 5600
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 5286,
+      "taxMinor": 132
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 5286,
+      "taxMinor": 132
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-004",
+   "title": "MRP 55.50 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 5550,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 4955,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 4955,
+        "amountMinor": 297
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 4955,
+        "amountMinor": 298
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 4955,
+    "discountMinor": 0,
+    "taxMinor": 595,
+    "roundOffMinor": 50,
+    "totalMinor": 5600
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 4955,
+      "taxMinor": 297
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 4955,
+      "taxMinor": 298
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-005",
+   "title": "MRP 118.00 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11800,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10536,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10536,
+        "amountMinor": 632
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10536,
+        "amountMinor": 632
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10536,
+    "discountMinor": 0,
+    "taxMinor": 1264,
+    "roundOffMinor": 0,
+    "totalMinor": 11800
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10536,
+      "taxMinor": 632
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10536,
+      "taxMinor": 632
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-006",
+   "title": "MRP 118.00 inclusive of 18% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11800,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 10000,
+        "amountMinor": 900
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 10000,
+        "amountMinor": 900
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1800,
+    "roundOffMinor": 0,
+    "totalMinor": 11800
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 10000,
+      "taxMinor": 900
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 10000,
+      "taxMinor": 900
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-007",
+   "title": "MRP 33.50 inclusive of 5% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 3350,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 3190,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 3190,
+        "amountMinor": 80
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 3190,
+        "amountMinor": 80
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 3190,
+    "discountMinor": 0,
+    "taxMinor": 160,
+    "roundOffMinor": 50,
+    "totalMinor": 3400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 3190,
+      "taxMinor": 80
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 3190,
+      "taxMinor": 80
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-008",
+   "title": "MRP 33.50 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 3350,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 2991,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 2991,
+        "amountMinor": 179
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 2991,
+        "amountMinor": 180
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 2991,
+    "discountMinor": 0,
+    "taxMinor": 359,
+    "roundOffMinor": 50,
+    "totalMinor": 3400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 2991,
+      "taxMinor": 179
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 2991,
+      "taxMinor": 180
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-009",
+   "title": "MRP 1050.00 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 105000,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 93750,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 93750,
+        "amountMinor": 5625
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 93750,
+        "amountMinor": 5625
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 93750,
+    "discountMinor": 0,
+    "taxMinor": 11250,
+    "roundOffMinor": 0,
+    "totalMinor": 105000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 93750,
+      "taxMinor": 5625
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 93750,
+      "taxMinor": 5625
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-010",
+   "title": "MRP 1050.00 inclusive of 18% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 105000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 88983,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 88983,
+        "amountMinor": 8008
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 88983,
+        "amountMinor": 8009
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 88983,
+    "discountMinor": 0,
+    "taxMinor": 16017,
+    "roundOffMinor": 0,
+    "totalMinor": 105000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 88983,
+      "taxMinor": 8008
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 88983,
+      "taxMinor": 8009
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-011",
+   "title": "MRP 5.25 inclusive of 5% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 525,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 500,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 500,
+        "amountMinor": 13
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 500,
+        "amountMinor": 12
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 500,
+    "discountMinor": 0,
+    "taxMinor": 25,
+    "roundOffMinor": -25,
+    "totalMinor": 500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 500,
+      "taxMinor": 13
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 500,
+      "taxMinor": 12
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-012",
+   "title": "MRP 5.25 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 525,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 469,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 469,
+        "amountMinor": 28
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 469,
+        "amountMinor": 28
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 469,
+    "discountMinor": 0,
+    "taxMinor": 56,
+    "roundOffMinor": -25,
+    "totalMinor": 500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 469,
+      "taxMinor": 28
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 469,
+      "taxMinor": 28
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-013",
+   "title": "MRP 250.00 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 25000,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 22321,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 22321,
+        "amountMinor": 1339
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 22321,
+        "amountMinor": 1340
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 22321,
+    "discountMinor": 0,
+    "taxMinor": 2679,
+    "roundOffMinor": 0,
+    "totalMinor": 25000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 22321,
+      "taxMinor": 1339
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 22321,
+      "taxMinor": 1340
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-014",
+   "title": "MRP 250.00 inclusive of 18% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 25000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 21186,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 21186,
+        "amountMinor": 1907
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 21186,
+        "amountMinor": 1907
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 21186,
+    "discountMinor": 0,
+    "taxMinor": 3814,
+    "roundOffMinor": 0,
+    "totalMinor": 25000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 21186,
+      "taxMinor": 1907
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 21186,
+      "taxMinor": 1907
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-015",
+   "title": "MRP 999.99 inclusive of 5% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 99999,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 95237,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 95237,
+        "amountMinor": 2381
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 95237,
+        "amountMinor": 2381
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 95237,
+    "discountMinor": 0,
+    "taxMinor": 4762,
+    "roundOffMinor": 1,
+    "totalMinor": 100000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 95237,
+      "taxMinor": 2381
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 95237,
+      "taxMinor": 2381
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-016",
+   "title": "MRP 999.99 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 99999,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 89285,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 89285,
+        "amountMinor": 5357
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 89285,
+        "amountMinor": 5357
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 89285,
+    "discountMinor": 0,
+    "taxMinor": 10714,
+    "roundOffMinor": 1,
+    "totalMinor": 100000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 89285,
+      "taxMinor": 5357
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 89285,
+      "taxMinor": 5357
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-017",
+   "title": "MRP 17.80 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1780,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1589,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 1589,
+        "amountMinor": 95
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 1589,
+        "amountMinor": 96
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1589,
+    "discountMinor": 0,
+    "taxMinor": 191,
+    "roundOffMinor": 20,
+    "totalMinor": 1800
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 1589,
+      "taxMinor": 95
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 1589,
+      "taxMinor": 96
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-018",
+   "title": "MRP 17.80 inclusive of 18% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 1780,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 1508,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 1508,
+        "amountMinor": 136
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 1508,
+        "amountMinor": 136
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1508,
+    "discountMinor": 0,
+    "taxMinor": 272,
+    "roundOffMinor": 20,
+    "totalMinor": 1800
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 1508,
+      "taxMinor": 136
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 1508,
+      "taxMinor": 136
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-019",
+   "title": "MRP 84.00 inclusive of 5% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 8400,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 8000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 8000,
+        "amountMinor": 200
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 8000,
+        "amountMinor": 200
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 8000,
+    "discountMinor": 0,
+    "taxMinor": 400,
+    "roundOffMinor": 0,
+    "totalMinor": 8400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 8000,
+      "taxMinor": 200
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 8000,
+      "taxMinor": 200
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-020",
+   "title": "MRP 84.00 inclusive of 12% GST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 8400,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 7500,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 7500,
+        "amountMinor": 450
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 7500,
+        "amountMinor": 450
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 7500,
+    "discountMinor": 0,
+    "taxMinor": 900,
+    "roundOffMinor": 0,
+    "totalMinor": 8400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 7500,
+      "taxMinor": 450
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 7500,
+      "taxMinor": 450
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-021",
+   "title": "Three strips at MRP 112.00, 12% inclusive",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 3,
+      "grossMinor": 33600,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 30000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 30000,
+        "amountMinor": 1800
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 30000,
+        "amountMinor": 1800
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 30000,
+    "discountMinor": 0,
+    "taxMinor": 3600,
+    "roundOffMinor": 0,
+    "totalMinor": 33600
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 30000,
+      "taxMinor": 1800
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 30000,
+      "taxMinor": 1800
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-022",
+   "title": "Inter-state sale at MRP 112.00 gives IGST",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": true,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": true
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "IGST",
+        "ratePercent": "12.00",
+        "taxableMinor": 10000,
+        "amountMinor": 1200
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1200,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "IGST",
+      "ratePercent": "12.00",
+      "taxableMinor": 10000,
+      "taxMinor": 1200
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-023",
+   "title": "Invoice discount on an MRP-inclusive line",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 1200,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 1200,
+      "taxableMinor": 8929,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 8929,
+        "amountMinor": 536
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 8929,
+        "amountMinor": 535
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10129,
+    "discountMinor": 1200,
+    "taxMinor": 1071,
+    "roundOffMinor": 0,
+    "totalMinor": 10000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 8929,
+      "taxMinor": 536
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 8929,
+      "taxMinor": 535
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-024",
+   "title": "Consultation (exempt) plus two MRP-inclusive medicines",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 5250,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "5",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "consult",
+      "discountMinor": 0,
+      "taxableMinor": 50000,
+      "taxes": []
+     },
+     {
+      "key": "a",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       }
+      ]
+     },
+     {
+      "key": "b",
+      "discountMinor": 0,
+      "taxableMinor": 5000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 5000,
+        "amountMinor": 125
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 5000,
+        "amountMinor": 125
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 65000,
+    "discountMinor": 0,
+    "taxMinor": 1450,
+    "roundOffMinor": 50,
+    "totalMinor": 66500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 5000,
+      "taxMinor": 125
+     },
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 5000,
+      "taxMinor": 125
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-025",
+   "title": "Head says inclusive, pharmacy leaves it unset: the head stands",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": true,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1200,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-026",
+   "title": "Pharmacy says exclusive on a head marked inclusive",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": true,
+        "interState": false
+       },
+       "priceInclusive": false,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1200,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-027",
+   "title": "Exclusive price with GST added on top",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": false,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 10000,
+        "amountMinor": 600
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 1200,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 10000,
+      "taxMinor": 600
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-028",
+   "title": "Bill of Supply of an unregistered clinic carries no tax",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": true,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 11200,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "TAXABLE",
+        "ratePercent": "12",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": true,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 11200,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 11200,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 11200
+   },
+   "printed": {
+    "documentTitle": "Bill of Supply",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "PHL-IN-029",
+   "title": "Nil-rated item stays nil",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 5000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false,
+      "pharmacy": {
+       "base": {
+        "category": "NIL",
+        "ratePercent": "0",
+        "inclusive": false,
+        "interState": false
+       },
+       "priceInclusive": null,
+       "zeroRated": false
+      }
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 5000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 5000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 5000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-IN-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  }
+ ]
+}

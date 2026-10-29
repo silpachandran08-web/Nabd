@@ -11,21 +11,40 @@ import java.util.UUID;
  */
 public interface FlowHandler {
 
-    enum State { START, CHOOSING_DOCTOR, CHOOSING_SLOT, CONFIRMING, DONE }
+    enum State { START, CHOOSING_DOCTOR, CHOOSING_SLOT, CONFIRMING, DONE, CONSENT_CARE, CONSENT_UPDATES, CHECKIN,
+        /** ACC-040/042 booking flow */
+        LANGUAGE, MENU, WHO, CHILD_NAME, CHILD_DOB, CHILD_SEX, CHOOSING_DAY, HANDOFF,
+        REG_NAME, REG_SEX, REG_DOB, COMPLETE_ADDRESS, COMPLETE_LANG,
+        MEMBER_RELATION, MEMBER_NAME, MEMBER_DOB, MEMBER_PHONE_CHOICE, MEMBER_PHONE, MEMBER_CONSENT, MEMBER_OTP } // ACC-043: registration and the desk's "complete in chat"
 
     /** Context keys the Edge may keep: ids, first name, age. Anything else is refused (no clinical content in the Edge DB). */
-    Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step");
+    Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care", "cands", "ciChannel",
+            /* ACC-040/042: who (opaque patientRef), day, misses (unrecognised messages in a row), urgent, cname/dob (child being added) */
+            "who", "day", "misses", "urgent", "cname", "dob",
+            "appointmentId", "patientRef", "flow",
+            "sex", "consentId",
+            "caregiverRef", "memRel", "memName", "memDob", "memPhone", "otpChal", "otpHash", "otpTry"); // IDC-010 add-a-member flow // ACC-043: the answers so far (name is firstName, the date of birth is never kept), the consent record id
 
     record Conversation(UUID id, UUID tenantId, String channel, String contactHash, State state, Map<String, String> context,
                         int version) {
     }
 
     /** In memory only; text and buttonAction are never persisted or logged. buttonAction is set only for a verified token. */
-    record Message(String kind, String text, String buttonAction) {
+    record Message(String kind, String text, String buttonAction, String messageId) {
+        public Message(String kind, String text, String buttonAction) {
+            this(kind, text, buttonAction, null);
+        }
+    }
+
+    /** A reply button: the engine signs the action into a tamper-proof payload (ButtonTokens); title is shown to the patient (max 20 characters). */
+    record Button(String action, String title) {
     }
 
     /** reply may be null (no answer). */
-    record Outcome(State next, Map<String, String> context, String reply) {
+    record Outcome(State next, Map<String, String> context, String reply, java.util.List<Button> buttons) {
+        public Outcome(State next, Map<String, String> context, String reply) {
+            this(next, context, reply, java.util.List.of());
+        }
     }
 
     State state();

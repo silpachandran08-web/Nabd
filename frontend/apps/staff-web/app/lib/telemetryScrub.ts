@@ -2,7 +2,7 @@
 // no input values, no names: only the metric name, a numeric value, the route shape and a hash of the stack.
 const ID = /\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{2,})(?=\/|$)/gi;
 
-export type TelemetryReport = { kind: "vital" | "error"; metric: string; value?: number; route: string; message: string; stackHash: string };
+export type TelemetryReport = { kind: "vital" | "error"; metric: string; value?: number; route: string; message: string; stackHash: string; release?: string };
 
 export function scrubRoute(href: string): string {
   const path = href.replace(/^[a-z]+:\/\/[^/]+/i, "").split(/[?#]/, 1)[0] || "/";
@@ -25,4 +25,11 @@ export function errorReport(e: unknown, href: string): TelemetryReport {
 
 export function vitalReport(name: string, value: number, href: string): TelemetryReport {
   return { kind: "vital", metric: name.replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 64) || "metric", value: Math.round(value * 100) / 100, route: scrubRoute(href), message: "", stackHash: "" };
+}
+
+/** FEF-029: an error-boundary hit. Group + error class (never the message), the route template, the build id. */
+export function boundaryReport(e: unknown, href: string, group: string, release: string | undefined): TelemetryReport {
+  const base = errorReport(e, href);
+  const rel = (release ?? "").replace(/[^A-Za-z0-9._-]/g, "").slice(0, 64);
+  return { ...base, metric: `boundary.${group.replace(/[^A-Za-z0-9]/g, "")}.${base.metric}`.slice(0, 64), ...(rel ? { release: rel } : {}) };
 }

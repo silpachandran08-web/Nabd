@@ -27,3 +27,7 @@ edge:
   comms-url: ${EDGE_COMMS_URL:}
   comms-token: ${EDGE_COMMS_TOKEN:}
   button-key: ${EDGE_BUTTON_KEY:}
+  # ACC-040: numbers per region (public emergency numbers); languages offered once per conversation. Phrase list: signed by the clinical lead before use.
+  emergency-numbers: { in: "108", sa: "997", ae: "998", qa: "999" }
+  languages: { in: [en, hi, kn, te], sa: [ar, en], ae: [ar, en], qa: [ar, en] }
+  emergency-phrases: []

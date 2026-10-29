@@ -51,7 +51,7 @@ public class AdministrationService {
     @Transactional
     public List<AdministrationOrderResponse> listToday(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listAdministrationOrders(tenantId, clock.today(tenantId)).stream().map(o -> toResponse(tenantId, o)).toList();
+        return repo.listAdministrationOrders(tenantId, clock.clinicDate(tenantId)).stream().map(o -> toResponse(tenantId, o)).toList();
     }
 
     @Transactional

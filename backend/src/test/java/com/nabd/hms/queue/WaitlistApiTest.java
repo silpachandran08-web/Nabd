@@ -83,7 +83,7 @@ class WaitlistApiTest extends ApiTestBase {
         String waitlistId1 = (String) join1.getBody().get("id");
 
         exchange("/v1/appointments/" + appointmentId + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "patient cancelled")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "illness")), Map.class);
 
         ResponseEntity<List> listResp = exchange("/v1/waitlist?doctorId=" + doctor.id(), HttpMethod.GET, authed(token), List.class);
         List<Map<String, Object>> entries = listResp.getBody();
@@ -111,7 +111,7 @@ class WaitlistApiTest extends ApiTestBase {
         String waitlistId = (String) join.getBody().get("id");
 
         exchange("/v1/appointments/" + appointmentId + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "cancelled")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "illness")), Map.class);
 
         ResponseEntity<Map> acceptResp = exchange("/v1/waitlist/" + waitlistId + "/accept", HttpMethod.POST, authed(token), Map.class);
         assertThat(acceptResp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -149,7 +149,7 @@ class WaitlistApiTest extends ApiTestBase {
         String waitlistId2 = (String) join2.getBody().get("id");
 
         exchange("/v1/appointments/" + appointmentId + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "cancelled")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "illness")), Map.class);
 
         // force the first offer into the past
         inTenantTx(tenant.id(), () -> jdbc.update(
@@ -166,7 +166,7 @@ class WaitlistApiTest extends ApiTestBase {
 
         // the expired holder can no longer accept
         ResponseEntity<Map> lateAccept = exchange("/v1/waitlist/" + waitlistId1 + "/accept", HttpMethod.POST, authed(token), Map.class);
-        assertThat(lateAccept.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(lateAccept.getStatusCode()).isEqualTo(HttpStatus.GONE); // ACC-026: 410 OFFER_EXPIRED (was 409)
     }
 
     @Test
@@ -244,7 +244,7 @@ class WaitlistApiTest extends ApiTestBase {
         Instant freed = base.plus(60, ChronoUnit.MINUTES);
         String toCancel = bookAppointment(token, doctor.id(), other, freed);
         exchange("/v1/appointments/" + toCancel + "/cancel", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "patient cancelled")), Map.class);
+                authedJsonBody(token, Map.of("reasonCode", "illness")), Map.class);
         ResponseEntity<Map> onOffer = exchange("/v1/waitlist/" + entryC + "/accept", HttpMethod.POST,
                 authedJsonBody(token, Map.of("slotStart", freed.toString())), Map.class);
         assertThat(onOffer.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);

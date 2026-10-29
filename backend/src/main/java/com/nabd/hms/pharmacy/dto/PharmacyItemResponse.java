@@ -12,6 +12,19 @@ public record PharmacyItemResponse(
         BigDecimal taxRatePercent,
         int stockQty,
         boolean active,
-        String drugId
+        String drugId,
+        /** PHL-002: statutory class code (OTC, IN_H1, ...). */
+        String scheduleClass,
+        /** PHL-002: set when the class needs a statutory register (the badge PHL-022/024 use); null otherwise. */
+        String register,
+        String genericName,
+        Integer packSize,
+        String unit,
+        /** PHL-004: false = not dispensed here, shown as "buy outside" on the Rx and never offered at checkout. */
+        boolean inHouse,
+        /** PHL-021: null = the charge head decides. */
+        Boolean priceInclusiveOfTax,
+        boolean zeroRated,
+        BigDecimal mrp
 ) {
 }

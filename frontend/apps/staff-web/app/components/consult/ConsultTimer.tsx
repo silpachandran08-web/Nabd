@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import Icon from "../ui/Icon";
 import s from "./noteTemplates.module.css";
@@ -42,6 +43,7 @@ export default function ConsultTimer({ entryId, ended }: { entryId: string; ende
 }
 
 function TimerInner({ entryId, ended }: { entryId: string; ended: boolean }) {
+  const tx = useTranslations("consult.consultTimer");
   const [st, setSt] = useState<TimerState>(() => load(entryId) ?? { startedAt: Date.now(), pausedAt: null, pausedTotal: 0, extendedMin: 0, endedAt: null });
   const [now, setNow] = useState(() => Date.now());
 
@@ -77,19 +79,19 @@ function TimerInner({ entryId, ended }: { entryId: string; ended: boolean }) {
 
   const done = ended || st.endedAt !== null;
   return (
-    <div className={s.timer} role="group" aria-label="Consultation timer">
+    <div className={s.timer} role="group" aria-label={tx("consultationTimer")}>
       <Icon name="clock" size={14} />
       <span className={`${s.time} ${overBox ? s.timeOver : ""}`} role="timer" aria-live="off">
         {fmt(over)}{boxMs > 0 ? ` / ${st.extendedMin} min` : ""}
       </span>
-      {done ? <span className={s.timerNote} style={{ flexBasis: "auto" }}>Ended</span> : paused ? <span className={s.timerNote} style={{ flexBasis: "auto" }}>Paused</span> : overBox ? <span className={s.timerNote} style={{ flexBasis: "auto" }}>Over your time box</span> : null}
+      {done ? <span className={`${s.timerNote} ${s.timerNoteInline}`}>{tx("ended")}</span> : paused ? <span className={`${s.timerNote} ${s.timerNoteInline}`}>{tx("paused")}</span> : overBox ? <span className={`${s.timerNote} ${s.timerNoteInline}`}>{tx("overYourTimeBox")}</span> : null}
       {!done && (
         <>
-          <button type="button" className={s.timerBtn} onClick={pauseResume}>{paused ? "Resume" : "Pause"}</button>
-          <button type="button" className={s.timerBtn} onClick={extend}><Icon name="plus" size={12} /> Extend 10 min</button>
+          <button type="button" className={s.timerBtn} onClick={pauseResume}>{paused ? tx("resume") : tx("pause")}</button>
+          <button type="button" className={s.timerBtn} onClick={extend}><Icon name="plus" size={12} /> {" "}{tx("extend10Min")}</button>
         </>
       )}
-      <p className={s.timerNote}>Private timer for this tab. Not saved to the record; waiting times are not changed.</p>
+      <p className={s.timerNote}>{tx("privateTimerForThisTab")}</p>
     </div>
   );
 }

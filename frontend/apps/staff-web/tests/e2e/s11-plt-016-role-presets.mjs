@@ -35,6 +35,7 @@ async function open(perms, extra, o = {}, viewport) {
   await seedClinic(s.page, perms, extra);
   await mockApi(s.page, s.log, handlers());
   await s.page.goto(`${APP}/staff`, { waitUntil: 'networkidle' });
+  await s.page.getByRole('tab', { name: 'Roles & permissions' }).click().catch(() => {}); // ADM-018: presets moved to their own tab
   return s;
 }
 const body = (p) => p.locator('body').innerText();
@@ -51,6 +52,7 @@ try {
   await resetBtns.click();
   await s.page.getByText('Doctor is back to its preset.').waitFor({ timeout: 5000 }).then(() => check('3 reset confirms and the list shows the preset name again', true), () => check('3 reset confirmation', false));
   check('4 reset sent an Idempotency-Key', /^[0-9a-f-]{36}$/.test(opts.resetHeaders?.['idempotency-key'] ?? ''));
+  await s.page.getByRole('tab', { name: 'People' }).click(); // ADM-018
   // CARRY-12: the separate Clinician: on/off toggle was merged into the CLN-005 dialog (one clinician control per row).
   check('5 staff row shows Clinician pill and the single clinician control for registered doctor', /Dr Asha[\s\S]*Clinician/.test(await body(s.page)) && await s.page.getByRole('button', { name: 'Reg. no. & clinician', exact: true }).count() === 1);
   check('6 no separate Clinician toggle on any row', await s.page.getByRole('button', { name: /Clinician: (on|off)/ }).count() === 0);
@@ -80,6 +82,7 @@ try {
 
   // review list failure and empty staff
   s = await open(OWNER_PERMS, { owner: true }, { reviewFail: true });
+  await s.page.getByRole('tab', { name: 'People' }).click(); // ADM-018
   check('13 review list failure is visible', /Couldn.t load the clinicians to confirm/.test(await body(s.page)));
   await s.browser.close();
   s = await open(OWNER_PERMS, { owner: true }, { staff: [] });

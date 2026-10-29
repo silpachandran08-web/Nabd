@@ -1,0 +1,20 @@
+/* ACC-023: full-screen, high contrast, scales with the viewport. Fixed colours on purpose: a TV across the room needs black on white or white on black. */
+.screen { position: fixed; inset: 0; z-index: var(--z-lock); overflow: hidden; background: #000; color: #fff; display: flex; flex-direction: column; padding: 2vmin; font-size: clamp(16px, 2.2vmin, 40px); }
+.grid { flex: 1; display: grid; gap: 2vmin; grid-template-columns: repeat(auto-fit, minmax(min(100%, 38vmin), 1fr)); align-content: stretch; min-block-size: 0; }
+.grid[data-count="1"] { grid-template-columns: 1fr; }
+.card { border: 0.3vmin solid #fff; border-radius: 2vmin; padding: 2vmin; display: flex; flex-direction: column; justify-content: space-between; min-inline-size: 0; }
+.doctor { margin: 0; font-size: 3.2vmin; font-weight: 700; }
+.label { display: flex; gap: 2vmin; flex-wrap: wrap; font-size: 2.2vmin; opacity: 0.85; }
+.now { font-size: 14vmin; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.next { display: flex; gap: 2vmin; flex-wrap: wrap; font-size: 6vmin; font-weight: 700; font-variant-numeric: tabular-nums; }
+.delay { display: flex; gap: 2vmin; flex-wrap: wrap; font-size: 2.6vmin; background: #ffd400; color: #000; padding: 1vmin 2vmin; border-radius: 1vmin; font-weight: 700; }
+.none { margin: auto; font-size: 4vmin; display: flex; gap: 3vmin; }
+.stale, .lost { display: flex; gap: 3vmin; justify-content: center; padding: 1vmin 2vmin; margin-block-end: 1.5vmin; font-size: 3vmin; font-weight: 800; border-radius: 1vmin; }
+.stale { background: #ffd400; color: #000; }
+.lost { background: #ff3b30; color: #fff; }
+.pair { margin: auto; display: flex; flex-direction: column; gap: 2vmin; align-items: center; text-align: center; max-inline-size: 90vmin; }
+.pairTitle { margin: 0; font-size: 5vmin; }
+.pairInput { min-block-size: 44px; font-size: 4vmin; text-align: center; inline-size: 40vmin; padding: 1vmin; border-radius: 1vmin; border: 0.3vmin solid #fff; background: #111; color: #fff; letter-spacing: 1vmin; }
+.pairBtn { min-block-size: 44px; font-size: 3vmin; padding: 1vmin 4vmin; border-radius: 1vmin; border: 0; background: #fff; color: #000; font-weight: 700; cursor: pointer; }
+.pairBtn:disabled { opacity: 0.4; }
+.pairErr { min-block-size: 1.5em; color: #ffd400; margin: 0; }

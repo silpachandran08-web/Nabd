@@ -17,6 +17,8 @@ export type FormErrors = {
   set: (message: string | null) => void;
   clear: () => void;
   clearField: (name: string) => void;
+  /** FEF-033: replace the per-field messages (client-side validation). */
+  setFields: (update: (f: Record<string, string>) => Record<string, string>) => void;
   /** aria attributes for the input named `name`. */
   attrs: (name: string) => { "aria-invalid"?: true; "aria-describedby"?: string };
   prefix: string;
@@ -37,8 +39,9 @@ export function useFormErrors(prefix: string, labels: Record<string, string> = {
     const { [name]: _gone, ...rest } = s.fields; // eslint-disable-line @typescript-eslint/no-unused-vars
     return { ...s, fields: rest };
   }), []);
+  const setFields = useCallback((update: (f: Record<string, string>) => Record<string, string>) => setState((s) => ({ ...s, fields: update(s.fields) })), []);
   const attrs = (name: string) => (name in state.fields ? { "aria-invalid": true as const, "aria-describedby": `${prefix}-${name}-error` } : {});
-  return { ...state, fail, set, clear, clearField, attrs, prefix, labels };
+  return { ...state, fail, set, clear, clearField, setFields, attrs, prefix, labels };
 }
 
 /** The summary (role="alert"): the message, or one line per field error. Renders nothing when there is no error. */

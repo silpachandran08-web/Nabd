@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 import ph from "./pharmacy.module.css";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
@@ -13,27 +13,30 @@ import { can } from "../../lib/permissions";
 import { api, ApiError } from "../../lib/api";
 import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
 import type { Full } from "../../lib/gen";
+import { classBadge, registerBadge, type ScheduleClass } from "../../lib/pharmacyRules";
 import type { DispensingQueueEntryResponse, DispensingQueueItem, PharmacyItemResponse, PharmacySettingsResponse } from "@nabd/api-client/generated";
 
 // Fed only by /pharmacy/* so a pharmacy-only user never touches /setup/*, and a Setup user without
 // pharmacy:view never sees this tab's 403 as a page-level error (PHA-002). It owns its own loading.
 export type PharmacyMode = "external" | "hybrid" | "in_house";
 type PharmacySettings = Omit<Full<PharmacySettingsResponse>, "mode"> & { mode: PharmacyMode };
-type PharmacyItem = Full<PharmacyItemResponse, "hsnCode">;
+// PHL-002/004 fields (also in the generated type once regenerated): class, register badge, generic name, dispensed-here flag.
+type PharmacyItem = Full<PharmacyItemResponse, "hsnCode"> & { scheduleClass: string; register?: string | null; genericName?: string | null; inHouse: boolean };
 type DispensingQueueEntry = Omit<Full<DispensingQueueEntryResponse>, "items" | "token"> & {
   token?: number | null; items: Full<DispensingQueueItem, "stockQty" | "dosage" | "frequency" | "duration" | "instructions">[];
 };
 
+const MODE_RANK: Record<PharmacyMode, number> = { external: 0, hybrid: 1, in_house: 2 };
 export const MODE_LABEL: Record<PharmacyMode, string> = { external: "External", hybrid: "Hybrid", in_house: "In-house" };
 export const MODE_DESC: Record<PharmacyMode, string> = {
   external: "The patient buys at any outside pharmacy. Default for every tenant, included in all plans, zero setup.",
-  hybrid: "In-house cosmeceuticals, external antibiotics. Phase 2, paid tier, low setup.",
-  in_house: "Clinics that sell or dispense at the desk. Phase 3, paid tier, highest setup.",
+  hybrid: "A small-shelf item master with simple stock and one-tap dispense at checkout. No batches or FEFO.",
+  in_house: "Full inventory: batch and expiry, FEFO, registers and a dispensing queue. Needs a plan that includes it.",
 };
 // Only what the API actually offers is ticked: there is no dispense endpoint yet (the queue below is
 // read-only) and the in-house extras are later-phase.
 const RULES: { label: string; hybrid: boolean; inHouse: boolean }[] = [
-  { label: "One-tap dispense (not yet available)", hybrid: false, inHouse: false },
+  { label: "One-tap dispense at checkout", hybrid: true, inHouse: true },
   { label: "Simple stock", hybrid: true, inHouse: true },
   { label: "Batch & expiry (not yet available)", hybrid: false, inHouse: false },
   { label: "Controlled-drug register (not yet available)", hybrid: false, inHouse: false },
@@ -54,8 +57,8 @@ function Mark({ on }: { on: boolean }) {
 // In-house is Phase 3 and not selectable (the server answers 400 mode-not-available).
 export const MODE_REASON_MIN = 3;
 export const MODE_REASON_MAX = 200;
-export function ModeChangeDialog({ from, to, onClose, onSaved }: {
-  from: PharmacyMode | null; to: PharmacyMode; onClose: () => void; onSaved: () => void;
+export function ModeChangeDialog({ from, to, onClose, onSaved, onLocked }: {
+  from: PharmacyMode | null; to: PharmacyMode; onClose: () => void; onSaved: () => void; onLocked?: (text: string) => void;
 }) {
   const [reason, setReason] = useState("");
   const fe = useFormErrors("pm", { reason: "Reason", mode: "Mode" });
@@ -71,6 +74,7 @@ export function ModeChangeDialog({ from, to, onClose, onSaved }: {
       await api.patch("/pharmacy/settings", { mode: to, reason: r });
       onSaved();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 402) onLocked?.(err.detail || "This mode is not part of your plan.");
       if (err instanceof ApiError) fe.fail(err, "Request failed");
       else fe.set("Couldn't reach the server. Nothing was changed; try again.");
     } finally {
@@ -81,12 +85,9 @@ export function ModeChangeDialog({ from, to, onClose, onSaved }: {
     <Dialog title={`Switch pharmacy to ${MODE_LABEL[to]}`} onClose={onClose}>
       <form onSubmit={submit}>
         <p className={ph.modeDesc}>{from ? `Current mode: ${MODE_LABEL[from]}. ` : ""}{MODE_DESC[to]}</p>
-        {from === "hybrid" && (
-          <div className={ph.warn} role="note">
-            <strong>Downgrade from Hybrid.</strong> Pharmacy items stop appearing at checkout, counter sales stop, and the item
-            master and dispensing queue are hidden. Items and stock history are kept, not deleted, and come back if you switch to Hybrid again.
-          </div>
-        )}
+        <div className={ph.warn} role="note">
+          <strong>Nothing is deleted.</strong> Items, stock and dispense history are kept. Screens this mode does not use are hidden, and come back if you switch again.
+        </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="pm-reason">Reason (required)</label>
           <input id="pm-reason" className={styles.input} autoFocus minLength={MODE_REASON_MIN} maxLength={MODE_REASON_MAX} required
@@ -97,7 +98,7 @@ export function ModeChangeDialog({ from, to, onClose, onSaved }: {
         <ErrorSummary fe={fe} className={`${ph.notice} ${ph.noticeError}`} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>
-          <button type="submit" className={styles.btnPrimary} disabled={busy}>{busy ? "Saving…" : from === "hybrid" ? "Confirm downgrade" : "Confirm switch"}</button>
+          <button type="submit" className={styles.btnPrimary} disabled={busy}>{busy ? "Saving…" : from && MODE_RANK[to] < MODE_RANK[from] ? "Confirm downgrade" : "Confirm switch"}</button>
         </div>
       </form>
     </Dialog>
@@ -133,6 +134,8 @@ export default function PharmacyPanel() {
   const [settings, setSettings] = useState<PharmacySettings | null>(null);
   const [items, setItems] = useState<PharmacyItem[]>([]);
   const [queue, setQueue] = useState<DispensingQueueEntry[]>([]);
+  const [classes, setClasses] = useState<ScheduleClass[]>([]);
+  const [locked, setLocked] = useState<string | null>(null); // 402 entitlement-required text for the In-house card
   const [queueError, setQueueError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -151,7 +154,7 @@ export default function PharmacyPanel() {
   const [switchTo, setSwitchTo] = useState<PharmacyMode | null>(null);
   const closeSwitch = useCallback(() => setSwitchTo(null), [setSwitchTo]);
   const reasonRef = useRef<HTMLInputElement>(null);
-  const [newItem, setNewItem] = useState<Partial<PharmacyItem>>({ isRx: false, stockQty: 0, taxRatePercent: 0 });
+  const [newItem, setNewItem] = useState<Partial<PharmacyItem>>({ isRx: false, stockQty: 0, taxRatePercent: 0, scheduleClass: "OTC", inHouse: true });
 
   const afe = useFormErrors("ph", { name: "Name", price: "Price", taxRatePercent: "Tax rate", stockQty: "Stock qty", hsnCode: "HSN code", isRx: "Rx" });
   const efe = useFormErrors("pe", { name: "Name", price: "Price", taxRatePercent: "Tax rate", hsnCode: "HSN code", isRx: "Rx" });
@@ -160,18 +163,23 @@ export default function PharmacyPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const [s, i, q] = await Promise.allSettled([
-      api.get<PharmacySettings>("/pharmacy/settings"),
-      api.get<PharmacyItem[]>("/pharmacy/items"),
-      api.get<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"),
-    ]);
+    const s = await Promise.allSettled([api.get<PharmacySettings>("/pharmacy/settings")]).then((r) => r[0]);
     if (s.status === "rejected") setLoadError(problemText(s.reason));
-    else {
+    else if (s.value.mode === "external") {
+      // External: no item master, queue or classes are fetched at all (the server answers 403 pharmacy-mode-external).
+      setSettings(s.value); setItems([]); setQueue([]); setClasses([]);
+    } else {
       setSettings(s.value);
+      const [i, q, c] = await Promise.allSettled([
+        api.get<PharmacyItem[]>("/pharmacy/items"),
+        api.get<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"),
+        api.get<ScheduleClass[]>("/pharmacy/schedule-classes"),
+      ]);
       if (i.status === "rejected") setLoadError(problemText(i.reason));
       else {
         setItems(i.value);
         if (q.status === "rejected") setQueueError(problemText(q.reason)); else { setQueue(q.value); setQueueError(null); }
+        setClasses(c.status === "fulfilled" && Array.isArray(c.value) ? c.value : []);
       }
     }
     setLoading(false);
@@ -205,6 +213,8 @@ export default function PharmacyPanel() {
   // not part of the item body (codes are generated; activation has its own endpoint).
   const itemBody = (i: PharmacyItem) => ({
     name: i.name, isRx: i.isRx, hsnCode: i.hsnCode || null, price: i.price, taxRatePercent: i.taxRatePercent,
+    scheduleClass: i.scheduleClass, genericName: i.genericName || null, inHouse: i.inHouse,
+    priceInclusiveOfTax: i.priceInclusiveOfTax ?? null, zeroRated: !!i.zeroRated, mrp: i.mrp ?? null,
   });
 
   const openAdjust = (item: PharmacyItem, direction: 1 | -1) => {
@@ -273,9 +283,9 @@ export default function PharmacyPanel() {
     e.preventDefault();
     if (!newItem.name || newItem.price == null) return;
     setNotice(null);
-    if (await send("POST", "/pharmacy/items", newItem, afe)) {
+    if (await send("POST", "/pharmacy/items", { ...newItem, isRx: classes.find((c) => c.code === newItem.scheduleClass)?.requiresRx ?? false }, afe)) {
       setNotice({ text: `${newItem.name} added.` });
-      setNewItem({ isRx: false, stockQty: 0, taxRatePercent: 0 });
+      setNewItem({ isRx: false, stockQty: 0, taxRatePercent: 0, scheduleClass: "OTC", inHouse: true });
       await load();
     }
   };
@@ -284,21 +294,21 @@ export default function PharmacyPanel() {
   if (loadError || !settings) return <div className={styles.card}><ErrorState message={loadError ?? "Pharmacy settings are unavailable."} onRetry={load} /></div>;
 
   const mode = settings.mode;
-  const hybrid = mode === "hybrid";
-  const canWrite = hybrid && canEdit;
+  const canWrite = mode !== "external" && canEdit; // Hybrid and In-house both manage items
 
   return (
     <div className={styles.card}>
       <h2 className={styles.cardTitle}>Pharmacy</h2>
       {canEdit ? (
-        <div className={styles.tabs} role="group" aria-label="Pharmacy mode">
-          {(["external", "hybrid"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? styles.tabActive : styles.tab}
+        <div className={ph.modeCards} role="group" aria-label="Pharmacy mode">
+          {(["external", "hybrid", "in_house"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} data-testid={`mode-card-${m}`} className={`${ph.modeCard} ${mode === m ? ph.modeCardOn : ""}`}
               onClick={() => { if (m !== mode) { setNotice(null); setSwitchTo(m); } }}>
-              {MODE_LABEL[m]}
+              <strong>{MODE_LABEL[m]}{mode === m ? " · current" : ""}</strong>
+              <span>{MODE_DESC[m]}</span>
+              {m === "in_house" && locked && <span className={ph.lockNote} role="note">{locked}</span>}
             </button>
           ))}
-          <span className={mode === "in_house" ? styles.tabActive : ph.na}>{MODE_LABEL.in_house} · {mode === "in_house" ? "current" : "Not available yet"}</span>
         </div>
       ) : (
         // pharmacy:view only: the mode is information, not a control (PHA-016).
@@ -316,9 +326,7 @@ export default function PharmacyPanel() {
         <p className={styles.subtitle}>Item master and dispensing queue are not shown in External mode.{canEdit ? " Switch to Hybrid to add items." : ""}</p>
       ) : (
         <>
-          {!canEdit ? null : mode === "in_house" ? (
-            <div className={styles.empty}>Batch &amp; expiry tracking, the controlled-drug register, stock alerts and FEFO suggestions are later-phase capabilities and aren&apos;t available yet. Switch to Hybrid to add or edit items; existing items stay visible below, read-only.</div>
-          ) : (
+          {!canEdit ? null : (
             <>
               <form onSubmit={addItem}>
                 <div className={ph.formRow}>
@@ -348,11 +356,13 @@ export default function PharmacyPanel() {
                     <FieldError fe={afe} name="hsnCode" className={ph.sub} />
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label} htmlFor="ph-rx">Rx</label>
-                    <select id="ph-rx" className={styles.select} value={newItem.isRx ? "yes" : "no"} onChange={(e) => setNewItem({ ...newItem, isRx: e.target.value === "yes" })}>
-                      <option value="no">Non-Rx</option>
-                      <option value="yes">Rx</option>
+                    <label className={styles.label} htmlFor="ph-class">Schedule class</label>
+                    <select id="ph-class" className={styles.select} value={newItem.scheduleClass ?? "OTC"} onChange={(e) => setNewItem({ ...newItem, scheduleClass: e.target.value })}>
+                      {(classes.length ? classes : [{ code: "OTC", label: "Over the counter" }]).map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                     </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={ph.check} htmlFor="ph-inhouse"><input id="ph-inhouse" type="checkbox" checked={newItem.inHouse !== false} onChange={(e) => setNewItem({ ...newItem, inHouse: e.target.checked })} /> Dispensed here</label>
                   </div>
                 </div>
                 <ErrorSummary fe={afe} className={`${ph.notice} ${ph.noticeError}`} />
@@ -360,7 +370,7 @@ export default function PharmacyPanel() {
                   <button className={styles.btnPrimary} type="submit">Add item</button>
                 </div>
               </form>
-              <p className={styles.subtitle}>No batch, no expiry, no purchase orders in Hybrid — those are later-phase capabilities.</p>
+              <p className={styles.subtitle}>Batch, expiry and purchase orders arrive with the In-house pharmacy stories; stock here is a simple count.</p>
             </>
           )}
 
@@ -374,7 +384,7 @@ export default function PharmacyPanel() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Price</th><th scope="col">Tax %</th><th scope="col">Stock</th><th scope="col">Rx</th><th scope="col">HSN</th><th scope="col">Status</th>{canWrite && <th scope="col"></th>}</tr>
+                  <tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Price</th><th scope="col">Tax %</th><th scope="col">Stock</th><th scope="col">Class</th><th scope="col">HSN</th><th scope="col">Status</th>{canWrite && <th scope="col"></th>}</tr>
                 </thead>
                 <tbody>
                   {items.map((i) => (
@@ -391,7 +401,11 @@ export default function PharmacyPanel() {
                           {i.stockQty === 0 ? <StatusPill tone="danger" label="Out of stock" /> : i.stockQty <= LOW_STOCK ? <StatusPill tone="warn" label="Low" /> : null}
                         </div>
                       </td>
-                      <td><StatusPill tone={i.isRx ? "info" : "neutral"} label={i.isRx ? "Rx" : "Non-Rx"} icon={i.isRx ? "pulse" : "list"} /></td>
+                      <td>
+                        <StatusPill tone={i.isRx ? "info" : "neutral"} label={classBadge(i.scheduleClass)} icon={i.isRx ? "pulse" : "list"} />
+                        {registerBadge(i.register) && <> <StatusPill tone="warn" label={registerBadge(i.register) as string} /></>}
+                        {i.inHouse === false && <> <StatusPill tone="neutral" label="Buy outside" /></>}
+                      </td>
                       <td>{i.hsnCode ?? "—"}</td>
                       <td><StatusPill tone={i.active ? "ok" : "neutral"} label={i.active ? "Active" : "Inactive"} icon={i.active ? "check" : "x"} /></td>
                       {canWrite && (
@@ -409,6 +423,7 @@ export default function PharmacyPanel() {
             </div>
           )}
 
+          {canWrite && mode === "hybrid" && <p><Link href="/pharmacy/receipt" className={styles.btn}>Enter supplier bill</Link></p>}
           <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
           <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. Open a row to dispense on that patient&apos;s billing screen.</p>
           {queueError ? (
@@ -452,7 +467,7 @@ export default function PharmacyPanel() {
         </>
       )}
 
-      {switchTo && <ModeChangeDialog from={mode} to={switchTo} onClose={closeSwitch} onSaved={() => void modeSaved()} />}
+      {switchTo && <ModeChangeDialog from={mode} to={switchTo} onClose={closeSwitch} onSaved={() => void modeSaved()} onLocked={setLocked} />}
 
       {editing && (
         <Dialog title={`Edit ${editing.name}`} size="drawer" onClose={closeEdit}>
@@ -473,11 +488,31 @@ export default function PharmacyPanel() {
               <FieldError fe={efe} name="taxRatePercent" className={ph.sub} />
             </div>
             <div className={styles.field}>
+              <label className={styles.label} htmlFor="pe-mrp">MRP</label>
+              <input id="pe-mrp" className={styles.input} type="number" step="0.01" min="0" value={editing.mrp ?? ""} onChange={(e) => setEditing({ ...editing, mrp: (e.target.value === "" ? null : Number(e.target.value)) as number })} />
+            </div>
+            <div className={styles.field}>
+              <label><input type="checkbox" checked={!!editing.zeroRated} onChange={(e) => setEditing({ ...editing, zeroRated: e.target.checked })} /> Zero-rated (0% tax, noted on the invoice)</label>
+            </div>
+            <div className={styles.field}>
+              <label><input type="checkbox" checked={editing.priceInclusiveOfTax ?? false} onChange={(e) => setEditing({ ...editing, priceInclusiveOfTax: e.target.checked })} /> Price includes tax</label>
+            </div>
+            <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-hsn">HSN code</label>
               <input id="pe-hsn" className={styles.input} value={editing.hsnCode ?? ""} {...efe.attrs("hsnCode")} onChange={(e) => { efe.clearField("hsnCode"); setEditing({ ...editing, hsnCode: e.target.value }); }} />
               <FieldError fe={efe} name="hsnCode" className={ph.sub} />
             </div>
-            <label className={ph.check}><input type="checkbox" checked={editing.isRx} onChange={(e) => setEditing({ ...editing, isRx: e.target.checked })} /> Prescription only (Rx)</label>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pe-class">Schedule class</label>
+              <select id="pe-class" className={styles.select} value={editing.scheduleClass} onChange={(e) => setEditing({ ...editing, scheduleClass: e.target.value, isRx: classes.find((c) => c.code === e.target.value)?.requiresRx ?? editing.isRx })}>
+                {(classes.some((c) => c.code === editing.scheduleClass) ? classes : [...classes, { code: editing.scheduleClass, label: editing.scheduleClass }]).map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pe-generic">Generic name</label>
+              <input id="pe-generic" className={styles.input} maxLength={200} value={editing.genericName ?? ""} onChange={(e) => setEditing({ ...editing, genericName: e.target.value })} />
+            </div>
+            <label className={ph.check}><input type="checkbox" checked={editing.inHouse !== false} onChange={(e) => setEditing({ ...editing, inHouse: e.target.checked })} /> Dispensed here (untick for &quot;buy outside&quot;)</label>
             <ErrorSummary fe={efe} className={`${ph.notice} ${ph.noticeError}`} />
             <div className={styles.actions}>
               <button type="button" className={styles.btn} onClick={closeEdit}>Cancel</button>

@@ -1,0 +1,15 @@
+{
+  "retry": "Retry",
+  "close": "Close",
+  "cancel": "Cancel",
+  "formErrors": {
+    "required": "This field is required.",
+    "invalid": "Check this value.",
+    "tooLong": "This is too long.",
+    "phoneInvalid": "Enter a valid mobile number for this clinic's country.",
+    "dobFuture": "Date of birth cannot be in the future.",
+    "amountPositive": "Enter an amount above 0.",
+    "discountReason": "Pick a reason for the discount.",
+    "discountTooBig": "The discount cannot be more than the subtotal."
+  }
+}

@@ -51,6 +51,12 @@
       "type": "integer",
       "minimum": 1,
       "description": "Outbox id of this event: monotonic per aggregate."
+    },
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Notification request this message belongs to (COM-023); lets Core map the status to the appointment."
     }
   },
   "examples": [

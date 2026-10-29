@@ -1,0 +1,18 @@
+{
+  "_note": "PROVISIONAL light palette: no light theme was approved in DESIGN.md and prototype/css/nb.css is not in this repository. Values are derived to meet WCAG contrast (see contrast-report.json); needs design sign-off.",
+  "bg-root": "#f4f6f8", "bg-canvas": "#eef1f4", "bg-nav": "#ffffff",
+  "surface-1": "#ffffff", "surface-2": "#f3f5f7", "surface-3": "#e8ecf0", "surface-overlay": "#ffffff",
+  "scrim": "rgba(10, 15, 20, 0.5)",
+  "border-subtle": "rgba(0, 0, 0, 0.08)", "border-default": "rgba(0, 0, 0, 0.14)", "border-strong": "rgba(0, 0, 0, 0.32)",
+  "accent-500": "#0b6f7a", "accent-gradient": "linear-gradient(90deg, #0b6f7a 0%, #0a7f8f 100%)",
+  "accent-tint": "rgba(11, 111, 122, 0.10)", "accent-glow": "0 8px 24px rgba(11, 111, 122, 0.20)", "on-accent": "#ffffff",
+  "danger-500": "#b3261e", "danger-tint": "rgba(179, 38, 30, 0.10)", "danger-600": "#9c1f18",
+  "ok-500": "#1b7a4b", "ok-tint": "rgba(27, 122, 75, 0.12)",
+  "success-500": "#1b7a4b", "success-tint": "rgba(27, 122, 75, 0.12)",
+  "warn-500": "#8a5a00", "warn-tint": "rgba(138, 90, 0, 0.12)",
+  "info-500": "#1a5fa8", "info-600": "#144e8c", "info-tint": "rgba(26, 95, 168, 0.10)",
+  "sync-500": "#5b3fc4", "sync-tint": "rgba(91, 63, 196, 0.10)",
+  "urgent-500": "#b4440f", "urgent-tint": "rgba(180, 68, 15, 0.10)",
+  "text-primary": "#0b1217", "text-secondary": "#46525c", "text-tertiary": "#56626c", "text-disabled": "#8a949c",
+  "focus-ring": "#0b6f7a"
+}

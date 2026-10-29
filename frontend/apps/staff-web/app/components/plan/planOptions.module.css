@@ -1,0 +1,8 @@
+.page { display: flex; flex-direction: column; gap: var(--nb-space-12); padding: var(--nb-space-16); max-inline-size: 720px; }
+.title { margin: 0; font-size: var(--nb-fs-xl); color: var(--nb-text-primary); }
+.h2 { margin: 0; font-size: var(--nb-fs-lg); }
+.sub, .muted { color: var(--nb-text-secondary); margin: 0; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-2, 8px); }
+.row { display: flex; align-items: center; gap: var(--nb-space-12); padding: var(--nb-space-12); min-block-size: 44px; border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); }
+.text { display: flex; flex-direction: column; gap: 2px; min-inline-size: 0; overflow-wrap: anywhere; }
+.link { display: inline-flex; align-items: center; min-block-size: 44px; color: var(--nb-accent-500); }

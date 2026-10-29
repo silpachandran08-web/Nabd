@@ -1,7 +1,7 @@
 // COM-006: the delivery tick mapping and the SSE path (event type -> cache resource -> screen refresh). Fakes only.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tickOf } from "../../app/patients/messageTicks.ts";
+import { tickOf } from "../../app/(clinic)/patients/messageTicks.ts";
 import { createApplier, resourcesFor, LIVE_RESOURCES } from "../../../../packages/api-client/sse/patch.ts";
 
 test("one grey tick = sent, two grey = delivered, two blue = read, red ! = failed", () => {

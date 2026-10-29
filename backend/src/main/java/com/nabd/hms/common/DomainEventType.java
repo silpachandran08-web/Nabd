@@ -9,6 +9,7 @@ public enum DomainEventType {
     APPOINTMENT_BOOKED("scheduling.appointment.booked.v1", "core/scheduling"),
     APPOINTMENT_CANCELLED("scheduling.appointment.cancelled.v1", "core/scheduling"),
     APPOINTMENT_RESCHEDULED("scheduling.appointment.rescheduled.v1", "core/scheduling"),
+    APPOINTMENT_NO_SHOW("scheduling.appointment.no_show.v1", "core/scheduling"),
     APPOINTMENT_ARRIVED("scheduling.appointment.arrived.v1", "core/scheduling"),
     QUEUE_ENTRY_CREATED("visit.queue_entry.created.v1", "core/visit"),
     QUEUE_ENTRY_CHANGED("visit.queue_entry.changed.v1", "core/visit"),
@@ -19,6 +20,7 @@ public enum DomainEventType {
     ALLERGY_CHANGED("clinical.allergy.changed.v1", "core/clinical"),
     INVOICE_PAID("billing.invoice.paid.v1", "core/billing"),
     PAYMENT_RECORDED("billing.payment.recorded.v1", "core/billing"),
+    REFUND_APPROVED("billing.refund.approved.v1", "core/billing"),
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
     ORGANIZATION_CONFIG_CHANGED("organization.config.changed.v1", "core/organization"),
     TENANT_REGION_PINNED("organization.tenant.region_pinned.v1", "core/organization"),
@@ -33,7 +35,13 @@ public enum DomainEventType {
     ORGANIZATION_IMPORT_COMPLETED("organization.import.completed.v1", "core/organization"),
     DRUG_MASTER_VERSION_ACTIVATED("clinical.drug_master.version_activated.v1", "core/clinical"),
     PLATFORM_ENTITLEMENTS_CHANGED("platform.entitlements.changed.v1", "core/platform"),
-    PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization");
+    PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization"),
+    BOOKING_ROUTED("scheduling.booking.routed.v1", "core/scheduling"),
+    SENDER_THROTTLED("comms.sender.throttled.v1", "core/messaging"),
+    ATTACHMENT_SCANNED("shared.attachment.scanned.v1", "core/shared"),
+    CALENDAR_CHANGED("organization.calendar.changed.v1", "core/organization"),
+    PATIENT_LINK_OPENED("patient.link.opened.v1", "core/patient"),
+    PHARMACY_STOCK_BATCH_CHANGED("pharmacy.stock.batch_changed.v1", "core/pharmacy");
 
     private final String type;
     private final String source;

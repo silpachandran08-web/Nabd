@@ -102,6 +102,22 @@ Do these in order; each is one line of work.
 - Nightly load tests and the residency/egress checks are GitHub workflows (`nightly-load.yml`, `residency*.yml`) that have not had a first run.
 - Five browser scripts need their own builds: see `kanban/CONTEXT.md` (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`).
 
+## After upgrading to Sprint 15 (S6) code
+
+- Migrations V2410-V2619 (see `db/migrations/VERSIONS`, including V2604 and V2619 clinic policy keys union) and Comms Gateway V6-V17. Flyway applies them on start; no manual step.
+- New env: `APP_TRIAL_HASH_PEPPER` (free-trial sign-up, set a random secret per environment). Other new keys are optional and blank by default.
+- Staff pages moved into the `(clinic)` route group; no URL changes.
+- Five browser scripts still need their own builds (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`); the patient-links script needs a patient-web build.
+
+## After upgrading to Sprint 16 (S7) code
+
+- Migrations V2710-V2909 in Core (see `db/migrations/VERSIONS`), Patient Access Edge V6-V17 and Comms Gateway V18-V23. Flyway applies them on start; no manual step.
+- New env: `PATIENT_WEB_BASE_URL` (where a family member opens the consent link; default `http://localhost:3810`). The Edge emergency phrase list is empty until the clinical lead signs a list; do not fill it in without that sign-off.
+- Clinic day now starts at the tenant's day-start offset (default 04:00) in queue, no-show and checkout code instead of local midnight.
+- Sprint 7 left unindexed foreign keys on `patients.guardian_id`, `patients.merged_into_id` and `queue_entries.patient_id`; a bulk delete or merge of patients scans the table once per row (see `kanban/DECISIONS_PENDING.md`).
+- `s16-fef-039-consult-i18n` (consult in the pseudo-locale) needs a build started with `NABD_PSEUDO=1`.
+- Clinical glossary changes (`packages/i18n/glossary`) need review by the `@nabd/clinical-owners` GitHub team; create that team and turn on code-owner reviews in the repository settings.
+
 ## Errors seen and what they mean
 
 | Error | Cause | Fix |

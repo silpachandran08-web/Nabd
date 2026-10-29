@@ -252,6 +252,7 @@ public class SecurityConfig {
                                 "/.well-known/jwks.json",
                                 "/.well-known/jwks/*.json", // PLT-009: one JWKS per population
                                 "/v1/plans/catalogue", // ADM-034: public plan comparison
+                                "/v1/billing/gateway-webhooks/*/*", // FIN-020: HMAC-signed by the payment gateway, verified in PaymentGatewayWebhookController
                                 "/v1/webhooks/whatsapp", // HMAC-signed by Meta, verified in WhatsAppWebhookController
                                 "/internal/v1/notification-requests/*" // COM-004: internal service token, checked in NotificationClaimController
                         ).permitAll()

@@ -1,0 +1,571 @@
+.page {
+  min-height: 100%;
+  padding: var(--nb-space-32);
+  max-width: 1400px; /* the registry table has seven columns */
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nb-space-16);
+  margin-bottom: var(--nb-space-16);
+}
+
+.title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin: 0 0 var(--nb-space-4);
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+  margin: 0;
+}
+
+.searchBar {
+  margin-bottom: var(--nb-space-16);
+}
+
+.input {
+  height: 40px;
+  width: 100%;
+  max-width: 360px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-12);
+  color: var(--nb-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.card {
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  overflow: hidden;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: start;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.row {
+  cursor: pointer;
+  position: relative;
+}
+
+/* FEF-027: the patient name is the row's link; its ::after stretches over the row so a click anywhere opens it. */
+.rowLink { text-decoration: none; }
+.rowLink::after { content: ""; position: absolute; inset: 0; }
+.row .checkInBtn { position: relative; z-index: 1; }
+
+.row:hover td {
+  background: var(--nb-surface-2);
+}
+
+.patientName {
+  color: var(--nb-text-primary);
+  font-weight: 500;
+}
+
+.mrn {
+  display: block;
+  color: var(--nb-text-tertiary);
+  font-size: 12px;
+  margin-top: 1px;
+}
+
+.muted {
+  color: var(--nb-text-tertiary);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
+.pillMerged { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
+
+.state {
+  padding: var(--nb-space-32);
+  text-align: center;
+  color: var(--nb-text-secondary);
+  font-size: 14px;
+}
+
+.errorState {
+  composes: state;
+  color: var(--nb-danger-500);
+}
+
+/* Patient 360 drawer */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--nb-scrim);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 10;
+}
+
+.drawer {
+  width: 420px;
+  max-width: 100%;
+  height: 100%;
+  background: var(--nb-surface-1);
+  border-inline-start: 1px solid var(--nb-border-default);
+  padding: var(--nb-space-24);
+  overflow-y: auto;
+}
+
+.drawerHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--nb-space-16);
+}
+
+.drawerName {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.drawerMeta {
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+}
+
+.closeBtn {
+  height: 32px;
+  width: 32px;
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: var(--nb-text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.allergyBanner {
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12);
+  margin-bottom: var(--nb-space-16);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.allergyBannerNone {
+  composes: allergyBanner;
+  background: var(--nb-surface-3);
+  color: var(--nb-text-secondary);
+}
+
+.allergyBannerSome {
+  composes: allergyBanner;
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+}
+
+.section {
+  margin-bottom: var(--nb-space-16);
+}
+
+.sectionLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  margin-bottom: var(--nb-space-8);
+}
+
+.sectionValue {
+  font-size: 14px;
+  color: var(--nb-text-primary);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--nb-space-16);
+}
+
+.drawerTabs {
+  display: flex;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-16);
+}
+
+.drawerTab,
+.drawerTabActive {
+  height: 30px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.drawerTabActive {
+  background: var(--nb-accent-tint);
+  border-color: var(--nb-accent-500);
+  color: var(--nb-accent-500);
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--nb-accent-500);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 0;
+}
+
+.linkBtn:disabled {
+  color: var(--nb-text-disabled);
+  cursor: not-allowed;
+}
+
+.allergyRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nb-space-8);
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--nb-border-subtle);
+}
+
+.allergyForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: var(--nb-space-12);
+}
+
+.smallInput {
+  min-inline-size: 0; /* grid items default to min-content; without this the reaction field pushes Add out of the drawer */
+  inline-size: 100%;
+  height: 32px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-8);
+  color: var(--nb-text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.timelineRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--nb-border-subtle);
+}
+
+.dueBanner {
+  background: var(--nb-warn-tint);
+  border: 1px solid var(--nb-warn-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  margin-bottom: var(--nb-space-16);
+}
+
+.dueList {
+  margin-top: var(--nb-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dueRow {
+  display: flex;
+  gap: var(--nb-space-12);
+  font-size: 13px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.dueRow:hover {
+  text-decoration: underline;
+}
+
+.numberingToggle {
+  display: flex;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-12);
+}
+
+.toothGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+.toothCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--nb-surface-2);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-8);
+}
+
+.toothNumber {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nb-text-tertiary);
+}
+
+.toothSelect {
+  width: 100%;
+  height: 26px;
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-xs);
+  background: var(--nb-surface-3);
+  color: var(--nb-text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+/* ── Patient Registry (DESIGN.md) ── */
+.primaryBtn {
+  min-height: 44px;
+  padding: 0 var(--nb-space-16);
+  border-radius: 12px;
+  border: 0;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.primaryBtn:disabled { opacity: 0.5; cursor: default; }
+.secondaryBtn {
+  height: 36px;
+  padding: 0 var(--nb-space-12);
+  border-radius: 10px;
+  border: 1px solid var(--nb-border-default);
+  background: transparent;
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.searchInput {
+  width: 100%;
+  height: 46px;
+  padding: 0 var(--nb-space-16);
+  border-radius: 12px;
+  border: 1px solid var(--nb-border-default);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  margin-bottom: var(--nb-space-12);
+}
+.filter {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.filterOn {
+  composes: filter;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+}
+.filterCount {
+  font-size: 12px;
+  min-width: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--nb-surface-3);
+  line-height: 16px;
+  text-align: center;
+}
+.flash {
+  border: 1px solid var(--nb-ok-500);
+  background: var(--nb-ok-tint);
+  color: var(--nb-ok-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  font-size: 13px;
+  margin-bottom: var(--nb-space-12);
+}
+.patientCell { display: flex; align-items: center; gap: var(--nb-space-12); }
+.avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatarMuted { composes: avatar; background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
+.nowrap { white-space: nowrap; }
+.flags { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.actionCell { text-align: end; white-space: nowrap; }
+.checkInBtn {
+  height: 38px;
+  padding: 0 var(--nb-space-24);
+  border-radius: 10px;
+  border: 0;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.inQueue { font-size: 12px; font-weight: 600; color: var(--nb-accent-500); }
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--nb-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-nav);
+  padding: var(--nb-space-16);
+}
+.dialog {
+  width: 460px;
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-lg);
+  padding: var(--nb-space-24);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dialogForm { display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.dialog .input, .dialogForm .input { max-width: none; }
+.dialogTitle { font-size: 18px; font-weight: 600; margin: 0; }
+.dialogSub { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-8); }
+.fieldLabel { font-size: 12px; font-weight: 600; color: var(--nb-text-secondary); margin-top: var(--nb-space-8); }
+.fieldRow { display: grid; grid-template-columns: 1fr 1fr; gap: var(--nb-space-12); }
+.candidateRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding: 8px 10px;
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.dialogActions { display: flex; justify-content: flex-end; gap: var(--nb-space-8); margin-top: var(--nb-space-12); }
+
+.guardianCell { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8); }
+.toothStatus { font-size: 12px; color: var(--nb-text-secondary); text-align: center; }
+.errorInline { font-size: 13px; color: var(--nb-danger-500); }
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24); }
+}
+@media (max-width: 430px) {
+  .page { padding: var(--nb-space-16); }
+  .header { flex-wrap: wrap; }
+  .filterBar { flex-wrap: nowrap; overflow-x: auto; }
+  .filter, .filterOn { flex: none; }
+  .toothGrid { grid-template-columns: repeat(4, 1fr); }
+  .allergyForm { grid-template-columns: 1fr; }
+  .fieldRow { grid-template-columns: 1fr; }
+}
+/* OPS-008: registry infinite-scroll footer */
+.moreRow { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-12); padding-block: var(--nb-space-12); padding-inline: var(--nb-space-16); flex-wrap: wrap; }
+.moreRow .secondaryBtn { min-block-size: 44px; }
+
+/* IDC-004 consent block */
+.consentBlock { border: 1px solid var(--nb-border-default); border-radius: 8px; padding: 12px; margin-block: 8px; }
+.consentRow { display: flex; align-items: center; gap: 10px; min-block-size: 44px; }
+.consentRow input { inline-size: 24px; block-size: 24px; flex: none; }
+.assistedScreen { font-size: 1.6rem; line-height: 1.5; }
+.assistedScreen .consentRow { font-size: 1.4rem; min-block-size: 64px; }

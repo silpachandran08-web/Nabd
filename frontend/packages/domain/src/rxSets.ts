@@ -5,6 +5,8 @@ export type RxSetItem = {
   brandName: string | null; sigPattern: string | null; route: string | null; quantity: number | null; quantityUnit: string | null;
   /** true = not in the active pharmacy item master; null = no master to compare with (unknown, never "fine") */
   stale: boolean | null;
+  /** CLN-021: drug master code; codeSuggestion = best match for an uncoded item ("code this"), never applied automatically */
+  drugId?: string | null; genericName?: string | null; codeSuggestion?: { drugId: string; display: string } | null;
 };
 export type RxSet = {
   id: string; doctorId: string | null; ownerName: string | null; name: string; scope: RxSetScope; shared: boolean;
@@ -15,6 +17,7 @@ export type RxSet = {
 export type RxSetWriteItem = {
   drugName: string; dosage: string; frequency: string; duration: string; instructions: string;
   brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
+  drugId?: string;
 };
 export type RxSetResult = { ok: true } | { ok: false; message: string };
 
@@ -27,12 +30,14 @@ const blank = (s: string | null | undefined) => (s && s.trim() ? s.trim() : null
 type LooseItem = {
   drugName: string; dosage?: string | null; frequency?: string | null; duration?: string | null; instructions?: string | null;
   brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
+  drugId?: string | null;
 };
 export function toWriteItem(i: LooseItem): RxSetWriteItem {
   return {
     drugName: i.drugName.trim(), dosage: blank(i.dosage) ?? "", frequency: blank(i.frequency) ?? "", duration: blank(i.duration) ?? "",
     instructions: blank(i.instructions) ?? "", brandName: blank(i.brandName), sigPattern: blank(i.sigPattern), route: blank(i.route),
     quantity: i.quantity ?? null, quantityUnit: blank(i.quantityUnit),
+    ...(blank(i.drugId) ? { drugId: blank(i.drugId) as string } : {}), // CLN-021: a coded line stays coded in the set
   };
 }
 

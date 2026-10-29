@@ -10,7 +10,7 @@ export type CacheLike = {
 };
 
 /** Resources that live messages keep fresh; a snapshot (connect, resume gap) invalidates all of them. */
-export const LIVE_RESOURCES = ["queue", "wait-estimate", "doctor-delay", "nursing", "roster", "doctor-status", "patient-messages"] as const;
+export const LIVE_RESOURCES = ["queue", "wait-estimate", "doctor-delay", "nursing", "roster", "doctor-status", "patient-messages", "desk-exceptions"] as const;
 
 /** Event type (without the .vN suffix) -> the cache resources it makes stale. */
 export function resourcesFor(type: string): readonly string[] {
@@ -18,7 +18,9 @@ export function resourcesFor(type: string): readonly string[] {
   if (type.startsWith("nursing.")) return ["nursing"];
   if (type.startsWith("doctor.status")) return ["roster", "doctor-delay", "wait-estimate", "doctor-status"];
   if (type.startsWith("comms.message.")) return ["patient-messages"]; // COM-006
-  return []; // requests / exceptions topics have no screen yet
+  if (type.startsWith("scheduling.booking.") || type.startsWith("scheduling.appointment.")) return ["booking-requests"]; // ACC-010
+  if (type.startsWith("desk.exception.")) return ["desk-exceptions"]; // ACC-032
+  return [];
 }
 
 const PATCHABLE = ["status"] as const; // scalar fields a queue delta may carry

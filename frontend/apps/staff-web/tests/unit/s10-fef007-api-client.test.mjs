@@ -154,7 +154,7 @@ test("contract: migrated endpoints are in api/openapi.yaml (known gaps listed)",
 
 // Acceptance 3: the three flows carry no fetch(, API_BASE or local response types.
 test("migrated screens contain 0 fetch(, 0 API_BASE and 0 hand-written response types", () => {
-  for (const f of ["app/checkout/[queueEntryId]/page.tsx", "app/checkout/otc/page.tsx", "app/components/arrivals/CheckInDialog.tsx"]) {
+  for (const f of ["app/(clinic)/checkout/[queueEntryId]/page.tsx", "app/(clinic)/checkout/otc/page.tsx", "app/components/arrivals/CheckInDialog.tsx"]) {
     const src = readFileSync(new URL(`../../${f}`, import.meta.url), "utf8");
     assert.doesNotMatch(src, /fetch\(/i, f); assert.doesNotMatch(src, /API_BASE/, f);
     assert.doesNotMatch(src, /^\s*(export )?type (Invoice|Charge|Payment|LineItem|Problem|QueueEntry|CheckoutContext|OtcContext|FlowStep|PrescribedItem)\b/m, f);

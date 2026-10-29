@@ -29,6 +29,11 @@ export function RxSetCard({ set, onApply, onEdit, onDelete, compact = false }: {
         <span>{lastUsedLabel(set.lastUsedAt)}</span>
       </div>
       <p className={styles.meds}>{set.items.map(itemLine).join(", ")}</p>
+      {set.items.some((i) => i.codeSuggestion) && (
+        <p className={styles.staleNote} data-testid="code-this">
+          Code this: {set.items.filter((i) => i.codeSuggestion).map((i) => `${i.drugName} → ${i.codeSuggestion?.display}`).join("; ")}.
+        </p>
+      )}
       {staleNames.length > 0 && (
         <p className={styles.staleNote}>
           Not in the current active pharmacy list: {staleNames.join(", ")}. Check before applying.

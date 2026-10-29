@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { arrivalsSource } from "./arrivalsSource.mjs";
+import { nursingSource } from "./nursingSource.mjs";
 import { qk, qkPrefix, STALE } from "../../../../packages/api-client/queries/keys.ts";
 
 test("keys are ['t', tenantId, resource, params] and a prefix matches every params", () => {
@@ -32,7 +33,7 @@ function effectBodies(src) {
 }
 
 for (const page of ["arrivals", "nursing"]) {
-  const src = page === "arrivals" ? arrivalsSource() : readFileSync(new URL(`../../app/${page}/page.tsx`, import.meta.url), "utf8"); // FEF-028: Arrivals is a folder
+  const src = page === "arrivals" ? arrivalsSource() : nursingSource(); // FEF-028/031: Arrivals and Nursing are folders
   test(`${page}: 0 Promise.resolve().then, 0 useEffect fetches, 0 hand-written API types`, () => {
     assert.equal((src.match(/Promise\.resolve\(\)\.then/g) ?? []).length, 0);
     const fetching = effectBodies(src).filter((b) => /\b(fetch|authedFetch|apiFetch|api\.(get|post|patch|put|delete)|load\w*)\(/.test(b));

@@ -21,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -81,12 +79,21 @@ public class QueueService {
     private final ActorDirectory actors;
     private final QueueEventRepository eventRepo;
     private final DoctorSessionService sessions;
+    private final EtaService eta;
+    private final ServiceTimeService serviceTimes;
+    private final DeskExceptions desk;
+    private final com.nabd.hms.patient.api.ProxyAccess proxy; // IDC-011
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, OrganizationConfig departmentService, TenantContext tenantContext, ClinicClock clock,
                  com.nabd.hms.common.AuditService auditService,
                  com.nabd.hms.common.EventPublisher events, ActorDirectory actors,
-                 QueueEventRepository eventRepo, DoctorSessionService sessions) {
+                 QueueEventRepository eventRepo, DoctorSessionService sessions, EtaService eta, ServiceTimeService serviceTimes, DeskExceptions desk,
+                 com.nabd.hms.patient.api.ProxyAccess proxy) {
+        this.desk = desk;
+        this.proxy = proxy;
+        this.eta = eta;
+        this.serviceTimes = serviceTimes;
         this.eventRepo = eventRepo;
         this.sessions = sessions;
         this.actors = actors;
@@ -104,18 +111,21 @@ public class QueueService {
     @Transactional
     public QueueEntryResponse checkIn(UUID tenantId, UUID callerStaffId, CheckInRequest req) {
         tenantContext.set(tenantId);
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
 
         if (!repo.patientExists(tenantId, req.patientId())) {
             throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
                     "That patient doesn't exist in this clinic.");
         }
+        var by = req.actedByPatientId() == null ? null : proxy.onBehalf(req.actedByPatientId(), req.actedByRelation(), req.patientId()); // IDC-011
         var doctorDepartment = repo.findCheckInDepartment(tenantId, req.doctorId()); // also the doctor-exists check
         if (doctorDepartment.isEmpty()) {
             throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
                     "That doctor doesn't exist in this clinic.");
         }
 
+        Integer reservedToken = null; // ACC-011: the number a token booking reserved
+        Instant lateAfterGrace = null; // ACC-012: slot start + the session's grace
         if (req.appointmentId() != null) {
             var appt = appointmentRepo.findById(tenantId, req.appointmentId())
                     .filter(a -> "scheduled".equals(a.status()) || "arrived".equals(a.status()))
@@ -125,7 +135,14 @@ public class QueueService {
             if ("arrived".equals(appt.status())) {
                 throw alreadyCheckedIn(tenantId, appt.id());
             }
-            LocalDate apptDay = appt.startTime().atZone(clock.zone(tenantId)).toLocalDate();
+            if ("token".equals(appt.bookingKind())) {
+                reservedToken = appt.sessionToken();
+            } else {
+                lateAfterGrace = scheduleRepo.blockAt(tenantId, req.doctorId(), appt.startTime())
+                        .map(b -> appt.startTime().plus(java.time.Duration.ofMinutes(b.lateGraceMinutes())))
+                        .orElse(appt.startTime().plus(java.time.Duration.ofMinutes(15)));
+            }
+            LocalDate apptDay = clock.clinicDate(tenantId, appt.startTime());
             if (!apptDay.equals(today)) {
                 throw new ApiException(HttpStatus.CONFLICT, "appointment-not-today", "Appointment is not for today",
                         "This appointment is dated " + apptDay + ", not today. Book the patient as a walk-in instead.");
@@ -144,7 +161,9 @@ public class QueueService {
         }
 
         UUID departmentId = doctorDepartment.get(0);
-        int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
+        // ACC-011: a token booking is issued its reserved number if still free, else the next one
+        int token = reservedToken != null && !repo.tokenTaken(tenantId, req.doctorId(), today, reservedToken)
+                ? reservedToken : repo.nextTokenNumber(tenantId, req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
         UUID id;
@@ -158,13 +177,23 @@ public class QueueService {
             }
             throw e;
         }
+        if (by != null) {
+            repo.stampActedBy(tenantId, id, by.patientId(), by.relation());
+            proxy.audit(by, "check_in", "queue_entry", id);
+        }
         entryCreated(tenantId, id, req.doctorId(), today, "checked_in", callerStaffId);
+        if (lateAfterGrace != null && clock.now().isAfter(lateAfterGrace)) { // ACC-012
+            repo.markLateArrival(tenantId, id);
+        }
         if (req.appointmentId() != null) {
             events.publish(tenantId, DomainEventType.APPOINTMENT_ARRIVED, req.appointmentId(), java.util.Map.of(
                     "appointmentId", req.appointmentId(), "doctorId", req.doctorId(), "queueEntryId", id, "status", "arrived"));
+            desk.resolveRef(tenantId, req.appointmentId(), DeskExceptions.CHECKIN_FAILED, DeskExceptions.UNCONFIRMED); // ACC-032: the desk (or the patient) got them in
         }
-        var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
-        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+        // ACC-033: callerStaffId == null is the patient's own check-in through the Edge (same rules, other actor)
+        var actor = callerStaffId == null ? new ActorDirectory.Actor(null, InternalSchedulingService.ACTOR, "patient-access-edge", false)
+                : actors.findActor(tenantId, callerStaffId).orElseThrow();
+        auditService.record(tenantId, callerStaffId == null ? "system" : "staff", callerStaffId, actor.name(), actor.role(), null,
                 "queue.check_in", "queue_entry", id, null,
                 java.util.Map.of("doctorId", req.doctorId(), "tokenNumber", token, "source", source,
                         "appointmentId", req.appointmentId() == null ? "" : req.appointmentId().toString()));
@@ -176,7 +205,7 @@ public class QueueService {
     @Transactional
     public List<QueueEntryResponse> list(UUID tenantId, UUID doctorId, UUID departmentId, LocalDate date, boolean priorityOnly) {
         tenantContext.set(tenantId);
-        LocalDate day = date == null ? clock.today(tenantId) : date;
+        LocalDate day = date == null ? clock.clinicDate(tenantId) : date;
         return repo.listForDay(tenantId, doctorId, departmentId, day, priorityOnly).stream().map(this::toResponse).toList();
     }
 
@@ -191,13 +220,18 @@ public class QueueService {
 
     /** Billing's only way to reach 'completed' (see VisitCommands); same CAS and legality as any move. */
     QueueEntryResponse move(UUID tenantId, UUID callerStaffId, UUID id, String expectedStatus, String nextStatus) {
+        return move(tenantId, callerStaffId, id, expectedStatus, nextStatus, null);
+    }
+
+    /** orderReason (ACC-012): why the policy called this entry; carried on the changed event. */
+    QueueEntryResponse move(UUID tenantId, UUID callerStaffId, UUID id, String expectedStatus, String nextStatus, String orderReason) {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
         if (expectedStatus != null && !expectedStatus.equals(current.status())) {
             throw stale(current.status());
         }
         requireLegalTransition(tenantId, current, nextStatus, callerStaffId, id);
-        casStatus(tenantId, callerStaffId, current, nextStatus);
+        casStatus(tenantId, callerStaffId, current, nextStatus, orderReason);
         if ("completed".equals(nextStatus) || "no_show".equals(nextStatus)) {
             // a transferred leg has no appointment of its own: the encounter's first leg does (ACC-003, QA-08)
             UUID apptId = current.appointmentId() != null ? current.appointmentId()
@@ -210,7 +244,7 @@ public class QueueService {
     }
 
     /** The one status write: WHERE status = the row we validated against, so a concurrent move makes this 0 rows -> 409. */
-    private void casStatus(UUID tenantId, UUID callerStaffId, QueueEntryRow current, String nextStatus) {
+    private void casStatus(UUID tenantId, UUID callerStaffId, QueueEntryRow current, String nextStatus, String orderReason) {
         if (repo.updateStatus(tenantId, current.id(), current.status(), nextStatus) == 0) {
             throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(this::notFound));
         }
@@ -237,6 +271,7 @@ public class QueueService {
         changed.put("queueDate", current.queueDate());
         changed.put("fromStatus", current.status());
         changed.put("status", nextStatus);
+        if (orderReason != null) changed.put("orderReason", orderReason);
         events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, current.id(), changed);
         if ("completed".equals(nextStatus)) {
             events.publish(tenantId, DomainEventType.VISIT_COMPLETED, current.encounterId(), java.util.Map.of("encounterId", current.encounterId(),
@@ -287,11 +322,11 @@ public class QueueService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "transfer-reason-required", "Transfer reason required",
                     "A reason is required when moving a patient to another department.");
         }
-        casStatus(tenantId, callerStaffId, current, "transferred_out");
+        casStatus(tenantId, callerStaffId, current, "transferred_out", null);
         log.info("queue entry {} transferred_out by {} (patient {} -> department {})",
                 id, callerStaffId, current.patientId(), req.toDepartmentId());
 
-        LocalDate today = clock.today(tenantId);
+        LocalDate today = clock.clinicDate(tenantId);
         repo.lockDoctorDay(tenantId, req.doctorId(), today);
         int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
@@ -316,6 +351,13 @@ public class QueueService {
     public QueueEntryResponse reorder(UUID tenantId, UUID callerStaffId, UUID id, QueueReorderRequest req) {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        if (req.priority() && (req.reason() == null || req.reason().isBlank())) { // ACC-022: a priority flag needs its reason
+            throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
+                    "State why this patient is moved up.", java.util.Map.of("code", "REASON_REQUIRED"));
+        }
+        if (req.reason() != null && !req.reason().isBlank() && req.reason().strip().length() < 3) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "reason: must be at least 3 characters");
+        }
         repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
         recordEvent(tenantId, id, current.status(), current.status(), "priority", null, callerStaffId, current.doctorId());
         events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, id, java.util.Map.of("entryId", id, "doctorId", current.doctorId(),
@@ -346,7 +388,7 @@ public class QueueService {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private void recordEvent(UUID tenantId, UUID entryId, String from, String to, String kind, Integer minutes, UUID callerStaffId, UUID doctorId) {
         eventRepo.record(tenantId, entryId, from, to, kind, minutes, clock.now(), callerStaffId,
-                callerStaffId.equals(doctorId) ? "doctor" : "desk");
+                callerStaffId == null ? "patient" : callerStaffId.equals(doctorId) ? "doctor" : "desk");
     }
 
     /** NB-143: the "alerts the doctor" half of the AC — a doctor (or anyone with queue:edit)
@@ -364,40 +406,37 @@ public class QueueService {
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
-    // ponytail: 30-visit sample, most-recent-first — enough to smooth out one unusually long/short
-    // visit without dragging in a doctor's schedule from months ago. Revisit if a doctor's typical
-    // visit length genuinely drifts week to week and this window turns out too short to track it.
-    private static final int WAIT_ESTIMATE_SAMPLE_SIZE = 30;
-    private static final double DEFAULT_VISIT_MINUTES = 15.0; // no billed history yet — same default as slot length
-
-    /** NB-101: estimated minutes until a patient checking in right now sees this doctor. */
+    /** NB-101 / ACC-017: minutes until a patient checking in right now sees this doctor, read from the ETA projection (not computed per call). */
     @Transactional
     public WaitEstimateResponse waitEstimate(UUID tenantId, UUID doctorId) {
         tenantContext.set(tenantId);
-        Optional<Double> avg = repo.averageRecentVisitMinutes(tenantId, doctorId, WAIT_ESTIMATE_SAMPLE_SIZE);
-        double avgVisitMinutes = avg.orElse(DEFAULT_VISIT_MINUTES);
-        int patientsAhead = repo.countActiveAhead(tenantId, doctorId, clock.today(tenantId));
-        int estimatedMinutes = (int) Math.round(avgVisitMinutes * patientsAhead);
-        return new WaitEstimateResponse(estimatedMinutes, patientsAhead, avgVisitMinutes, avg.isPresent());
+        EtaService.Day d = eta.day(doctorId, clock.clinicDate(tenantId));
+        var learned = serviceTimes.estimate(doctorId, "new", "default");
+        int minutes = d.newcomerP50() == null ? 0 : (int) Math.max(0, java.time.Duration.between(clock.now(), d.newcomerP50()).toMinutes());
+        return new WaitEstimateResponse(minutes, (int) d.results().stream().filter(r -> r.entryId() != null).count(),
+                learned.dist().medianS() / 60.0, learned.n() > 0);
     }
 
     /** NB-098 — same session cap AppointmentService.book() enforces, applied to the walk-in path. */
     private void enforceSessionCapacity(UUID tenantId, UUID doctorId, LocalDate today) {
-        ZoneId zone = clock.zone(tenantId);
-        LocalTime now = clock.now().atZone(zone).toLocalTime(); // the clinic's clock, same as the block times
-        int dayOfWeek = today.getDayOfWeek().getValue() % 7;
-
-        Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, now);
+        // ACC-005: today is the clinic date, so a 00:30 walk-in lands in the evening session that began the day before
+        Optional<WorkingHoursRow> block = scheduleRepo.blockAt(tenantId, doctorId, clock.now());
         if (block.isEmpty() || block.get().maxPatients() == null) {
             return;
         }
 
-        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, today, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, today, block.get());
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached (walk-in check-in): doctor {} on {} ({}/{})",
                     doctorId, today, occupancy, block.get().maxPatients());
             throw sessionFull();
         }
+    }
+
+    /** ACC-022: the entry as the API shows it (used by the reassign service in this package). */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    QueueEntryResponse view(UUID tenantId, UUID id) {
+        return toResponse(repo.findById(tenantId, id).orElseThrow(this::notFound));
     }
 
     private QueueEntryResponse toResponse(QueueEntryRow row) {
@@ -408,7 +447,7 @@ public class QueueService {
                 row.priorityAcknowledgedBy(), row.priorityAcknowledgedAt(), row.source(),
                 row.presentingComplaint(), row.paymentMode(), row.createdAt(),
                 row.transferReason(), row.transferReasonNote(), row.ageYears(), row.gender(), row.doctorName(),
-                row.waitMinutes(), row.visitType(), row.appointmentStatus());
+                row.waitMinutes(), row.visitType(), row.appointmentStatus(), null, row.orderReason(), null);
     }
 
     private static String blankToNull(String v) {
@@ -429,6 +468,6 @@ public class QueueService {
 
     private ApiException sessionFull() {
         return new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
-                "This session has reached its patient cap (walk-ins and bookings counted together).");
+                "This session has reached its patient cap (walk-ins and bookings counted together).", java.util.Map.of("code", "SESSION_FULL", "scope", "total"));
     }
 }

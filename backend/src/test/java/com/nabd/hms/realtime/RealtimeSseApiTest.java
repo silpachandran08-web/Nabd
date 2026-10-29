@@ -1,5 +1,6 @@
 package com.nabd.hms.realtime;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.shared.events.consumer.ConsumerGroups;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.ValkeyTestSupport;
@@ -76,7 +77,7 @@ class RealtimeSseApiTest extends ApiTestBase {
         drain();
         tenant = seedTenant();
         fullStaff = staff(tenant, seedFullAccessRole(tenant.id()));
-        queueOnly = staff(tenant, seedRole(tenant.id(), "Queue only", false, fullGrant("queue")));
+        queueOnly = staff(tenant, seedRole(tenant.id(), "Queue only", false, new ModuleGrant("queue", true, false, false, false, false, false, false))); // ACC-010: the requests topic needs queue:create, so "queue only" is view-only
     }
 
     @AfterEach
@@ -140,6 +141,44 @@ class RealtimeSseApiTest extends ApiTestBase {
         assertThat(d.path("id").asString()).isEqualTo(msg.toString());
         assertThat(d.path("topic").asString()).isEqualTo("messages");
         assertThat(d.path("fields").path("status").asString()).isEqualTo("read");
+    }
+
+    // ---- ACC-032: the desk exceptions inbox is live on the exceptions topic ----
+
+    @Autowired com.nabd.hms.queue.DeskExceptions deskExceptions;
+
+    @Test
+    void anExceptionOpenedAndResolvedByEventReachesTheExceptionsTopicWithinTwoSeconds() throws Exception {
+        Stream desk = connectReady(token(fullStaff), "exceptions");
+        UUID appt = UUID.randomUUID();
+        long t0 = System.nanoTime();
+        inTenantTx(tenant.id(), () -> deskExceptions.open(tenant.id(), "checkin_failed", "warn", "appointment", appt, Map.of("reason", "outside_geofence")));
+        JsonNode opened = desk.nextDelta(2000).json();
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)).as("item appears < 2 s after the trigger").isLessThan(2000);
+        assertThat(opened.path("topic").asString()).isEqualTo("exceptions");
+        assertThat(opened.path("fields").path("kind").asString()).isEqualTo("checkin_failed");
+        assertThat(opened.path("fields").path("status").asString()).isEqualTo("open");
+        assertThat(opened.toString()).as("ids and codes only").doesNotContain("outside_geofence");
+
+        t0 = System.nanoTime(); // the issue is fixed elsewhere: the patient arrives, the item goes within 2 s
+        xadd("ev:in:scheduling", envelope(nextId(), "scheduling.appointment.arrived.v1", appt, Map.of("tenantId", tenant.id().toString(),
+                "appointmentId", appt.toString(), "doctorId", UUID.randomUUID().toString(), "queueEntryId", UUID.randomUUID().toString(), "status", "arrived", "version", 1)));
+        drain();
+        JsonNode closed = desk.nextDelta(2000).json();
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)).as("item disappears < 2 s after the fix").isLessThan(2000);
+        assertThat(closed.path("fields").path("status").asString()).isEqualTo("resolved");
+        assertThat(closed.path("fields").path("exceptionId").asString()).isEqualTo(opened.path("fields").path("exceptionId").asString());
+    }
+
+    @Test
+    void exceptionsAreInvisibleToAnotherClinicsStream() throws Exception {
+        SeededTenant other = seedTenant();
+        SeededStaff otherStaff = staff(other, seedFullAccessRole(other.id()));
+        Stream mine = connectReady(token(fullStaff), "exceptions");
+        Stream theirs = connectReady(token(otherStaff), "exceptions");
+        inTenantTx(tenant.id(), () -> deskExceptions.open(tenant.id(), "handoff", "warn", "conversation", UUID.randomUUID(), Map.of()));
+        mine.nextDelta(2000);
+        assertThat(theirs.pollDelta(600)).isNull();
     }
 
     // ---- 2. resume ----

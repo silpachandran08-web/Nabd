@@ -12,5 +12,7 @@ public record QueueEntryResponse(UUID id, UUID appointmentId, UUID patientId, UU
                                   String presentingComplaint, String paymentMode, Instant createdAt,
                                   String transferReason, String transferReasonNote,
                                   Integer ageYears, String gender, String doctorName, int waitMinutes, String visitType,
-                                  String appointmentStatus) {
+                                  String appointmentStatus,
+                                  // ACC-012: filled on the per-doctor list and at check-in; null elsewhere
+                                  Integer position, String orderReason, String expectedRange) {
 }

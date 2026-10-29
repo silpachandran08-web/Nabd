@@ -190,7 +190,7 @@ class Acc003ArrivedTest extends ApiTestBase {
         assertThat(checkIn(c, p, a).getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<Map> cancel = exchange("/v1/appointments/" + a + "/cancel", HttpMethod.POST,
-                authedJsonBody(c.token, Map.of("reason", "changed mind")), Map.class);
+                authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class);
         assertThat(cancel.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(cancel.getBody().get("code")).isEqualTo("APPOINTMENT_ARRIVED");
         assertThat(cancel.getBody().get("type").toString()).endsWith("appointment-arrived");
@@ -212,7 +212,7 @@ class Acc003ArrivedTest extends ApiTestBase {
         // a still-scheduled appointment can be cancelled as before
         UUID other = appt(c, p, noonToday(30), "scheduled");
         assertThat(exchange("/v1/appointments/" + other + "/cancel", HttpMethod.POST,
-                authedJsonBody(c.token, Map.of("reason", "patient called")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+                authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     // AC4: transfer General -> Dermatology, last leg completes -> appointment completed
@@ -293,8 +293,12 @@ class Acc003ArrivedTest extends ApiTestBase {
         if (!Files.exists(dir)) {
             dir = Path.of("db", "migrations");
         }
-        String v310 = Files.readString(dir.resolve("V310__acc_appointment_arrived.sql"));
-        String v311 = Files.readString(dir.resolve("V311__acc_checkin_unique_indexes.sql"));
+        // V2420 widened appointments_status_check ('requested','declined'); replaying V310's narrower CHECK would fail on rows other tests left in the shared DB, and it is not what this test is about
+        String v310 = Files.readString(dir.resolve("V310__acc_appointment_arrived.sql"))
+                .replaceAll("(?s)ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_status_check;.*?VALIDATE CONSTRAINT appointments_status_check;", "");
+        // ACC-011: token bookings of one session legitimately share the session start, so the legacy index is rebuilt for slot rows only
+        String v311 = Files.readString(dir.resolve("V311__acc_checkin_unique_indexes.sql"))
+                .replace("WHERE status IN ('scheduled','arrived');", "WHERE status IN ('scheduled','arrived') AND booking_kind = 'slot';");
         try (Connection su = superuserConnection()) {
             su.setAutoCommit(false);
             try (var st = su.createStatement()) {

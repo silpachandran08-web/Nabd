@@ -27,9 +27,13 @@ import static com.nabd.hms.billing.CheckoutModels.VoidableInvoice;
 class CheckoutRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.pharmacy.api.StockCommands stock;
+    private final com.nabd.hms.pharmacy.api.RxDispensing dispensing;
 
-    CheckoutRepository(JdbcTemplate jdbc) {
+    CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock, com.nabd.hms.pharmacy.api.RxDispensing dispensing) {
+        this.dispensing = dispensing;
         this.jdbc = jdbc;
+        this.stock = stock;
     }
 
     Optional<String> findTenantRegion(UUID tenantId) {
@@ -45,7 +49,9 @@ class CheckoutRepository {
                 "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent, c.stock_qty, " +
                         "COALESCE(c.is_rx, false) AS is_rx " +
                         "FROM charge_catalogue c LEFT JOIN pharmacy_settings ps ON ps.tenant_id = c.tenant_id " +
-                        "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR ps.mode = 'hybrid') " +
+                        "LEFT JOIN pharmacy_item_profiles pp ON pp.item_id = c.id AND pp.tenant_id = c.tenant_id " +
+                        // PHL-004: stocked items are offered in Hybrid / In-house, and never when flagged 'buy outside'
+                        "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR (ps.mode IN ('hybrid', 'in_house') AND COALESCE(pp.in_house, true))) " +
                         "ORDER BY c.display_order, c.name",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("code"), rs.getString("name"),
                         rs.getString("category"), rs.getBigDecimal("base_amount"), rs.getBigDecimal("follow_up_amount"),
@@ -104,13 +110,26 @@ class CheckoutRepository {
                 (rs, i) -> rs.getString("name"), tenantId, staffId).stream().findFirst();
     }
 
-    /** NB-162's follow-up pricing auto-detection: same doctor, a completed visit within the window. */
-    boolean hasRecentCompletedVisit(UUID tenantId, UUID patientId, UUID doctorId, LocalDate since) {
-        Boolean exists = jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM queue_entries WHERE tenant_id = ? AND patient_id = ? AND doctor_id = ? " +
-                        "AND status = 'completed' AND queue_date >= ?)",
-                Boolean.class, tenantId, patientId, doctorId, Date.valueOf(since));
-        return Boolean.TRUE.equals(exists);
+    /** FIN-015: date of the last completed visit with this doctor billed at full price; a follow-up visit does not restart the window. */
+    LocalDate lastFullPriceVisit(UUID tenantId, UUID patientId, UUID doctorId) {
+        Date d = jdbc.queryForObject(
+                "SELECT max(q.queue_date) FROM queue_entries q WHERE q.tenant_id = ? AND q.patient_id = ? AND q.doctor_id = ? " +
+                        "AND q.status = 'completed' AND NOT EXISTS (SELECT 1 FROM invoices i JOIN invoice_line_items li ON li.invoice_id = i.id " +
+                        "WHERE i.tenant_id = q.tenant_id AND i.queue_entry_id = q.id AND li.tier = 'follow_up')",
+                Date.class, tenantId, patientId, doctorId);
+        return d == null ? null : d.toLocalDate();
+    }
+
+    /** FIN-016: the check-in's urgent flag is queue_entries.priority (owned by the queue domain; billing only reads it). */
+    boolean isUrgent(UUID tenantId, UUID queueEntryId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT COALESCE(priority, false) FROM queue_entries WHERE tenant_id = ? AND id = ?",
+                Boolean.class, tenantId, queueEntryId));
+    }
+
+    /** FIN-015: a doctor's own fee for a consultation head, or null (blank override: the base amount applies). */
+    BigDecimal findDoctorFee(UUID tenantId, UUID chargeId, UUID doctorId) {
+        return jdbc.query("SELECT amount FROM charge_doctor_fees WHERE tenant_id = ? AND charge_id = ? AND doctor_id = ?",
+                (rs, i) -> rs.getBigDecimal(1), tenantId, chargeId, doctorId).stream().findFirst().orElse(null);
     }
 
     /** FIN-006: the number comes from the facility's gapless series (allocated in this transaction); currency and *_minor are filled by the DB. */
@@ -124,27 +143,29 @@ class CheckoutRepository {
                 number.formatted(), number.seriesId(), number.number());
     }
 
-    void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items) {
-        appendLineItems(tenantId, invoiceId, items, 0);
+    void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, UUID staffId) {
+        appendLineItems(tenantId, invoiceId, items, 0, staffId);
     }
 
     /** NB-355: a department whose flow bills mid-visit (e.g. a consultation fee at an interim
      * billing_pending stop) keeps adding to the SAME invoice at each later billing checkpoint
      * rather than creating a new one — display_order continues from whatever's already there. */
-    void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder) {
+    void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder, UUID staffId) {
         int order = startOrder;
+        List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed = new java.util.ArrayList<>();
         for (LineItemInput item : items) {
-            decrementPharmacyStockIfApplicable(tenantId, invoiceId, item.chargeCode(), item.quantity());
+            String scheduleClass = decrementPharmacyStockIfApplicable(invoiceId, item, dispensed);
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
-                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
-                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId());
+                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(), scheduleClass);
         }
+        dispensing.record(invoiceId, staffId, dispensed); // PHL-018: dispenses row + stock discrepancies
     }
 
     int nextLineItemOrder(UUID tenantId, UUID invoiceId) {
@@ -167,13 +188,13 @@ class CheckoutRepository {
     java.util.Map<String, PharmacyChargeRow> findCatalogueCharges(UUID tenantId, List<String> chargeCodes) {
         java.util.Map<String, PharmacyChargeRow> out = new java.util.HashMap<>();
         jdbc.query(
-                "SELECT code, id, name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
+                "SELECT code, id, name, category, base_amount, follow_up_amount, emergency_amount, tax_rate_percent, active, doctor_override, " +
                         "stock_qty IS NOT NULL AS stocked, COALESCE(is_rx, false) AS is_rx FROM charge_catalogue " +
                         "WHERE tenant_id = ? AND code = ANY (?)",
                 (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.put(rs.getString("code"), new PharmacyChargeRow(
                         UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
                         rs.getBigDecimal("follow_up_amount"), rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active"),
-                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked"), rs.getBoolean("is_rx"))),
+                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked"), rs.getBoolean("is_rx"), rs.getBigDecimal("emergency_amount"))),
                 tenantId, chargeCodes.toArray(String[]::new));
         return out;
     }
@@ -195,30 +216,17 @@ class CheckoutRepository {
                 (rs, i) -> rs.getString("mode"), tenantId).stream().findFirst();
     }
 
-    /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same
-     * transaction — "one invoice, one-tap stock deduction", the wireframe's own words. Non-pharmacy
-     * charges (stock_qty IS NULL) are untouched. */
-    private void decrementPharmacyStockIfApplicable(UUID tenantId, UUID invoiceId, String chargeCode, int quantity) {
-        List<UUID> pharmacy = jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
-                (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, chargeCode);
-        if (pharmacy.isEmpty()) {
-            return;
-        }
-        // The guarded UPDATE takes the row lock, so it serialises with a manual stock adjustment (PharmacyService).
-        List<Integer> after = jdbc.query(
-                "UPDATE charge_catalogue SET stock_qty = stock_qty - ? WHERE tenant_id = ? AND code = ? AND stock_qty >= ? " +
-                        "RETURNING stock_qty",
-                (rs, i) -> rs.getInt("stock_qty"), quantity, tenantId, chargeCode, quantity);
-        if (after.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Insufficient stock",
-                    "Not enough stock for " + chargeCode + " to dispense " + quantity + " unit(s).");
-        }
-        // Immutable movement row (V51): every stock change, including a checkout dispense, leaves one.
-        if (quantity > 0) {
-            jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id) " +
-                            "VALUES (?,?,'dispense',?,?,?,?,?)",
-                    tenantId, pharmacy.get(0), -quantity, after.get(0) + quantity, after.get(0), "Dispensed at checkout", invoiceId);
-        }
+    /** Billing a stocked pharmacy item takes it off the shelf in the same transaction, through the pharmacy module's
+     * StockCommands (PHL-003); an ordinary charge is untouched. Returns the item's schedule class as sold (PHL-002), else null. */
+    private String decrementPharmacyStockIfApplicable(UUID invoiceId, LineItemInput line, List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed) {
+        return stock.stockedItem(line.chargeCode()).map(item -> {
+            var issued = dispensing.issue(item, line.quantity(), invoiceId, line.shortfallReason()); // PHL-018: a reason lets a shortfall through
+            if (line.prescriptionItemId() != null || issued.shortQty() > 0) {
+                dispensed.add(new com.nabd.hms.pharmacy.api.RxDispensing.Line(line.chargeCode(), item, line.quantity(), issued.shortQty(),
+                        line.shortfallReason(), line.prescriptionItemId()));
+            }
+            return issued.scheduleClass();
+        }).orElse(null);
     }
 
     /** PHA-011: locks the invoice row so two concurrent voids (or a void racing a payment) run one after the other. */
@@ -246,16 +254,17 @@ class CheckoutRepository {
                 (rs, i) -> new Object[]{UUID.fromString(rs.getString("id")), rs.getString("charge_code"), rs.getInt("qty")},
                 tenantId, invoiceId);
         for (Object[] l : lines) {
-            int qty = (Integer) l[2];
-            Integer after = jdbc.queryForObject(
-                    "UPDATE charge_catalogue SET stock_qty = stock_qty + ?, updated_at = now() WHERE tenant_id = ? AND id = ? RETURNING stock_qty",
-                    Integer.class, qty, tenantId, l[0]);
-            jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id, actor_id) " +
-                            "VALUES (?,?,'restock',?,?,?,?,?,?)",
-                    tenantId, l[0], qty, after - qty, after, reason, invoiceId, staffId);
+            int qty = (Integer) l[2] - dispensing.shortfallOf(invoiceId, (UUID) l[0]); // PHL-018: units that never left the shelf
+            if (qty <= 0) continue;
+            stock.returnIn((UUID) l[0], qty, invoiceId, staffId, reason);
             restored.add(new Object[]{l[1], qty});
         }
         return restored;
+    }
+
+    /** OPS-006: empty = no such invoice in this clinic; a null element = untouched since V2603 (reads as 0). */
+    java.util.List<Long> changeSeq(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT change_seq FROM invoices WHERE tenant_id = ? AND id = ?", (rs, i) -> rs.getObject(1, Long.class), tenantId, invoiceId);
     }
 
     Optional<InvoiceRow> findInvoice(UUID tenantId, UUID invoiceId) {

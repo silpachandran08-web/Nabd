@@ -52,7 +52,7 @@ public class EtaAccuracyController {
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                         @RequestParam(required = false) UUID doctorId) {
         UUID tenantId = tenantContext.current();
-        LocalDate end = to != null ? to : clock.today(tenantId).minusDays(1);
+        LocalDate end = to != null ? to : clock.clinicDate(tenantId).minusDays(1);
         LocalDate start = from != null ? from : end.minusDays(13);
         if (start.isAfter(end) || start.plusDays(MAX_DAYS).isBefore(end)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-range", "Invalid date range",

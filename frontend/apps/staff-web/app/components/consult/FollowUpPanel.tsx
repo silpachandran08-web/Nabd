@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
@@ -30,6 +31,7 @@ export default function FollowUpPanel({
   /** queue:create — booking controls are absent without it; the existing follow-up still shows. */
   canBook: boolean;
 }) {
+  const tx = useTranslations("consult.followUpPanel");
   const tz = useClinicTimeZone(); // clinic wall-clock time from the session, not the browser's (DOC-038, FEF-011)
   const [interval, setIntervalId] = useState<string | null>(null);
   const [date, setDate] = useState("");
@@ -105,8 +107,8 @@ export default function FollowUpPanel({
       const res = await authedFetch("/appointments", { method: "POST", body: JSON.stringify({ patientId, doctorId, startTime: slot, isFollowUp: true }) });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't schedule the follow-up." }));
-        setMessage(p.detail || "Couldn't schedule the follow-up.");
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: tx("couldnTScheduleTheFollow") }));
+        setMessage(p.detail || tx("couldnTScheduleTheFollow"));
         return;
       }
       const label = fmtFull(slot);
@@ -116,43 +118,43 @@ export default function FollowUpPanel({
       setDate("");
       setSlots(null);
     } catch {
-      setMessage("Couldn't reach the server. Check your connection and try again.");
+      setMessage(tx("couldnTReachTheServer"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className={s.card} aria-label="Follow-up">
+    <section className={s.card} aria-label={tx("followUp")}>
       <h3 className={s.cardTitle}>
-        Follow-up
-        {existing === "loading" ? null : booked ? <StatusPill tone="ok" label={`Set · ${booked}`} />
-          : existing === "error" ? <StatusPill tone="warn" icon="alert" label="Unknown" /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
+        {tx("followUp")}
+        {existing === "loading" ? null : booked ? <StatusPill tone="ok" label={tx("setBooked", { date: booked })} />
+          : existing === "error" ? <StatusPill tone="warn" icon="alert" label={tx("unknown")} /> : <StatusPill tone="neutral" icon="calendar" label={tx("notSet")} />}
       </h3>
-      {existing === "loading" && <Skeleton rows={1} label="Checking for a booked follow-up" />}
-      {existing === "error" && <p className={s.muted}>Couldn&apos;t check for an existing follow-up; one may already be booked. Check the schedule before booking.</p>}
+      {existing === "loading" && <Skeleton rows={1} label={tx("checkingForABookedFollow")} />}
+      {existing === "error" && <p className={s.muted}>{tx("couldnTCheckForAn")}</p>}
       {canBook && (<>
-      {booked && <p className={s.muted}>Book another only if a second visit is needed; the existing one is not moved.</p>}
-      <div className={s.row} role="group" aria-label="Follow-up interval">
+      {booked && <p className={s.muted}>{tx("bookAnotherOnlyIfA")}</p>}
+      <div className={s.row} role="group" aria-label={tx("followUpInterval")}>
         {INTERVALS.map((i) => (
           <button key={i.id} type="button" className={`${s.chip} ${interval === i.id ? s.chipOn : ""}`} aria-pressed={interval === i.id} onClick={() => pick(i.id)}>
-            {i.label}
+            {tx(`interval.${i.id}`)}
           </button>
         ))}
       </div>
       {interval === "custom" && (
-        <div className={s.row} style={{ marginBlockStart: "var(--nb-space-8)" }}>
-          <label className={s.muted} htmlFor="fuDate">Date</label>
+        <div className={`${s.row} ${s.mtS}`}>
+          <label className={s.muted} htmlFor="fuDate">{tx("date")}</label>
           <input id="fuDate" type="date" className={s.input} value={date} min={clinicToday(tz)} onChange={(e) => setDate(e.target.value)} />
         </div>
       )}
       {date && (
-        <div style={{ marginBlockStart: "var(--nb-space-12)" }}>
-          <p className={s.muted}>Free slots on {date}{tz?.includes("/") ? ` (${tz.split("/")[1].replace("_", " ")} time)` : ""}</p>
-          {slots === null ? <Skeleton rows={1} label="Loading slots" /> : slots.length === 0 ? (
-            <p className={s.muted}>{slotsError ? "Couldn't load free slots. Pick the date again to retry." : "No free slots that day. Try another interval."}</p>
+        <div className={s.mtM}>
+          <p className={s.muted}>{tx("freeSlotsOn", { date })}{tz?.includes("/") ? ` (${tz.split("/")[1].replace("_", " ")} time)` : ""}</p>
+          {slots === null ? <Skeleton rows={1} label={tx("loadingSlots")} /> : slots.length === 0 ? (
+            <p className={s.muted}>{slotsError ? tx("couldnTLoadFreeSlots") : tx("noFreeSlotsThatDay")}</p>
           ) : (
-            <div className={s.slots} role="group" aria-label="Free slots">
+            <div className={s.slots} role="group" aria-label={tx("freeSlots")}>
               {slots.map((sl) => (
                 <button key={sl} type="button" className={`${s.chip} ${slot === sl ? s.chipOn : ""}`} aria-pressed={slot === sl} onClick={() => setSlot(sl)}>
                   {fmtSlot(sl)}
@@ -160,15 +162,15 @@ export default function FollowUpPanel({
               ))}
             </div>
           )}
-          <div className={s.row} style={{ marginBlockStart: "var(--nb-space-12)" }}>
-            <button type="button" className={s.btnPrimary} onClick={book} disabled={busy || !slot}>{busy ? "Booking…" : "Book follow-up"}</button>
+          <div className={`${s.row} ${s.mtM}`}>
+            <button type="button" className={s.btnPrimary} onClick={book} disabled={busy || !slot}>{busy ? tx("booking") : tx("bookFollowUp")}</button>
           </div>
         </div>
       )}
-      {message && <div className={`${s.notice} ${s.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-8)" }}>{message}</div>}
+      {message && <div className={`${s.notice} ${s.noticeDanger} ${s.mtS}`} role="alert">{message}</div>}
       </>)}
-      <p className={s.muted} style={{ marginBlockStart: "var(--nb-space-8)" }}>
-        Reminder: not available yet. No WhatsApp reminder or booking link is sent; the follow-up appears on the schedule and in Follow-ups.
+      <p className={`${s.muted} ${s.mtS}`}>
+        {tx("reminderNotAvailableYetNo")}
       </p>
     </section>
   );

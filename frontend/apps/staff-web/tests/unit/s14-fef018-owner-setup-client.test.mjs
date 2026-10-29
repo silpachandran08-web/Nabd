@@ -107,8 +107,8 @@ test("raw-api gate on the real tree: no new file, no stale allowlist entry", () 
 });
 
 const MIGRATED = [
-  "app/setup", "app/staff", "app/reports", "app/overview", "app/owner", "app/account", "app/platform", "app/pharmacy",
-  "app/compliance", "app/accept-invite", "app/components/setup", "app/components/staff", "app/components/MfaEnrolCard.tsx",
+  "app/(clinic)/setup", "app/(clinic)/staff", "app/(clinic)/reports", "app/(clinic)/overview", "app/(owner)/owner", "app/(clinic)/account", "app/(platform)/platform", "app/(clinic)/pharmacy",
+  "app/(clinic)/compliance", "app/(auth)/accept-invite", "app/components/setup", "app/components/staff", "app/components/MfaEnrolCard.tsx",
 ];
 test("the migrated screens have no raw fetch, API_BASE, authedFetch or res.json()", () => {
   const hits = scan(join(root, "app"), root).filter((f) => MIGRATED.some((m) => f.startsWith(m)));
@@ -120,7 +120,7 @@ test("the migrated screens have no raw fetch, API_BASE, authedFetch or res.json(
 test("operator console: no clinic keys, no fetch( outside the client; clinic code never imports the operator client", async () => {
   const { readdirSync, statSync } = await import("node:fs");
   const files = [];
-  (function walk(d) { for (const n of readdirSync(d)) { const p = join(d, n); statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(n) && files.push(p); } })(join(root, "app", "platform"));
+  (function walk(d) { for (const n of readdirSync(d)) { const p = join(d, n); statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(n) && files.push(p); } })(join(root, "app", "(platform)", "platform"));
   for (const f of files) {
     const src = readFileSync(f, "utf8");
     assert.ok(!/nabd_access_token|nabd_refresh_token/.test(src), `${f} touches clinic token keys`);

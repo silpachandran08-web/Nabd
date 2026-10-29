@@ -32,6 +32,8 @@ schemas:
       route: phi
       site: phi
       created_at: operational
+      change_seq: operational
+      updated_at: operational
     administration_records:
       id: operational
       tenant_id: operational
@@ -42,6 +44,8 @@ schemas:
       refuse_reason: phi
       recorded_at: operational
     appointments:
+      acted_by_patient_id: pii
+      acted_by_relation: pii
       id: operational
       tenant_id: operational
       patient_id: pii
@@ -55,6 +59,126 @@ schemas:
       is_follow_up: operational
       arrived_at: operational
       booking_kind: operational
+      change_seq: operational
+      policy_version: operational
+      channel: operational
+      visit_type: operational
+      decision_source: operational
+      decided_by: operational
+      decided_at: operational
+      session_token: operational
+      working_hours_id: operational
+      needs_reschedule_reason: operational
+      confirmed_at: operational
+      patient_confirmed_at: operational
+      no_show_at: operational
+      no_show_marked_by: operational
+      no_show_reason_code: operational
+      decision_source_before_no_show: operational
+      late_arrival_queue_entry_id: operational
+      cancel_reason_code: operational
+    reason_code_catalogue:
+      kind: operational
+      code: operational
+      market: operational
+      labels: operational
+      requires_note: operational
+      sort: operational
+    tenant_reason_codes:
+      id: operational
+      tenant_id: operational
+      kind: operational
+      code: operational
+      labels: operational
+      hidden: operational
+      created_at: operational
+    appointment_change_offers:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      reason_code: operational
+      slots: operational
+      status: operational
+      sent_at: operational
+      expires_at: operational
+      accepted_slot: operational
+      new_appointment_id: operational
+      created_by: operational
+    appointment_desk_exceptions:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      kind: operational
+      status: operational
+      created_at: operational
+    booking_policy_versions:
+      id: operational
+      tenant_id: operational
+      version: operational
+      status: operational
+      config: operational
+      change_note: operational
+      created_by: operational
+      published_by: operational
+      published_at: operational
+      updated_at: operational
+    desk_exceptions:
+      id: operational
+      tenant_id: operational
+      kind: operational
+      severity: operational
+      ref_type: operational
+      ref_id: operational
+      summary_params: operational
+      created_at: operational
+      resolved_at: operational
+      resolved_by: operational
+      resolution: operational
+      snoozed_until: operational
+    facility_checkin_settings:
+      tenant_id: operational
+      checkin_code: operational
+      geo_lat: operational
+      geo_lng: operational
+      geofence_required: operational
+      geofence_radius_m: operational
+      walkin_allowed: operational
+      wa_number: operational
+      updated_at: operational
+    checkin_attempts:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      channel: operational
+      distance_m: operational
+      outcome: operational
+      created_at: operational
+    booking_request_details:
+      appointment_id: operational
+      tenant_id: operational
+      review_reason: operational
+      triage_flags: phi  # uncertain: codes for red-flag symptoms the patient mentioned
+      patient_note: phi
+      sla_due_at: operational
+      escalated_at: operational
+      decline_reason_code: operational
+    booking_request_offers:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      slots: operational
+      status: operational
+      chosen_slot: operational
+      expires_at: operational
+      created_by: operational
+      created_at: operational
+    booking_routing_settings:
+      tenant_id: operational
+      acceptance_mode: operational
+      daily_auto_cap: operational
+      review_sla_minutes: operational
+      policy_version: operational
+      updated_at: operational
     attendance_records:
       id: operational
       tenant_id: operational
@@ -102,6 +226,56 @@ schemas:
       created_at: operational
       updated_at: operational
       data_visibility_scope: operational
+    file_objects:
+      id: operational
+      tenant_id: operational
+      purpose: operational
+      storage_key: operational
+      quarantine_key: operational
+      declared_type: operational
+      detected_type: operational
+      size_bytes: operational
+      sha256: operational
+      status: operational
+      scan_engine: operational
+      scanned_at: operational
+      uploaded_by: operational
+      patient_id: pii
+      visit_id: operational
+      created_at: operational
+    file_blocked_alerts:
+      id: operational
+      tenant_id: operational
+      file_id: operational
+      owner_staff_id: operational
+      reason: operational
+      created_at: operational
+    stock_batches:
+      id: operational
+      tenant_id: operational
+      item_id: operational
+      batch_no: operational
+      expiry_date: operational
+      mrp: financial
+      purchase_rate: financial
+      qty_on_hand: operational
+      location: operational
+      status: operational
+      supplier_id: operational
+      grn_line_id: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
+    visit_attachments:
+      id: operational
+      tenant_id: operational
+      visit_id: operational
+      patient_id: pii
+      file_id: operational
+      kind: operational
+      note: phi
+      attached_by: operational
+      created_at: operational
     break_glass_alerts:
       id: operational
       tenant_id: operational
@@ -167,6 +341,25 @@ schemas:
       recurring: operational
       created_at: operational
       updated_at: operational
+      effect: operational
+      short_hours: operational
+      source_template: operational
+    clinic_quiet_hours:
+      tenant_id: operational
+      enabled: operational
+      from_time: operational
+      to_time: operational
+      updated_at: operational
+    holiday_templates:
+      code: operational
+      market: operational
+      region_code: operational
+      year: operational
+      holiday_date: operational
+      name: operational
+      kind: operational
+      source: operational
+      template_name: operational
     clinic_policies:
       id: operational
       tenant_id: operational
@@ -184,6 +377,8 @@ schemas:
       done_at: operational
       created_at: operational
       updated_at: operational
+      draft: pii            # ADM-007: a step's in-progress form (doctor names and phones)
+      version: operational
     clinical_documents:
       id: operational
       tenant_id: operational
@@ -237,6 +432,28 @@ schemas:
       channel: operational
       witness_staff_id: operational
       evidence: pii
+      guardian_patient_id: pii
+    cross_tenant_ref_quarantine:
+      table_name: operational
+      column_name: operational
+      row_id: operational
+      child_tenant_id: operational
+      parent_tenant_id: operational
+      found_at: operational
+    tenant_data_keys:
+      tenant_id: operational
+      kid: operational
+      wrapped_dek: operational
+      kms_key_ref: operational
+      status: operational
+      created_at: operational
+      rotated_at: operational
+      destroyed_at: operational
+    kms_region_keys:
+      region_code: operational
+      current_key_ref: operational
+      created_at: operational
+      last_rotated_at: operational
     crypto_reencrypt_progress:
       table_name: operational
       column_name: operational
@@ -381,6 +598,24 @@ schemas:
       cleared_by: operational
       cleared_at: operational
       clinic_date: operational
+      expires_at: operational
+      broadcast: operational
+      reason_code: operational
+    delay_broadcast_recipients:
+      id: operational
+      tenant_id: operational
+      doctor_id: operational
+      delay_id: operational
+      pause_id: operational
+      appointment_id: operational
+      queue_entry_id: operational
+      patient_id: pii
+      message_ref: operational
+      expected_at: operational
+      status: operational
+      response: operational
+      responded_at: operational
+      created_at: operational
     doctor_leave:
       id: operational
       tenant_id: operational
@@ -388,6 +623,8 @@ schemas:
       date_from: operational
       date_to: operational
       reason: pii  # uncertain: staff leave reason may be medical (staff health data)
+      start_time: operational
+      end_time: operational
     doctor_working_hours:
       id: operational
       tenant_id: operational
@@ -397,6 +634,15 @@ schemas:
       end_time: operational
       slot_minutes: operational
       max_patients: operational
+      session_mode: operational
+      previous_session_mode: operational
+      online_cap: operational
+      label: operational
+      effective_from: operational
+      walkin_mode: operational
+      walkin_ratio: operational
+      late_grace_minutes: operational
+      eta_display_mode: operational
     dpa_acceptances:
       id: operational
       tenant_id: operational
@@ -423,6 +669,8 @@ schemas:
       route: operational
       quantity: operational
       quantity_unit: operational
+      drug_id: phi
+      generic_name_snapshot: phi
     favourite_rx_sets:
       id: operational
       tenant_id: operational
@@ -449,6 +697,70 @@ schemas:
       patient_ref: pii  # opaque random token that stands in for a patient toward the Edge; it identifies a patient only through this table
       patient_id: pii
       created_at: operational
+    billing_documents:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      kind: operational
+      layout: operational
+      version: operational
+      object_key: operational
+      sha256: operational
+      content: financial
+      created_at: operational
+    payment_intents:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      purpose: operational
+      purpose_ref: operational
+      kind: operational
+      provider: operational
+      provider_order_id: operational
+      amount_minor: financial
+      currency: operational
+      payer_kind: operational
+      payer_ref: pii
+      status: operational
+      url: operational
+      qr_payload: operational
+      expires_at: operational
+      paid_at: operational
+      payment_id: operational
+      gateway_ref: operational
+      created_by: operational
+      created_at: operational
+    gateway_webhook_events:
+      id: operational
+      tenant_id: operational
+      provider: operational
+      event_id: operational
+      event_type: operational
+      provider_order_id: operational
+      gateway_ref: operational
+      amount_minor: financial
+      payload_sha256: operational
+      received_at: operational
+      processed_at: operational
+      error: operational
+    dues_reminders:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      invoice_ids: operational
+      channel: operational
+      sent_by: operational
+      message_ref: operational
+      created_at: operational
+    invoice_write_offs:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      amount: financial
+      reason_code: operational
+      note: financial
+      written_by: operational
+      created_at: operational
     invoice_discounts:
       id: operational
       tenant_id: operational
@@ -463,6 +775,7 @@ schemas:
       approval_id: operational
       created_at: operational
     invoice_line_items:
+      schedule_class: operational
       id: operational
       tenant_id: operational
       invoice_id: operational
@@ -497,7 +810,79 @@ schemas:
       rate: financial
       taxable_minor: financial
       amount_minor: financial
+    refund_requests:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      amount_minor: financial
+      currency: operational
+      reason_code: operational
+      note: pii  # free text typed by staff; may name a patient
+      lines: operational
+      refund_to: financial
+      status: operational
+      requested_by: operational
+      approved_by: operational
+      decision_note: pii  # free text typed by staff
+      decided_at: operational
+      created_at: operational
+    charge_doctor_fees:
+      tenant_id: operational
+      charge_id: operational
+      doctor_id: operational
+      amount: financial
+      updated_by: operational
+      updated_at: operational
+    charge_price_changes:
+      id: operational
+      tenant_id: operational
+      charge_id: operational
+      doctor_id: operational
+      field: operational
+      old_value: financial
+      new_value: financial
+      actor_id: operational
+      effective_from: operational
+      created_at: operational
+    payment_gateway_accounts:
+      id: operational
+      tenant_id: operational
+      provider: operational
+      merchant_ref: operational
+      secret_ref: operational  # a secret NAME in the tenant secret store, never the value
+      webhook_secret_ref: operational
+      status: operational
+      last_test_status: operational
+      last_test_at: operational
+      connected_by: operational
+      connected_at: operational
+      disabled_at: operational
+    credit_notes:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      refund_request_id: operational
+      series_id: operational
+      number: financial
+      currency: operational
+      taxable_minor: financial
+      tax_minor: financial
+      round_off_minor: financial
+      total_minor: financial
+      issued_at: operational
+      issued_by: operational
+    credit_note_lines:
+      id: operational
+      tenant_id: operational
+      credit_note_id: operational
+      invoice_line_id: operational
+      quantity: operational
+      taxable_minor: financial
+      tax_minor: financial
+      taxes: financial
     invoice_payments:
+      acted_by_patient_id: pii
+      acted_by_relation: pii
       id: operational
       tenant_id: operational
       invoice_id: operational
@@ -510,6 +895,14 @@ schemas:
       receipt_number: financial
       currency: operational
       amount_minor: financial
+      kind: operational
+      refund_request_id: operational
+      gateway: operational
+      gateway_ref: operational
+      payment_intent_id: operational
+      payer_kind: operational
+      payer_ref: pii
+      refund_of_payment_id: operational
     invoice_series:
       id: operational
       tenant_id: operational
@@ -554,6 +947,8 @@ schemas:
       paid_minor: financial
       document_type: operational
       buyer_gstin: financial
+      change_seq: operational
+      updated_at: operational
     legal_entities:
       id: operational
       owner_id: operational
@@ -572,6 +967,11 @@ schemas:
       expiry_date: pii
       region: operational
       status: operational
+      certificate_upload_id: operational
+      reminders_sent: operational
+      override_until: operational
+      override_reason: pii  # free text typed by the owner
+      override_by: operational
       created_at: operational
       updated_at: operational
     login_attempts:
@@ -793,6 +1193,8 @@ schemas:
       recorded_at: operational
       category: phi
       source: phi
+      allergen_ingredient_id: phi
+      allergen_class_id: phi
       updated_by: operational
       updated_at: operational
       deactivated_by: operational
@@ -867,6 +1269,11 @@ schemas:
       change_seq: operational
       updated_at: operational
     patients:
+      registration_source: operational
+      profile_completed_at: operational
+      chat_completion_requested_at: operational
+      email: pii
+      preferred_language: operational
       legacy_record_no: pii
       is_synthetic: operational
       id: operational
@@ -889,11 +1296,92 @@ schemas:
       phone_digits: pii
       phone_last10: pii
       name_search: pii
+      change_seq: operational
+    dispenses:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      source: operational
+      lines: operational
+      created_by: operational
+      created_at: operational
+    goods_receipts:
+      id: operational
+      tenant_id: operational
+      supplier_id: operational
+      supplier_name_snapshot: operational
+      supplier_key: operational
+      purchase_order_id: operational
+      bill_number: financial
+      bill_date: financial
+      status: operational
+      subtotal: financial
+      line_count: operational
+      posted_by: operational
+      posted_at: operational
+    goods_receipt_lines:
+      id: operational
+      tenant_id: operational
+      receipt_id: operational
+      line_order: operational
+      item_id: operational
+      batch_id: operational
+      batch_no: operational
+      expiry_date: operational
+      mrp: financial
+      rate: financial
+      qty: operational
+      free_qty: operational
+      tax_rate: financial
+      effective_rate: financial
+      line_total: financial
+    stock_discrepancies:
+      id: operational
+      tenant_id: operational
+      item_id: operational
+      qty: operational
+      reason: operational
+      dispense_id: operational
+      resolved_by_stock_take_id: operational
+      created_by: operational
+      created_at: operational
+    pharmacy_item_profiles:
+      item_id: operational
+      tenant_id: operational
+      schedule_class: operational
+      generic_name: operational
+      pack_size: operational
+      unit: operational
+      in_house: operational
+      updated_at: operational
+      price_inclusive_of_tax: operational
+      zero_rated: operational
+      hsn_code: operational
+      mrp: financial
+    pharmacy_schedule_rules:
+      market: operational
+      schedule_class: operational
+      label: operational
+      requires_rx: operational
+      register_type: operational
+      duplicate_rx_copy: operational
+      retention_years: operational
+      refill_self_serve_allowed: operational
+      drug_master_flag: operational
     pharmacy_settings:
       tenant_id: operational
       mode: operational
       updated_at: operational
+      mode_changed_at: operational
+      mode_changed_by: operational
+      drug_licence_numbers: operational
+      pharmacist_in_charge_staff_id: operational
+      alert_recipient_staff_id: operational
     pharmacy_stock_movements:
+      batch_id: operational
+      source_type: operational
+      source_id: operational
+      fefo_override_reason: operational
       id: operational
       seq: operational
       tenant_id: operational
@@ -931,6 +1419,8 @@ schemas:
       ip: pii
       request_id: operational
       batch_id: operational
+      outcome: operational
+      device_family: operational
     phi_read_volume_alerts:
       id: operational
       tenant_id: operational
@@ -956,6 +1446,8 @@ schemas:
       route: phi
       quantity: phi
       quantity_unit: phi
+      drug_id: phi
+      generic_name_snapshot: phi
     prescription_signer_backfill:
       prescription_id: operational
       tenant_id: operational
@@ -974,6 +1466,8 @@ schemas:
       safety_dictionary_version: operational
       signed_by: operational
       signed_by_registration_no: pii
+      change_seq: operational
+      updated_at: operational
     notice_templates:
       key: operational
       market: operational
@@ -991,6 +1485,105 @@ schemas:
       verified_at: operational
       updated_by: operational
       updated_at: operational
+    patient_proxies:
+      id: operational
+      tenant_id: operational
+      proxy_patient_id: pii
+      subject_patient_id: pii
+      relation: pii
+      scope: operational
+      status: operational
+      invited_at: operational
+      accepted_at: operational
+      revoked_at: operational
+      revoked_by: operational
+      evidence: pii
+      notice_version: operational
+    proxy_invites:
+      token_hash: pii
+      tenant_id: operational
+      proxy_id: operational
+      expires_at: operational
+      used_at: operational
+      otp_hash: pii
+      otp_expires_at: operational
+      otp_attempts: operational
+      otp_challenge_id: operational
+    secure_links:
+      id: operational
+      tenant_id: operational
+      token_hash: operational
+      document_type: operational
+      document_id: operational
+      patient_id: pii
+      recipient_patient_id: pii
+      expires_at: operational
+      max_opens: operational
+      open_count: operational
+      failed_otps: operational
+      locked_until: operational
+      otp_hash: operational
+      otp_expires_at: operational
+      created_by: operational
+      created_at: operational
+    secure_link_opens:
+      id: operational
+      tenant_id: operational
+      link_id: operational
+      opened_at: operational
+      ip: pii
+      user_agent: pii
+      outcome: operational
+    chat_added_members:
+      id: operational
+      tenant_id: operational
+      caregiver_patient_id: pii
+      member_patient_id: pii
+      relation: pii
+      proxy_scope: operational
+      proxy_status: operational
+      created_at: operational
+    patient_desk_tasks:
+      id: operational
+      tenant_id: operational
+      kind: operational
+      patient_id: pii
+      caregiver_patient_id: pii
+      status: operational
+      created_at: operational
+      done_at: operational
+    chat_consents:
+      id: operational
+      tenant_id: operational
+      phone_hash: pii
+      purpose: operational
+      granted: operational
+      notice_version: operational
+      language: operational
+      wamid: operational
+      decided_at: operational
+      attached_patient_id: pii
+      attached_at: operational
+    patient_identifiers:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      id_type: operational
+      blind_index: pii
+      value_enc: pii
+      last4: pii
+      verified_via: operational
+      verified_at: operational
+      created_at: operational
+    abdm_share_requests:
+      tenant_id: operational
+      request_id: operational
+      outcome: operational
+      reason: operational
+      patient_id: pii
+      queue_entry_id: operational
+      token_number: operational
+      created_at: operational
     privacy_notices:
       id: operational
       tenant_id: operational
@@ -1022,6 +1615,8 @@ schemas:
       consent_signed_name: pii
       consent_recorded_by: operational
       consent_signed_at: operational
+      change_seq: operational
+      updated_at: operational
     projector_applied_events:
       tenant_id: operational
       consumer_group: operational
@@ -1056,6 +1651,8 @@ schemas:
       last_event_id: operational
       updated_at: operational
     queue_entries:
+      acted_by_patient_id: pii
+      acted_by_relation: pii
       id: operational
       tenant_id: operational
       appointment_id: operational
@@ -1063,6 +1660,8 @@ schemas:
       doctor_id: operational
       queue_date: operational
       token_number: operational
+      previous_token: operational
+      reassigned_from_doctor_id: operational
       status: operational
       priority: operational
       priority_reason: phi
@@ -1084,6 +1683,10 @@ schemas:
       transfer_reason: operational
       transfer_reason_note: phi  # uncertain: free text, may carry clinical reason
       legacy_duplicate: operational
+      change_seq: operational
+      order_reason: operational
+      called_seq: operational
+      placed_as_walkin_late: operational
     tax_rules:
       id: operational
       jurisdiction: operational
@@ -1107,6 +1710,17 @@ schemas:
       phone_nsn_length: operational
       cell: operational
       active: operational
+      display_languages: operational
+      einvoice_scheme: operational
+    price_templates:
+      id: operational
+      specialty: operational
+      jurisdiction: operational
+      heads: operational
+      version: operational
+      reviewed: operational
+      review_note: operational
+      updated_at: operational
     registry_dirty:
       tenant_id: operational
       patient_id: pii
@@ -1247,6 +1861,7 @@ schemas:
       status: operational
       scope: operational
       mfa_enabled: operational
+      bookable_online: operational
       mfa_secret_enc: pii
       invite_token_hash: pii
       invite_expires_at: operational
@@ -1321,8 +1936,18 @@ schemas:
       from_status: operational
       to_status: operational
       changed_by: operational
+      changed_by_staff: operational
       reason: operational
       changed_at: operational
+    trial_conversion_jobs:
+      id: operational
+      tenant_id: operational
+      requested_by: operational
+      status: operational
+      synthetic_rows_deleted: operational
+      error_code: operational
+      created_at: operational
+      completed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational
@@ -1338,6 +1963,7 @@ schemas:
       region_code: operational
       status: operational
       data_gate: operational
+      go_live_by: operational
       created_at: operational
       updated_at: operational
       brand_id: operational
@@ -1354,6 +1980,10 @@ schemas:
       facility_type: operational
       billing_mode: operational
       tax_registration_id: operational
+      consent_default_deny: operational
+      secure_link_ttl_days: operational
+      consent_two_witnesses: operational
+      day_start_minute: operational
     vaccine_records:
       id: operational
       tenant_id: operational
@@ -1386,6 +2016,8 @@ schemas:
       weight_recorded_at: operational
       blood_sugar: phi
       pain_score: phi
+      change_seq: operational
+      updated_at: operational
     waitlist_entries:
       id: operational
       tenant_id: operational
@@ -1396,6 +2028,8 @@ schemas:
       offered_slot_start: operational
       offer_expires_at: operational
       booked_appointment_id: operational
+      change_seq: operational
+      updated_at: operational
     notification_requests:
       id: operational
       tenant_id: operational
@@ -1482,6 +2116,11 @@ schemas:
       steps: operational
       toggle_keys: operational
       created_at: operational
+    session_reserved_slots:
+      id: operational
+      tenant_id: operational
+      working_hours_id: operational
+      slot_minute: operational
     queue_entry_events:
       id: operational
       tenant_id: operational
@@ -1496,6 +2135,26 @@ schemas:
       occurred_at: operational
       actor_id: operational
       source: operational
+      capped: operational
+    service_time_stats:
+      tenant_id: operational
+      doctor_id: operational
+      visit_type: operational
+      hour_bucket: operational
+      n: operational
+      mu_log: operational
+      sigma_log: operational
+      ewma_mu: operational
+      ewma_var: operational
+      median_s: operational
+      p80_s: operational
+      prior_source: operational
+      updated_at: operational
+    specialty_service_defaults:
+      specialty_code: operational
+      visit_type: operational
+      median_s: operational
+      p80_s: operational
     eta_prediction_log:
       id: operational
       tenant_id: operational
@@ -1516,6 +2175,40 @@ schemas:
       mae_s: operational
       p80_hit_rate: operational
       within10_pct: operational
+    doctor_queue_settings:
+      tenant_id: operational
+      doctor_id: operational
+      eta_display_mode: operational
+      updated_by: operational
+      updated_at: operational
+    facility_queue_settings:
+      tenant_id: operational
+      eta_display_mode: operational
+      updated_by: operational
+      updated_at: operational
+    display_devices:
+      id: operational
+      tenant_id: operational
+      label: operational
+      scope: operational
+      token_hash: operational
+      paired_by: operational
+      paired_at: operational
+      last_seen_at: operational
+      revoked_at: operational
+    display_pairing_codes:
+      id: operational
+      tenant_id: operational
+      code_hash: operational
+      scope: operational
+      label: operational
+      expires_at: operational
+      used_at: operational
+      created_by: operational
+    display_pairing_lockout:
+      tenant_id: operational
+      failures: operational
+      locked_until: operational
     doctor_sessions:
       id: operational
       tenant_id: operational
@@ -1532,3 +2225,20 @@ schemas:
       paused_at: operational
       resumed_at: operational
       reason_code: operational
+    drug_usage:
+      tenant_id: operational
+      doctor_id: operational
+      drug_id: operational
+      uses: operational
+      last_used_at: operational
+    drug_usage_applied:
+      tenant_id: operational
+      prescription_id: operational
+      applied_at: operational
+    rx_coding_suggestions:
+      id: operational
+      tenant_id: operational
+      prescription_item_id: operational
+      suggested_drug_id: operational
+      confidence: operational
+      created_at: operational

@@ -15,6 +15,7 @@ type AccessTokenClaims = {
   staffName?: string;
   roleName?: string;
   owner?: boolean;
+  specialty?: string; // T-298 specialty profile; the Specialty workspace nav item follows it
   pinChange?: boolean;
   exp?: number;
 };
@@ -82,9 +83,9 @@ export function getIdentity(): Identity | null {
 // DOCTOR_ITEMS / NAV_ITEMS (same order, same grants, plus each page's own gate); keep them in step.
 type Destination = [href: string, ...permissions: string[]];
 const OWNER_LANDING: Destination[] = [
-  ["/overview", "reports:view"], ["/schedule", "queue:view"], ["/billing", "billing:view"], ["/packages", "packages:view"],
-  ["/reports", "reports:view"], ["/staff", "staff:view"], ["/setup", "setup:view"],
-];
+  ["/overview", "reports:view"], ["/schedule", "queue:view"], ["/setup", "setup:view"], ["/reports", "reports:view"],
+  ["/staff", "staff:view"], ["/billing", "billing:view"], ["/packages", "packages:view"], ["/compliance", "compliance:view"],
+]; // FEF-058: the owner nav order (sections: run, people, money, growth, compliance); planned screens are never a landing page
 // /my-day and /consult both read the queue (AccessGate / forbidden state without queue:view).
 const DOCTOR_LANDING: Destination[] = [
   ["/my-day", "clinical:edit", "queue:view"], ["/patients", "patients:view"], ["/consult", "clinical:edit", "queue:view"],
@@ -118,10 +119,6 @@ export function landingPathFor(permissions: string[], owner = false): string {
   return first(STAFF_LANDING) ?? "/account";
 }
 
-// Routes with their own identity/nav (platform console, owner's cross-clinic login) or no
-// session yet (login, invite acceptance) — the shared clinic shell never renders here.
-export const SHELL_SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner"];
-
 // "exp" is the JWT standard claim (Unix seconds) — for the signed-in popover's "Session expires
 // in Xh Ym", not used for any auth decision (the server enforces expiry independently).
 export function getSessionExpiresAt(): Date | null {
@@ -146,3 +143,4 @@ export async function signOut(): Promise<void> {
   clearIntents(); // FEF-008: no payment intent outlives the session
   await clearLocalSessionData(); // FEF-005: lock flag + drafts database
 }
+

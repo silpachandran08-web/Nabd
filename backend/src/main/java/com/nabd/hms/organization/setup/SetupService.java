@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -63,10 +64,18 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final com.nabd.hms.iam.api.ActorDirectory actors;
 
     private final com.nabd.hms.patient.api.PrivacyNotices privacyNotices;
+    private final CalendarService calendar;
+    private final com.nabd.hms.organization.licence.LicenceLifecycleService licences;
+    private final PriceChangeLog pricingLog;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
-                 com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices) {
+                 com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
+                 CalendarService calendar,
+                 com.nabd.hms.organization.licence.LicenceLifecycleService licences, PriceChangeLog pricingLog) {
+        this.calendar = calendar;
+        this.licences = licences;
+        this.pricingLog = pricingLog;
         this.actors = actors;
         this.entitlements = entitlements;
         this.privacyNotices = privacyNotices;
@@ -80,7 +89,10 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public List<SetupChecklistItemResponse> getChecklist(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listProgress(tenantId).stream().map(this::toChecklistItem).toList();
+        List<SetupProgressRow> rows = repo.listProgress(tenantId);
+        // ADM-007: the first pending step is the one the owner is on
+        String current = rows.stream().filter(r -> "pending".equals(r.status())).map(SetupProgressRow::step).findFirst().orElse(null);
+        return rows.stream().map(r -> toChecklistItem(r, r.step().equals(current))).toList();
     }
 
     /** status is 'skipped' or 'done', always derived from which endpoint the controller called —
@@ -89,6 +101,14 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     public void updateProgress(UUID tenantId, String step, String status) {
         tenantContext.set(tenantId);
         validateStep(step);
+        if (SetupSteps.DPA.equals(step)) { // ADM-007: never skipped; done only once a DPA is on file
+            if ("skipped".equals(status)) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "step-invalid", "STEP_INVALID", "The data processing agreement cannot be skipped.");
+            }
+            if (!repo.hasDpaAcceptance()) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "step-invalid", "STEP_INVALID", "Accept the data processing agreement first.");
+            }
+        }
         repo.updateProgress(tenantId, step, status);
         if ("go_live".equals(step) && "done".equals(status)) {
             repo.markSetupCompleted(tenantId);
@@ -137,8 +157,9 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public ChargeHeadResponse updateCharge(UUID tenantId, UUID callerStaffId, UUID id, ChargeHeadWriteRequest req) {
         tenantContext.set(tenantId);
-        repo.findCharge(tenantId, id)
+        ChargeHeadRow before = repo.findCharge(tenantId, id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "charge-not-found", "Charge not found", "Charge not found"));
+        pricingLog.logChargeUpdate(id, before, req, callerStaffId); // FIN-016: same transaction as the update
         repo.updateCharge(tenantId, id, req);
         log.info("charge head {} updated for tenant {} by {}", id, tenantId, callerStaffId);
         catalogueChanged(tenantId, id, "updated");
@@ -169,8 +190,14 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         if ("session.idle_lock_minutes".equals(policyKey) && !req.value().matches("^(?:[2-9]|[12][0-9]|30)$")) { // FEF-005
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Idle lock must be a whole number of minutes from 2 to 30");
         }
+        if ("follow_up_window_days".equals(policyKey) && !req.value().matches("^(?:[1-9]|[1-8][0-9]|90)$")) { // FIN-015
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "The follow-up window is a whole number of days from 1 to 90.");
+        }
         if ("cash_variance_tolerance".equals(policyKey) && !req.value().matches("^\\d{1,9}$")) { // FIN-005: minor units
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
+        }
+        if (policyKey.startsWith("print.default_paper.") && !req.value().matches("^(a4|a5|80mm)$")) { // FEF-046
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Default paper must be a4, a5 or 80mm");
         }
         repo.updatePolicy(tenantId, policyKey, req.value());
         log.info("policy {} updated for tenant {} by {}", policyKey, tenantId, callerStaffId);
@@ -209,7 +236,7 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public List<ClinicHolidayResponse> listHolidays(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listHolidays(tenantId).stream().map(this::toHolidayResponse).toList();
+        return calendar.withBookingsToMove(repo.listHolidays(tenantId).stream().map(this::toHolidayResponse).toList());
     }
 
     @Transactional
@@ -217,16 +244,19 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         tenantContext.set(tenantId);
         UUID id = repo.insertHoliday(tenantId, req);
         log.info("holiday {} added for tenant {} by {}", id, tenantId, callerStaffId);
-        return new ClinicHolidayResponse(id.toString(), req.holidayDate(), req.name(), req.recurring());
+        calendar.changed(tenantId, List.of(new CalendarService.Change(req.holidayDate(), "closed", null)));
+        return new ClinicHolidayResponse(id.toString(), req.holidayDate(), req.name(), req.recurring(), "closed", List.of(), null, null);
     }
 
     @Transactional
     public void deleteHoliday(UUID tenantId, UUID callerStaffId, UUID id) {
         tenantContext.set(tenantId);
+        LocalDate date = calendar.dateOf(tenantId, id).orElse(null);
         int deleted = repo.deleteHoliday(tenantId, id);
         if (deleted == 0) {
             throw new ApiException(HttpStatus.NOT_FOUND, "holiday-not-found", "Holiday not found", "Holiday not found");
         }
+        calendar.changed(tenantId, List.of(new CalendarService.Change(date, "open", null))); // the day is an ordinary day again
         log.info("holiday {} deleted for tenant {} by {}", id, tenantId, callerStaffId);
     }
 
@@ -304,10 +334,36 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         return new ExportJobResponse(id.toString(), req.exportType(), "pending", null, null, null);
     }
 
+    /** ADM-032: the register, soonest expiry first; kind (licence type) and status narrow it. */
     @Transactional
-    public List<LicenceResponse> listLicences(UUID tenantId) {
+    public List<LicenceResponse> listLicences(UUID tenantId, String kind, String status) {
         tenantContext.set(tenantId);
-        return repo.listLicences(tenantId).stream().map(this::toLicenceResponse).toList();
+        var hidden = licences.hiddenFromBooking();
+        var today = licences.today();
+        return repo.listLicences(tenantId).stream()
+                .filter(l -> kind == null || kind.isBlank() || kind.equals(l.licenceType()))
+                .filter(l -> status == null || status.isBlank() || status.equals(l.status()))
+                .map(l -> toLicenceResponse(l, today, hidden)).toList();
+    }
+
+    /** ADM-032: one register row as the API shows it (the override reads it back). Runs in the caller's tenant transaction. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public LicenceResponse licence(UUID id) {
+        var hidden = licences.hiddenFromBooking();
+        var today = licences.today();
+        return repo.listLicences(tenantContext.current()).stream().filter(l -> l.id().equals(id)).findFirst().map(l -> toLicenceResponse(l, today, hidden))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "licence-not-found", "Licence not found", "Licence not found"));
+    }
+
+    /** ADM-032: a holder is a staff member of this clinic (never a foreign-key 500); their name is copied into the register when none was typed. */
+    private LicenceWriteRequest withHolder(UUID tenantId, LicenceWriteRequest req) {
+        if (req.holderId() == null) {
+            return req;
+        }
+        var a = actors.findActor(tenantId, req.holderId()).orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "holder-not-found", "Holder not found",
+                "That staff member does not exist in this clinic."));
+        return req.holderName() != null && !req.holderName().isBlank() ? req
+                : new LicenceWriteRequest(req.licenceType(), req.holderId(), a.name(), req.number(), req.issuingBody(), req.expiryDate(), req.region(), req.certificateUploadId());
     }
 
     @Transactional
@@ -325,25 +381,21 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public LicenceResponse addLicence(UUID tenantId, UUID callerStaffId, LicenceWriteRequest req) {
         tenantContext.set(tenantId);
-        UUID id = repo.insertLicence(tenantId, req);
+        UUID id = repo.insertLicence(tenantId, withHolder(tenantId, req));
         log.info("licence {} added for tenant {} by {}", id, tenantId, callerStaffId);
-        return repo.listLicences(tenantId).stream()
-                .filter(l -> l.id().equals(id))
-                .findFirst()
-                .map(this::toLicenceResponse)
-                .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "licence-not-found", "Licence not found after insert", "Licence not found after insert"));
+        licences.afterSave(id, callerStaffId, null, null); // status, reminders and the holder's bookability follow the saved date at once
+        return licence(id);
     }
 
     @Transactional
     public LicenceResponse updateLicence(UUID tenantId, UUID callerStaffId, UUID id, LicenceWriteRequest req) {
         tenantContext.set(tenantId);
-        repo.updateLicence(tenantId, id, req);
+        java.time.LocalDate before = repo.listLicences(tenantId).stream().filter(l -> l.id().equals(id)).findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "licence-not-found", "Licence not found", "Licence not found")).expiryDate();
+        repo.updateLicence(tenantId, id, withHolder(tenantId, req));
         log.info("licence {} updated for tenant {} by {}", id, tenantId, callerStaffId);
-        return repo.listLicences(tenantId).stream()
-                .filter(l -> l.id().equals(id))
-                .findFirst()
-                .map(this::toLicenceResponse)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "licence-not-found", "Licence not found", "Licence not found"));
+        licences.afterSave(id, callerStaffId, null, before);
+        return licence(id);
     }
 
     @Transactional
@@ -355,16 +407,18 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     }
 
     private void validateStep(String step) {
-        List<String> valid = List.of("welcome", "profile", "tax", "doctors", "departments", "schedule", "charges", "pharmacy", "whatsapp", "go_live");
-        if (!valid.contains(step)) {
+        if (!SetupSteps.ALL.contains(step)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-step", "Invalid wizard step", "Invalid wizard step: " + step);
         }
     }
 
     // ── Mappers ──
 
-    private SetupChecklistItemResponse toChecklistItem(SetupProgressRow row) {
-        return new SetupChecklistItemResponse(row.step(), row.status(), row.skippedAt(), row.doneAt());
+    private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.json.JsonMapper();
+
+    private SetupChecklistItemResponse toChecklistItem(SetupProgressRow row, boolean current) {
+        return new SetupChecklistItemResponse(row.step(), current ? "current" : row.status(), row.skippedAt(), row.doneAt(),
+                JSON.readTree(row.draftJson()), row.version(), row.updatedAt());
     }
 
     private ClinicProfileResponse toProfileResponse(TenantProfileRow row) {
@@ -404,7 +458,7 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     }
 
     private ClinicHolidayResponse toHolidayResponse(HolidayRow row) {
-        return new ClinicHolidayResponse(row.id().toString(), row.holidayDate(), row.name(), row.recurring());
+        return CalendarService.response(row);
     }
 
     private StaffShiftResponse toShiftResponse(StaffShiftRow row) {
@@ -438,7 +492,9 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
                 row.createdAt());
     }
 
-    private LicenceResponse toLicenceResponse(LicenceRow row) {
+    private LicenceResponse toLicenceResponse(LicenceRow row, java.time.LocalDate today, java.util.Set<UUID> hidden) {
+        long left = java.time.temporal.ChronoUnit.DAYS.between(today, row.expiryDate());
+        var next = com.nabd.hms.organization.licence.LicenceLifecycleService.nextReminder(left, row.remindersSent());
         return new LicenceResponse(
                 row.id().toString(),
                 row.licenceType(),
@@ -448,6 +504,13 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
                 row.issuingBody(),
                 row.expiryDate(),
                 row.region(),
-                row.status());
+                row.status(),
+                left,
+                row.remindersSent().stream().sorted(java.util.Comparator.reverseOrder()).toList(),
+                next.map(t -> row.expiryDate().minusDays(t)).orElse(null),
+                "clinician".equals(row.licenceType()) && row.holderId() != null ? !hidden.contains(row.holderId()) : null,
+                row.overrideUntil(),
+                row.overrideReason(),
+                row.certificateUploadId() == null ? null : row.certificateUploadId().toString());
     }
 }

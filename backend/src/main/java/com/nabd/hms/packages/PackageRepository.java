@@ -38,11 +38,11 @@ class PackageRepository {
     // ── package definitions ──────────────────────────────────────────────
 
     List<PackageRow> listPackages(UUID tenantId) {
-        return jdbc.query("SELECT * FROM packages WHERE tenant_id = ? ORDER BY name", this::mapPackage, tenantId);
+        return jdbc.query("SELECT id, tenant_id, name, package_type, speciality, description, status, price, tax_inclusive, validity_days, validity_starts, grace_days, refund_note, created_by, created_at, updated_at FROM packages WHERE tenant_id = ? ORDER BY name", this::mapPackage, tenantId);
     }
 
     Optional<PackageRow> findPackage(UUID tenantId, UUID id) {
-        return jdbc.query("SELECT * FROM packages WHERE tenant_id = ? AND id = ?", this::mapPackage, tenantId, id)
+        return jdbc.query("SELECT id, tenant_id, name, package_type, speciality, description, status, price, tax_inclusive, validity_days, validity_starts, grace_days, refund_note, created_by, created_at, updated_at FROM packages WHERE tenant_id = ? AND id = ?", this::mapPackage, tenantId, id)
                 .stream().findFirst();
     }
 
@@ -118,7 +118,7 @@ class PackageRepository {
                         "JOIN staff s ON s.id = ed.doctor_id " +
                         "JOIN doctor_leave dl ON dl.doctor_id = ed.doctor_id " +
                         "WHERE p.tenant_id = ? AND ed.package_id = ? AND dl.tenant_id = ? " +
-                        "AND ?::date BETWEEN dl.date_from AND dl.date_to LIMIT 1",
+                        "AND ?::date BETWEEN dl.date_from AND dl.date_to AND dl.start_time IS NULL LIMIT 1", // ACC-005: a part-day leave does not block the whole day
                 (rs, i) -> rs.getString("name"), tenantId, packageId, tenantId, java.sql.Date.valueOf(clock.today(tenantId))).stream().findFirst();
     }
 

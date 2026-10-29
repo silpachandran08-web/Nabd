@@ -12,10 +12,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * PLT-018 (ADR-07, CONS M1): brand visibility is CONTAINED. With the legacy flag off (the default in
- * every profile) FACILITY / BRAND / TENANT scope all read only the caller's own facility, and no
+ * PLT-021: brand visibility is REMOVED (was contained by PLT-018). FACILITY / BRAND / TENANT scope all read only the caller's own facility, and no
  * statement can write a row carrying a sibling's tenant_id. Staff, sessions and roles never widen.
- * The flag-on + allow-list behaviour is in LegacyBrandVisibilityTest. Uses `patients` (V6 table).
+ * The flag and allow-list no longer exist. Uses `patients` (V6 table).
  */
 class CrossFacilityVisibilityTest extends ApiTestBase {
 
@@ -55,7 +54,7 @@ class CrossFacilityVisibilityTest extends ApiTestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"FACILITY", "BRAND", "TENANT"})
-    void flagOffEveryScopeReadsOnlyTheCallersOwnFacility(String scope) {
+    void everyScopeReadsOnlyTheCallersOwnFacility(String scope) {
         Group g = group("read-" + scope.toLowerCase() + "@a.com", scope);
 
         assertThat(patientNamesVisibleFrom(g.a().id())).containsExactly("Patient A");
@@ -100,18 +99,15 @@ class CrossFacilityVisibilityTest extends ApiTestBase {
     }
 
     @Test
-    void allTwentyWidenedTablesLostTheAccessibleIdsClauseAndHaveWritePolicies() {
+    void noPolicyAnywhereReferencesTheVisibleOrAccessibleTenantIds() {
+        // PLT-021: the widening is gone from the database, not just switched off.
+        List<String> refs = jdbc.query("SELECT tablename || '.' || policyname FROM pg_policies " +
+                "WHERE coalesce(qual,'') || coalesce(with_check,'') ~ '(visible|accessible)_tenant_ids'", (rs, i) -> rs.getString(1));
+        assertThat(refs).isEmpty();
         for (String t : WIDENED) {
-            List<String> defs = jdbc.query("SELECT coalesce(qual,'') || coalesce(with_check,'') FROM pg_policies " +
-                    "WHERE tablename = ?", (rs, i) -> rs.getString(1), t);
-            assertThat(defs).as(t).isNotEmpty();
-            assertThat(String.join(" ", defs)).as(t).doesNotContain("accessible_tenant_ids");
-            boolean singleOnly = t.equals("roles") || t.equals("staff") || t.equals("sessions");
-            assertThat(String.join(" ", defs).contains("visible_tenant_ids")).as(t + " widens?").isEqualTo(!singleOnly);
-            if (!singleOnly) {
-                assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE tablename = ? AND cmd IN ('INSERT','UPDATE') AND with_check IS NOT NULL",
-                        Integer.class, t)).as(t + " WITH CHECK policies").isEqualTo(2);
-            }
+            String defs = String.join(" ", jdbc.query("SELECT coalesce(qual,'') || coalesce(with_check,'') FROM pg_policies " +
+                    "WHERE tablename = ?", (rs, i) -> rs.getString(1), t));
+            assertThat(defs).as(t).isNotBlank().contains("app_tenant_id()");
         }
     }
 

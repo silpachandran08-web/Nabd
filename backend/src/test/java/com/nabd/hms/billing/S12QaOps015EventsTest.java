@@ -58,8 +58,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
     /** events.md section 5: data keys besides tenantId + version (required) and the optional ones (suffix ?). */
     private static final Map<String, List<String>> DOCUMENTED = Map.ofEntries(
             Map.entry("scheduling.appointment.booked.v1", List.of("appointmentId", "doctorId", "startTime", "status")),
-            Map.entry("scheduling.appointment.cancelled.v1", List.of("appointmentId", "doctorId", "startTime", "status")),
-            Map.entry("scheduling.appointment.rescheduled.v1", List.of("appointmentId", "doctorId", "startTime", "status", "previousAppointmentId", "previousStartTime")),
+            Map.entry("scheduling.appointment.cancelled.v1", List.of("appointmentId", "doctorId", "startTime", "status", "by?", "reasonCode?")),
+            Map.entry("scheduling.appointment.rescheduled.v1", List.of("appointmentId", "doctorId", "startTime", "status", "previousAppointmentId", "previousStartTime", "by?", "reasonCode?")),
             Map.entry("scheduling.appointment.arrived.v1", List.of("appointmentId", "doctorId", "queueEntryId", "status")),
             Map.entry("visit.queue_entry.created.v1", List.of("entryId", "doctorId", "queueDate", "status")),
             Map.entry("visit.queue_entry.changed.v1", List.of("entryId", "doctorId", "queueDate", "status", "fromStatus?", "priority?")),
@@ -70,6 +70,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
             Map.entry("clinical.allergy.changed.v1", List.of("patientId", "allergyId?", "change", "status")),
             Map.entry("billing.invoice.paid.v1", List.of("invoiceId", "totalMinor", "currency", "status")),
             Map.entry("billing.payment.recorded.v1", List.of("invoiceId", "paymentId", "method", "amountMinor", "currency", "balanceMinor", "status")),
+            Map.entry("billing.refund.approved.v1", List.of("refundRequestId", "invoiceId", "amountMinor", "methods")),
             Map.entry("consent.changed.v1", List.of("patientId", "consentType", "status")),
             Map.entry("organization.config.changed.v1", List.of("configKey", "status")),
             Map.entry("iam.role.changed.v1", List.of("roleId", "status")),
@@ -257,7 +258,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         assertThat(data(evs.get(0))).containsEntry("appointmentId", appt[1]).containsEntry("previousAppointmentId", appt[0]);
         seen.addAll(types(evs));
 
-        evs = eventsOf(t, () -> call(e, HttpMethod.POST, "/v1/appointments/" + appt[1] + "/cancel", Map.of("reason", "patient called")));
+        evs = eventsOf(t, () -> call(e, HttpMethod.POST, "/v1/appointments/" + appt[1] + "/cancel", Map.of("reasonCode", "illness")));
         assertThat(types(evs)).containsExactly("scheduling.appointment.cancelled.v1");
         assertThat(data(evs.get(0))).containsEntry("status", "cancelled");
         seen.addAll(types(evs));
@@ -373,6 +374,14 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("clinical.drug_master.version_activated.v1"); // CLN-019: DrugMasterApiTest
         expected.remove("platform.entitlements.changed.v1"); // PLT-059: operator-plane producer, Plt059EntitlementsApiTest
         expected.remove("organization.privacy_notice.published.v1"); // IDC-003: Idc003PrivacyNoticeApiTest
+        expected.remove("billing.refund.approved.v1"); // FIN-013: Fin013RefundApiTest
+        expected.remove("comms.sender.throttled.v1"); // COM-021: produced by services/comms-gateway
+        expected.remove("scheduling.booking.routed.v1"); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
+        expected.remove("scheduling.appointment.no_show.v1"); // ACC-025: Acc025NoShowApiTest
+        expected.remove("shared.attachment.scanned.v1"); // PLT-029: Plt029FilesApiTest
+        expected.remove("organization.calendar.changed.v1"); // ADM-028: Adm028CalendarApiTest, DomainEventContractApiTest
+        expected.remove("patient.link.opened.v1"); // PLT-041: Plt041LinkOpenApiTest
+        expected.remove("pharmacy.stock.batch_changed.v1"); // PHL-005: Phl005StockBatchesApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));
@@ -411,6 +420,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
                 if (a.getTargetOwner().isEquivalentTo(DomainEventType.class)) referenced.add(a.getName());
             }
         }
+        referenced.add(DomainEventType.SENDER_THROTTLED.name()); // COM-021: produced by services/comms-gateway, not by backend main code
         Set<String> missing = Arrays.stream(DomainEventType.values()).map(Enum::name).filter(n -> !referenced.contains(n))
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(missing).as("catalogue types no business action publishes").isEmpty();

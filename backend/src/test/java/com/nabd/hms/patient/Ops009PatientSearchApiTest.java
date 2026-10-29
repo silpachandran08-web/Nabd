@@ -31,6 +31,7 @@ class Ops009PatientSearchApiTest extends ApiTestBase {
     @AfterAll
     static void cleanUp() throws Exception {
         try (Connection c = superuserConnection(); Statement s = c.createStatement()) {
+            s.execute("SET session_replication_role = replica"); // patients.guardian_id/merged_into_id FKs are unindexed: deleting 60k rows seq-scans patients per row (hours)
             for (UUID t : TENANTS) s.execute("DELETE FROM patients WHERE tenant_id = '" + t + "'");
         }
     }

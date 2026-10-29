@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import AllergyRegister from "./AllergyRegister";
@@ -23,6 +24,7 @@ export default function PreConsultDialog({
   /** clinical:edit — the "Add allergy" action is absent without it. */
   canEditAllergies?: boolean;
 }) {
+  const tx = useTranslations("consult.preConsultDialog");
   const { ctx, reload } = useClinicalContext(authedFetch, row.patientId, row.id);
   const [showAllergies, setShowAllergies] = useState(false);
   const p = row.patient;
@@ -30,24 +32,24 @@ export default function PreConsultDialog({
 
   return (
     <>
-    <Dialog title={`${row.patientName} · #${row.tokenNumber}`} onClose={onClose} size="lg">
+    <Dialog title={tx("title", { patientName: row.patientName, tokenNumber: row.tokenNumber })} onClose={onClose} size="lg">
       <div className={s.stack}>
         <SafetyStrip patient={p} ctx={ctx} onRetry={reload} sticky={false} />
 
         <div className={s.statGrid}>
-          <div className={s.stat}><span className={s.safetyLabel}>Visit reason</span>{row.presentingComplaint?.trim() || "Not recorded"}</div>
-          <div className={s.stat}><span className={s.safetyLabel}>Patient</span>{p ? `${age(p.dob)} · ${p.gender} · ${p.mrn}` : "—"}</div>
-          <div className={s.stat}><span className={s.safetyLabel}>Package</span>{p ? (p.activePackages > 0 ? `${p.activePackages} active` : "None") : "—"}</div>
-          <div className={s.stat}><span className={s.safetyLabel}>Status</span>{queueStatusLabel(row.status)}</div>
+          <div className={s.stat}><span className={s.safetyLabel}>{tx("visitReason")}</span>{row.presentingComplaint?.trim() || tx("notRecorded")}</div>
+          <div className={s.stat}><span className={s.safetyLabel}>{tx("patient")}</span>{p ? `${age(p.dob)} · ${p.gender} · ${p.mrn}` : "—"}</div>
+          <div className={s.stat}><span className={s.safetyLabel}>{tx("package")}</span>{p ? (p.activePackages > 0 ? `${p.activePackages} active` : "None") : "—"}</div>
+          <div className={s.stat}><span className={s.safetyLabel}>{tx("status")}</span>{queueStatusLabel(row.status)}</div>
         </div>
 
         <VitalsCard vitals={ctx.vitals} onRetry={reload} />
 
-        <section className={s.card} aria-label="Last visits">
-          <h3 className={s.cardTitle}>Last three visits</h3>
-          {recent.status === "loading" && <Skeleton rows={2} label="Loading visits" />}
-          {recent.status === "error" && <p className={s.muted}>Couldn&apos;t load previous visits. <button type="button" className={s.linkBtn} onClick={reload}>Retry</button></p>}
-          {(recent.status === "none" || (recent.status === "ok" && (recent.data ?? []).length === 0)) && <p className={s.muted}>No previous visits recorded.</p>}
+        <section className={s.card} aria-label={tx("lastVisits")}>
+          <h3 className={s.cardTitle}>{tx("lastThreeVisits")}</h3>
+          {recent.status === "loading" && <Skeleton rows={2} label={tx("loadingVisits")} />}
+          {recent.status === "error" && <p className={s.muted}>{tx("couldnTLoadPreviousVisits")}{" "}<button type="button" className={s.linkBtn} onClick={reload}>{tx("retry")}</button></p>}
+          {(recent.status === "none" || (recent.status === "ok" && (recent.data ?? []).length === 0)) && <p className={s.muted}>{tx("noPreviousVisitsRecorded")}</p>}
           {recent.status === "ok" && (recent.data ?? []).length > 0 && (
             <ul className={s.list}>
               {(recent.data ?? []).map((e) => (
@@ -61,20 +63,20 @@ export default function PreConsultDialog({
           )}
         </section>
 
-        <section className={s.card} aria-label="Previous medicines">
-          <h3 className={s.cardTitle}>Previous medicines</h3>
+        <section className={s.card} aria-label={tx("previousMedicines")}>
+          <h3 className={s.cardTitle}>{tx("previousMedicines")}</h3>
           <MedicinesList prescriptions={ctx.prescriptions} onRetry={reload} />
-          <p className={s.muted} style={{ marginBlockStart: "var(--nb-space-8)" }}>Whether the last prescription was bought can&apos;t be recorded here yet.</p>
+          <p className={`${s.muted} ${s.mtS}`}>{tx("whetherTheLastPrescriptionWas")}</p>
         </section>
 
         {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert">{error}</div>}
       </div>
       <div className={s.dialogActions}>
-        {onStart && <StatusPill tone="info" label="Ready for doctor" />}
-        <button type="button" className={s.btn} onClick={onClose}>Close</button>
-        {canEditAllergies && p && <button type="button" className={s.btn} onClick={() => setShowAllergies(true)}>Add allergy</button>}
-        {onOpenVisit && <button type="button" className={s.btn} onClick={onOpenVisit}>Open visit record</button>}
-        {onStart && <button type="button" className={s.btnPrimary} onClick={onStart} disabled={starting}>{starting ? "Starting…" : "Start consultation"}</button>}
+        {onStart && <StatusPill tone="info" label={tx("readyForDoctor")} />}
+        <button type="button" className={s.btn} onClick={onClose}>{tx("close")}</button>
+        {canEditAllergies && p && <button type="button" className={s.btn} onClick={() => setShowAllergies(true)}>{tx("addAllergy")}</button>}
+        {onOpenVisit && <button type="button" className={s.btn} onClick={onOpenVisit}>{tx("openVisitRecord")}</button>}
+        {onStart && <button type="button" className={s.btnPrimary} onClick={onStart} disabled={starting}>{starting ? tx("starting") : tx("startConsultation")}</button>}
       </div>
     </Dialog>
       {showAllergies && p && (

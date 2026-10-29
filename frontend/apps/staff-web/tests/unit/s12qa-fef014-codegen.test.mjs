@@ -156,7 +156,7 @@ test("FEF-014 AC2: renaming spec fields breaks compilation of EVERY consumer (Qu
     const silent = consumers.filter((c) => !errors.some((l) => l.startsWith(c) || l.includes(c + "(")));
     assert.deepEqual(silent, [], `consumers of .tokenNumber that still compile after QueueEntryResponse.tokenNumber was renamed (they would read undefined at runtime): ${silent.join(", ")}`);
     // status: the arrivals and nursing row types re-declare it, so they must still fail on the rename.
-    for (const page of ["app/(components/)?arrivals/", "app/nursing/page.tsx"]) { // FEF-028: Arrivals is a folder now
+    for (const page of ["app/(components/|\\(clinic\\)/)arrivals/", "app/(components/|\\(clinic\\)/)nursing/"]) { // FEF-028/031: Arrivals and Nursing are folders now
       assert.ok(errors.some((l) => new RegExp(page).test(l) && /'status'|queueStatus/.test(l)), `${page} must fail when QueueEntryResponse.status is renamed`);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }

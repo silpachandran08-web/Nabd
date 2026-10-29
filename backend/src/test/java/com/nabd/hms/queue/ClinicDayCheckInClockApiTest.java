@@ -41,7 +41,8 @@ class ClinicDayCheckInClockApiTest extends ApiTestBase {
     @CsvSource({"Asia/Kolkata", "Asia/Dubai", "Asia/Riyadh"})
     void eveningSessionCheckInBelongsToTheSessionsDay(String zone) {
         SeededTenant tenant = seedTenant();
-        jdbc.update("UPDATE tenants SET timezone = ? WHERE id = ?", zone, tenant.id());
+        // ACC-005: the clinic day now starts at 04:00 by default; this PLT-028 test is about a day that rolls over at midnight
+        jdbc.update("UPDATE tenants SET timezone = ?, day_start_minute = 0 WHERE id = ?", zone, tenant.id());
         UUID roleId = seedFullAccessRole(tenant.id());
         String tag = UUID.randomUUID().toString().substring(0, 6);
         SeededStaff doc = seedStaff(tenant, roleId, "clk" + tag + "@a.com", "+9198" + (10000000 + Math.abs(tag.hashCode() % 89999999)), false);

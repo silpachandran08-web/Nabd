@@ -3,7 +3,7 @@
 
 /* Clinical safety strip (DOC-021) */
 .safety { display: flex; flex-wrap: wrap; gap: var(--nb-space-8) var(--nb-space-16); align-items: flex-start; padding: var(--nb-space-12) var(--nb-space-16); margin-block-end: var(--nb-space-16); background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); }
-.safetySticky { position: sticky; inset-block-start: var(--nb-topbar-h, 64px); z-index: 20; box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.6); }
+.safetySticky { position: sticky; inset-block-start: var(--nb-topbar-h); z-index: var(--z-nav); box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.6); }
 .safetyChip { display: flex; align-items: flex-start; gap: var(--nb-space-8); min-width: 0; font-size: 13px; color: var(--nb-text-primary); }
 .safetyLabel { display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--nb-text-tertiary); }
 .safetyValue { display: block; font-weight: 500; overflow-wrap: anywhere; }
@@ -88,3 +88,25 @@
 .pregOption { display: flex; align-items: center; gap: var(--nb-space-8); font-size: 13px; min-block-size: 32px; }
 .pregDate { background: var(--nb-surface-2); color: var(--nb-text-primary); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-sm); padding: var(--nb-space-4) var(--nb-space-8); font: inherit; }
 .pregActions { display: flex; gap: var(--nb-space-16); }
+
+/* FEF-030: spacing helpers that replaced the inline styles of the consult screen (tokens only, logical properties). */
+.mbL { margin-block-end: var(--nb-space-16); }
+.mbM { margin-block-end: var(--nb-space-12); }
+.mb0 { margin-block-end: 0; }
+.mtS { margin-block-start: var(--nb-space-8); }
+.mtM { margin-block-start: var(--nb-space-12); }
+.msS { margin-inline-start: var(--nb-space-8); }
+.m0 { margin: 0; }
+.noticeList { margin: 4px 0 0; padding-inline-start: 18px; }
+.kbNote { font-size: 12px; color: var(--nb-text-tertiary); margin: var(--nb-space-8) 0 0; }
+.noDeco { text-decoration: none; }
+.skelPad { padding: 0 16px; }
+.colGap4 { flex-direction: column; gap: var(--nb-space-4); }
+.basisAuto { flex-basis: auto; }
+.selectScope { flex: 0 1 180px; }
+.orderRow { display: flex; flex-direction: column; align-items: flex-start; gap: var(--nb-space-4); }
+.myM { margin-block: var(--nb-space-12); }
+.iconPlain, .iconFilled { display: inline-flex; }
+.iconFilled svg { fill: currentColor; fill-opacity: 0.3; }
+.viewerFrame { inline-size: 100%; block-size: 70vh; border: 0; }
+.viewerImg { max-inline-size: 100%; }

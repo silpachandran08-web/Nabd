@@ -1,0 +1,42 @@
+# OPS-059: DR script self-test on every change, and the yearly DR rehearsal. OIDC only, no stored cloud keys.
+# The real rehearsal is inactive until the repo variables exist (Needs external action):
+#   AWS_DR_ROLE_ARN, DR_CONFIG_JSON (identifiers only, schema = infra/dr/dr-config.example.json), and a protected
+#   environment "dr-rehearsal" with required reviewers. Kube contexts must be reachable from the runner (self-hosted) -- see runbook.
+name: dr-rehearsal
+on:
+  pull_request:
+    paths: ["infra/dr/**", "scripts/ci/test_ops059.py", "infra/terraform/modules/cell/**", ".github/workflows/dr-rehearsal.yml"]
+  schedule:
+    - cron: "43 4 20 3 *"   # yearly, 20 Mar 10:13 IST
+  workflow_dispatch:
+    inputs:
+      action: { description: "failover or failback", required: true, default: failover }
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/ci/test_ops059.py
+      - run: python3 infra/dr/dr_failover.py failover --config infra/dr/dr-config.example.json   # dry run prints the plan
+      - run: python3 infra/dr/dr_failover.py failback --config infra/dr/dr-config.example.json
+
+  rehearsal:
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && vars.AWS_DR_ROLE_ARN != ''
+    needs: selftest
+    runs-on: [self-hosted, dr]
+    environment: dr-rehearsal
+    timeout-minutes: 120
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ vars.AWS_DR_ROLE_ARN }}", aws-region: ap-south-2 }
+      - run: echo '${{ vars.DR_CONFIG_JSON }}' > "$RUNNER_TEMP/dr.json"
+      - run: python3 infra/dr/dr_failover.py "${{ inputs.action || 'failover' }}" --config "$RUNNER_TEMP/dr.json" --execute --record "$RUNNER_TEMP/dr-record.json"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: dr-record, path: "${{ runner.temp }}/dr-record.json" }

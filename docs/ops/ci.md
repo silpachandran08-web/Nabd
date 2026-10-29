@@ -2,7 +2,7 @@
 
 Workflows: `.github/workflows/ci.yml` (stages 1, 2, 3, 6) and `ci-selftest.yml` (manual canary).
 Required checks on `main`: `stage1-static`, `stage2-unit`, `stage3-integration`, `stage6-build-and-scan`
-(budgets 3, 2, 6, 4 min via `timeout-minutes`). Path filters skip backend/frontend steps when untouched; skipped jobs count as passing.
+(`timeout-minutes` 15, 20, 120, 30; the first budgets of 3, 2, 6, 4 min were never measured and cancelled stage 2 and 3 on every real run: stage 2 needs about 100 s for the frontend tests alone, stage 3 is the whole `*ApiTest` suite). Path filters skip backend/frontend steps when untouched; skipped jobs count as passing.
 
 - Stage 1: gitleaks (`.gitleaks.toml`: defaults plus Meta tokens), baseline check, Semgrep new-vs-base, `pnpm turbo run typecheck lint check:permissions` in `frontend/` (`next typegen && tsc --noEmit`, ESLint incl. boundaries, permission check), OpenAPI.
 - Stage 2: `pnpm turbo run test` in `frontend/` (staff-web unit tests plus `scripts/test-consult-flow.mjs`), JUnit classes that need no Docker.

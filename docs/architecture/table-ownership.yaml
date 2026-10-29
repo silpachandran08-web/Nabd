@@ -10,17 +10,18 @@
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
 modules:
   billing:
-    owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoices, tax_rules]
-    reads: []
+    # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
+    owns: [billing_documents, charge_catalogue, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
+    reads: [charge_doctor_fees, patients, pharmacy_item_profiles, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout
   clinical:
-    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, favourite_rx_set_items, ingredients, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
+    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, rx_coding_suggestions, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
   common:
-    owns: [audit_chain_heads, audit_chain_seals, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
-    reads: []
+    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts, tenant_data_keys]
+    reads: [tenants]  # PLT-045: TenantKeyService lists tenants and reads their region and status; the same read ClinicClock, TenantContext and CryptoReencryptJob already do
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
-    owns: [tenant_integrations_abdm]
+    owns: [abdm_share_requests, patient_identifiers, tenant_integrations_abdm]
     reads: []
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
@@ -38,7 +39,7 @@ modules:
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.
-    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, data_import_rows, data_import_uploads, department_transfers, department_workflow_selection, departments, dpa_acceptances, invoice_series, licence_registry, regions, service_points, staff_shifts, workflow_definitions]
+    owns: [attendance_records, booking_policy_versions, charge_doctor_fees, charge_price_changes, price_templates, clinic_holidays, clinic_policies, clinic_quiet_hours, holiday_templates, clinic_setup_progress, data_export_jobs, data_import_jobs, data_import_rows, data_import_uploads, department_transfers, department_workflow_selection, departments, dpa_acceptances, invoice_series, licence_registry, regions, service_points, staff_shifts, trial_conversion_jobs, workflow_definitions]
     reads: [tenants]  # FIN-006: InvoiceSeriesService checks the tenant's tax_registration_id (needs architecture review)
   owner:
     owns: [legal_entities, owners, tax_registrations]
@@ -47,21 +48,21 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [consents, internal_patient_refs, notice_templates, patient_duplicate_dismissals, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
+    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_proxies, patient_registry_summary, patients, privacy_notices, proxy_invites, registry_dirty, secure_link_opens, secure_links]
     reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
-    owns: [pharmacy_settings, pharmacy_stock_movements]
-    reads: []
+    owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, stock_batches, stock_discrepancies]
+    reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
-    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, tenant_lifecycle_events, tenants]
+    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, tenant_lifecycle_events, tenants]
     reads: []
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
     owns: [doctor_daily_metrics, tenant_daily_metrics]
     reads: [appointments, invoice_payments, invoices, package_instances, queue_entries]  # OPS-010: the recompute-from-source of one tenant-day
   queue:
-    owns: [appointments, doctor_delays, doctor_leave, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, queue_entries, queue_entry_events, waitlist_entries]
-    reads: []
+    owns: [appointment_change_offers, appointment_desk_exceptions, appointments, booking_request_details, booking_request_offers, booking_routing_settings, checkin_attempts, delay_broadcast_recipients, desk_exceptions, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_checkin_settings, facility_queue_settings, queue_entries, queue_entry_events, reason_code_catalogue, service_time_stats, session_reserved_slots, specialty_service_defaults, tenant_reason_codes, waitlist_entries]
+    reads: [tenants]  # ACC-040: the clinic name shown on the WhatsApp booking card (no organization.api accessor yet)
   shared:
-    owns: [idempotency_keys, projector_applied_events, shedlock]
-    reads: []
+    owns: [file_blocked_alerts, file_objects, idempotency_keys, projector_applied_events, shedlock]
+    reads: [staff, roles]  # PLT-029: file_blocked_alerts fans out to the owner staff (built-in role); no owner API exists yet

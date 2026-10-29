@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../app/', import.meta.url));
 const src = (p) => readFileSync(root + p, 'utf8');
-const FILES = ['components/myday/useMyDay.ts', 'components/doctorlists/api.ts', 'components/myschedule/useMySchedule.ts', 'consult/page.tsx', 'components/consult/RxPrint.tsx'];
+const FILES = ['components/myday/useMyDay.ts', 'components/doctorlists/api.ts', 'components/myschedule/useMySchedule.ts', '(clinic)/consult/page.tsx', 'components/consult/queue/useConsultQueue.ts', 'components/consult/visit/useVisitLoad.ts', 'components/consult/visit/useAuthedFetch.ts', 'components/consult/RxPrint.tsx'];
 
 for (const f of FILES) {
   test(`AC3 ${f}: 0 raw fetch calls`, () => {
@@ -40,12 +40,13 @@ test('prefetch is wired on focus and hover (My Day) and on row hover/focus/arrow
   const d = src('components/myday/MyDayParts.tsx');
   assert.equal((d.match(/onMouseEnter=\{warm/g) ?? []).length, 2);
   assert.equal((d.match(/onFocus=\{warm/g) ?? []).length, 2);
-  const c = src('consult/page.tsx');
-  assert.match(c, /onMouseEnter=\{\(\) => warm\(r\)\} onFocus=\{\(\) => warm\(r\)\} onKeyDown=\{rowArrows\}/);
+  const c = src('components/consult/queue/QueueList.tsx'); // FEF-030: the queue table moved here
+  assert.match(c, /onMouseEnter=\{\(\) => q\.warm\(r\)\} onFocus=\{\(\) => q\.warm\(r\)\} onKeyDown=\{rowArrows\}/);
+  assert.match(src('components/consult/queue/useConsultQueue.ts'), /prefetchVisit\(qc, r\.id/);
 });
 
 test('opening a visit cancels the previous visit\'s reads (abort)', () => {
-  const c = src('consult/page.tsx');
-  assert.match(c, /openAbortRef\.current\?\.abort\(\)/);
+  const c = src('components/consult/visit/useVisitLoad.ts'); // FEF-030: the open-visit reads moved here; the workspace unmounts per visit
+  assert.match(c, /ctl\.abort\(\)/);
   assert.match(c, /cancelQueries\(\{ queryKey: visitReadKey/);
 });

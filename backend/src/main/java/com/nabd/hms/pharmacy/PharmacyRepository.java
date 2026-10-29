@@ -13,6 +13,8 @@ import java.util.UUID;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingItemRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
+import static com.nabd.hms.pharmacy.PharmacyModels.RuleRow;
+import static com.nabd.hms.pharmacy.PharmacyModels.SettingsRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.StockMovementRow;
 
 /** Pharmacy items are charge_catalogue rows tagged with a non-null stock_qty — no parallel item
@@ -37,38 +39,102 @@ class PharmacyRepository {
                 (rs, i) -> rs.getString("mode"), tenantId).stream().findFirst();
     }
 
-    void upsertMode(UUID tenantId, String mode) {
-        jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode) VALUES (?, ?) " +
-                        "ON CONFLICT (tenant_id) DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()",
-                tenantId, mode);
+    Optional<SettingsRow> findSettings(UUID tenantId) {
+        return jdbc.query("SELECT mode, mode_changed_at, drug_licence_numbers::text AS lic, pharmacist_in_charge_staff_id, " +
+                        "alert_recipient_staff_id FROM pharmacy_settings WHERE tenant_id = ?",
+                (rs, i) -> new SettingsRow(rs.getString("mode"),
+                        rs.getTimestamp("mode_changed_at") == null ? null : rs.getTimestamp("mode_changed_at").toInstant(),
+                        rs.getString("lic"), uuid(rs.getString("pharmacist_in_charge_staff_id")),
+                        uuid(rs.getString("alert_recipient_staff_id"))), tenantId).stream().findFirst();
     }
 
-    List<PharmacyItemRow> listItems(UUID tenantId) {
-        return jdbc.query(
-                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active, drug_id " +
-                        "FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL ORDER BY name",
-                itemMapper(), tenantId);
+    /** PHL-004: writes the whole settings row; mode_changed_* move only when the mode really changed. */
+    void saveSettings(UUID tenantId, String mode, boolean modeChanged, UUID actorId, String licenceJson, UUID inCharge, UUID alertTo) {
+        jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode, mode_changed_at, mode_changed_by, drug_licence_numbers, " +
+                        "pharmacist_in_charge_staff_id, alert_recipient_staff_id) " +
+                        "VALUES (?, ?, CASE WHEN ? THEN now() END, CASE WHEN ? THEN ?::uuid END, ?::jsonb, ?, ?) " +
+                        "ON CONFLICT (tenant_id) DO UPDATE SET mode = EXCLUDED.mode, " +
+                        "mode_changed_at = COALESCE(EXCLUDED.mode_changed_at, pharmacy_settings.mode_changed_at), " +
+                        "mode_changed_by = COALESCE(EXCLUDED.mode_changed_by, pharmacy_settings.mode_changed_by), " +
+                        "drug_licence_numbers = EXCLUDED.drug_licence_numbers, " +
+                        "pharmacist_in_charge_staff_id = EXCLUDED.pharmacist_in_charge_staff_id, " +
+                        "alert_recipient_staff_id = EXCLUDED.alert_recipient_staff_id, updated_at = now()",
+                tenantId, mode, modeChanged, modeChanged, actorId == null ? null : actorId.toString(), licenceJson, inCharge, alertTo);
+    }
+
+    private static UUID uuid(String s) {
+        return s == null ? null : UUID.fromString(s);
+    }
+
+    private static final String ITEM_SELECT =
+            "SELECT c.id, c.code, c.name, c.is_rx, c.hsn_code, c.base_amount, c.tax_rate_percent, c.stock_qty, c.active, c.drug_id, " +
+                    "COALESCE(p.schedule_class, 'OTC') AS schedule_class, " +
+                    "(SELECT max(r.register_type) FROM pharmacy_schedule_rules r WHERE r.schedule_class = p.schedule_class) AS register_type, " +
+                    "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house, " +
+                    "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp " +
+                    "FROM charge_catalogue c LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id ";
+
+    /** @param scheduleClass optional PHL-002 filter (index on tenant_id, schedule_class) */
+    List<PharmacyItemRow> listItems(UUID tenantId, String scheduleClass) {
+        return jdbc.query(ITEM_SELECT + "WHERE c.tenant_id = ? AND c.stock_qty IS NOT NULL AND (?::text IS NULL OR p.schedule_class = ?) ORDER BY c.name",
+                itemMapper(), tenantId, scheduleClass, scheduleClass);
     }
 
     Optional<PharmacyItemRow> findItem(UUID tenantId, UUID id) {
-        return jdbc.query(
-                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active, drug_id " +
-                        "FROM charge_catalogue WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
+        return jdbc.query(ITEM_SELECT + "WHERE c.tenant_id = ? AND c.id = ? AND c.stock_qty IS NOT NULL",
                 itemMapper(), tenantId, id).stream().findFirst();
     }
 
     /** V2-004: row lock held to the end of the transaction, so a manual adjustment and a checkout dispense
      * on the same item run one after the other and each sees the other's result. */
     Optional<PharmacyItemRow> lockItem(UUID tenantId, UUID id) {
-        return jdbc.query(
-                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active, drug_id " +
-                        "FROM charge_catalogue WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL FOR UPDATE",
+        return jdbc.query(ITEM_SELECT + "WHERE c.tenant_id = ? AND c.id = ? AND c.stock_qty IS NOT NULL FOR UPDATE OF c",
                 itemMapper(), tenantId, id).stream().findFirst();
     }
 
-    void setStock(UUID tenantId, UUID id, int newQty) {
-        jdbc.update("UPDATE charge_catalogue SET stock_qty = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
-                newQty, tenantId, id);
+    /** PHL-003: the one stock write. Guarded, so the balance never goes below zero; empty = no such item or not enough. */
+    Optional<Integer> applyDelta(UUID tenantId, UUID id, int delta) {
+        return jdbc.query("UPDATE charge_catalogue SET stock_qty = stock_qty + ?, updated_at = now() " +
+                        "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL AND stock_qty + ? >= 0 RETURNING stock_qty",
+                (rs, i) -> rs.getInt("stock_qty"), delta, tenantId, id, delta).stream().findFirst();
+    }
+
+    Optional<UUID> findStockedItemByCode(UUID tenantId, String code) {
+        return jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
+                (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, code).stream().findFirst();
+    }
+
+    Optional<String> scheduleClassOf(UUID tenantId, UUID itemId) {
+        return jdbc.query("SELECT schedule_class FROM pharmacy_item_profiles WHERE tenant_id = ? AND item_id = ?",
+                (rs, i) -> rs.getString("schedule_class"), tenantId, itemId).stream().findFirst();
+    }
+
+    /** PHL-002: class and descriptive fields; a null generic/pack/unit/inHouse leaves the stored value. */
+    void upsertProfile(UUID tenantId, UUID itemId, String scheduleClass, String genericName, Integer packSize, String unit, Boolean inHouse) {
+        jdbc.update("INSERT INTO pharmacy_item_profiles (item_id, tenant_id, schedule_class, generic_name, pack_size, unit, in_house) " +
+                        "VALUES (?,?,?,?,?,?,COALESCE(?, true)) ON CONFLICT (item_id) DO UPDATE SET schedule_class = EXCLUDED.schedule_class, " +
+                        "generic_name = COALESCE(?, pharmacy_item_profiles.generic_name), pack_size = COALESCE(?, pharmacy_item_profiles.pack_size), " +
+                        "unit = COALESCE(?, pharmacy_item_profiles.unit), in_house = COALESCE(?, pharmacy_item_profiles.in_house)",
+                itemId, tenantId, scheduleClass, genericName, packSize, unit, inHouse, genericName, packSize, unit, inHouse);
+    }
+
+    List<RuleRow> rulesForMarket(String market) {
+        return jdbc.query("SELECT schedule_class, label, requires_rx, register_type, duplicate_rx_copy, retention_years, " +
+                        "refill_self_serve_allowed, drug_master_flag FROM pharmacy_schedule_rules WHERE market = ? ORDER BY schedule_class <> 'OTC', schedule_class",
+                (rs, i) -> new RuleRow(rs.getString("schedule_class"), rs.getString("label"), rs.getBoolean("requires_rx"),
+                        rs.getString("register_type"), rs.getBoolean("duplicate_rx_copy"), (Integer) rs.getObject("retention_years"),
+                        rs.getBoolean("refill_self_serve_allowed"), rs.getString("drug_master_flag")), market);
+    }
+
+    /** PHL-004: lower-cased names of active items this clinic does not dispense (flagged in_house = false). */
+    List<String> buyOutsideNames(UUID tenantId) {
+        return jdbc.queryForList("SELECT lower(btrim(c.name)) FROM charge_catalogue c JOIN pharmacy_item_profiles p " +
+                "ON p.item_id = c.id AND p.tenant_id = c.tenant_id WHERE c.tenant_id = ? AND c.active AND NOT p.in_house ORDER BY 1",
+                String.class, tenantId);
+    }
+
+    String tenantMarket(UUID tenantId) {
+        return jdbc.queryForObject("SELECT trim(region_code) FROM tenants WHERE id = ?", String.class, tenantId);
     }
 
     void setActive(UUID tenantId, UUID id, boolean active) {
@@ -86,14 +152,6 @@ class PharmacyRepository {
                 "WHERE tenant_id = ? AND id = ?", active, drugId, tenantId, id);
     }
 
-    /** Append-only (trigger-enforced in V51): one row per stock change. */
-    void insertMovement(UUID tenantId, UUID itemId, String kind, int delta, int qtyBefore, int qtyAfter, String reason,
-                        UUID actorId) {
-        jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, actor_id) " +
-                        "VALUES (?,?,?,?,?,?,?,?)",
-                tenantId, itemId, kind, delta, qtyBefore, qtyAfter, reason, actorId);
-    }
-
     List<StockMovementRow> listMovements(UUID tenantId, UUID itemId) {
         return jdbc.query(
                 "SELECT m.id, m.kind, m.delta, m.qty_before, m.qty_after, m.reason, m.actor_id, s.name AS actor_name, m.occurred_at " +
@@ -108,22 +166,22 @@ class PharmacyRepository {
 
     UUID insertItem(UUID tenantId, String code, PharmacyItemWriteRequest req) {
         UUID id = UUID.randomUUID();
+        // stock_qty starts at 0: opening stock goes through StockCommands (movement row + audit). is_rx is set by the profile trigger.
         jdbc.update(
                 "INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, tax_rate_percent, " +
                         "is_rx, hsn_code, stock_qty, active, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 id, tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
-                req.isRx(), req.hsnCode(), req.stockQtyOrZero(), true, java.sql.Date.valueOf(clock.today(tenantId)));
+                req.isRx(), req.hsnCode(), 0, true, java.sql.Date.valueOf(clock.today(tenantId)));
         return id;
     }
 
-    /** Name, price, tax, Rx flag and HSN only. Stock is never written here (V2-004): it changes through
-     * stock adjustments (delta or stock-take) and checkout dispenses, each of which leaves a movement row. */
+    /** Name, price, tax and HSN only. Stock is never written here (V2-004); is_rx follows the schedule class (PHL-002). */
     int updateItem(UUID tenantId, UUID id, PharmacyItemWriteRequest req) {
         return jdbc.update(
-                "UPDATE charge_catalogue SET name = ?, base_amount = ?, tax_rate_percent = ?, is_rx = ?, " +
+                "UPDATE charge_catalogue SET name = ?, base_amount = ?, tax_rate_percent = ?, " +
                         "hsn_code = ?, updated_at = now() " +
                         "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
-                req.name(), req.price(), req.taxRatePercentOrZero(), req.isRx(), req.hsnCode(),
+                req.name(), req.price(), req.taxRatePercentOrZero(), req.hsnCode(),
                 tenantId, id);
     }
 
@@ -162,6 +220,9 @@ class PharmacyRepository {
     private RowMapper<PharmacyItemRow> itemMapper() {
         return (rs, i) -> new PharmacyItemRow(UUID.fromString(rs.getString("id")), rs.getString("code"),
                 rs.getString("name"), rs.getBoolean("is_rx"), rs.getString("hsn_code"), rs.getBigDecimal("base_amount"),
-                rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"), rs.getString("drug_id"));
+                rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"), rs.getString("drug_id"),
+                rs.getString("schedule_class"), rs.getString("register_type"), rs.getString("generic_name"),
+                (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"),
+                (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"));
     }
 }

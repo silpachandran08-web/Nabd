@@ -32,13 +32,10 @@ jobs:
       - name: pnpm audit runtime deps
         run: pnpm audit --prod --audit-level=high
       - name: Trivy fs scan
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          scan-type: fs
-          scan-ref: frontend
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+        working-directory: ${{ github.workspace }}
+        run: |
+          scripts/ci/install-trivy.sh
+          ./trivy fs --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 frontend
       - name: OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@main
         with:

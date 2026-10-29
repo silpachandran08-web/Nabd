@@ -47,7 +47,7 @@ test("audit gate: allowlist works until expiry day, then fails and reports expir
 test("workflow parses as YAML and carries audit, trivy, dependency-check, sbom, 365d retention", () => {
   const py = spawnSync("python3", ["-c", "import sys,yaml;d=yaml.safe_load(open(sys.argv[1]));print(list(d['jobs']))", root + ".github/workflows/frontend-supply-chain.yml"], { encoding: "utf8" });
   assert.equal(py.status, 0, py.stderr);
-  for (const s of ["pnpm audit --prod --audit-level=high", "trivy-action", "exit-code: \"1\"", "HIGH,CRITICAL", "Dependency-Check", "cyclonedx", "retention-days: 365", "upload-artifact", "pull_request"]) {
+  for (const s of ["pnpm audit --prod --audit-level=high", "install-trivy.sh", "--exit-code 1", "HIGH,CRITICAL", "Dependency-Check", "cyclonedx", "retention-days: 365", "upload-artifact", "pull_request"]) {
     assert.ok(wf.includes(s), s);
   }
 });

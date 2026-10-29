@@ -28,18 +28,18 @@ class DentalRepository {
     /** NB-122: full chart, one row per tooth ever annotated (unannotated teeth are implicitly healthy),
      * plus any supernumerary teeth — the frontend separates the two by isSupernumerary. */
     List<ToothRow> findByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT * FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? " +
+        return jdbc.query("SELECT id, tenant_id, patient_id, tooth_number, status, note, updated_by, updated_at, is_supernumerary FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? " +
                         "ORDER BY tooth_number",
                 mapper(), tenantId, patientId);
     }
 
     Optional<ToothRow> findById(UUID tenantId, UUID patientId, UUID id) {
-        return jdbc.query("SELECT * FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? AND id = ?",
+        return jdbc.query("SELECT id, tenant_id, patient_id, tooth_number, status, note, updated_by, updated_at, is_supernumerary FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? AND id = ?",
                 mapper(), tenantId, patientId, id).stream().findFirst();
     }
 
     Optional<ToothRow> findByToothNumber(UUID tenantId, UUID patientId, int toothNumber) {
-        return jdbc.query("SELECT * FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? " +
+        return jdbc.query("SELECT id, tenant_id, patient_id, tooth_number, status, note, updated_by, updated_at, is_supernumerary FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? " +
                         "AND tooth_number = ? AND NOT is_supernumerary",
                 mapper(), tenantId, patientId, toothNumber).stream().findFirst();
     }

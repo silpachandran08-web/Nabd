@@ -27,6 +27,17 @@ final class Http {
         return send(builder(url).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(json)).build());
     }
 
+    /** Core's @Idempotent endpoints: the same key replays the stored answer instead of acting twice. */
+    String post(String url, String json, String idempotencyKey) {
+        return send(builder(url).header("Content-Type", "application/json").header("Idempotency-Key", idempotencyKey)
+                .POST(HttpRequest.BodyPublishers.ofString(json)).build());
+    }
+
+    String patch(String url, String json, String idempotencyKey) {
+        return send(builder(url).header("Content-Type", "application/json").header("Idempotency-Key", idempotencyKey)
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(json)).build());
+    }
+
     private HttpRequest.Builder builder(String url) {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).timeout(timeout);
         if (!token.isBlank()) {
@@ -39,7 +50,7 @@ final class Http {
         try {
             HttpResponse<String> r = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (r.statusCode() / 100 != 2) {
-                throw new IllegalStateException("upstream status " + r.statusCode());
+                throw new UpstreamStatusException(r.statusCode(), r.body());
             }
             return r.body();
         } catch (IOException e) {
@@ -47,6 +58,19 @@ final class Http {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("interrupted", e);
+        }
+    }
+
+    /** A non-2xx answer; the status lets a caller tell a rule refusal (409) from an outage. Same message as before. */
+    static final class UpstreamStatusException extends IllegalStateException {
+        final int status;
+        /** Problem+json from Core (error codes only; never logged). */
+        final String body;
+
+        UpstreamStatusException(int status, String body) {
+            super("upstream status " + status);
+            this.status = status;
+            this.body = body == null ? "" : body;
         }
     }
 }

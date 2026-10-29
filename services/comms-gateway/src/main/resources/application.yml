@@ -26,3 +26,7 @@ comms:
     batch-size: 50
     max-attempts: 5
     claim-idle-ms: 60000
+# Optional, set per environment (leave unset to keep the feature off; an empty value would switch it on):
+#   comms.core.base-url + comms.core.token   COM-023 scheduler and claim check against Core /internal/v1 (CORE_INTERNAL_URL, CORE_COMMS_TOKEN)
+#   comms.scheduler.tick-ms (15000), comms.scheduler.batch (500)
+#   comms.field-key (base64, 32 bytes) + comms.internal-token   COM-030 inbox (COMMS_FIELD_KEY, COMMS_INTERNAL_TOKEN)

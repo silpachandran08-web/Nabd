@@ -78,7 +78,7 @@ await run('registry', async () => {
 await run('register', async () => {
   const posts = [];
   const s = await open('/patients', RECEPTION, [
-    ['GET', /^\/patients\/guardian-reviews-due/, { body: [] }], ['GET', /^\/queue/, { body: [] }],
+    ['GET', /^\/patients\/guardian-reviews-due/, { body: [] }], ['GET', /^\/queue/, { body: [] }], ['GET', /^\/abha\/status/, { body: { enabled: false } }], // IDC-017
     ['GET', /^\/patients\/registry/, { body: regPage(0, 2, null) }],
     ['POST', /^\/patients$/, async (r, req) => {
       posts.push({ key: req.headers()['idempotency-key'], body: req.postData() });
@@ -254,7 +254,7 @@ await run('packages-403', async () => {
 });
 await run('pharmacy', async () => {
   const s = await open('/pharmacy', ['pharmacy:view', 'pharmacy:edit'], [
-    ['GET', /^\/queue/, { body: [] }], ['GET', /^\/pharmacy\/settings/, { body: { mode: 'hybrid' } }], ['GET', /^\/pharmacy\/items/, { body: [] }], ['GET', /^\/pharmacy\/dispensing-queue/, { body: [] }],
+    ['GET', /^\/queue/, { body: [] }], ['GET', /^\/pharmacy\/settings/, { body: { mode: 'hybrid' } }], ['GET', /^\/pharmacy\/capabilities/, { body: { mode: 'hybrid', features: [] } }], ['GET', /^\/pharmacy\/schedule-classes/, { body: [] }], ['GET', /^\/pharmacy\/items/, { body: [] }], ['GET', /^\/pharmacy\/dispensing-queue/, { body: [] }], // PHL-002/004 fixtures: capabilities, schedule-classes
     ['POST', /^\/pharmacy\/items$/, problem(400, [{ field: 'price', message: 'must not be negative' }])]]);
   await s.page.locator('#ph-name').fill('Sunscreen');
   await s.page.locator('#ph-price').fill('5');

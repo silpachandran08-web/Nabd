@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8');
+// FEF-022: the --nb-* values moved from app/globals.css to the generated packages/tokens/dist/tokens.css (dark :root is the first block).
+const css = readFileSync(new URL('../../../../packages/tokens/dist/tokens.css', import.meta.url), 'utf8');
 const tok = (n) => css.match(new RegExp(`--nb-${n}:\\s*([^;]+);`))[1].trim();
 const rgb = (c) => c.startsWith('#') ? [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) : c.match(/[\d.]+/g).slice(0, 3).map(Number);
 const alpha = (c) => (c.startsWith('rgba') ? Number(c.match(/[\d.]+/g)[3]) : 1);

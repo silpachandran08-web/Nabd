@@ -129,7 +129,7 @@ class Acc038InternalApiTest extends ApiTestBase {
                 .isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(post(b.base() + "/appointments", a.edgeToken(), Map.of("patientRef", "x", "doctorId", b.doctorId().toString(), "startTime", b.slot().toString()))
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(post(b.base() + "/appointments/" + UUID.randomUUID() + "/cancel", a.edgeToken(), Map.of("patientRef", "x", "reasonCode", "changed_mind"))
+        assertThat(post(b.base() + "/appointments/" + UUID.randomUUID() + "/cancel", a.edgeToken(), Map.of("patientRef", "x", "reasonCode", "illness"))
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(exchange(b.base() + "/households/not-a-uuid-tenant", HttpMethod.GET, authed(a.edgeToken()), Map.class).getStatusCode()).isNotEqualTo(HttpStatus.OK);
         // a token naming both clinics may call both
@@ -257,7 +257,7 @@ class Acc038InternalApiTest extends ApiTestBase {
         assertThat(confirm.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(confirm.getBody()).containsEntry("appointmentId", id.toString()).containsEntry("status", "scheduled");
 
-        ResponseEntity<Map> notOwner = post(actions + "/cancel", c.edgeToken(), Map.of("patientRef", refB, "reasonCode", "changed_mind"));
+        ResponseEntity<Map> notOwner = post(actions + "/cancel", c.edgeToken(), Map.of("patientRef", refB, "reasonCode", "illness"));
         assertThat(notOwner.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(notOwner.getBody()).containsEntry("code", "NOT_OWNER");
 
@@ -272,14 +272,14 @@ class Acc038InternalApiTest extends ApiTestBase {
         assertThat(newId).isNotEqualTo(id);
         assertThat(su().queryForObject("SELECT status FROM appointments WHERE id = ?", String.class, id)).isEqualTo("cancelled");
 
-        ResponseEntity<Map> cancel = post(c.base() + "/appointments/" + newId + "/cancel", c.edgeToken(), Map.of("patientRef", refA, "reasonCode", "changed_mind"));
+        ResponseEntity<Map> cancel = post(c.base() + "/appointments/" + newId + "/cancel", c.edgeToken(), Map.of("patientRef", refA, "reasonCode", "illness"));
         assertThat(cancel.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(cancel.getBody()).containsEntry("status", "cancelled");
-        assertThat(su().queryForObject("SELECT cancel_reason FROM appointments WHERE id = ?", String.class, newId)).isEqualTo("changed_mind");
+        assertThat(su().queryForObject("SELECT cancel_reason_code FROM appointments WHERE id = ?", String.class, newId)).isEqualTo("illness"); // ACC-007: coded reason
         assertThat(su().queryForList("SELECT action FROM audit_log WHERE tenant_id = ? AND actor_name = 'patient via edge' AND action LIKE 'appointment.%' ORDER BY id", String.class, c.tenant().id()))
                 .containsExactly("appointment.booked_via_edge", "appointment.confirmed_via_edge", "appointment.rescheduled_via_edge", "appointment.cancelled_via_edge");
         // already cancelled: nothing left to act on
-        assertThat(post(actions + "/cancel", c.edgeToken(), Map.of("patientRef", refA, "reasonCode", "changed_mind")).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(actions + "/cancel", c.edgeToken(), Map.of("patientRef", refA, "reasonCode", "illness")).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -288,7 +288,7 @@ class Acc038InternalApiTest extends ApiTestBase {
         String refA = refOf(c, c.phoneA());
         UUID arrived = UUID.fromString((String) book(c, refA, c.slot()).getBody().get("appointmentId"));
         su().update("UPDATE appointments SET status = 'arrived', arrived_at = now() WHERE id = ?", arrived);
-        ResponseEntity<Map> r = post(c.base() + "/appointments/" + arrived + "/cancel", c.edgeToken(), Map.of("patientRef", refA, "reasonCode", "changed_mind"));
+        ResponseEntity<Map> r = post(c.base() + "/appointments/" + arrived + "/cancel", c.edgeToken(), Map.of("patientRef", refA, "reasonCode", "illness"));
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(r.getBody()).containsEntry("code", "APPOINTMENT_ARRIVED");
 
@@ -296,7 +296,7 @@ class Acc038InternalApiTest extends ApiTestBase {
         inTenantTx(c.tenant().id(), () -> jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, 'cancellation_window_hours', '72')", c.tenant().id()));
         for (String action : List.of("cancel", "reschedule")) {
             ResponseEntity<Map> w = post(c.base() + "/appointments/" + inside + "/" + action, c.edgeToken(),
-                    Map.of("patientRef", refA, "reasonCode", "changed_mind", "newStartTime", c.slot().plusSeconds(7200).toString()));
+                    Map.of("patientRef", refA, "reasonCode", "illness", "newStartTime", c.slot().plusSeconds(7200).toString()));
             assertThat(w.getStatusCode()).as(action).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
             assertThat(w.getBody()).containsEntry("code", "INSIDE_CANCELLATION_WINDOW");
         }
@@ -309,7 +309,7 @@ class Acc038InternalApiTest extends ApiTestBase {
         String refOfA = refOf(a, a.phoneA());
         UUID bAppointment = UUID.fromString((String) book(b, refOf(b, b.phoneA()), b.slot()).getBody().get("appointmentId"));
         String both = InternalTestTokens.mint(encoder, EDGE, a.tenant().id(), b.tenant().id());
-        ResponseEntity<Map> r = post(b.base() + "/appointments/" + bAppointment + "/cancel", both, Map.of("patientRef", refOfA, "reasonCode", "changed_mind"));
+        ResponseEntity<Map> r = post(b.base() + "/appointments/" + bAppointment + "/cancel", both, Map.of("patientRef", refOfA, "reasonCode", "illness"));
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(su().queryForObject("SELECT status FROM appointments WHERE id = ?", String.class, bAppointment)).isEqualTo("scheduled");
         // RLS on the new table: tenant B's transaction sees none of tenant A's references
@@ -334,7 +334,7 @@ class Acc038InternalApiTest extends ApiTestBase {
         List<Map<String, Object>> members = (List<Map<String, Object>>) body.get("members");
         assertThat(members).hasSize(2);
         for (Map<String, Object> m : members) {
-            assertThat(m.keySet()).containsExactlyInAnyOrder("patientRef", "firstName", "age", "relation", "isGuardian");
+            assertThat(m.keySet()).containsExactlyInAnyOrder("patientRef", "firstName", "age", "years", "relation", "isGuardian");
         }
         Map<String, Object> guardian = members.stream().filter(m -> "Asha".equals(m.get("firstName"))).findFirst().orElseThrow();
         Map<String, Object> dependant = members.stream().filter(m -> "Chitra".equals(m.get("firstName"))).findFirst().orElseThrow();

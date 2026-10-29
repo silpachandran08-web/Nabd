@@ -17,3 +17,4 @@ output "kms" { value = one(module.aws[*].kms) }
 output "dns" { value = one(module.aws[*].dns) }
 output "backup" { value = one(module.aws[*].backup) }
 output "dr" { value = one(module.aws[*].dr) }
+output "dr_standby" { value = one(module.aws[*].dr_standby) } # OPS-059

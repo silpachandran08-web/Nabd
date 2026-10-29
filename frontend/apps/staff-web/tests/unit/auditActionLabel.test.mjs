@@ -1,7 +1,7 @@
 // PLT-036: platform audit actions render readably; unknown or missing codes never crash. `npm run -s test:unit`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { actionLabel } from "../../app/platform/audit/actionLabel.ts";
+import { actionLabel } from "../../app/(platform)/platform/audit/actionLabel.ts";
 
 test("known codes get a readable label", () => {
   assert.equal(actionLabel("support_access.grant"), "Support access granted");

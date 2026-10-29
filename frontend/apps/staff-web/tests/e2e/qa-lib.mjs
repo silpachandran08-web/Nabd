@@ -1,6 +1,8 @@
 // Shared E2E helpers: browser launch, session seeding, API mocking with request log. Set APP (base URL) and SHOTS (screenshot dir) via env.
 // FEF-049: CI overrides the Playwright module and browser (PLAYWRIGHT_MODULE, PW_CHROMIUM=''); defaults are the sandbox paths.
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? '/home/claude/ws/qa/node_modules/playwright/index.mjs');
+// FEF-050: PW_BROWSER (chromium|webkit|firefox) and PW_CHANNEL (msedge) pick the engine for the weekly cross-browser smoke; defaults unchanged.
+const pw = await import(process.env.PLAYWRIGHT_MODULE ?? '/home/claude/ws/qa/node_modules/playwright/index.mjs');
+const chromium = pw[process.env.PW_BROWSER || 'chromium'];
 export const APP = process.env.APP ?? 'http://localhost:3000';
 export const API = 'http://localhost:8080/v1';
 export const SHOTS = process.env.SHOTS ?? '/tmp/e2e-shots';
@@ -15,7 +17,7 @@ export function clinicToken(permissions, extra = {}) {
 }
 
 export async function launch(opts = {}) {
-  const browser = await chromium.launch({ executablePath: (process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium') || undefined });
+  const browser = await chromium.launch({ executablePath: process.env.PW_BROWSER || process.env.PW_CHANNEL ? undefined : (process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium') || undefined, channel: process.env.PW_CHANNEL || undefined });
   const context = await browser.newContext({ viewport: opts.viewport ?? { width: 1280, height: 900 }, timezoneId: opts.timezoneId ?? 'Asia/Riyadh' });
   const page = await context.newPage();
   const log = { requests: [], console: [], pageErrors: [], unmatched: [] };

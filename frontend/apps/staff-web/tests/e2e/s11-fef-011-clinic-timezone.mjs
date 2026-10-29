@@ -19,6 +19,7 @@ async function myDay({ nowUtc, profile, day, viewport, region = 'IN' }) {
     ['GET', /^\/queue\/wait-estimate/, { body: { estimatedMinutes: 0, patientsAhead: 0, avgVisitMinutes: 10, basedOnHistory: false } }],
     ['GET', /^\/doctors\/.*\/delay/, { body: [] }],
     ['GET', /^\/clinical\/conditions\/due/, { body: [] }],
+    ['GET', /^\/patients\/batch/, { body: [patient] }], // FEF-016 batched summaries
     ['GET', /^\/patients\/p1/, { body: patient }],
     ['GET', /^\/queue(\?|$)/, { body: [] }],
   ]);
@@ -96,7 +97,7 @@ async function myDay({ nowUtc, profile, day, viewport, region = 'IN' }) {
   await page.getByText('Riyadh Clinic').waitFor({ timeout: 15000 }).catch(() => {});
   await sleep(300);
   // no zone lookups allowed -> region default IN = Kolkata: the sheet must show 11 Mar (Kolkata 01:30)
-  const kolkata = await page.locator('article').innerText().catch(() => '');
+  const kolkata = await page.locator('article[aria-label]').innerText().catch(() => '');
   check('F: without a configured zone the sheet follows the session fallback (Kolkata, 11 Mar 2026)', /11 Mar 2026/.test(kolkata), kolkata.match(/\d{2} \w{3} \d{4}/g)?.join(','));
   check('F: calendar dob printed as-is (01 Jan 1990)', /01 Jan 1990/.test(kolkata));
   await browser.close();
@@ -111,7 +112,7 @@ async function myDay({ nowUtc, profile, day, viewport, region = 'IN' }) {
   ]);
   await page.goto(APP + '/documents/d1/print');
   await page.waitForFunction(() => /10 Mar 2026/.test(document.querySelector('article')?.innerText ?? ''), null, { timeout: 15000 }).catch(() => {});
-  const t = await page.locator('article').innerText().catch(() => '');
+  const t = await page.locator('article[aria-label]').innerText().catch(() => '');
   check('F AC2: Riyadh clinic (session zone) prints 10 Mar 2026 even though header region is IN', /Date\s*10 Mar 2026/i.test(t) && !/11 Mar 2026/.test(t), t.match(/\d{2} \w{3} \d{4}/g)?.join(','));
   check('F: zero console errors', errs(log).length === 0, errs(log).slice(0, 2).join('|'));
   dumpLog('F', log);

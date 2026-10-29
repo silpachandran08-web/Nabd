@@ -223,7 +223,7 @@ class S10QaSlotRulesTest extends ApiTestBase {
     void ac5_cancelledSlotRebooksImmediately_andRescheduleFreesTheOldSlot() {
         Clinic c = clinic("Asia/Kolkata");
         String first = (String) book(c, c.at("10:00")).getBody().get("id");
-        assertThat(exchange("/v1/appointments/" + first + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reason", "changed mind")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(exchange("/v1/appointments/" + first + "/cancel", HttpMethod.POST, authedJsonBody(c.token, Map.of("reasonCode", "illness")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<Map> again = book(c, patient(c.token), c.at("10:00"));
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String id = (String) again.getBody().get("id");

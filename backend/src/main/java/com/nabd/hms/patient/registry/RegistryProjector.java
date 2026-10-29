@@ -55,19 +55,25 @@ public class RegistryProjector {
     public void drain() { // serialises the poller with explicit callers: SKIP LOCKED made a concurrent caller return before the poller's claim committed
         drainLock.lock();
         try {
-            for (UUID tenantId : tx.execute(s -> repo.dirtyTenants(100))) {
-                try { // one tenant's failing batch (e.g. a statement timeout) must not starve the others
-                    int claimed;
-                    do {
-                        claimed = tx.execute(s -> {
-                            tenantContext.set(tenantId);
-                            List<UUID> ids = repo.claimDirty(tenantId, BATCH);
-                            publish(tenantId, repo.upsert(tenantId, ids));
-                            return ids.size();
-                        });
-                    } while (claimed == BATCH);
-                } catch (RuntimeException e) {
-                    log.warn("registry projector pass failed for tenant {}: {}", tenantId, e.toString());
+            java.util.Set<UUID> failed = new java.util.HashSet<>();
+            List<UUID> tenants;
+            // dirtyTenants returns at most 100: keep going until no tenant (other than ones that failed this pass) is left, so an explicit drain() really drains
+            while (!(tenants = tx.execute(s -> repo.dirtyTenants(100)).stream().filter(t -> !failed.contains(t)).toList()).isEmpty()) {
+                for (UUID tenantId : tenants) {
+                    try { // one tenant's failing batch (e.g. a statement timeout) must not starve the others
+                        int claimed;
+                        do {
+                            claimed = tx.execute(s -> {
+                                tenantContext.set(tenantId);
+                                List<UUID> ids = repo.claimDirty(tenantId, BATCH);
+                                publish(tenantId, repo.upsert(tenantId, ids));
+                                return ids.size();
+                            });
+                        } while (claimed == BATCH);
+                    } catch (RuntimeException e) {
+                        failed.add(tenantId);
+                        log.warn("registry projector pass failed for tenant {}: {}", tenantId, e.toString());
+                    }
                 }
             }
         } catch (RuntimeException e) {

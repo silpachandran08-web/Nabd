@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:comms.sender.throttled.v1",
+  "title": "comms.sender.throttled.v1",
+  "description": "A WhatsApp sender's quality rating, messaging tier, block rate or ops override changed, and with it the lanes it may send on (COM-021). Alerts the owner and platform ops.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "senderAccountId", "kind", "from", "to", "throttleMode", "version"],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Owner clinic; the nil UUID for the shared Nabd sender."
+    },
+    "senderAccountId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "kind": { "type": "string", "enum": ["rating", "tier", "block_rate", "override"] },
+    "from": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,40}$", "description": "Previous rating, tier or throttle mode ('none' if unknown)." },
+    "to": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,40}$" },
+    "throttleMode": { "type": "string", "enum": ["auto", "bulk_paused", "replies_only"] },
+    "version": { "type": "integer", "minimum": 1, "description": "sender_quality_events id: monotonic." }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "senderAccountId": "66666666-6666-4666-8666-666666666666",
+      "kind": "rating",
+      "from": "GREEN",
+      "to": "YELLOW",
+      "throttleMode": "bulk_paused",
+      "version": 3
+    }
+  ]
+}

@@ -22,7 +22,7 @@ import java.util.UUID;
  * One shared Spring context for every Edge test: real Postgres 16 (Testcontainers; the app connects as the non-owner role
  * edge_app so FORCE RLS really applies, Flyway runs as the superuser), a Redis 6.2 stand-in for Valkey, fake Core and Comms.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "edge.booking-flow=false")
 @AutoConfigureTestRestTemplate
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class EdgeTestBase {
@@ -60,10 +60,11 @@ abstract class EdgeTestBase {
         r.add("edge.comms-url", UP::commsUrl);
         r.add("edge.button-key", () -> BUTTON_KEY);
         r.add("edge.ip-per-min", () -> "30");
+        r.add("edge.notice-base-url", () -> "https://notice.example.test");
     }
 
     @Autowired StringRedisTemplate valkey;
-    @Autowired CountingHandler counting;
+    @Autowired(required = false) CountingHandler counting;
     @Autowired DataSource dataSource;
     @Autowired EdgeProperties props;
 
@@ -73,7 +74,25 @@ abstract class EdgeTestBase {
         UP.slotsByDoctor.clear();
         UP.coreDelayMs = 0;
         UP.coreCalls.set(0);
-        counting.invocations.set(0);
+        UP.relayed.clear();
+        UP.checkIns.clear();
+        UP.checkInReplies.clear();
+        UP.consentStatus = 201;
+        UP.coreHook = null;
+        UP.coreLog.clear();
+        UP.noticeVersion = "v1";
+        if (counting != null) {
+            counting.invocations.set(0);
+        }
+        UP.profiles.clear();
+        UP.households.clear();
+        UP.rawSessions.clear();
+        UP.corePaths.clear();
+        UP.bookCalls.clear();
+        UP.dependantCalls.clear();
+        UP.bookResults.clear();
+        UP.bookMode = "confirmed";
+        UP.dependantStatus = 201;
         valkey.keys("edge:avail:*").forEach(valkey::delete);
     }
 

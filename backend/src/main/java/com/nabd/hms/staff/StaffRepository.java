@@ -121,6 +121,12 @@ class StaffRepository {
         return jdbc.queryForObject("SELECT count(*) FROM staff WHERE tenant_id = ? AND status IN ('invited','active')", Integer.class, tenantId);
     }
 
+    /** ADM-018: a new single-use link for a still-pending invite (the old token stops working). */
+    int renewInvite(UUID tenantId, UUID id, String inviteTokenHash, Instant inviteExpiresAt) {
+        return jdbc.update("UPDATE staff SET invite_token_hash = ?, invite_expires_at = ? WHERE tenant_id = ? AND id = ? AND status = 'invited'",
+                inviteTokenHash, Timestamp.from(inviteExpiresAt), tenantId, id);
+    }
+
     void suspend(UUID tenantId, UUID id) {
         jdbc.update("UPDATE staff SET status = 'suspended' WHERE tenant_id = ? AND id = ?", tenantId, id);
     }

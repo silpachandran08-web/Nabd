@@ -1,0 +1,13 @@
+.page { max-inline-size: 820px; margin-inline: auto; padding: var(--nb-space-24) var(--nb-space-16); display: flex; flex-direction: column; gap: var(--nb-space-16); }
+.toolbar { display: flex; gap: var(--nb-space-8); flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.toolbarActions { display: flex; gap: var(--nb-space-8); flex-wrap: wrap; }
+.btn { min-height: 36px; padding: 0 var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-8); text-decoration: none; }
+.btnPrimary { composes: btn; border: none; background: var(--nb-accent-gradient); color: var(--nb-on-accent); font-weight: 600; }
+.title { margin: 0; font-size: 16px; font-weight: 600; }
+.note { font-size: 13px; color: var(--nb-text-secondary); margin: 0; }
+
+/* FEF-046: printing (paper size, hiding the shell, black on white) comes from the print kit (PrintSheet). */
+@media print {
+  .noPrint { display: none !important; }
+  .page { padding: 0; }
+}

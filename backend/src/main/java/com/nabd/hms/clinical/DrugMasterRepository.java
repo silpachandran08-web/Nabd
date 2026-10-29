@@ -66,6 +66,40 @@ class DrugMasterRepository {
                 (rs, n) -> new Named(rs.getString("id"), rs.getString("name")), drugId);
     }
 
+    record IndexRow(String id, String brand, String strength, String form, List<String> generic, List<String> schedule) {
+    }
+
+    /** CLN-020 client index: the doctor's favourites first, then by this doctor's and this clinic's usage, then A-Z. */
+    List<IndexRow> indexRows(UUID tenantId, UUID doctorId, String region, int limit) {
+        return jdbc.query("SELECT m.id, m.brand, m.strength, m.form, m.schedule, " +
+                        "(SELECT array_agg(g.name ORDER BY g.name) FROM drug_ingredients d JOIN ingredients g ON g.id = d.ingredient_id WHERE d.drug_id = m.id) AS generic " +
+                        "FROM drug_master m " +
+                        "LEFT JOIN (SELECT drug_id, sum(CASE WHEN doctor_id IS NULL THEN uses ELSE uses * 3 END) AS boost FROM drug_usage " +
+                        "           WHERE tenant_id = ? AND (doctor_id IS NULL OR doctor_id = ?) GROUP BY drug_id) u ON u.drug_id = m.id " +
+                        "WHERE m.region = ? AND m.status = 'active' " +
+                        "ORDER BY (m.id IN (SELECT fi.drug_id FROM favourite_rx_set_items fi JOIN favourite_rx_sets fs " +
+                        "            ON fs.tenant_id = fi.tenant_id AND fs.id = fi.set_id " +
+                        "            WHERE fi.tenant_id = ? AND fi.drug_id IS NOT NULL AND (fs.doctor_id = ? OR fs.doctor_id IS NULL OR fs.shared))) DESC, " +
+                        "COALESCE(u.boost, 0) DESC, m.brand, m.id LIMIT ?",
+                (rs, n) -> new IndexRow(rs.getString("id"), rs.getString("brand"), rs.getString("strength"), rs.getString("form"),
+                        strings(rs.getArray("generic")), strings(rs.getArray("schedule"))),
+                tenantId, doctorId, region, tenantId, doctorId, limit);
+    }
+
+    /** Version of the active drug master of a region; part of the index ETag. */
+    int masterVersion(String region) {
+        Integer v = jdbc.queryForObject("SELECT COALESCE(max(version), 0) FROM drug_master WHERE region = ?", Integer.class, region);
+        return v == null ? 0 : v;
+    }
+
+    boolean ingredientExists(String id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM ingredients WHERE id = ?)", Boolean.class, id));
+    }
+
+    boolean classExists(String id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM drug_classes WHERE id = ?)", Boolean.class, id));
+    }
+
     /** Active products only (retired ones are hidden from new search), prefix match on every word. */
     List<Summary> search(String region, String tsQuery, int limit) {
         return jdbc.query("SELECT m.id, m.brand, m.strength, m.form, m.schedule, " +

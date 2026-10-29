@@ -51,9 +51,9 @@ class SetupRepository {
     List<SetupProgressRow> listProgress(UUID tenantId) {
         ensureProgressSeeded(tenantId);
         return jdbc.query(
-                "SELECT id, step, status, skipped_at, done_at FROM clinic_setup_progress " +
-                        "WHERE tenant_id = ? ORDER BY array_position(ARRAY['welcome','profile','tax','doctors','departments','schedule','charges','pharmacy','whatsapp','go_live'], step)",
-                progressMapper(), tenantId);
+                "SELECT id, step, status, skipped_at, done_at, draft::text AS draft, version, updated_at FROM clinic_setup_progress " +
+                        "WHERE tenant_id = ? ORDER BY array_position(?::text[], step)",
+                progressMapper(), tenantId, SetupSteps.ALL.toArray(new String[0]));
     }
 
     void updateProgress(UUID tenantId, String step, String status) {
@@ -69,12 +69,23 @@ class SetupRepository {
                 status, status, status, tenantId, step);
     }
 
+    /** ADM-007: compare-and-set on the version; the new version, or empty when someone saved first. */
+    java.util.OptionalInt saveDraft(UUID tenantId, String step, String draftJson, int expectedVersion) {
+        ensureProgressSeeded(tenantId);
+        List<Integer> v = jdbc.queryForList("UPDATE clinic_setup_progress SET draft = ?::jsonb, version = version + 1, updated_at = now() " +
+                "WHERE tenant_id = ? AND step = ? AND version = ? RETURNING version", Integer.class, draftJson, tenantId, step, expectedVersion);
+        return v.isEmpty() ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(v.get(0));
+    }
+
+    boolean hasDpaAcceptance() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM dpa_acceptances)", Boolean.class));
+    }
+
     /** Per-step upsert (not a single "seed if empty" guard) so a step added after a tenant already
      * had its checklist seeded — e.g. "departments" — still appears for it, without a one-off
      * migration-time backfill. UNIQUE(tenant_id, step) makes this a no-op for steps already there. */
     private void ensureProgressSeeded(UUID tenantId) {
-        String[] steps = {"welcome", "profile", "tax", "doctors", "departments", "schedule", "charges", "pharmacy", "whatsapp", "go_live"};
-        for (String step : steps) {
+        for (String step : SetupSteps.ALL) {
             jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, ?, 'pending') " +
                     "ON CONFLICT (tenant_id, step) DO NOTHING", tenantId, step);
         }
@@ -118,14 +129,19 @@ class SetupRepository {
     }
 
     UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req) {
+        return insertCharge(tenantId, req, null, null);
+    }
+
+    /** FIN-017: a head from a starter list also carries its tax class and SAC/HSN (FIN-009 columns). */
+    UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req, String taxCategory, String sacHsn) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, follow_up_amount, " +
-                        "emergency_amount, tax_code, tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "emergency_amount, tax_code, tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order, " +
+                        "tax_category, sac_hsn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, tenantId, req.code(), req.name(), req.category(), req.baseAmount(), req.followUpAmount(),
                 req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
                 Date.valueOf(req.effectiveFrom()), req.effectiveTo() == null ? null : Date.valueOf(req.effectiveTo()),
-                req.displayOrder());
+                req.displayOrder(), taxCategory, sacHsn);
         return id;
     }
 
@@ -151,7 +167,7 @@ class SetupRepository {
         ensurePoliciesSeeded(tenantId);
         int n = jdbc.update("UPDATE clinic_policies SET value = ?, version = version + 1, updated_at = now() WHERE tenant_id = ? AND policy_key = ?",
                 value, tenantId, policyKey);
-        if (n == 0 && ("session.idle_lock_minutes".equals(policyKey) || "cash_variance_tolerance".equals(policyKey))) { // FEF-005/FIN-005: not seeded, first write creates it
+        if (n == 0 && ("session.idle_lock_minutes".equals(policyKey) || "cash_variance_tolerance".equals(policyKey) || policyKey.startsWith("print.default_paper."))) { // FEF-005/FIN-005/FEF-046: not seeded, first write creates it
             jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, ?, ?)", tenantId, policyKey, value);
         }
     }
@@ -171,7 +187,8 @@ class SetupRepository {
                 {"no_show_fee_amount", "0"},
                 {"reminder_hours_before", "24,2"},
                 {"refund_rule", "Full refund on unused sessions"},
-                {"appointment_buffer_minutes", "15"}
+                {"appointment_buffer_minutes", "15"},
+                {"follow_up_window_days", "7"} // FIN-015
         };
         for (String[] d : defaults) {
             jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, ?, ?)",
@@ -196,7 +213,9 @@ class SetupRepository {
     // ── Holidays ──
 
     List<HolidayRow> listHolidays(UUID tenantId) {
-        return jdbc.query("SELECT id, holiday_date, name, recurring FROM clinic_holidays WHERE tenant_id = ? ORDER BY holiday_date",
+        return jdbc.query("SELECT id, holiday_date, name, recurring, effect, source_template, " +
+                        "(SELECT string_agg((e->>'from') || '-' || (e->>'to'), ',' ORDER BY o) FROM jsonb_array_elements(short_hours) WITH ORDINALITY AS t(e, o)) AS hours " +
+                        "FROM clinic_holidays WHERE tenant_id = ? ORDER BY holiday_date",
                 holidayMapper(), tenantId);
     }
 
@@ -317,27 +336,27 @@ class SetupRepository {
 
     List<LicenceRow> listLicences(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status " +
-                        "FROM licence_registry WHERE tenant_id = ? ORDER BY licence_type, holder_name",
+                "SELECT id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status, COALESCE((SELECT array_agg(k::int) FROM jsonb_object_keys(reminders_sent) k), '{}'::int[]) AS reminders, " +
+                        "override_until, override_reason, certificate_upload_id " +
+                        "FROM licence_registry WHERE tenant_id = ? ORDER BY expiry_date, licence_type, holder_name",
                 licenceMapper(), tenantId);
     }
 
     UUID insertLicence(UUID tenantId, LicenceWriteRequest req) {
         UUID id = UUID.randomUUID();
-        String status = computeLicenceStatus(req.expiryDate(), clock.today(tenantId));
-        jdbc.update("INSERT INTO licence_registry (id, tenant_id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        String status = "valid"; // ADM-032: the lifecycle pass right after the save sets the real status, so a lapse is seen as a change and announced once
+        jdbc.update("INSERT INTO licence_registry (id, tenant_id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status, certificate_upload_id) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, tenantId, req.licenceType(), req.holderId(), req.holderName(), req.number(),
-                req.issuingBody(), Date.valueOf(req.expiryDate()), req.region(), status);
+                req.issuingBody(), Date.valueOf(req.expiryDate()), req.region(), status, req.certificateUploadId());
         return id;
     }
 
     void updateLicence(UUID tenantId, UUID id, LicenceWriteRequest req) {
-        String status = computeLicenceStatus(req.expiryDate(), clock.today(tenantId));
         jdbc.update("UPDATE licence_registry SET licence_type = ?, holder_id = ?, holder_name = ?, number = ?, " +
-                        "issuing_body = ?, expiry_date = ?, region = ?, status = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
+                        "issuing_body = ?, expiry_date = ?, region = ?, certificate_upload_id = COALESCE(?, certificate_upload_id), updated_at = now() WHERE tenant_id = ? AND id = ?",
                 req.licenceType(), req.holderId(), req.holderName(), req.number(), req.issuingBody(),
-                Date.valueOf(req.expiryDate()), req.region(), status, tenantId, id);
+                Date.valueOf(req.expiryDate()), req.region(), req.certificateUploadId(), tenantId, id);
     }
 
     /** {total, expiringSoon (expiry within 30 days, inclusive), expired}, judged from expiry_date today (the stored status can be stale). */
@@ -348,16 +367,6 @@ class SetupRepository {
                         "FROM licence_registry WHERE tenant_id = ?",
                 (rs, i) -> new int[]{rs.getInt(1), rs.getInt(2), rs.getInt(3)},
                 Date.valueOf(today), Date.valueOf(today.plusDays(30)), Date.valueOf(today), tenantId);
-    }
-
-    private String computeLicenceStatus(LocalDate expiry, LocalDate now) {
-        if (expiry.isBefore(now)) {
-            return "expired";
-        }
-        if (expiry.isBefore(now.plusDays(30))) {
-            return "expiring_soon";
-        }
-        return "valid";
     }
 
     // ── Staff lookup helper ──
@@ -378,7 +387,8 @@ class SetupRepository {
                 rs.getString("step"),
                 rs.getString("status"),
                 rs.getTimestamp("skipped_at") == null ? null : rs.getTimestamp("skipped_at").toInstant(),
-                rs.getTimestamp("done_at") == null ? null : rs.getTimestamp("done_at").toInstant());
+                rs.getTimestamp("done_at") == null ? null : rs.getTimestamp("done_at").toInstant(),
+                rs.getString("draft"), rs.getInt("version"), rs.getTimestamp("updated_at").toInstant());
     }
 
     private RowMapper<TenantProfileRow> profileMapper() {
@@ -430,7 +440,8 @@ class SetupRepository {
                 UUID.fromString(rs.getString("id")),
                 rs.getDate("holiday_date").toLocalDate(),
                 rs.getString("name"),
-                rs.getBoolean("recurring"));
+                rs.getBoolean("recurring"),
+                rs.getString("effect"), rs.getString("hours"), rs.getString("source_template"));
     }
 
     private RowMapper<StaffShiftRow> shiftMapper() {
@@ -485,6 +496,10 @@ class SetupRepository {
                 rs.getString("issuing_body"),
                 rs.getDate("expiry_date").toLocalDate(),
                 rs.getString("region"),
-                rs.getString("status"));
+                rs.getString("status"),
+                java.util.Set.copyOf(java.util.Arrays.asList((Integer[]) rs.getArray("reminders").getArray())),
+                rs.getDate("override_until") == null ? null : rs.getDate("override_until").toLocalDate(),
+                rs.getString("override_reason"),
+                rs.getString("certificate_upload_id") == null ? null : UUID.fromString(rs.getString("certificate_upload_id")));
     }
 }

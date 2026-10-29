@@ -19,21 +19,35 @@ import static com.nabd.hms.queue.QueueModels.CallbackEntryRow;
 class AppointmentRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason ";
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason, decision_source, channel, booking_kind, session_token, cancel_reason_code, no_show_at, no_show_marked_by, late_arrival_queue_entry_id, patient_confirmed_at ";
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.organization.api.BookingRules bookingRules;
 
-    AppointmentRepository(JdbcTemplate jdbc) {
+    AppointmentRepository(JdbcTemplate jdbc, com.nabd.hms.organization.api.BookingRules bookingRules) {
         this.jdbc = jdbc;
+        this.bookingRules = bookingRules;
+    }
+
+    /** OPS-006: empty = no such appointment in this clinic; a null element = untouched since V2603 (reads as 0). */
+    java.util.List<Long> changeSeq(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT change_seq FROM appointments WHERE tenant_id = ? AND id = ?", (rs, i) -> rs.getObject(1, Long.class), tenantId, id);
     }
 
     /** Throws DataIntegrityViolationException if the slot is already booked — see uq_appointments_doctor_slot. */
-    UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime, boolean isFollowUp) {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up) " +
-                        "VALUES (?,?,?,?,?,?,?)",
-                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp);
+    UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime, boolean isFollowUp, String decisionSource) {
+        UUID id = com.nabd.hms.shared.UuidV7.next();
+        // ACC-008: every booking path stamps the policy version it was made under (null before the first publish)
+        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up, decision_source, policy_version) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?)",
+                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp, decisionSource,
+                bookingRules.publishedVersion().orElse(null));
         return id;
+    }
+
+    /** IDC-011: who booked on the patient's behalf (null columns = the patient or the desk acted for themselves). */
+    void stampActedBy(UUID tenantId, UUID id, UUID actorPatientId, String relation) {
+        jdbc.update("UPDATE appointments SET acted_by_patient_id = ?, acted_by_relation = ? WHERE tenant_id = ? AND id = ?", actorPatientId, relation, tenantId, id);
     }
 
     /** NB-116: no_show is an immediate miss; a still-scheduled follow-up 15+ days past start was never rebooked. */
@@ -55,7 +69,7 @@ class AppointmentRepository {
                 mapper(), tenantId, id).stream().findFirst();
     }
 
-    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date, java.time.ZoneId zone,
+    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, Instant dayFrom, Instant dayTo,
                                    int limit, Instant afterCreatedAt, UUID afterId) {
         StringBuilder sql = new StringBuilder("SELECT " + COLUMNS + "FROM appointments WHERE tenant_id = ? ");
         List<Object> params = new ArrayList<>();
@@ -69,10 +83,10 @@ class AppointmentRepository {
             sql.append("AND patient_id = ? ");
             params.add(patientId);
         }
-        if (date != null) {
+        if (dayFrom != null) { // ACC-005: the bounds of one clinic day
             sql.append("AND start_time >= ? AND start_time < ? ");
-            params.add(Timestamp.from(date.atStartOfDay(zone).toInstant()));
-            params.add(Timestamp.from(date.plusDays(1).atStartOfDay(zone).toInstant()));
+            params.add(Timestamp.from(dayFrom));
+            params.add(Timestamp.from(dayTo));
         }
         if (afterCreatedAt != null) {
             sql.append("AND (created_at, id) > (?, ?) ");
@@ -85,9 +99,15 @@ class AppointmentRepository {
         return jdbc.query(sql.toString(), mapper(), params.toArray());
     }
 
+    /** ACC-007: reasonCode is the coded reason, note the free text allowed only with 'other'. */
+    void cancel(UUID tenantId, UUID id, String reasonCode, String note) {
+        jdbc.update("UPDATE appointments SET status = 'cancelled', cancel_reason_code = ?, cancel_reason = ? " +
+                "WHERE tenant_id = ? AND id = ? AND status = 'scheduled'", reasonCode, note, tenantId, id);
+    }
+
+    /** System-initiated undo of a booking made a moment ago (waitlist claim lost a race): no desk reason exists, so code 'other' with the cause as note. */
     void cancel(UUID tenantId, UUID id, String reason) {
-        jdbc.update("UPDATE appointments SET status = 'cancelled', cancel_reason = ? " +
-                "WHERE tenant_id = ? AND id = ? AND status = 'scheduled'", reason, tenantId, id);
+        cancel(tenantId, id, "other", reason);
     }
 
     void markTerminal(UUID tenantId, UUID id, String status) {
@@ -112,7 +132,23 @@ class AppointmentRepository {
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getBoolean("is_follow_up"),
-                rs.getString("cancel_reason"));
+                rs.getString("cancel_reason"), rs.getString("decision_source"), rs.getString("channel"),
+                rs.getString("booking_kind"),
+                (Integer) rs.getObject("session_token"),
+                rs.getString("cancel_reason_code"),
+                rs.getTimestamp("no_show_at") == null ? null : rs.getTimestamp("no_show_at").toInstant(),
+                rs.getObject("no_show_marked_by", UUID.class), rs.getObject("late_arrival_queue_entry_id", UUID.class),
+                rs.getTimestamp("patient_confirmed_at") == null ? null : rs.getTimestamp("patient_confirmed_at").toInstant());
+    }
+
+    /** ACC-011: a token booking takes the whole session window and a reserved number (no overlap constraint, V312). */
+    UUID insertToken(UUID tenantId, UUID patientId, UUID doctorId, Instant start, Instant end, boolean isFollowUp,
+                     UUID workingHoursId, int token) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up, " +
+                        "booking_kind, working_hours_id, session_token) VALUES (?,?,?,?,?,?,?,'token',?,?)",
+                id, tenantId, patientId, doctorId, Timestamp.from(start), Timestamp.from(end), isFollowUp, workingHoursId, token);
+        return id;
     }
 
     /** QA-03: existence checked up front so an unknown id is a 404, not an FK violation mis-reported as a slot conflict. */
@@ -124,5 +160,16 @@ class AppointmentRepository {
     boolean doctorExists(UUID tenantId, UUID doctorId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, doctorId));
+    }
+
+    /** ADM-028: appointments still 'scheduled' on each of the given clinic days. */
+    java.util.Map<java.time.LocalDate, Integer> scheduledPerDay(java.util.UUID tenantId, java.util.Collection<java.time.LocalDate> days, java.time.ZoneId zone) {
+        var out = new java.util.HashMap<java.time.LocalDate, Integer>();
+        for (java.time.LocalDate d : days) {
+            out.put(d, jdbc.queryForObject("SELECT count(*) FROM appointments WHERE tenant_id = ? AND status = 'scheduled' AND start_time >= ? AND start_time < ?",
+                    Integer.class, tenantId, java.sql.Timestamp.from(com.nabd.hms.common.ClinicClock.startOf(d, zone)),
+                    java.sql.Timestamp.from(com.nabd.hms.common.ClinicClock.startOf(d.plusDays(1), zone))));
+        }
+        return out;
     }
 }

@@ -1,7 +1,7 @@
 // FEF-049 smoke journeys J1, J5, J6, J9 (QA journey ids) with their time budgets. Each journey runs per seeded
 // tenant (IN, KSA) and project (desktop 1280, mobile 390). Mock target: synthetic data below. Preview target: ids
 // from the OPS-036 seed's fixtures file (slot `${journey}:${project}:${attempt}`, so a retry never reuses a signed visit).
-import { previewFixtures, TARGET } from './harness.mjs';
+import { previewFixtures, TARGET, untranslated } from './harness.mjs';
 import { ArrivalsPage, ConsultPage, CheckoutPage } from './pages.mjs';
 
 // Synthetic only. Phones use the reserved test range of tools/synthetic-data (national number starting 0000: never assignable).
@@ -10,20 +10,20 @@ export const TENANTS = [
   { key: 'KSA', region: 'SA', name: 'Synthetic Clinic KSA', timezone: 'Asia/Riyadh', currency: 'SAR', patient: 'Noura Al-Harbi', phone: '+9660000000101', walkIn: 'Reem Al-Qahtani' },
 ];
 export const PROJECTS = [
-  { key: 'desktop', viewport: { width: 1280, height: 900 } },
+  { key: 'desktop', viewport: { width: 1366, height: 768 } },
   { key: 'mobile', viewport: { width: 390, height: 844 } },
 ];
-const SELF = '11111111-1111-1111-1111-111111111111'; // the mock JWT's staff id (qa-lib clinicToken)
-const json = (r, status, body) => r.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) });
+export const SELF = '11111111-1111-1111-1111-111111111111'; // the mock JWT's staff id (qa-lib clinicToken)
+export const json = (r, status, body) => r.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) });
 
 // ---- mock back ends (stateful where the journey writes) ------------------------------------------
 // Shell boot of a healthy clinic: tenants.timezone is configured (FEF-011 warns `[clinic-timezone-fallback]` when it
 // is not). Smoke roles lack setup:view, so /setup/profile is 403 and the zone comes from /schedule/day, as on the API.
-const clinicMocks = (t) => [
+export const clinicMocks = (t) => [
   ['GET', /^\/setup\/profile$/, { status: 403, body: { type: 'forbidden', title: 'Forbidden', detail: 'Missing setup:view.' } }],
   ['GET', /^\/schedule\/day(\?.*)?$/, { body: { timezone: t.timezone } }],
 ];
-function arrivalsMocks(t) {
+export function arrivalsMocks(t) {
   const st = { checkIns: 0 };
   return { st, h: [
     ['GET', /^\/queue(\?.*)?$/, { body: [] }],
@@ -37,7 +37,7 @@ function arrivalsMocks(t) {
   ], doctor: 'Dr Synthetic', region: t.region };
 }
 
-function consultMocks(t, { allergy = null } = {}) {
+export function consultMocks(t, { allergy = null } = {}) {
   const entry = { id: 'e1', appointmentId: null, patientId: 'p1', doctorId: SELF, departmentId: 'dep1', queueDate: new Date().toISOString().slice(0, 10), tokenNumber: 3, status: 'in_consult', priority: false, priorityReason: null, createdAt: new Date().toISOString(), source: 'walk_in' };
   const allergies = allergy ? [{ id: 'a1', substance: allergy, severity: 'severe', reaction: null, active: true }] : [];
   const patient = { id: 'p1', mrn: 'SYN-1', name: t.patient, phone: t.phone, dob: '1990-04-02', gender: 'female', status: 'active', allergies: allergies.map((a) => a.substance), chronicConditions: [], activePackages: 0, lastVisitAt: null };
@@ -65,7 +65,7 @@ function consultMocks(t, { allergy = null } = {}) {
   ], entryId: 'e1', patientName: t.patient };
 }
 
-function checkoutMocks(t) {
+export function checkoutMocks(t) {
   const Q = '33333333-3333-4333-8333-333333333333';
   const charge = { id: 'c1', code: 'CONS', name: 'Consultation', category: 'Consultation', baseAmount: 500, followUpAmount: null, taxRatePercent: 0, stockQty: null };
   const st = { invoice: null, bills: 0, payments: [] };
@@ -84,7 +84,7 @@ function checkoutMocks(t) {
 }
 
 /** Per-journey data: mock fixtures, or the preview seed's slot for this case and attempt. */
-function data(journey, tenant, project, attempt, mock) {
+export function data(journey, tenant, project, attempt, mock) {
   if (TARGET === 'mock') return { ...mock, h: [...clinicMocks(tenant), ...mock.h] };
   const f = previewFixtures(tenant.key);
   if (!f) throw new Error(`SMOKE_FIXTURES has no tenant ${tenant.key}`);
@@ -95,8 +95,8 @@ function data(journey, tenant, project, attempt, mock) {
 export const JOURNEYS = [
   { id: 'J1', title: 'walk-in registration to token', role: 'receptionist', owner: '@nabd/engineering', budgetMs: 45000,
     prepare: (t, p, a) => data('J1', t, p, a, arrivalsMocks(t)),
-    async run({ page, d, tenant, axe, attempt }) {
-      const arr = new ArrivalsPage(page);
+    async run({ page, d, tenant, axe, attempt, locale }) {
+      const arr = new ArrivalsPage(page, locale);
       await arr.open(); await axe('arrivals');
       const who = TARGET === 'mock' ? tenant.walkIn : `${tenant.walkIn} ${Date.now().toString(36)}${attempt}`; // preview: never collide with the seed
       const ms = await (async () => { const t0 = performance.now();
@@ -107,6 +107,10 @@ export const JOURNEYS = [
         const tok = await arr.token(); if (!/^#\d+$/.test(tok)) throw new Error(`token slip shows "${tok}"`);
         return Math.round(performance.now() - t0); })();
       await axe('token slip');
+      if (locale !== 'en') { // FEF-050: arrivals + walk-in dialog + slip are migrated screens: no plain English left except data values
+        const raw = await untranslated(page, [tenant.name, tenant.walkIn, tenant.patient, 'Dr Synthetic', 'Synthetic', 'General']);
+        if (raw.length) throw new Error(`untranslated strings in ${locale}: ${raw.slice(0, 6).join(' | ')}`);
+      }
       if (TARGET === 'mock' && d.st.checkIns !== 1) throw new Error(`expected 1 check-in POST, saw ${d.st.checkIns}`);
       return { walkInMs: ms };
     } },

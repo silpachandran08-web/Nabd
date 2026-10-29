@@ -23,7 +23,7 @@ class QueueRepository {
                     "q.current_stage, q.workflow_definition_id, q.queue_date, q.token_number, " +
                     "q.status, q.priority, q.priority_reason, q.priority_flagged_by, q.priority_flagged_at, q.priority_acknowledged_by, " +
                     "q.priority_acknowledged_at, q.source, q.presenting_complaint, q.payment_mode, q.created_at, " +
-                    "q.transfer_reason, q.transfer_reason_note, a.status AS appointment_status, " +
+                    "q.transfer_reason, q.transfer_reason_note, a.status AS appointment_status, q.order_reason, " +
                     "date_part('year', age(q.queue_date, p.dob))::int AS age_years, p.gender, d.name AS doctor_name, " +
                     "GREATEST(0, floor(extract(epoch FROM (now() - q.created_at)) / 60))::int AS wait_minutes, " +
                     "CASE WHEN a.is_follow_up THEN 'follow_up' WHEN q.appointment_id IS NOT NULL THEN 'appointment' " +
@@ -49,6 +49,50 @@ class QueueRepository {
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?), ?)", Object.class, tenantId + ":" + doctorId, (int) date.toEpochDay());
     }
 
+    /** ACC-012: a booked patient later than the grace is queued as a walk-in, and the entry says why. */
+    void markLateArrival(UUID tenantId, UUID entryId) {
+        jdbc.update("UPDATE queue_entries SET placed_as_walkin_late = true, order_reason = ? WHERE tenant_id = ? AND id = ?",
+                CallOrderPolicy.LATE_TEXT, tenantId, entryId);
+    }
+
+    /** Records the call: why this entry was called and its place in the day's calls (caller holds the doctor-day lock). */
+    void markCalled(UUID tenantId, UUID doctorId, LocalDate day, UUID entryId, String reason) {
+        jdbc.update("UPDATE queue_entries SET order_reason = ?, called_seq = (SELECT COALESCE(max(called_seq), 0) + 1 FROM queue_entries " +
+                        "WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ?) WHERE tenant_id = ? AND id = ?",
+                reason, tenantId, doctorId, Date.valueOf(day), tenantId, entryId);
+    }
+
+    /** Booked calls since the last walk-in call, newest first; priority calls do not count either way. */
+    int bookedSinceWalkin(UUID tenantId, UUID doctorId, LocalDate day) {
+        List<String> reasons = jdbc.queryForList("SELECT order_reason FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? " +
+                "AND queue_date = ? AND called_seq IS NOT NULL ORDER BY called_seq DESC", String.class, tenantId, doctorId, Date.valueOf(day));
+        int n = 0;
+        for (String r : reasons) {
+            if ("priority".equals(r)) continue;
+            if (!"booked_on_time".equals(r)) break;
+            n++;
+        }
+        return n;
+    }
+
+    /** ACC-012: the entries still to be called (checked in or waiting) with what the policy needs. */
+    List<CallOrderPolicy.Candidate> openCandidates(UUID tenantId, UUID doctorId, LocalDate day) {
+        return jdbc.query("SELECT q.id, q.created_at, a.start_time, q.priority, q.priority_flagged_at, q.placed_as_walkin_late " +
+                        "FROM queue_entries q LEFT JOIN appointments a ON a.id = q.appointment_id " +
+                        "WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? AND q.status IN ('checked_in','waiting')",
+                (rs, i) -> new CallOrderPolicy.Candidate(rs.getObject("id", UUID.class), rs.getTimestamp("created_at").toInstant(),
+                        rs.getTimestamp("start_time") == null ? null : rs.getTimestamp("start_time").toInstant(), rs.getBoolean("priority"),
+                        rs.getTimestamp("priority_flagged_at") == null ? null : rs.getTimestamp("priority_flagged_at").toInstant(),
+                        rs.getBoolean("placed_as_walkin_late")),
+                tenantId, doctorId, Date.valueOf(day));
+    }
+
+    boolean tokenTaken(UUID tenantId, UUID doctorId, LocalDate date, int token) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? AND token_number = ?)",
+                Boolean.class, tenantId, doctorId, Date.valueOf(date), token));
+    }
+
     int nextTokenNumber(UUID tenantId, UUID doctorId, LocalDate date) {
         Integer max = jdbc.queryForObject(
                 "SELECT COALESCE(MAX(token_number), 0) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ?",
@@ -62,13 +106,18 @@ class QueueRepository {
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
                 UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status,
                 String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote, Instant createdAt) {
-        UUID id = UUID.randomUUID();
+        UUID id = com.nabd.hms.shared.UuidV7.next();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
                         "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note, created_at) " +
                         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", // PLT-028: created_at from the injected clock, so session-time checks see the same "now"
                 id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId, encounterId,
                 Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode, transferReason, transferReasonNote, Timestamp.from(createdAt));
         return id;
+    }
+
+    /** IDC-011: who checked the patient in on their behalf. */
+    void stampActedBy(UUID tenantId, UUID id, UUID actorPatientId, String relation) {
+        jdbc.update("UPDATE queue_entries SET acted_by_patient_id = ?, acted_by_relation = ? WHERE tenant_id = ? AND id = ?", actorPatientId, relation, tenantId, id);
     }
 
     boolean patientExists(UUID tenantId, UUID patientId) {
@@ -124,18 +173,18 @@ class QueueRepository {
         String priorityGate = priorityOnly ? "AND q.priority = true " : "";
         if (doctorId != null) {
             return jdbc.query("SELECT " + COLUMNS + FROM +
-                            "WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " + priorityGate +
+                            "WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? AND q.class = 'ambulatory' " + priorityGate +
                             "ORDER BY q.priority DESC, q.token_number",
                     mapper(), tenantId, doctorId, Date.valueOf(date));
         }
         if (departmentId != null) {
             return jdbc.query("SELECT " + COLUMNS + FROM +
-                            "WHERE q.tenant_id = ? AND q.department_id = ? AND q.queue_date = ? " + priorityGate +
+                            "WHERE q.tenant_id = ? AND q.department_id = ? AND q.queue_date = ? AND q.class = 'ambulatory' " + priorityGate +
                             "ORDER BY q.doctor_id, q.priority DESC, q.token_number",
                     mapper(), tenantId, departmentId, Date.valueOf(date));
         }
         return jdbc.query("SELECT " + COLUMNS + FROM +
-                        "WHERE q.tenant_id = ? AND q.queue_date = ? " + priorityGate +
+                        "WHERE q.tenant_id = ? AND q.queue_date = ? AND q.class = 'ambulatory' " + priorityGate +
                         "ORDER BY q.doctor_id, q.priority DESC, q.token_number",
                 mapper(), tenantId, Date.valueOf(date));
     }
@@ -192,7 +241,7 @@ class QueueRepository {
     /** Still-in-the-pipeline entries for a doctor today — what a newly-arriving patient is actually behind. */
     int countActiveAhead(UUID tenantId, UUID doctorId, LocalDate date) {
         Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? " +
+                "SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? AND class = 'ambulatory' " +
                         "AND status NOT IN ('completed', 'no_show', 'transferred_out')",
                 Integer.class, tenantId, doctorId, Date.valueOf(date));
         return count == null ? 0 : count;
@@ -233,7 +282,7 @@ class QueueRepository {
                     rs.getTimestamp("created_at").toInstant(),
                     rs.getString("transfer_reason"), rs.getString("transfer_reason_note"),
                     (Integer) rs.getObject("age_years"), rs.getString("gender"), rs.getString("doctor_name"),
-                    rs.getInt("wait_minutes"), rs.getString("visit_type"), rs.getString("appointment_status"));
+                    rs.getInt("wait_minutes"), rs.getString("visit_type"), rs.getString("appointment_status"), rs.getString("order_reason"));
         };
     }
 }

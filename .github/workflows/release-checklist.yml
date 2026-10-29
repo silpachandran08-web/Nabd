@@ -1,0 +1,22 @@
+# OPS-044: a PR whose title starts with "Release" (template .github/PULL_REQUEST_TEMPLATE/release.md) must carry the completed release checklist:
+# change approval, deploy window outside OPD peaks and freezes, rollback plan, safety report link.
+name: release-checklist
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  checklist:
+    if: startsWith(github.event.pull_request.title, 'Release')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q pyyaml
+      - name: validate the release checklist
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$BODY" > pr-body.md
+          python3 scripts/ci/release_checklist.py --body-file pr-body.md
