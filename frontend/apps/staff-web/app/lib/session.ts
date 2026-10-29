@@ -1,6 +1,7 @@
 import { decodeJwtPayload } from "./jwt.ts";
 import { clearIntents } from "./idempotency.ts";
 import { clearLocalSessionData } from "./idleLock.ts";
+import { COUNTER_ROLES, navFor } from "../shell/navRegistry.ts";
 // The access token's "permissions" claim (SecurityConfig.java: authoritiesClaimName) already
 // carries everything the client needs for nav/redirect — decoding it here avoids a round trip
 // to a /me endpoint that doesn't exist for clinic staff (only /platform/auth/me does).
@@ -116,6 +117,8 @@ export function landingPathFor(permissions: string[], owner = false): string {
   if (ownerHome) return ownerHome;
   if (hasNursingGrant(permissions)) return "/nursing";
   if (!owner && permissions.includes("clinical:edit")) return first(DOCTOR_LANDING) ?? "/account";
+  const counter = owner ? null : navFor({ perms: permissions, owner: false, ent: null }); // FEF-057: billing / pharmacist / lab role home
+  if (counter && COUNTER_ROLES.includes(counter.role)) return counter.items[0].href;
   return first(STAFF_LANDING) ?? "/account";
 }
 
