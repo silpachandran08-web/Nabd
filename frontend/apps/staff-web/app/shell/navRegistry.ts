@@ -3,7 +3,7 @@
 import type { IconName } from "../components/ui/Icon";
 import { NAV_MODULES, navAllowed, type Entitlements } from "../lib/entitlementRules.ts";
 
-export type RoleContext = "owner" | "doctor" | "nurse" | "reception";
+export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing";
 export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent";
 export type NavItem = {
   id: string; href: string; label: string; short: string; icon: IconName;
@@ -13,12 +13,14 @@ export type NavItem = {
   urgent?: boolean; // the badge is a warning: shown with an icon and the word "urgent", not colour alone
   /** Planned screen: shown only when the plan explicitly enables one of these modules (half-built features stay invisible). */
   planned?: { module: string[] };
+  /** Built screen whose plan modules are not keyed by its href (NAV_MODULES): any one enabled; unknown entitlements never hide it. */
+  modules?: string[];
   section?: SectionId; // owner sidebar grouping
   keywords?: string[]; // Ctrl+K only
   active?: (path: string, tab: string | null) => boolean;
 };
 
-export const ROLE_LABEL: Record<RoleContext, string> = { owner: "Owner", doctor: "Doctor", nurse: "Nurse", reception: "Reception" };
+export const ROLE_LABEL: Record<RoleContext, string> = { owner: "Owner", doctor: "Doctor", nurse: "Nurse", reception: "Reception", pharmacist: "Pharmacist", lab: "Lab", billing: "Billing" };
 export const MY_DAY_HREF = "/my-day";
 
 const ACC = "Patient Access", CLN = "Clinical", MON = "Money & Pharmacy", OWN = "Owner & Admin";
@@ -105,7 +107,47 @@ const NURSE: NavItem[] = [
   { id: "activity", href: "/nursing?tab=activity", label: "Completed Activity", short: "Activity", icon: "clock", perms: NURSING, owner: CLN, active: tabActive("activity") },
 ];
 
-export const NAV: Record<RoleContext, NavItem[]> = { owner: OWNER, doctor: DOCTOR, nurse: NURSE, reception: RECEPTION };
+// FEF-057: the counter shells (billing desk, pharmacy counter, lab bench): a live queue home, the transaction screen, then reports. Order: the
+// spec's prototype ids (S18_SPECS FEF-057 "prototype", source prototype/js/core.js NB.ROLES, not in the repo). Built screens keep their
+// route; the rest are `planned` route skeletons (PlannedScreen) the owning squad fills. The same shells serve a standalone pharmacy-only or
+// lab-only tenant: they hold no clinic screens.
+export const COUNTER_PROTOTYPE_ORDER = {
+  billing: ["checkout", "invoices", "preauth", "claims", "packages", "dayclose"],
+  pharmacist: ["dispense", "pos", "stock", "purchase", "registers", "insights"],
+  lab: ["worklist", "collect", "results", "validate", "catalog"],
+} as const;
+const INS = "Insurance (GCC/KSA squads)", PHARMACY_MODULES = ["pharmacy_inhouse", "pharmacy_external"];
+const BILLING: NavItem[] = [
+  { id: "billing-checkout", href: "/arrivals?tab=checkout_pending", label: "Checkout queue", short: "Checkout", icon: "receipt", perms: ["billing:view", "queue:view"], modules: ["billing"], owner: MON, badge: "checkout",
+    active: (p, t) => (p === "/arrivals" && t === "checkout_pending") || (p.startsWith("/checkout/") && p !== "/checkout/otc"), keywords: ["payment", "bill"] },
+  { id: "billing-invoices", href: "/billing/invoices", label: "Invoices", short: "Invoices", icon: "scroll", perms: ["billing:view"], owner: MON, planned: { module: ["billing"] }, active: (p) => p === "/billing/invoices" }, // /billing/invoices/[id] is the built invoice view
+  { id: "billing-preauth", href: "/billing/preauth", label: "Pre-authorisations", short: "Pre-auth", icon: "shield", perms: ["billing:view"], owner: INS, planned: { module: ["insurance"] } },
+  { id: "billing-claims", href: "/billing/claims", label: "Insurance claims", short: "Claims", icon: "list", perms: ["billing:view"], owner: INS, planned: { module: ["insurance"] } },
+  { id: "billing-packages", href: "/packages", label: "Treatment Packages", short: "Packages", icon: "package", perms: ["packages:view"], owner: MON },
+  { id: "billing-dayclose", href: "/billing", label: "Day Close", short: "Day close", icon: "banknote", perms: ["billing:view"], owner: MON, active: (p) => p === "/billing" },
+];
+const PHARMACIST: NavItem[] = [
+  { id: "ph-dispense", href: "/pharmacy", label: "e-Rx queue & Dispense", short: "Dispense", icon: "syringe", perms: ["pharmacy:view"], owner: MON, active: (p) => p === "/pharmacy" || p.startsWith("/pharmacy/receipt"), keywords: ["e-rx", "prescriptions", "dispensing"] },
+  { id: "ph-pos", href: "/checkout/otc", label: "Counter sale (POS)", short: "POS", icon: "card", perms: ["billing:view", "billing:create"], modules: PHARMACY_MODULES, owner: MON, keywords: ["otc", "sale"] },
+  { id: "ph-stock", href: "/pharmacy/stock", label: "Stock & expiry", short: "Stock", icon: "package", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["inventory", "stock take", "expiry"] },
+  { id: "ph-purchase", href: "/pharmacy/purchase", label: "Purchase & GRN", short: "Purchase", icon: "plusSquare", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["goods receipt", "supplier"] },
+  { id: "ph-registers", href: "/pharmacy/registers", label: "Controlled registers", short: "Registers", icon: "scroll", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
+  { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
+];
+// No lab permission exists yet: "lab:view" is the placeholder grant the Diagnostics squad defines with the lab screens (absent until then).
+export const LAB_GRANT = "lab:view";
+const LAB: NavItem[] = [
+  { id: "lab-worklist", href: "/lab", label: "Worklist", short: "Worklist", icon: "list", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] }, active: (p) => p === "/lab" },
+  { id: "lab-collect", href: "/lab/collect", label: "Sample collection", short: "Collect", icon: "syringe", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] } },
+  { id: "lab-results", href: "/lab/results", label: "Result entry", short: "Results", icon: "pulse", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] } },
+  { id: "lab-validate", href: "/lab/validate", label: "Validation", short: "Validate", icon: "check", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] } },
+  { id: "lab-catalog", href: "/lab/catalog", label: "Test catalogue", short: "Catalogue", icon: "settings", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] } },
+];
+/** Counter role -> the grant that marks it, for a role that does not book patients (queue:create is the front desk's). */
+const COUNTER_SIGNAL: [RoleContext, string][] = [["pharmacist", "pharmacy:edit"], ["lab", LAB_GRANT], ["billing", "billing:create"]];
+export const COUNTER_ROLES: readonly RoleContext[] = COUNTER_SIGNAL.map(([r]) => r);
+
+export const NAV: Record<RoleContext, NavItem[]> = { owner: OWNER, doctor: DOCTOR, nurse: NURSE, reception: RECEPTION, pharmacist: PHARMACIST, lab: LAB, billing: BILLING };
 export const findItem = (id: string): NavItem | undefined => Object.values(NAV).flat().find((i) => i.id === id);
 
 /** Specialty profile (T-298) -> the Specialty workspace item's label and icon. Cosmetic only. */
@@ -114,8 +156,9 @@ const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(
 
 export function itemVisible(i: NavItem, perms: readonly string[], ent: Entitlements | null): boolean {
   if (!i.perms.every((p) => perms.includes(p))) return false;
-  if (i.planned) return !!ent && i.planned.module.some((m) => ent.modules.some((x) => x.code === m && x.enabled));
-  return navAllowed(i.href, ent);
+  const on = (m: string) => !!ent && ent.modules.some((x) => x.code === m && x.enabled);
+  if (i.planned) return i.planned.module.some(on);
+  return i.modules ? !ent || i.modules.some(on) : navAllowed(i.href, ent);
 }
 
 /** Role contexts this session may use: an owner who also holds clinical grants can switch to the Doctor context. */
@@ -123,7 +166,9 @@ export function rolesFor(perms: readonly string[], owner: boolean): RoleContext[
   const doctor = perms.includes("clinical:edit") && perms.includes("queue:view");
   if (owner) return doctor ? ["owner", "doctor"] : ["owner"];
   if (perms.includes("nursing:view")) return ["nurse"];
-  return perms.includes("clinical:edit") ? ["doctor"] : ["reception"];
+  if (perms.includes("clinical:edit")) return ["doctor"];
+  const counter = perms.includes("queue:create") ? [] : COUNTER_SIGNAL.filter(([, g]) => perms.includes(g)).map(([r]) => r);
+  return counter.length ? counter : ["reception"];
 }
 
 export type NavInput = { perms: readonly string[]; owner: boolean; ent: Entitlements | null; override?: string | null; specialty?: string | null };
@@ -131,8 +176,8 @@ export function navFor({ perms, owner, ent, override, specialty }: NavInput): { 
   const roles = rolesFor(perms, owner);
   let role = roles.find((r) => r === override) ?? roles[0];
   let items = NAV[role].filter((i) => itemVisible(i, perms, ent));
-  // A trimmed Owner role that can open none of the owner items falls back to the generic staff list.
-  if (items.length === 0 && role === "owner") { role = "reception"; items = NAV.reception.filter((i) => itemVisible(i, perms, ent)); }
+  // A trimmed Owner role (or a counter role) that can open none of its items falls back to the generic staff list.
+  if (items.length === 0 && (role === "owner" || COUNTER_ROLES.includes(role))) { role = "reception"; items = NAV.reception.filter((i) => itemVisible(i, perms, ent)); }
   if (specialty) items = items.map((i) => (i.id === "specialty" ? { ...i, label: `${titleCase(specialty)} workspace`, short: titleCase(specialty), icon: SPECIALTY_ICON[specialty] ?? i.icon } : i));
   return { role, roles, items };
 }
@@ -157,6 +202,16 @@ export function jumpTargets(input: NavInput, query: string): NavItem[] {
 
 export const isActive = (i: NavItem, path: string | null, tab: string | null): boolean =>
   !!path && (i.active ? i.active(path, tab) : path === i.href.split("?")[0] || path.startsWith(`${i.href.split("?")[0]}/`));
+
+/** FEF-057: direct-URL gate of the counter shells: the item of the role's nav this path belongs to, when the session may not see it. */
+export function blockedRoute(role: RoleContext, input: NavInput, path: string | null, tab: string | null = null): NavItem | undefined {
+  if (!COUNTER_ROLES.includes(role)) return undefined;
+  return NAV[role].find((i) => isActive(i, path, tab) && !itemVisible(i, input.perms, input.ent));
+}
+
+/** Phone bottom nav: at most 5 destinations (DESIGN.md §4), so more than 5 items become the top 4 + More. */
+export const bottomNavSplit = <T,>(items: T[]): { primary: T[]; more: T[] } =>
+  items.length > 5 ? { primary: items.slice(0, 4), more: items.slice(4) } : { primary: items, more: [] };
 
 /** FEF-058: owner areas the user may open but the plan does not include (module off). The Plan screen lists them as upgrade options. */
 export function ownerUpgradeOptions(perms: readonly string[], ent: Entitlements | null): { item: NavItem; modules: string[] }[] {

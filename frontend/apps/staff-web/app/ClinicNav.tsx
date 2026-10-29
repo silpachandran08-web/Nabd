@@ -8,7 +8,7 @@ import styles from "./clinicNav.module.css";
 import Icon from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
 import { getIdentity, getSessionExpiresAt, ownerPendingTokenValid, regionLabel, signOut, type Identity } from "./lib/session";
-import { isActive, ROLE_LABEL } from "./shell/navRegistry";
+import { bottomNavSplit, COUNTER_ROLES, isActive, ROLE_LABEL } from "./shell/navRegistry";
 import { useShellNav } from "./shell/useShellNav";
 import { usePharmacyCapabilities } from "./lib/pharmacyCapabilities";
 import { pharmacyNavAllowed } from "./lib/pharmacyRules";
@@ -16,6 +16,7 @@ import { useNavBadges } from "./shell/useNavBadges";
 import FacilitySwitcher from "./shell/FacilitySwitcher";
 import { BottomSheet } from "@nabd/ui";
 import UrgentBadge from "./shell/UrgentBadge";
+import BarcodeWedge from "./shell/BarcodeWedge";
 
 // FEF-052: the sidebar renders whatever shell/navRegistry resolves for the role context (one registry, one badge resolver).
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -72,10 +73,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pharmacyCaps = usePharmacyCapabilities(input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
   if (input.perms.length === 0 || items.length === 0) return null;
   const currentTab = searchParams.get("tab");
-  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i0) => (i0.section && role === "owner" ? { ...i0, label: t(`ownerNav.${i0.id}.label`), short: t(`ownerNav.${i0.id}.short`) } : i0)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined, urgent: !!i.urgent }));
+  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i0) => (i0.section && role === "owner" ? { ...i0, label: t(`ownerNav.${i0.id}.label`), short: t(`ownerNav.${i0.id}.short`) } : COUNTER_ROLES.includes(role) ? { ...i0, label: t(`counterNav.${i0.id}.label`), short: t(`counterNav.${i0.id}.short`) } : i0)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined, urgent: !!i.urgent }));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4): 4 items + "More" when there are more.
-  const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
-  const overflowEntries = entries.length > 5 ? entries.slice(4) : [];
+  const { primary: primaryEntries, more: overflowEntries } = bottomNavSplit(entries);
   const activeRoleLabel = roles.length > 1 ? ROLE_LABEL[role] : identity?.roleName ?? ROLE_LABEL[role];
   const branchLocked = !!plan && plan.branchesLimit > 0 && plan.branchesUsed >= plan.branchesLimit;
 
@@ -92,6 +92,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
 
   return (
     <>
+    {role === "pharmacist" && <BarcodeWedge />}
     <nav className={`${styles.nav} ${collapsed ? styles.navRail : ""}`} aria-label="Main">
       <div className={styles.brand}>nabd</div>
 
