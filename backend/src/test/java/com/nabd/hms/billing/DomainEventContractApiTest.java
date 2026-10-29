@@ -287,6 +287,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
         expected.remove(DomainEventType.PATIENT_LINK_OPENED.type()); // PLT-041: written by LinkOpenRecorder when the secure-link service reports an open, Plt041LinkOpenApiTest
         expected.remove(DomainEventType.PHARMACY_STOCK_BATCH_CHANGED.type()); // PHL-005: Phl005StockBatchesApiTest
+        expected.remove(DomainEventType.PHARMACY_STOCK_TAKE_POSTED.type()); // PHL-010: Phl010StockTakeApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

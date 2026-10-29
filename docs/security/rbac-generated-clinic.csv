@@ -118,6 +118,7 @@ owner,GET /v1/patients/{id},patients:view,allow
 owner,GET /v1/patients/{id}/consents,patients:view,allow
 owner,GET /v1/patients/{patientId}/messages,patients:view,allow
 owner,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
+owner,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,allow
 owner,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
 owner,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner,GET /v1/pharmacy/items,pharmacy:view,allow
@@ -126,6 +127,8 @@ owner,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
 owner,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 owner,GET /v1/pharmacy/settings,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock,pharmacy:view,allow
+owner,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
+owner,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 owner,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 owner,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -327,11 +330,15 @@ owner,POST /v1/patients/{id}/consents,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner,POST /v1/patients/{id}/merge,patients:delete,allow
 owner,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
+owner,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,allow
 owner,POST /v1/pharmacy/items,pharmacy:edit,allow
 owner,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,allow
 owner,POST /v1/pharmacy/picks,pharmacy:view,allow
 owner,POST /v1/pharmacy/receipts,pharmacy:edit,allow
 owner,POST /v1/pharmacy/rx-lines/search,billing:create,allow
+owner,POST /v1/pharmacy/stock-takes,pharmacy:edit,allow
+owner,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,allow
+owner,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,allow
 owner,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 owner,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 owner,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -398,6 +405,7 @@ owner,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,PUT /v1/facility/checkin-config,setup:edit,allow
 owner,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
 owner,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
+owner,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,allow
 owner,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 owner,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 owner,PUT /v1/queue-settings/facility,setup:edit,allow
@@ -527,6 +535,7 @@ owner_doctor,GET /v1/patients/{id},patients:view,allow
 owner_doctor,GET /v1/patients/{id}/consents,patients:view,allow
 owner_doctor,GET /v1/patients/{patientId}/messages,patients:view,allow
 owner_doctor,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
+owner_doctor,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,allow
 owner_doctor,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items,pharmacy:view,allow
@@ -535,6 +544,8 @@ owner_doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/settings,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
+owner_doctor,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
+owner_doctor,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 owner_doctor,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -736,11 +747,15 @@ owner_doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/merge,patients:delete,allow
 owner_doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
+owner_doctor,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/items,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/picks,pharmacy:view,allow
 owner_doctor,POST /v1/pharmacy/receipts,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/rx-lines/search,billing:create,allow
+owner_doctor,POST /v1/pharmacy/stock-takes,pharmacy:edit,allow
+owner_doctor,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,allow
+owner_doctor,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,allow
 owner_doctor,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 owner_doctor,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 owner_doctor,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -807,6 +822,7 @@ owner_doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,PUT /v1/facility/checkin-config,setup:edit,allow
 owner_doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
 owner_doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
+owner_doctor,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,allow
 owner_doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 owner_doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 owner_doctor,PUT /v1/queue-settings/facility,setup:edit,allow
@@ -936,6 +952,7 @@ doctor,GET /v1/patients/{id},patients:view,allow
 doctor,GET /v1/patients/{id}/consents,patients:view,allow
 doctor,GET /v1/patients/{patientId}/messages,patients:view,allow
 doctor,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
+doctor,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 doctor,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
 doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items,pharmacy:view,allow
@@ -944,6 +961,8 @@ doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
 doctor,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 doctor,GET /v1/pharmacy/settings,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
+doctor,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
+doctor,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 doctor,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1145,11 +1164,15 @@ doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 doctor,POST /v1/patients/{id}/merge,patients:delete,deny-403
 doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
+doctor,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/picks,pharmacy:view,allow
 doctor,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
+doctor,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
+doctor,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
+doctor,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
 doctor,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 doctor,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 doctor,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -1216,6 +1239,7 @@ doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,PUT /v1/facility/checkin-config,setup:edit,deny-403
 doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
+doctor,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 doctor,PUT /v1/queue-settings/facility,setup:edit,deny-403
@@ -1345,6 +1369,7 @@ nurse,GET /v1/patients/{id},patients:view,allow
 nurse,GET /v1/patients/{id}/consents,patients:view,allow
 nurse,GET /v1/patients/{patientId}/messages,patients:view,allow
 nurse,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
+nurse,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 nurse,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
 nurse,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items,pharmacy:view,allow
@@ -1353,6 +1378,8 @@ nurse,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
 nurse,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 nurse,GET /v1/pharmacy/settings,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock,pharmacy:view,allow
+nurse,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
+nurse,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 nurse,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 nurse,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 nurse,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1554,11 +1581,15 @@ nurse,POST /v1/patients/{id}/consents,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 nurse,POST /v1/patients/{id}/merge,patients:delete,deny-403
 nurse,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
+nurse,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/picks,pharmacy:view,allow
 nurse,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
+nurse,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
+nurse,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
+nurse,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
 nurse,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 nurse,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 nurse,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -1625,6 +1656,7 @@ nurse,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,PUT /v1/facility/checkin-config,setup:edit,deny-403
 nurse,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 nurse,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
+nurse,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 nurse,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 nurse,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 nurse,PUT /v1/queue-settings/facility,setup:edit,deny-403
@@ -1754,6 +1786,7 @@ receptionist,GET /v1/patients/{id},patients:view,allow
 receptionist,GET /v1/patients/{id}/consents,patients:view,allow
 receptionist,GET /v1/patients/{patientId}/messages,patients:view,allow
 receptionist,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
+receptionist,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 receptionist,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items,pharmacy:view,allow
@@ -1762,6 +1795,8 @@ receptionist,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/settings,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock,pharmacy:view,allow
+receptionist,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
+receptionist,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 receptionist,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1963,11 +1998,15 @@ receptionist,POST /v1/patients/{id}/consents,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 receptionist,POST /v1/patients/{id}/merge,patients:delete,deny-403
 receptionist,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
+receptionist,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/picks,pharmacy:view,allow
 receptionist,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/rx-lines/search,billing:create,allow
+receptionist,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
+receptionist,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
+receptionist,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
 receptionist,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 receptionist,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 receptionist,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -2034,6 +2073,7 @@ receptionist,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,PUT /v1/facility/checkin-config,setup:edit,deny-403
 receptionist,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 receptionist,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
+receptionist,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 receptionist,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 receptionist,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 receptionist,PUT /v1/queue-settings/facility,setup:edit,deny-403
@@ -2163,6 +2203,7 @@ frontdesk_vitals,GET /v1/patients/{id},patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id}/consents,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{patientId}/messages,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
+frontdesk_vitals,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 frontdesk_vitals,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items,pharmacy:view,allow
@@ -2171,6 +2212,8 @@ frontdesk_vitals,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/settings,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock,pharmacy:view,allow
+frontdesk_vitals,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
+frontdesk_vitals,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 frontdesk_vitals,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 frontdesk_vitals,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 frontdesk_vitals,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -2372,11 +2415,15 @@ frontdesk_vitals,POST /v1/patients/{id}/consents,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/merge,patients:delete,deny-403
 frontdesk_vitals,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
+frontdesk_vitals,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/picks,pharmacy:view,allow
 frontdesk_vitals,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/rx-lines/search,billing:create,allow
+frontdesk_vitals,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
+frontdesk_vitals,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
+frontdesk_vitals,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 frontdesk_vitals,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 frontdesk_vitals,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -2443,6 +2490,7 @@ frontdesk_vitals,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-40
 frontdesk_vitals,PUT /v1/facility/checkin-config,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
+frontdesk_vitals,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 frontdesk_vitals,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 frontdesk_vitals,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 frontdesk_vitals,PUT /v1/queue-settings/facility,setup:edit,deny-403

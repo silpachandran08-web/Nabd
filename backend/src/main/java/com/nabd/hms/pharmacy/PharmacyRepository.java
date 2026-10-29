@@ -99,6 +99,35 @@ class PharmacyRepository {
                 (rs, i) -> rs.getInt("stock_qty"), delta, tenantId, id, delta).stream().findFirst();
     }
 
+    /** PHL-010: the stock-take form of {@link #lockItem}: all rows in one statement, locked in id order (no deadlock between two
+     * multi-item lockers). Item id -> cached stock_qty; unknown or non-stocked items are absent. */
+    java.util.Map<UUID, Integer> lockItems(UUID tenantId, UUID[] ids) {
+        java.util.Map<UUID, Integer> out = new java.util.LinkedHashMap<>();
+        jdbc.query(con -> {
+            var ps = con.prepareStatement("SELECT id, stock_qty FROM charge_catalogue WHERE tenant_id = ? AND id = ANY (?) " +
+                    "AND stock_qty IS NOT NULL ORDER BY id FOR UPDATE");
+            ps.setObject(1, tenantId);
+            ps.setArray(2, con.createArrayOf("uuid", ids));
+            return ps;
+        }, rs -> {
+            out.put(rs.getObject(1, UUID.class), rs.getInt(2));
+        });
+        return out;
+    }
+
+    /** PHL-010: set-based {@link #applyDelta}; guarded, so the number of rows changed is less than ids.length when one would go negative. */
+    int applyDeltas(UUID tenantId, UUID[] ids, Integer[] deltas) {
+        return jdbc.update(con -> {
+            var ps = con.prepareStatement("UPDATE charge_catalogue c SET stock_qty = c.stock_qty + d.delta, updated_at = now() " +
+                    "FROM unnest(?::uuid[], ?::int[]) AS d(id, delta) WHERE c.tenant_id = ? AND c.id = d.id AND c.stock_qty IS NOT NULL " +
+                    "AND c.stock_qty + d.delta >= 0");
+            ps.setArray(1, con.createArrayOf("uuid", ids));
+            ps.setArray(2, con.createArrayOf("int4", deltas));
+            ps.setObject(3, tenantId);
+            return ps;
+        });
+    }
+
     Optional<UUID> findStockedItemByCode(UUID tenantId, String code) {
         return jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
                 (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, code).stream().findFirst();

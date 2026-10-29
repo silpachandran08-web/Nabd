@@ -52,6 +52,23 @@ public class EventPublisher {
                 tenantId, type.type(), toJson(body), type.type(), type.source(), aggregateId, TraceParent.current());
     }
 
+    /** PHL-010: {@link #publish(UUID, DomainEventType, UUID, java.util.Map)} for many events of one type in one JDBC batch. */
+    @io.opentelemetry.instrumentation.annotations.WithSpan("outbox.publish")
+    @Transactional
+    public void publishAll(UUID tenantId, DomainEventType type, java.util.List<java.util.Map.Entry<UUID, java.util.Map<String, ?>>> events) {
+        if (events.isEmpty()) { // joins the caller's tenant transaction (the tenant is bound there); never sets it
+            return;
+        }
+        String trace = TraceParent.current();
+        jdbc.batchUpdate("INSERT INTO outbox_events (tenant_id, event_type, payload, ce_type, ce_source, aggregate_id, trace_parent) "
+                + "VALUES (?,?,?::jsonb,?,?,?,?)", events.stream().map(e -> {
+                    var body = new java.util.LinkedHashMap<String, Object>();
+                    body.put("tenantId", tenantId);
+                    body.putAll(e.getValue());
+                    return new Object[]{tenantId, type.type(), toJson(body), type.type(), type.source(), e.getKey(), trace};
+                }).toList());
+    }
+
     private String toJson(Object payload) {
         try {
             return objectMapper.writeValueAsString(payload);
