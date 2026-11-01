@@ -438,6 +438,7 @@ export const PharmacyStockAdjustmentRequestSchema = z.object({ delta: z.number()
 export const PharmacyStockMovementResponseSchema = z.object({ actorId: z.string().optional(), actorName: z.string().optional(), delta: z.number().int().optional(), id: z.string().optional(), kind: z.string().optional(), occurredAt: z.string().optional(), qtyAfter: z.number().int().optional(), qtyBefore: z.number().int().optional(), reason: z.string().optional() });
 export const QuestionSchema = z.object({ answers: z.array(AnswerSchema).optional(), id: z.string().optional(), text: z.string().optional() });
 export const PickerSchema = z.object({ jurisdiction: z.string().optional(), outcomes: z.array(OutcomeSchema).optional(), questions: z.array(QuestionSchema).optional() });
+export const PinAssertionRequestSchema = z.object({ approvalId: z.string().optional(), pin: z.string().min(1) });
 export const PinChangeRequestSchema = z.object({ currentPin: z.string().min(1), newPin: z.string().min(1) });
 export const PinResetConfirmRequestSchema = z.object({ mobilePhone: z.string().min(1), newPin: z.string().min(1), tenantSlug: z.string().min(1), token: z.string().min(1) });
 export const PinResetRequestRequestSchema = z.object({ mobilePhone: z.string().min(1), tenantSlug: z.string().min(1) });
@@ -725,7 +726,7 @@ export const operationSchemas = {
   AuthController_verifyMfa: { body: MfaVerifyRequestSchema, response: z.record(z.string(), z.unknown()) },
   AuthController_requestOtp: { body: OtpRequestRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   AuthController_verifyOtp: { body: OtpVerifyRequestSchema, response: z.record(z.string(), z.unknown()) },
-  AuthController_pinAssertion: { body: UnlockRequestSchema, response: StepUpTokenResponseSchema },
+  AuthController_pinAssertion: { body: PinAssertionRequestSchema, response: StepUpTokenResponseSchema },
   PinChangeController_change: { body: PinChangeRequestSchema },
   AuthController_confirmPinReset: { body: PinResetConfirmRequestSchema },
   AuthController_requestPinReset: { body: PinResetRequestRequestSchema },

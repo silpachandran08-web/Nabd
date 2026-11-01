@@ -217,6 +217,61 @@ class Fin018DiscountApprovalApiTest extends S10QaBillingSupport {
         assertThat(bill(f.desk(), entry, svc, List.of(pct(15, "goodwill")), String.valueOf(id)).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    // fix round S18-BUG-1/4: one PIN entry decides one request (bound to it when asked for it); misses lock the desk caller, not the owner
+    @Test
+    void aPinAssertionDecidesExactlyOneRequestAndMissesNeverLockTheOwner() {
+        Fx f = fx();
+        policy(f, "discount_threshold_percent", "10");
+        Object a = ask(f.desk(), atCheckout(f.env()), List.of(line("SVC", 1)), List.of(pct(15, "goodwill"))).getBody().get("approvalId");
+        Object b = ask(f.desk(), atCheckout(f.env()), List.of(line("SVC", 1)), List.of(pct(40, "goodwill"))).getBody().get("approvalId");
+        String forA = (String) exchange("/v1/auth/pin-assertion", HttpMethod.POST, authedJsonBody(f.desk(), Map.of("pin", STAFF_PIN, "approvalId", a)), Map.class)
+                .getBody().get("stepUpToken");
+        ResponseEntity<Map> wrongRequest = decide(f.desk(), b, Map.of("decision", "approve", "method", "pin", "pinAssertion", forA));
+        assertThat(wrongRequest.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(code(wrongRequest)).isEqualTo("PIN_ASSERTION_MISMATCH");
+        assertThat(decide(f.desk(), a, Map.of("decision", "approve", "method", "pin", "pinAssertion", forA)).getStatusCode()).isEqualTo(HttpStatus.OK);
+        // an unbound assertion is single-use too
+        String any = (String) exchange("/v1/auth/pin-assertion", HttpMethod.POST, authedJsonBody(f.desk(), Map.of("pin", STAFF_PIN)), Map.class).getBody().get("stepUpToken");
+        Object c = ask(f.desk(), atCheckout(f.env()), List.of(line("SVC", 1)), List.of(pct(20, "goodwill"))).getBody().get("approvalId");
+        assertThat(decide(f.desk(), c, Map.of("decision", "reject", "method", "pin", "pinAssertion", any)).getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<Map> replay = decide(f.desk(), b, Map.of("decision", "approve", "method", "pin", "pinAssertion", any));
+        assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(code(replay)).isEqualTo("PIN_ASSERTION_USED");
+        assertThat(count(f.env(), "SELECT count(*) FROM discount_approvals WHERE id = ?::uuid AND status = 'pending'", b)).isEqualTo(1);
+
+        // five misses lock this desk caller (423) but not the owner's own login, and attempts are never booked on the owner
+        for (int i = 0; i < 5; i++) {
+            exchange("/v1/auth/pin-assertion", HttpMethod.POST, authedJsonBody(f.desk(), Map.of("pin", "000" + i)), Map.class);
+        }
+        assertThat(exchange("/v1/auth/pin-assertion", HttpMethod.POST, authedJsonBody(f.desk(), Map.of("pin", STAFF_PIN)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.LOCKED);
+        assertThat(loginAndGetAccessToken(f.env().owner())).isNotBlank();
+        assertThat(count(f.env(), "SELECT count(*) FROM login_attempts WHERE staff_id = ? AND NOT succeeded", f.env().owner().id())).isZero();
+        // a role that does not issue bills cannot try owner PINs
+        UUID nurseRole = seedRole(f.env().tenant().id(), "Nurse", false, fullGrant("queue"), fullGrant("nursing"));
+        String nurse = loginAndGetAccessToken(seedStaff(f.env().tenant(), nurseRole, "n" + UUID.randomUUID() + "@a.com", phone(), false));
+        assertThat(exchange("/v1/auth/pin-assertion", HttpMethod.POST, authedJsonBody(nurse, Map.of("pin", STAFF_PIN)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    // fix round S18-BUG-2: same visit, a different bill -> the approval does not cover it
+    @Test
+    void anApprovalCoversOnlyTheBillItWasAskedFor() {
+        Fx f = fx();
+        policy(f, "discount_threshold_percent", "10");
+        String entry = atCheckout(f.env());
+        Object id = ask(f.desk(), entry, List.of(line("SVC", 1)), List.of(Map.of("kind", "amount", "value", 75, "reasonCode", "goodwill"))).getBody().get("approvalId");
+        decide(f.env().token(), id, Map.of("decision", "approve", "method", "in_app"));
+        assertThat(code(bill(f.desk(), entry, List.of(line("CONS", 1)), List.of(Map.of("kind", "amount", "value", 75, "reasonCode", "goodwill")), String.valueOf(id))))
+                .isEqualTo("APPROVAL_NOT_USABLE");
+        // same gross, same 75.00 = 15%, but another charge: still not the bill the owner saw
+        catalogue(f.env().tenant(), "SV2", "Service", 500, null, 0);
+        assertThat(code(bill(f.desk(), entry, List.of(line("SV2", 1)), List.of(Map.of("kind", "amount", "value", 75, "reasonCode", "goodwill")), String.valueOf(id))))
+                .isEqualTo("APPROVAL_NOT_USABLE");
+        assertThat(bill(f.desk(), entry, List.of(line("SVC", 1)), List.of(Map.of("kind", "amount", "value", 70, "reasonCode", "goodwill")), String.valueOf(id))
+                .getStatusCode()).as("a smaller discount on the same bill is covered").isEqualTo(HttpStatus.OK);
+    }
+
     @Test
     void anotherClinicCannotSeeOrDecide() {
         Fx a = fx();

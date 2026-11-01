@@ -805,6 +805,15 @@ schemas:
       pay_later_at: operational
       created_at: operational
       expires_at: operational
+      bill_fingerprint: operational
+      gross_minor: financial
+      pin_assertion_id: operational
+    pin_assertion_attempts:
+      id: operational
+      tenant_id: operational
+      staff_id: operational
+      succeeded: operational
+      attempted_at: operational
     invoice_discounts:
       id: operational
       tenant_id: operational

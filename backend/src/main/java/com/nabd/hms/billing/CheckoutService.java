@@ -365,9 +365,11 @@ public class CheckoutService {
         BigDecimal amount = t.newDiscounts().stream().map(BillingPricing.DiscountInput::amount).reduce(earlier, BigDecimal::add);
         BigDecimal list = BigDecimal.ZERO;
         String reason = t.newDiscounts().isEmpty() ? null : t.newDiscounts().get(0).reasonCode();
+        List<String> bill = new java.util.ArrayList<>(); // S18-BUG-2/3: what the bill is, independent of its prices after overrides
         for (LineItemInput i : t.items()) {
             BigDecimal qty = BigDecimal.valueOf(i.quantity());
             list = list.add(i.listUnitPrice().multiply(qty));
+            bill.add("new|" + i.chargeCode() + "|" + i.quantity() + "|" + i.listUnitPrice().stripTrailingZeros().toPlainString());
             if (belowList(i)) {
                 amount = amount.add(i.listUnitPrice().subtract(i.unitPrice()).multiply(qty));
                 if (reason == null) reason = i.overrideReasonCode();
@@ -377,11 +379,22 @@ public class CheckoutService {
             BigDecimal qty = BigDecimal.valueOf(i.quantity());
             BigDecimal at = i.listUnitPrice() == null ? i.unitPrice() : i.listUnitPrice();
             list = list.add(at.multiply(qty));
+            bill.add("billed|" + i.id());
             if (i.overrideReasonCode() != null && i.unitPrice().compareTo(at) < 0) amount = amount.add(at.subtract(i.unitPrice()).multiply(qty));
         }
         BigDecimal percent = list.signum() == 0 ? BigDecimal.ZERO
                 : amount.multiply(BigDecimal.valueOf(100)).divide(list, 2, RoundingMode.HALF_UP).min(BigDecimal.valueOf(100));
-        return new DiscountApprovalService.Reduction(Money.of(amount, currency).amountMinor(), percent, currency, reason);
+        java.util.Collections.sort(bill);
+        return new DiscountApprovalService.Reduction(Money.of(amount, currency).amountMinor(), percent, currency, reason,
+                Money.of(list, currency).amountMinor(), sha256(String.join("\n", bill)));
+    }
+
+    private static String sha256(String s) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /**

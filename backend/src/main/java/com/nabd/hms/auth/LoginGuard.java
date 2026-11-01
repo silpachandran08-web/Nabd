@@ -45,11 +45,15 @@ public class LoginGuard {
 
     /** Throws 423 while the backoff window runs. Does not record anything, so a locked hit cannot renew the lock. */
     void enforceLockout(UUID staffId) {
-        int failures = repo.countFailedAttemptsSinceLastSuccess(staffId);
+        enforceLockout(repo.countFailedAttemptsSinceLastSuccess(staffId), repo.lastFailedAttemptAt(staffId), staffId);
+    }
+
+    /** The same rule over another attempt log (FIN-018: owner PIN tries at a desk, counted per desk caller). */
+    void enforceLockout(int failures, java.util.Optional<Instant> lastFailed, UUID staffId) {
         if (failures < props.lockoutThreshold()) {
             return;
         }
-        Instant lastFailedAt = repo.lastFailedAttemptAt(staffId).orElse(Instant.EPOCH);
+        Instant lastFailedAt = lastFailed.orElse(Instant.EPOCH);
         Instant lockedUntil = lastFailedAt.plus(backoff(failures));
         Instant now = Instant.now(clock);
         if (now.isBefore(lockedUntil)) {

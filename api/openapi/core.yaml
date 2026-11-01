@@ -2587,7 +2587,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UnlockRequest"
+              $ref: "#/components/schemas/PinAssertionRequest"
         required: true
       responses:
         "200":
@@ -2602,6 +2602,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
           description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
         default:
           content:
             application/problem+json:
@@ -2610,7 +2616,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - auth
-      x-required-permission: authenticated
+      x-required-permission: billing:create
   /v1/auth/pin/change:
     post:
       operationId: PinChangeController_change
@@ -26968,6 +26974,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Question"
+    PinAssertionRequest:
+      type: object
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        pin:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{4,8}$"
+      required:
+      - pin
     PinChangeRequest:
       type: object
       properties:
