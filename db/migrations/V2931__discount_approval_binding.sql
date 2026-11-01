@@ -1,4 +1,5 @@
 SET lock_timeout = '5s';
+-- migration-lint: allow MIG-001 discount_approvals is new in this sprint (V2930, unreleased) and empty in every environment
 -- FIN-018 fix round (S18-BUG-1..4).
 -- An approval covers the bill it was asked for: the bill fingerprint (charge codes, quantities and list prices, plus the
 -- lines already on the visit's invoice) and its list-price total; the issue gate also checks amount and percent.
