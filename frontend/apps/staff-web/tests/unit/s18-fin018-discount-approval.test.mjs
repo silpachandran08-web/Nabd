@@ -56,3 +56,13 @@ test("banner controls are absent without the grant, and the PIN is cleared after
   assert.match(page, /canPin=\{canApprove\}/);
   assert.match(page, /discountApprovalId: approval\.approvalId/);
 });
+
+test("fix round: the PIN entry names its approval, and the counter sale has the same approval flow", () => {
+  const banner = readFileSync(new URL("../../app/components/checkout/ApprovalBanner.tsx", import.meta.url), "utf8");
+  assert.match(banner, /"\/auth\/pin-assertion", \{ pin, approvalId: approval\.approvalId \}/);
+  const otc = readFileSync(new URL("../../app/(clinic)/checkout/otc/page.tsx", import.meta.url), "utf8");
+  assert.match(otc, /needsApproval\(e\.problem\)/);
+  assert.match(otc, /"\/billing\/discount-approvals", req/);
+  assert.match(otc, /<ApprovalBanner approval=\{approval\}[^>]*canPin=\{canApprove\} canPayLater=\{false\}/);
+  assert.match(otc, /discountApprovalId: approval\.approvalId/);
+});

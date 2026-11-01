@@ -246,6 +246,23 @@ class AuthRepository {
         return count == null ? 0 : count;
     }
 
+    /** FIN-018: failed owner-PIN tries by this desk caller since their last good one (1 day at most), as for logins. */
+    int countFailedPinAssertionsSinceLastSuccess(UUID staffId) {
+        Integer count = jdbc.queryForObject("SELECT count(*) FROM pin_assertion_attempts WHERE staff_id = ? AND NOT succeeded AND attempted_at > "
+                + "COALESCE((SELECT max(attempted_at) FROM pin_assertion_attempts WHERE staff_id = ? AND succeeded), now() - interval '1 day')",
+                Integer.class, staffId, staffId);
+        return count == null ? 0 : count;
+    }
+
+    Optional<Instant> lastFailedPinAssertionAt(UUID staffId) {
+        return jdbc.query("SELECT max(attempted_at) AS t FROM pin_assertion_attempts WHERE staff_id = ? AND NOT succeeded",
+                (rs, i) -> rs.getTimestamp("t"), staffId).stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
+    }
+
+    void recordPinAssertionAttempt(UUID tenantId, UUID staffId, boolean succeeded) {
+        jdbc.update("INSERT INTO pin_assertion_attempts (tenant_id, staff_id, succeeded) VALUES (?,?,?)", tenantId, staffId, succeeded);
+    }
+
     Optional<Instant> lastFailedAttemptAt(UUID staffId) {
         return jdbc.query(
                 "SELECT max(attempted_at) AS t FROM login_attempts WHERE staff_id = ? AND succeeded = false",

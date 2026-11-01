@@ -33,7 +33,7 @@ export default function ApprovalBanner({ approval, currency, canPin, canPayLater
     setBusy(true);
     setError(null);
     try {
-      const { stepUpToken } = await api.post<{ stepUpToken: string }>("/auth/pin-assertion", { pin });
+      const { stepUpToken } = await api.post<{ stepUpToken: string }>("/auth/pin-assertion", { pin, approvalId: approval.approvalId }); // one PIN entry, this request only
       onChange(await api.post<DiscountApproval>(`/billing/discount-approvals/${approval.approvalId}/decide`,
         { decision: "approve", method: "pin", pinAssertion: stepUpToken }));
       setPinOpen(false);

@@ -260,6 +260,7 @@ owner,POST /v1/appointments/{id}/no-show/undo,queue:edit,allow
 owner,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 owner,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 owner,POST /v1/auth/break-glass/activate,clinical:breakGlass,allow
+owner,POST /v1/auth/pin-assertion,billing:create,allow
 owner,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
 owner,POST /v1/billing/day-close,billing:approve,allow
 owner,POST /v1/billing/day-close/reopen,billing:approve,allow
@@ -682,6 +683,7 @@ owner_doctor,POST /v1/appointments/{id}/no-show/undo,queue:edit,allow
 owner_doctor,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 owner_doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 owner_doctor,POST /v1/auth/break-glass/activate,clinical:breakGlass,allow
+owner_doctor,POST /v1/auth/pin-assertion,billing:create,allow
 owner_doctor,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
 owner_doctor,POST /v1/billing/day-close,billing:approve,allow
 owner_doctor,POST /v1/billing/day-close/reopen,billing:approve,allow
@@ -1104,6 +1106,7 @@ doctor,POST /v1/appointments/{id}/no-show/undo,queue:edit,allow
 doctor,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 doctor,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
+doctor,POST /v1/auth/pin-assertion,billing:create,deny-403
 doctor,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-403
 doctor,POST /v1/billing/day-close,billing:approve,deny-403
 doctor,POST /v1/billing/day-close/reopen,billing:approve,deny-403
@@ -1526,6 +1529,7 @@ nurse,POST /v1/appointments/{id}/no-show/undo,queue:edit,allow
 nurse,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 nurse,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 nurse,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
+nurse,POST /v1/auth/pin-assertion,billing:create,deny-403
 nurse,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-403
 nurse,POST /v1/billing/day-close,billing:approve,deny-403
 nurse,POST /v1/billing/day-close/reopen,billing:approve,deny-403
@@ -1948,6 +1952,7 @@ receptionist,POST /v1/appointments/{id}/no-show/undo,queue:edit,allow
 receptionist,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 receptionist,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 receptionist,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
+receptionist,POST /v1/auth/pin-assertion,billing:create,allow
 receptionist,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
 receptionist,POST /v1/billing/day-close,billing:approve,allow
 receptionist,POST /v1/billing/day-close/reopen,billing:approve,allow
@@ -2370,6 +2375,7 @@ frontdesk_vitals,POST /v1/appointments/{id}/no-show/undo,queue:edit,allow
 frontdesk_vitals,POST /v1/appointments/{id}/offer-alternatives,queue:edit,allow
 frontdesk_vitals,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 frontdesk_vitals,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
+frontdesk_vitals,POST /v1/auth/pin-assertion,billing:create,allow
 frontdesk_vitals,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
 frontdesk_vitals,POST /v1/billing/day-close,billing:approve,allow
 frontdesk_vitals,POST /v1/billing/day-close/reopen,billing:approve,allow

@@ -411,6 +411,7 @@ export type PharmacySettingsWriteRequest = { alertRecipientStaffId?: string; lic
 export type PharmacyStockAdjustmentRequest = { delta?: number; reason: string; setTo?: number; };
 export type PharmacyStockMovementResponse = { actorId?: string; actorName?: string; delta?: number; id?: string; kind?: string; occurredAt?: string; qtyAfter?: number; qtyBefore?: number; reason?: string; };
 export type Picker = { jurisdiction?: string; outcomes?: Array<Outcome>; questions?: Array<Question>; };
+export type PinAssertionRequest = { approvalId?: string; pin: string; };
 export type PinChangeRequest = { currentPin: string; newPin: string; };
 export type PinResetConfirmRequest = { mobilePhone: string; newPin: string; tenantSlug: string; token: string; };
 export type PinResetRequestRequest = { mobilePhone: string; tenantSlug: string; };
@@ -723,7 +724,7 @@ export type Operations = {
   AuthController_verifyMfa: { method: "post"; path: "/v1/auth/mfa/verify"; permission: "public"; pathParams: never; query: never; body: MfaVerifyRequest; response: Record<string, unknown> };
   AuthController_requestOtp: { method: "post"; path: "/v1/auth/otp/request"; permission: "public"; pathParams: never; query: never; body: OtpRequestRequest; response: Record<string, Record<string, unknown>> };
   AuthController_verifyOtp: { method: "post"; path: "/v1/auth/otp/verify"; permission: "public"; pathParams: never; query: never; body: OtpVerifyRequest; response: Record<string, unknown> };
-  AuthController_pinAssertion: { method: "post"; path: "/v1/auth/pin-assertion"; permission: "authenticated"; pathParams: never; query: never; body: UnlockRequest; response: StepUpTokenResponse };
+  AuthController_pinAssertion: { method: "post"; path: "/v1/auth/pin-assertion"; permission: "billing:create"; pathParams: never; query: never; body: PinAssertionRequest; response: StepUpTokenResponse };
   PinChangeController_change: { method: "post"; path: "/v1/auth/pin/change"; permission: "authenticated"; pathParams: never; query: never; body: PinChangeRequest; response: void };
   AuthController_confirmPinReset: { method: "post"; path: "/v1/auth/pin/reset-confirm"; permission: "public"; pathParams: never; query: never; body: PinResetConfirmRequest; response: void };
   AuthController_requestPinReset: { method: "post"; path: "/v1/auth/pin/reset-request"; permission: "public"; pathParams: never; query: never; body: PinResetRequestRequest; response: void };

@@ -19,12 +19,12 @@ class DiscountApprovalRepository {
     /** status already reads 'expired' for a pending row past expires_at. */
     record Row(UUID id, String status, UUID invoiceId, UUID draftRef, UUID requestedBy, long amountMinor, BigDecimal percent, String currency,
                String reasonCode, String cartJson, UUID approverId, String method, Instant decidedAt, Instant consumedAt,
-               Instant payLaterAt, Instant createdAt, Instant expiresAt) {
+               Instant payLaterAt, Instant createdAt, Instant expiresAt, String fingerprint, Long grossMinor) {
     }
 
     private static final String COLS = "id, CASE WHEN status = 'pending' AND expires_at <= now() THEN 'expired' ELSE status END AS status, "
             + "invoice_id, draft_ref, requested_by, amount_minor, percent, currency, reason_code, cart::text AS cart, approver_id, method, "
-            + "decided_at, consumed_at, pay_later_at, created_at, expires_at FROM discount_approvals ";
+            + "decided_at, consumed_at, pay_later_at, created_at, expires_at, bill_fingerprint, gross_minor FROM discount_approvals ";
 
     private final JdbcTemplate jdbc;
 
@@ -37,11 +37,12 @@ class DiscountApprovalRepository {
         jdbc.update("UPDATE discount_approvals SET status = 'expired' WHERE tenant_id = ? AND draft_ref = ? AND status = 'pending'", tenantId, draftRef);
     }
 
-    UUID insert(UUID tenantId, UUID draftRef, UUID invoiceId, UUID requestedBy, long amountMinor, BigDecimal percent, String currency,
-                String reasonCode, String cartJson, java.time.Duration ttl) {
+    UUID insert(UUID tenantId, UUID draftRef, UUID invoiceId, UUID requestedBy, DiscountApprovalService.Reduction r, String cartJson,
+                java.time.Duration ttl) {
         return jdbc.queryForObject("INSERT INTO discount_approvals (tenant_id, draft_ref, invoice_id, requested_by, amount_minor, percent, currency, "
-                        + "reason_code, cart, expires_at) VALUES (?,?,?,?,?,?,?,?,?::jsonb, now() + make_interval(secs => ?)) RETURNING id", UUID.class,
-                tenantId, draftRef, invoiceId, requestedBy, amountMinor, percent, currency, reasonCode, cartJson, ttl.toSeconds());
+                        + "reason_code, cart, bill_fingerprint, gross_minor, expires_at) VALUES (?,?,?,?,?,?,?,?,?::jsonb,?,?, now() + make_interval(secs => ?)) RETURNING id",
+                UUID.class, tenantId, draftRef, invoiceId, requestedBy, r.amountMinor(), r.percent(), r.currency(), r.reasonCode(), cartJson,
+                r.fingerprint(), r.grossMinor(), ttl.toSeconds());
     }
 
     Optional<Row> find(UUID tenantId, UUID id) {
@@ -53,9 +54,10 @@ class DiscountApprovalRepository {
     }
 
     /** The one write that decides: only a still-pending, unexpired row moves, so a second decision finds 0 rows. */
-    int decide(UUID tenantId, UUID id, String status, UUID approverId, String method) {
-        return jdbc.update("UPDATE discount_approvals SET status = ?, approver_id = ?, method = ?, decided_at = now() "
-                + "WHERE tenant_id = ? AND id = ? AND status = 'pending' AND expires_at > now()", status, approverId, method, tenantId, id);
+    /** pinAssertionId (unique) consumes an owner PIN entry: a second decision with it fails with a duplicate key. */
+    int decide(UUID tenantId, UUID id, String status, UUID approverId, String method, UUID pinAssertionId) {
+        return jdbc.update("UPDATE discount_approvals SET status = ?, approver_id = ?, method = ?, decided_at = now(), pin_assertion_id = ? "
+                + "WHERE tenant_id = ? AND id = ? AND status = 'pending' AND expires_at > now()", status, approverId, method, pinAssertionId, tenantId, id);
     }
 
     int markUsed(UUID tenantId, UUID id, UUID invoiceId) {
@@ -80,7 +82,8 @@ class DiscountApprovalRepository {
                 rs.getObject("draft_ref", UUID.class), rs.getObject("requested_by", UUID.class), rs.getLong("amount_minor"),
                 rs.getBigDecimal("percent"), rs.getString("currency"), rs.getString("reason_code"), rs.getString("cart"),
                 rs.getObject("approver_id", UUID.class), rs.getString("method"), instant(rs, "decided_at"), instant(rs, "consumed_at"),
-                instant(rs, "pay_later_at"), instant(rs, "created_at"), instant(rs, "expires_at"));
+                instant(rs, "pay_later_at"), instant(rs, "created_at"), instant(rs, "expires_at"), rs.getString("bill_fingerprint"),
+                (Long) rs.getObject("gross_minor"));
     }
 
     private static Instant instant(ResultSet rs, String col) throws SQLException {

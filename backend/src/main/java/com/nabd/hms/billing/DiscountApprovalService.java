@@ -39,7 +39,7 @@ public class DiscountApprovalService {
     static final Duration TTL = Duration.ofHours(24);
 
     /** The bill's price reductions: discount ledger plus below-list overrides; percent of the list-price subtotal. */
-    record Reduction(long amountMinor, BigDecimal percent, String currency, String reasonCode) {
+    record Reduction(long amountMinor, BigDecimal percent, String currency, String reasonCode, long grossMinor, String fingerprint) {
     }
 
     private final DiscountApprovalRepository repo;
@@ -92,7 +92,11 @@ public class DiscountApprovalService {
         }
         if (!"approved".equals(a.status()) || a.consumedAt() != null) throw notUsable("This approval is " + (a.consumedAt() != null ? "already used" : a.status()) + ".");
         if (draftRef != null ? !draftRef.equals(a.draftRef()) : a.invoiceId() != null) throw notUsable("This approval is for another bill.");
-        if (r.amountMinor() > a.amountMinor()) throw notUsable("The discounts are larger than the owner approved. Ask again.");
+        // S18-BUG-2/3: the same bill the owner saw (lines, quantities, list prices), and no more off it in amount or in percent
+        if (a.fingerprint() == null || !a.fingerprint().equals(r.fingerprint()) || a.grossMinor() == null || a.grossMinor() != r.grossMinor()) {
+            throw notUsable("The bill changed since the owner approved it. Ask again.");
+        }
+        if (r.amountMinor() > a.amountMinor() || r.percent().compareTo(a.percent()) > 0) throw notUsable("The discounts are larger than the owner approved. Ask again.");
         return a.id();
     }
 
@@ -102,6 +106,10 @@ public class DiscountApprovalService {
 
     void markUsed(UUID tenantId, UUID approvalId, UUID invoiceId) {
         if (repo.markUsed(tenantId, approvalId, invoiceId) != 1) throw notUsable("This approval is already used.");
+    }
+
+    private static ApiException pinRefused(String detail, String code) {
+        return new ApiException(HttpStatus.FORBIDDEN, "pin-assertion-refused", "Owner PIN not valid for this request", detail, Map.of("code", code));
     }
 
     static ApiException notUsable(String detail) {
@@ -118,7 +126,7 @@ public class DiscountApprovalService {
         } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException("cart not serializable", e);
         }
-        UUID id = repo.insert(tenantId, draftRef, invoiceId, staffId, r.amountMinor(), r.percent(), r.currency(), r.reasonCode(), cartJson, TTL);
+        UUID id = repo.insert(tenantId, draftRef, invoiceId, staffId, r, cartJson, TTL);
         record(tenantId, staffId, ip, "billing.discount_approval_requested", id,
                 Map.of("draftRef", draftRef, "amountMinor", r.amountMinor(), "percent", r.percent(), "reasonCode", r.reasonCode()));
         events.publish(tenantId, DomainEventType.DISCOUNT_APPROVAL_REQUESTED, id,
@@ -133,17 +141,27 @@ public class DiscountApprovalService {
             case "reject" -> "rejected";
             default -> throw bad("decision is 'approve' or 'reject'.");
         };
-        UUID approver = switch (req.method()) {
-            case "in_app" -> callerId;
+        StepUpVerifier.PinAssertion pin = switch (req.method()) {
+            case "in_app" -> null;
             case "pin" -> stepUp.requirePinAssertion(req.pinAssertion()); // 403 STEP_UP_REQUIRED without a valid one for this session
             default -> throw bad("method is 'in_app' or 'pin'.");
         };
+        if (pin != null && pin.approvalId() != null && !pin.approvalId().equals(approvalId)) {
+            throw pinRefused("This owner PIN was entered for another request. Ask the owner to enter it again.", "PIN_ASSERTION_MISMATCH");
+        }
+        UUID approver = pin == null ? callerId : pin.ownerId();
         String role = actors.findActor(tenantId, approver).map(ActorDirectory.Actor::role).orElse("");
         if (!RefundService.OWNER_ROLE.equals(role)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "owner-required", "Owner approval needed",
                     "Only the owner can approve or reject a discount above the threshold.", Map.of("code", "OWNER_REQUIRED"));
         }
-        if (repo.decide(tenantId, approvalId, status, approver, req.method()) != 1) {
+        int moved;
+        try {
+            moved = repo.decide(tenantId, approvalId, status, approver, req.method(), pin == null ? null : pin.assertionId());
+        } catch (org.springframework.dao.DuplicateKeyException used) { // the PIN entry already decided another request
+            throw pinRefused("This owner PIN entry was already used. Ask the owner to enter it again.", "PIN_ASSERTION_USED");
+        }
+        if (moved != 1) {
             DiscountApprovalRepository.Row now = repo.find(tenantId, approvalId)
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "Approval request not found."));
             throw new ApiException(HttpStatus.CONFLICT, "already-decided", "Already decided",

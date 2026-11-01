@@ -260,6 +260,7 @@ super_admin,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 super_admin,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 super_admin,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 super_admin,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+super_admin,POST /v1/auth/pin-assertion,billing:create,deny-401
 super_admin,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 super_admin,POST /v1/billing/day-close,billing:approve,deny-401
 super_admin,POST /v1/billing/day-close/reopen,billing:approve,deny-401
@@ -682,6 +683,7 @@ implementation,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 implementation,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 implementation,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 implementation,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+implementation,POST /v1/auth/pin-assertion,billing:create,deny-401
 implementation,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 implementation,POST /v1/billing/day-close,billing:approve,deny-401
 implementation,POST /v1/billing/day-close/reopen,billing:approve,deny-401
@@ -1104,6 +1106,7 @@ support_engineer,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 support_engineer,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 support_engineer,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 support_engineer,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+support_engineer,POST /v1/auth/pin-assertion,billing:create,deny-401
 support_engineer,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 support_engineer,POST /v1/billing/day-close,billing:approve,deny-401
 support_engineer,POST /v1/billing/day-close/reopen,billing:approve,deny-401
@@ -1526,6 +1529,7 @@ billing,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 billing,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 billing,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 billing,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+billing,POST /v1/auth/pin-assertion,billing:create,deny-401
 billing,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 billing,POST /v1/billing/day-close,billing:approve,deny-401
 billing,POST /v1/billing/day-close/reopen,billing:approve,deny-401
@@ -1948,6 +1952,7 @@ sre,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 sre,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 sre,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 sre,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+sre,POST /v1/auth/pin-assertion,billing:create,deny-401
 sre,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 sre,POST /v1/billing/day-close,billing:approve,deny-401
 sre,POST /v1/billing/day-close/reopen,billing:approve,deny-401
@@ -2370,6 +2375,7 @@ commercial,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 commercial,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 commercial,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 commercial,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+commercial,POST /v1/auth/pin-assertion,billing:create,deny-401
 commercial,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 commercial,POST /v1/billing/day-close,billing:approve,deny-401
 commercial,POST /v1/billing/day-close/reopen,billing:approve,deny-401
@@ -2792,6 +2798,7 @@ compliance_dpo,POST /v1/appointments/{id}/no-show/undo,queue:edit,deny-401
 compliance_dpo,POST /v1/appointments/{id}/offer-alternatives,queue:edit,deny-401
 compliance_dpo,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 compliance_dpo,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
+compliance_dpo,POST /v1/auth/pin-assertion,billing:create,deny-401
 compliance_dpo,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
 compliance_dpo,POST /v1/billing/day-close,billing:approve,deny-401
 compliance_dpo,POST /v1/billing/day-close/reopen,billing:approve,deny-401

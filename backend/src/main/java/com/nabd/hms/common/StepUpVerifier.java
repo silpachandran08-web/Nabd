@@ -23,10 +23,23 @@ public class StepUpVerifier {
         decode(stepUpToken, "step_up", expectedStaffId);
     }
 
-    /** FIN-018: a staff member's PIN confirmed at someone else's desk (AuthService.issuePinAssertion); returns who it asserts.
-     * Bound to the caller's session and tenant like any step-up token. */
-    public UUID requirePinAssertion(String assertion) {
-        return UUID.fromString(decode(assertion, "pin_step_up", null).getSubject());
+    /** FIN-018: who the PIN assertion names, its one-time id (jti) and the approval it was asked for (null = any one approval). */
+    public record PinAssertion(UUID ownerId, UUID assertionId, UUID approvalId) {
+    }
+
+    /** FIN-018: an owner's PIN confirmed at someone else's desk (AuthService.issuePinAssertion). Bound to the caller's session
+     * and tenant like any step-up token; the caller must also consume assertionId once. */
+    public PinAssertion requirePinAssertion(String assertion) {
+        Jwt t = decode(assertion, "pin_step_up", null);
+        if (t.getId() == null) {
+            throw stepUpError();
+        }
+        String approval = t.getClaimAsString("approvalId");
+        try {
+            return new PinAssertion(UUID.fromString(t.getSubject()), UUID.fromString(t.getId()), approval == null ? null : UUID.fromString(approval));
+        } catch (IllegalArgumentException e) {
+            throw stepUpError();
+        }
     }
 
     private Jwt decode(String stepUpToken, String purpose, UUID expectedStaffId) {

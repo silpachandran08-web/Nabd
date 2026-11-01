@@ -127,10 +127,16 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    /** FIN-018: an owner confirms an action at this desk with their PIN; the token goes to that action (e.g. a discount approval). */
+    /** FIN-018: the owner confirms one decision at this desk with their PIN (approvalId: the discount approval it is for).
+     * Only a desk that issues bills may ask; misses lock out the caller, never the owner. */
+    public record PinAssertionRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "^[0-9]{4,8}$") String pin,
+                                      UUID approvalId) {
+    }
+
     @PostMapping("/pin-assertion")
-    public StepUpTokenResponse pinAssertion(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UnlockRequest req) {
-        return authService.issuePinAssertion(jwt, req.pin());
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('billing:create')")
+    public StepUpTokenResponse pinAssertion(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PinAssertionRequest req) {
+        return authService.issuePinAssertion(jwt, req.pin(), req.approvalId());
     }
 
     @PostMapping("/unlock")
