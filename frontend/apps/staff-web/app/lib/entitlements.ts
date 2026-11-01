@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
 
 export * from "./entitlementRules";
@@ -20,11 +20,19 @@ function load(): Promise<Entitlements | null> {
 }
 
 export function useEntitlements(): Entitlements | null {
-  const [ent, setEnt] = useState<Entitlements | null>(null);
+  return useEntitlementsStatus().ent;
+}
+
+/** FEF-057: entitlements plus whether the first answer (success or failure) has arrived. `settled` never goes back to false, so a
+ * retry or later refetch never swaps a page out again (S17-BUG-3); `retry` is manual only, so a failing call cannot loop. */
+export function useEntitlementsStatus(): { ent: Entitlements | null; settled: boolean; retry: () => void } {
+  const [s, setS] = useState<{ ent: Entitlements | null; settled: boolean }>({ ent: null, settled: false });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    void load().then((e) => { if (!cancelled && e) setEnt(e); });
+    void load().then((e) => { if (!cancelled) setS((p) => ({ ent: e ?? p.ent, settled: true })); });
     return () => { cancelled = true; };
-  }, []);
-  return ent;
+  }, [attempt]);
+  const retry = useCallback(() => { inflight = null; setAttempt((a) => a + 1); }, []);
+  return { ...s, retry };
 }

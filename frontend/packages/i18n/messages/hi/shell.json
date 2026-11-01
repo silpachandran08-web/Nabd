@@ -172,7 +172,7 @@
       "short": "POS"
     },
     "ph-stock": {
-      "label": "स्टॉक और समाप्ति",
+      "label": "स्टॉक गिनती",
       "short": "स्टॉक"
     },
     "ph-purchase": {
