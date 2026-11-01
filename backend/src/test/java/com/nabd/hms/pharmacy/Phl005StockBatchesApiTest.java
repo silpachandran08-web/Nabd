@@ -130,7 +130,7 @@ class Phl005StockBatchesApiTest extends ApiTestBase {
         UUID late = receive(c, it, "LATE", d.plusDays(300), 12);
         UUID early = receive(c, it, "EARLY", d.plusDays(100), 30);
         UUID gone = receive(c, it, "GONE", d.plusDays(50), 5);
-        inTenantTx(c.t(), () -> stock.adjustBatch(it, gone, -5, c.staffId(), "count"));
+        inTenantTx(c.t(), () -> stock.adjustBatch(it, gone, -5, c.staffId(), "count_correction", "count"));
 
         Map page = exchange("/v1/pharmacy/stock?q=zeta", HttpMethod.GET, authed(c.token()), Map.class).getBody();
         List<Map> items = (List<Map>) page.get("items");

@@ -90,9 +90,16 @@ class BatchRepository {
 
     void insertMovement(UUID tenantId, UUID itemId, UUID batchId, String kind, int delta, int before, int after, String reason,
                         UUID actorId, UUID invoiceId, String sourceType, UUID sourceId, String overrideReason) {
+        insertMovement(tenantId, itemId, batchId, kind, delta, before, after, reason, null, actorId, invoiceId, sourceType, sourceId, overrideReason);
+    }
+
+    /** @param reasonCode PHL-010: the fixed reason of a manual adjustment; null for receipts, sales and the like */
+    void insertMovement(UUID tenantId, UUID itemId, UUID batchId, String kind, int delta, int before, int after, String reason, String reasonCode,
+                        UUID actorId, UUID invoiceId, String sourceType, UUID sourceId, String overrideReason) {
         jdbc.update("INSERT INTO pharmacy_stock_movements (id, tenant_id, item_id, batch_id, kind, delta, qty_before, qty_after, reason, " +
-                        "actor_id, invoice_id, source_type, source_id, fefo_override_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                UuidV7.next(), tenantId, itemId, batchId, kind, delta, before, after, reason, actorId, invoiceId, sourceType, sourceId, overrideReason);
+                        "reason_code, actor_id, invoice_id, source_type, source_id, fefo_override_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                UuidV7.next(), tenantId, itemId, batchId, kind, delta, before, after, reason, reasonCode, actorId, invoiceId, sourceType, sourceId,
+                overrideReason);
     }
 
     // ---- PHL-010: set-based forms for a stock take (one statement for all batches) ----

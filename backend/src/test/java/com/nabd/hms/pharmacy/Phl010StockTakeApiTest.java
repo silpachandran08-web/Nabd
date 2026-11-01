@@ -325,6 +325,26 @@ class Phl010StockTakeApiTest extends ApiTestBase {
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    /** S18-BUG-5: the item-level +/- also takes its reason from the fixed list and stores the code on the movement. */
+    @Test
+    void theItemLevelAdjustmentStoresACodeFromTheFixedList() {
+        Clinic c = clinic("itemcode");
+        UUID otc = item(c, "Coded plain", "OTC");
+        receive(c, otc, "C1", 10, null);
+        String path = "/v1/pharmacy/items/" + otc + "/stock-adjustments";
+        assertThat(call(c.token(), HttpMethod.POST, path, Map.of("delta", -1, "reasonCode", "lost")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(slug(call(c.token(), HttpMethod.POST, path, Map.of("delta", -1, "reasonCode", "other")))).isEqualTo("reason-required");
+        assertThat(call(c.token(), HttpMethod.POST, path, Map.of("delta", -2, "reasonCode", "damaged")).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(call(c.token(), HttpMethod.POST, path, Map.of("setTo", 9, "reasonCode", "count_correction", "reason", "shelf recount"))
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(call(c.token(), HttpMethod.POST, path, Map.of("delta", -1, "reason", "older caller")).getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> mv = su().queryForList("SELECT reason_code, reason FROM pharmacy_stock_movements WHERE item_id = ? AND kind = 'adjustment' " +
+                "ORDER BY seq", otc);
+        assertThat(mv).extracting(m -> m.get("reason_code")).containsExactly("damaged", "count_correction", "other");
+        assertThat(mv).extracting(m -> m.get("reason")).containsExactly("Damaged", "Count correction: shelf recount", "older caller");
+        assertThat(cache(otc)).isEqualTo(8);
+    }
+
     @Test
     void aSingleBatchAdjustmentTakesDeltaOrSetToAndTheSecondSignerForAControlledBatch() {
         Clinic c = clinic("single");
