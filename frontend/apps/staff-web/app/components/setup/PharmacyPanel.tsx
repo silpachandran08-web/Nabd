@@ -8,6 +8,8 @@ import StatusPill from "../ui/StatusPill";
 import StockPill, { LOW_STOCK } from "../ui/StockPill";
 import Link from "next/link";
 import Dialog from "../ui/Dialog";
+import BatchAdjustDialog from "./BatchAdjustDialog";
+import { REASONS, type ReasonCode } from "../../lib/stockTake";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { api, ApiError } from "../../lib/api";
@@ -142,8 +144,11 @@ export default function PharmacyPanel() {
   const [editing, setEditing] = useState<PharmacyItem | null>(null);
   // Stock changes (V2-004): +/- opens a reason dialog and posts a delta (or a counted total) to the stock-adjustments
   // endpoint; the server keeps an immutable movement row and an audit event. Never an absolute overwrite from a stale list.
-  const [adjusting, setAdjusting] = useState<{ item: PharmacyItem; mode: "delta" | "total"; qty: string; reason: string; error: string | null } | null>(null);
+  const [adjusting, setAdjusting] = useState<{ item: PharmacyItem; mode: "delta" | "total"; qty: string; reasonCode: ReasonCode | ""; reason: string; error: string | null } | null>(null);
   const [adjustBusy, setAdjustBusy] = useState(false);
+  // PHL-010: a controlled item (a class with a register) changes only by batch, with a second sign-off
+  const [batchAdjust, setBatchAdjust] = useState<PharmacyItem | null>(null);
+  const closeBatchAdjust = useCallback(() => setBatchAdjust(null), [setBatchAdjust]);
   const [deactivating, setDeactivating] = useState<{ item: PharmacyItem; reason: string; error: string | null } | null>(null);
   const [deactivateBusy, setDeactivateBusy] = useState(false);
   // Stable identities: the shared Dialog re-runs its focus effect whenever onClose changes, which would pull focus
@@ -158,7 +163,7 @@ export default function PharmacyPanel() {
 
   const afe = useFormErrors("ph", { name: "Name", price: "Price", taxRatePercent: "Tax rate", stockQty: "Stock qty", hsnCode: "HSN code", isRx: "Rx" });
   const efe = useFormErrors("pe", { name: "Name", price: "Price", taxRatePercent: "Tax rate", hsnCode: "HSN code", isRx: "Rx" });
-  const jfe = useFormErrors("pa", { delta: "Change", setTo: "Counted total", reason: "Reason" });
+  const jfe = useFormErrors("pa", { delta: "Change", setTo: "Counted total", reasonCode: "Reason", reason: "Note" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -219,7 +224,8 @@ export default function PharmacyPanel() {
 
   const openAdjust = (item: PharmacyItem, direction: 1 | -1) => {
     setNotice(null);
-    setAdjusting({ item, mode: "delta", qty: direction === 1 ? "1" : "-1", reason: "", error: null });
+    if (item.register) { setBatchAdjust(item); return; }
+    setAdjusting({ item, mode: "delta", qty: direction === 1 ? "1" : "-1", reasonCode: "", reason: "", error: null });
   };
 
   const submitAdjust = async (e: React.FormEvent) => {
@@ -232,12 +238,15 @@ export default function PharmacyPanel() {
     if (delta && qty === 0) { setAdjusting({ ...adjusting, error: "Enter a change other than 0." }); return; }
     if (!delta && qty < 0) { setAdjusting({ ...adjusting, error: "A counted total cannot be negative." }); return; }
     if (delta && adjusting.item.stockQty + qty < 0) { setAdjusting({ ...adjusting, error: `Only ${adjusting.item.stockQty} in stock, so it cannot go down by ${-qty}.` }); return; }
-    if (reason.length < 3) { setAdjusting({ ...adjusting, error: "A reason is required (at least 3 characters)." }); reasonRef.current?.focus(); return; }
+    // PHL-010: the reason comes from the fixed list; the note is required for "Other"
+    if (!adjusting.reasonCode) { setAdjusting({ ...adjusting, error: "Choose a reason." }); return; }
+    if (adjusting.reasonCode === "other" && reason === "") { setAdjusting({ ...adjusting, error: "Reason \"Other\" needs a note." }); reasonRef.current?.focus(); return; }
     if (adjustBusy) return;
     setAdjustBusy(true);
     jfe.clear();
     try {
-      await api.post(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, delta ? { delta: qty, reason } : { setTo: qty, reason });
+      const why = { reasonCode: adjusting.reasonCode, reason: reason || undefined };
+      await api.post(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, delta ? { delta: qty, ...why } : { setTo: qty, ...why });
       setNotice({ text: `Stock of ${adjusting.item.name} updated.` });
       setAdjusting(null);
       await load(); // the server's count is authoritative: a concurrent sale or second pharmacist shows up here
@@ -423,7 +432,7 @@ export default function PharmacyPanel() {
             </div>
           )}
 
-          {canWrite && mode === "hybrid" && <p><Link href="/pharmacy/receipt" className={styles.btn}>Enter supplier bill</Link></p>}
+          {canWrite && <p>{mode === "hybrid" && <><Link href="/pharmacy/receipt" className={styles.btn}>Enter supplier bill</Link>{" "}</>}<Link href="/pharmacy/stock-take" className={styles.btn}>Stock take</Link></p>}
           <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
           <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. Open a row to dispense on that patient&apos;s billing screen.</p>
           {queueError ? (
@@ -539,8 +548,16 @@ export default function PharmacyPanel() {
               <FieldError fe={jfe} name={adjusting.mode === "delta" ? "delta" : "setTo"} className={ph.sub} />
             </div>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="pa-reason">Reason (required)</label>
-              <input id="pa-reason" ref={reasonRef} className={styles.input} maxLength={500} placeholder="e.g. Supplier delivery, damaged, stock-take" value={adjusting.reason} {...jfe.attrs("reason")} onChange={(e) => { jfe.clearField("reason"); setAdjusting({ ...adjusting, reason: e.target.value, error: null }); }} required />
+              <label className={styles.label} htmlFor="pa-code">Reason</label>
+              <select id="pa-code" className={styles.select} value={adjusting.reasonCode} {...jfe.attrs("reasonCode")} onChange={(e) => { jfe.clearField("reasonCode"); setAdjusting({ ...adjusting, reasonCode: e.target.value as ReasonCode, error: null }); }} required>
+                <option value="">Choose…</option>
+                {REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+              </select>
+              <FieldError fe={jfe} name="reasonCode" className={ph.sub} />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pa-reason">Note{adjusting.reasonCode === "other" ? " (required)" : " (optional)"}</label>
+              <input id="pa-reason" ref={reasonRef} className={styles.input} maxLength={500} value={adjusting.reason} {...jfe.attrs("reason")} onChange={(e) => { jfe.clearField("reason"); setAdjusting({ ...adjusting, reason: e.target.value, error: null }); }} />
               <FieldError fe={jfe} name="reason" className={ph.sub} />
             </div>
             {adjusting.error && <div className={`${ph.notice} ${ph.noticeError}`} role="alert"><Icon name="alert" size={14} /> {adjusting.error}</div>}
@@ -551,6 +568,11 @@ export default function PharmacyPanel() {
             </div>
           </form>
         </Dialog>
+      )}
+
+      {batchAdjust && (
+        <BatchAdjustDialog item={batchAdjust} controlled={!!batchAdjust.register} onClose={closeBatchAdjust}
+          onSaved={(text) => { setBatchAdjust(null); setNotice({ text }); void load(); }} />
       )}
 
       {deactivating && (

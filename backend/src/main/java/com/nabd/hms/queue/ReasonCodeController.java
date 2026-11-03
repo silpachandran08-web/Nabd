@@ -40,7 +40,7 @@ class ReasonCodeController {
     }
 
     @GetMapping("/v1/reason-codes")
-    @PreAuthorize("hasAuthority('queue:view')")
+    @PreAuthorize("hasAnyAuthority('queue:view', 'billing:create')") // FIN-018: a billing-only desk must pick discount reasons
     ListResponse list(@RequestParam String kind, @RequestParam(required = false) String locale) {
         return new ListResponse(service.list(kind, locale));
     }

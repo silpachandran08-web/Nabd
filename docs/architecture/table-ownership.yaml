@@ -11,7 +11,7 @@
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
-    owns: [billing_documents, charge_catalogue, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
+    owns: [billing_documents, charge_catalogue, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
     reads: [charge_doctor_fees, patients, pharmacy_item_profiles, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, rx_coding_suggestions, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
@@ -28,7 +28,7 @@ modules:
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
     # (remaining direct staff reads elsewhere are baseline debt).
     packages: [iam, auth, staff]
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_preferences]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_preferences]
     reads: []
   messaging:
     owns: [comms_cutover_flags, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
@@ -51,7 +51,7 @@ modules:
     owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_proxies, patient_registry_summary, patients, privacy_notices, proxy_invites, registry_dirty, secure_link_opens, secure_links]
     reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
-    owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, stock_batches, stock_discrepancies]
+    owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
     reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
     owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, tenant_lifecycle_events, tenants]

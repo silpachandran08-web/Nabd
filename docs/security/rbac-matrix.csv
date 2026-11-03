@@ -2,7 +2,8 @@
 # One row per (plane, role, module); 'actions' lists the granted actions ('|'-separated, empty = none); permission = module:action.
 # plane=clinic: RBAC Matrix sheet of 'Nabd HMS - Implementation Task Plan v2.xlsx' as transcribed in backend/src/test/resources/rbac-matrix-golden.csv
 #   (Y and P grant; nursing/specialty_dental/departments are its 'extension' rows), with the PLT-016 preset rules: MF-52/QA-17 the Owner has no
-#   clinical:approve; owner_doctor = owner OR doctor plus clinical:approve; breakGlass (not a sheet column) stays with the Owner (RolePresets).
+#   clinical:approve; owner_doctor = owner OR doctor plus clinical:approve; breakGlass (not a sheet column) stays with the Owner (RolePresets);
+#   PHL-010: pharmacy adjust_approve (not a sheet column) is derived from pharmacy approve (GrantsFlattener), so it is listed wherever that is.
 # plane=operator: 'SaaS Operator Roles' sheet as coded in PlatformPermissions (SSA-02, V2-005, V3-001, PLT-056, CLN-004).
 # A change here must be matched in RolePresets / PlatformPermissions and the generated cases regenerated: mvn test -Dtest=RbacMatrixApiTest,OperatorMatrixApiTest -Drbac.write=true
 plane,role,module,actions
@@ -11,7 +12,7 @@ clinic,owner,queue,view|create|edit|delete|approve|export
 clinic,owner,clinical,view|delete|export|breakGlass
 clinic,owner,billing,view|create|edit|delete|approve|refundDiscount|export
 clinic,owner,packages,view|create|edit|delete|approve|refundDiscount|export
-clinic,owner,pharmacy,view|create|edit|delete|approve|refundDiscount|export
+clinic,owner,pharmacy,view|create|edit|delete|approve|refundDiscount|export|adjust_approve
 clinic,owner,reports,view|approve|export
 clinic,owner,staff,view|create|edit|delete|approve|export
 clinic,owner,setup,view|edit|export
@@ -24,7 +25,7 @@ clinic,owner_doctor,queue,view|create|edit|delete|approve|export
 clinic,owner_doctor,clinical,view|create|edit|delete|approve|export|breakGlass
 clinic,owner_doctor,billing,view|create|edit|delete|approve|refundDiscount|export
 clinic,owner_doctor,packages,view|create|edit|delete|approve|refundDiscount|export
-clinic,owner_doctor,pharmacy,view|create|edit|delete|approve|refundDiscount|export
+clinic,owner_doctor,pharmacy,view|create|edit|delete|approve|refundDiscount|export|adjust_approve
 clinic,owner_doctor,reports,view|approve|export
 clinic,owner_doctor,staff,view|create|edit|delete|approve|export
 clinic,owner_doctor,setup,view|edit|export

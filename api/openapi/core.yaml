@@ -2580,6 +2580,43 @@ paths:
       tags:
       - auth
       x-required-permission: public
+  /v1/auth/pin-assertion:
+    post:
+      operationId: AuthController_pinAssertion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinAssertionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StepUpTokenResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - auth
+      x-required-permission: billing:create
   /v1/auth/pin/change:
     post:
       operationId: PinChangeController_change
@@ -3087,6 +3124,167 @@ paths:
       tags:
       - billing
       x-required-permission: billing:approve
+  /v1/billing/discount-approvals:
+    get:
+      operationId: DiscountApprovalController_list
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: invoiceDraftId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApprovalList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+    post:
+      operationId: DiscountApprovalController_request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscountApprovalCreateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApproval"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:create
+  /v1/billing/discount-approvals/{id}/decide:
+    post:
+      operationId: DiscountApprovalController_decide
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscountApprovalDecideRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApproval"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:approve
+  /v1/billing/discount-approvals/{id}/pay-later:
+    post:
+      operationId: DiscountApprovalController_payLater
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DiscountApproval"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:create
   /v1/billing/dues:
     get:
       operationId: DuesController_dues
@@ -3773,6 +3971,55 @@ paths:
       tags:
       - billing
       x-required-permission: billing:approve
+  /v1/billing/leakage:
+    get:
+      operationId: DiscountApprovalController_leakage
+      parameters:
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: type
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LeakageResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: reports:view
   /v1/billing/otc-charges:
     get:
       operationId: CheckoutController_otcCharges
@@ -11344,6 +11591,39 @@ paths:
       tags:
       - patient
       x-required-permission: patients:edit
+  /v1/pharmacy/adjustment-approvers:
+    get:
+      operationId: StockTakeController_approvers
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdjustmentApprover"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
   /v1/pharmacy/batches/{id}:
     patch:
       operationId: PharmacyController_patchBatch
@@ -11366,6 +11646,50 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/StockBatch"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
+  /v1/pharmacy/batches/{id}/adjustments:
+    post:
+      operationId: StockTakeController_adjust
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchAdjustmentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BatchAdjustmentResponse"
           description: OK
         "401":
           content:
@@ -12138,6 +12462,238 @@ paths:
       tags:
       - pharmacy
       x-required-permission: pharmacy:view
+  /v1/pharmacy/stock-takes:
+    get:
+      operationId: StockTakeController_list
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockTakeSummary"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:view
+    post:
+      operationId: StockTakeController_start
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockTakeStartRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockTakeStarted"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
+  /v1/pharmacy/stock-takes/{id}:
+    get:
+      operationId: StockTakeController_sheet
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockTakeSheet"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:view
+  /v1/pharmacy/stock-takes/{id}/cancel:
+    post:
+      operationId: StockTakeController_cancel
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockTakeSummary"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
+  /v1/pharmacy/stock-takes/{id}/counts:
+    put:
+      operationId: StockTakeController_counts
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockTakeCountsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockTakeCountsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
+  /v1/pharmacy/stock-takes/{id}/post:
+    post:
+      operationId: StockTakeController_post
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockTakePostRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockTakePosted"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
   /v1/phi-read/alerts:
     get:
       operationId: PhiReadAlertController_phiReadAlerts
@@ -14877,7 +15433,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: queue:view
+      x-required-permission: queue:view | billing:create
     post:
       operationId: ReasonCodeController_add
       requestBody:
@@ -19908,6 +20464,14 @@ components:
           format: date-time
         patientName:
           type: string
+    AdjustmentApprover:
+      type: object
+      properties:
+        name:
+          type: string
+        staffId:
+          type: string
+          format: uuid
     AdministerRequest:
       type: object
       properties:
@@ -20415,6 +20979,60 @@ components:
             $ref: "#/components/schemas/AuditEntryResponse"
         page:
           $ref: "#/components/schemas/PageMeta"
+    BatchAdjustmentRequest:
+      type: object
+      properties:
+        approverPin:
+          type: string
+          maxLength: 20
+          minLength: 0
+        approverStaffId:
+          type: string
+          format: uuid
+        delta:
+          type: integer
+          format: int32
+          maximum: 1000000
+          minimum: -1000000
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        reasonCode:
+          type: string
+          minLength: 1
+          pattern: damaged|count_correction|theft_loss|expired|other
+        setTo:
+          type: integer
+          format: int32
+          maximum: 10000000
+          minimum: 0
+      required:
+      - reasonCode
+    BatchAdjustmentResponse:
+      type: object
+      properties:
+        approverName:
+          type: string
+        batchId:
+          type: string
+          format: uuid
+        delta:
+          type: integer
+          format: int32
+        itemId:
+          type: string
+          format: uuid
+        makerName:
+          type: string
+        qtyAfter:
+          type: integer
+          format: int32
+        qtyBefore:
+          type: integer
+          format: int32
+        reasonCode:
+          type: string
     BillingLeakageResponse:
       type: object
       properties:
@@ -21300,6 +21918,9 @@ components:
           type: number
           exclusiveMinimum: false
           minimum: 0
+        discountApprovalId:
+          type: string
+          format: uuid
         discounts:
           type: array
           items:
@@ -22192,6 +22813,112 @@ components:
         total:
           type: integer
           format: int32
+    DiscountApproval:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        approvalId:
+          type: string
+          format: uuid
+        approverId:
+          type: string
+          format: uuid
+        approverName:
+          type: string
+        billStatus:
+          type: string
+        cart:
+          $ref: "#/components/schemas/CheckoutRequest"
+        createdAt:
+          type: string
+          format: date-time
+        currency:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        invoiceDraftId:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        method:
+          type: string
+        payLater:
+          type: boolean
+        percent:
+          type: number
+        reasonCode:
+          type: string
+        requestedBy:
+          type: string
+          format: uuid
+        requestedByName:
+          type: string
+        status:
+          type: string
+      required:
+      - amountMinor
+      - approvalId
+      - billStatus
+      - cart
+      - createdAt
+      - currency
+      - expiresAt
+      - payLater
+      - percent
+      - reasonCode
+      - requestedBy
+      - requestedByName
+      - status
+    DiscountApprovalCreateRequest:
+      type: object
+      properties:
+        buyerGstin:
+          type: string
+        discounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountRequest"
+        invoiceDraftId:
+          type: string
+          format: uuid
+        lineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineItemRequest"
+      required:
+      - invoiceDraftId
+      - lineItems
+    DiscountApprovalDecideRequest:
+      type: object
+      properties:
+        decision:
+          type: string
+          minLength: 1
+        method:
+          type: string
+          minLength: 1
+        pinAssertion:
+          type: string
+      required:
+      - decision
+      - method
+    DiscountApprovalList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountApproval"
+      required:
+      - items
     DiscountPage:
       type: object
       properties:
@@ -24399,6 +25126,106 @@ components:
           format: uuid
       required:
       - appointmentId
+    LeakageItem:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        appliedBy:
+          type: string
+          format: uuid
+        appliedByName:
+          type: string
+        approvalMethod:
+          type: string
+        approverId:
+          type: string
+          format: uuid
+        approverName:
+          type: string
+        at:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        reasonCode:
+          type: string
+        type:
+          type: string
+      required:
+      - amountMinor
+      - approvalMethod
+      - at
+      - id
+      - invoiceId
+      - reasonCode
+      - type
+    LeakageResponse:
+      type: object
+      properties:
+        currency:
+          type: string
+        from:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeakageItem"
+        to:
+          type: string
+          format: date
+        totals:
+          $ref: "#/components/schemas/LeakageTotals"
+      required:
+      - currency
+      - from
+      - items
+      - to
+      - totals
+    LeakageTotals:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int32
+        discountMinor:
+          type: integer
+          format: int64
+        overrideMinor:
+          type: integer
+          format: int64
+        ownerApprovedMinor:
+          type: integer
+          format: int64
+        refundMinor:
+          type: integer
+          format: int64
+        totalMinor:
+          type: integer
+          format: int64
+        withoutOwnerApprovalMinor:
+          type: integer
+          format: int64
+        writeOffMinor:
+          type: integer
+          format: int64
+      required:
+      - count
+      - discountMinor
+      - overrideMinor
+      - ownerApprovedMinor
+      - refundMinor
+      - totalMinor
+      - withoutOwnerApprovalMinor
+      - writeOffMinor
     LeaveAffectedAppointment:
       type: object
       properties:
@@ -26100,13 +26927,14 @@ components:
           type: string
           maxLength: 500
           minLength: 0
+        reasonCode:
+          type: string
+          pattern: damaged|count_correction|theft_loss|expired|other
         setTo:
           type: integer
           format: int32
           maximum: 10000000
           minimum: 0
-      required:
-      - reason
     PharmacyStockMovementResponse:
       type: object
       properties:
@@ -26147,6 +26975,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Question"
+    PinAssertionRequest:
+      type: object
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        pin:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{4,8}$"
+      required:
+      - pin
     PinChangeRequest:
       type: object
       properties:
@@ -28618,6 +29458,34 @@ components:
           type: string
         specialty:
           type: string
+    StepUpTokenResponse:
+      type: object
+      properties:
+        expiresIn:
+          type: integer
+          format: int64
+        stepUpToken:
+          type: string
+    StockAdjustmentLine:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        delta:
+          type: integer
+          format: int32
+        itemId:
+          type: string
+          format: uuid
+        qtyAfter:
+          type: integer
+          format: int32
+        qtyBefore:
+          type: integer
+          format: int32
+        reasonCode:
+          type: string
     StockBatch:
       type: object
       properties:
@@ -28719,6 +29587,182 @@ components:
             $ref: "#/components/schemas/StockListItem"
         nextCursor:
           type: string
+    StockTakeCount:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        counted:
+          type: integer
+          format: int32
+          maximum: 10000000
+          minimum: 0
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        reasonCode:
+          type: string
+          pattern: damaged|count_correction|theft_loss|expired|other
+      required:
+      - batchId
+      - counted
+    StockTakeCountsRequest:
+      type: object
+      properties:
+        counts:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockTakeCount"
+          maxItems: 1000
+          minItems: 0
+      required:
+      - counts
+    StockTakeCountsResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+          format: int32
+    StockTakeLine:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        batchNo:
+          type: string
+        controlled:
+          type: boolean
+        countedQty:
+          type: integer
+          format: int32
+        expectedQty:
+          type: integer
+          format: int32
+        expiryDate:
+          type: string
+          format: date
+        itemCode:
+          type: string
+        itemId:
+          type: string
+          format: uuid
+        itemName:
+          type: string
+        location:
+          type: string
+        movementsSinceSnapshot:
+          type: integer
+          format: int32
+        note:
+          type: string
+        postedDelta:
+          type: integer
+          format: int32
+        reasonCode:
+          type: string
+        scheduleClass:
+          type: string
+        snapshotQty:
+          type: integer
+          format: int32
+        variance:
+          type: integer
+          format: int32
+    StockTakePostRequest:
+      type: object
+      properties:
+        approverPin:
+          type: string
+          maxLength: 20
+          minLength: 0
+        approverStaffId:
+          type: string
+          format: uuid
+    StockTakePosted:
+      type: object
+      properties:
+        adjustments:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockAdjustmentLine"
+        approvedByName:
+          type: string
+        postedByName:
+          type: string
+        status:
+          type: string
+        stockTakeId:
+          type: string
+          format: uuid
+        value:
+          type: number
+    StockTakeSheet:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockTakeLine"
+        summary:
+          $ref: "#/components/schemas/StockTakeSummary"
+    StockTakeStartRequest:
+      type: object
+      properties:
+        location:
+          type: string
+          maxLength: 80
+          minLength: 0
+        scheduleClass:
+          type: string
+          maxLength: 40
+          minLength: 0
+        scope:
+          type: string
+          pattern: all|location|class
+      required:
+      - scope
+    StockTakeStarted:
+      type: object
+      properties:
+        lineCount:
+          type: integer
+          format: int32
+        stockTakeId:
+          type: string
+          format: uuid
+    StockTakeSummary:
+      type: object
+      properties:
+        approvedByName:
+          type: string
+        countedCount:
+          type: integer
+          format: int32
+        createdByName:
+          type: string
+        lineCount:
+          type: integer
+          format: int32
+        postedAt:
+          type: string
+          format: date-time
+        postedByName:
+          type: string
+        scope:
+          type: string
+        scopeValue:
+          type: string
+        snapshotAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        stockTakeId:
+          type: string
+          format: uuid
     SubscriptionPage:
       type: object
       properties:

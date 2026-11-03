@@ -225,14 +225,19 @@ class Fin003ServerPricingApiTest extends ApiTestBase {
     }
 
     @Test
-    void percentDiscountIsBookedAsItsAmountAndTheLegacyScalarStillWorks() {
+    void percentDiscountIsBookedAsItsAmountAndTheLegacyScalarNeedsAReason() {
         Env e = env();
-        ResponseEntity<Map> r = post(e.ownerToken(), pending(e), Map.of("lineItems", List.of(line("XRAY", 2)),
+        // FIN-018: the scalar discount carries no reason code, so it is refused
+        ResponseEntity<Map> legacy = post(e.ownerToken(), pending(e), Map.of("lineItems", List.of(line("XRAY", 2)),
                 "discounts", List.of(Map.of("kind", "percent", "value", 10, "reasonCode", "staff")), "discount", 5));
+        assertThat(legacy.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(legacy.getBody().get("code")).isEqualTo("REASON_REQUIRED");
+        ResponseEntity<Map> r = post(e.ownerToken(), pending(e), Map.of("lineItems", List.of(line("XRAY", 2)),
+                "discounts", List.of(Map.of("kind", "amount", "value", 5, "reasonCode", "goodwill"), Map.of("kind", "percent", "value", 10, "reasonCode", "staff"))));
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
-        // subtotal 1000: legacy 5 first, then 10% of the remaining 995 = 99.50
+        // subtotal 1000: 5 first, then 10% of the remaining 995 = 99.50
         assertThat(num(r.getBody().get("discount"))).isEqualTo(104.5);
-        assertThat(count(e, "SELECT count(*) FROM invoice_discounts WHERE reason_code = 'unspecified'")).isEqualTo(1);
+        assertThat(count(e, "SELECT count(*) FROM invoice_discounts WHERE reason_code = 'unspecified'")).isZero();
     }
 
     // AC6: follow-up chosen by the server

@@ -73,13 +73,16 @@ public class CheckoutService {
     private final com.nabd.hms.billing.tax.TaxService tax;
     private final PaymentActedBy paymentActedBy; // IDC-011
     private final com.nabd.hms.organization.api.ClinicPolicies policies;
+    private final DiscountApprovalService approvals; // FIN-018
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
-                     com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies) {
+                     com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies,
+                     DiscountApprovalService approvals) {
+        this.approvals = approvals;
         this.paymentActedBy = paymentActedBy;
         this.policies = policies;
         this.tax = tax;
@@ -187,11 +190,13 @@ public class CheckoutService {
                         "Add at least one charge before checking out.");
             }
             Totals t = computeTotals(null, lineItems, List.of(), BigDecimal.ZERO, req, canDiscount);
+            UUID approvalId = gate(tenantId, queueEntryId, t, List.of(), BigDecimal.ZERO, req);
             invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
                     t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
             repo.insertLineItems(tenantId, invoiceId, t.items(), staffId);
             tax.persist(invoiceId, t.computation());
-            repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
+            repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId, approvalId);
+            if (approvalId != null) approvals.markUsed(tenantId, approvalId, invoiceId);
             auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), BigDecimal.ZERO);
             log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
@@ -201,6 +206,7 @@ public class CheckoutService {
             List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
             BigDecimal earlier = repo.sumDiscounts(tenantId, invoiceId);
             Totals t = computeTotals(invoiceId, lineItems, existingItems, earlier, req, canDiscount);
+            UUID approvalId = gate(tenantId, queueEntryId, t, existingItems, earlier, req);
             if (!lineItems.isEmpty()) {
                 repo.appendLineItems(tenantId, invoiceId, t.items(), repo.nextLineItemOrder(tenantId, invoiceId), staffId);
             }
@@ -209,7 +215,8 @@ public class CheckoutService {
                 throw new ApiException(HttpStatus.CONFLICT, "total-below-paid", "Total is below what was paid",
                         "This invoice already has " + locked.paid().toPlainString() + " paid, which is more than the new total.");
             }
-            repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
+            repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId, approvalId);
+            if (approvalId != null) approvals.markUsed(tenantId, approvalId, invoiceId);
             auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), earlier);
             repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(),
                     InvoiceStatus.derive(locked.status(), t.total(), locked.paid()));
@@ -274,12 +281,14 @@ public class CheckoutService {
         // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
         UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
         Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
+        UUID approvalId = trusted ? null : gate(tenantId, null, t, List.of(), BigDecimal.ZERO, req);
 
         UUID invoiceId = repo.insertInvoice(tenantId, null, patientId != null ? patientId : rxPatient, null, t.subtotal(), t.discount(), t.tax(),
                 t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
         repo.insertLineItems(tenantId, invoiceId, t.items(), staffId);
         tax.persist(invoiceId, t.computation());
-        repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
+        repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId, approvalId);
+        if (approvalId != null) approvals.markUsed(tenantId, approvalId, invoiceId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
@@ -333,6 +342,92 @@ public class CheckoutService {
 
     private static BigDecimal money(long minor, String currency) {
         return new Money(minor, java.util.Currency.getInstance(currency)).amount();
+    }
+
+    /** FIN-018: the issue gate; null below the threshold or when this request adds no reduction (409 APPROVAL_REQUIRED otherwise). */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    private UUID gate(UUID tenantId, UUID draftRef, Totals t, List<LineItemRow> existing, BigDecimal earlier, CheckoutRequest req) {
+        if (t.newDiscounts().isEmpty() && t.items().stream().noneMatch(CheckoutService::belowList)) return null;
+        UUID id = approvals.requireApproval(tenantId, draftRef, reduction(t, existing, earlier, currencyFor(tenantId)), req.discountApprovalId());
+        if (id != null && draftRef == null && repo.findQueueEntryContext(tenantId, approvals.draftRef(tenantId, id)).isPresent()) {
+            throw DiscountApprovalService.notUsable("This approval is for another bill."); // a counter sale cannot spend a visit's approval
+        }
+        return id;
+    }
+
+    private static boolean belowList(LineItemInput i) {
+        return i.overriddenBy() != null && i.catalogueId() != null && i.unitPrice().compareTo(i.listUnitPrice()) < 0;
+    }
+
+    /** FIN-018: every price reduction on the bill (discount ledger + overrides below the list price, earlier checkpoints included),
+     * and its share of the bill at list prices. */
+    private static DiscountApprovalService.Reduction reduction(Totals t, List<LineItemRow> existing, BigDecimal earlier, String currency) {
+        BigDecimal amount = t.newDiscounts().stream().map(BillingPricing.DiscountInput::amount).reduce(earlier, BigDecimal::add);
+        BigDecimal list = BigDecimal.ZERO;
+        String reason = t.newDiscounts().isEmpty() ? null : t.newDiscounts().get(0).reasonCode();
+        List<String> bill = new java.util.ArrayList<>(); // S18-BUG-2/3: what the bill is, independent of its prices after overrides
+        for (LineItemInput i : t.items()) {
+            BigDecimal qty = BigDecimal.valueOf(i.quantity());
+            list = list.add(i.listUnitPrice().multiply(qty));
+            bill.add("new|" + i.chargeCode() + "|" + i.quantity() + "|" + i.listUnitPrice().stripTrailingZeros().toPlainString());
+            if (belowList(i)) {
+                amount = amount.add(i.listUnitPrice().subtract(i.unitPrice()).multiply(qty));
+                if (reason == null) reason = i.overrideReasonCode();
+            }
+        }
+        for (LineItemRow i : existing) {
+            BigDecimal qty = BigDecimal.valueOf(i.quantity());
+            BigDecimal at = i.listUnitPrice() == null ? i.unitPrice() : i.listUnitPrice();
+            list = list.add(at.multiply(qty));
+            bill.add("billed|" + i.id());
+            if (i.overrideReasonCode() != null && i.unitPrice().compareTo(at) < 0) amount = amount.add(at.subtract(i.unitPrice()).multiply(qty));
+        }
+        BigDecimal percent = list.signum() == 0 ? BigDecimal.ZERO
+                : amount.multiply(BigDecimal.valueOf(100)).divide(list, 2, RoundingMode.HALF_UP).min(BigDecimal.valueOf(100));
+        java.util.Collections.sort(bill);
+        return new DiscountApprovalService.Reduction(Money.of(amount, currency).amountMinor(), percent, currency, reason,
+                Money.of(list, currency).amountMinor(), sha256(String.join("\n", bill)));
+    }
+
+    private static String sha256(String s) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(s.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * FIN-018 POST /v1/billing/discount-approvals: prices the bill exactly as checkout would (for a visit, on top of what its invoice
+     * already holds) and stores the request when its reductions are above the owner's threshold. Nothing is billed.
+     */
+    @Transactional
+    public com.nabd.hms.billing.dto.DiscountApprovals.Item requestDiscountApproval(UUID staffId, boolean canDiscount, String ip,
+                                                                                    com.nabd.hms.billing.dto.DiscountApprovals.CreateRequest body) {
+        UUID tenantId = tenantContext.current();
+        BillingPricing.requireDiscountRight(canDiscount);
+        CheckoutRequest req = body.cart();
+        Optional<QueueEntryContext> ctx = repo.findQueueEntryContext(tenantId, body.invoiceDraftId());
+        ConsultationTier.Context tierCtx = ctx.map(c -> tierContext(tenantId, body.invoiceDraftId(), c)).orElse(ConsultationTier.Context.NONE);
+        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), tierCtx, canDiscount, false, staffId);
+        Optional<InvoiceRow> existing = ctx.isPresent() ? repo.findInvoiceByQueueEntry(tenantId, body.invoiceDraftId()) : Optional.empty();
+        existing.ifPresent(CheckoutService::rejectVoid);
+        List<LineItemRow> existingItems = existing.map(i -> repo.findLineItems(tenantId, i.id())).orElse(List.of());
+        BigDecimal earlier = existing.map(i -> repo.sumDiscounts(tenantId, i.id())).orElse(BigDecimal.ZERO);
+        if (existing.isEmpty() && items.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge", "Add at least one charge before asking for approval.");
+        }
+        Totals t = computeTotals(existing.map(InvoiceRow::id).orElse(null), items, existingItems, earlier, req, canDiscount);
+        if (t.newDiscounts().isEmpty() && t.items().stream().noneMatch(CheckoutService::belowList)) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "nothing-to-approve", "Nothing to approve",
+                    "This bill has no new discount or below-list price to approve.", java.util.Map.of("code", "NOTHING_TO_APPROVE"));
+        }
+        DiscountApprovalService.Reduction r = reduction(t, existingItems, earlier, currencyFor(tenantId));
+        if (!approvals.exceeds(tenantId, r)) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "approval-not-needed", "No approval needed",
+                    "These discounts are within the owner's threshold; check out directly.", java.util.Map.of("code", "APPROVAL_NOT_NEEDED"));
+        }
+        return approvals.create(staffId, ip, body.invoiceDraftId(), existing.map(InvoiceRow::id).orElse(null), r, req);
     }
 
     /** FIN-008: tax for a draft cart, nothing stored. Same path as checkout, so the quote is the bill. */

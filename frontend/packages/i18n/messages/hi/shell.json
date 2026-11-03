@@ -137,5 +137,75 @@
       "label": "कमांड सेंटर",
       "short": "आज"
     }
+  },
+  "counterNav": {
+    "billing-checkout": {
+      "label": "चेकआउट कतार",
+      "short": "चेकआउट"
+    },
+    "billing-invoices": {
+      "label": "इनवॉइस",
+      "short": "इनवॉइस"
+    },
+    "billing-preauth": {
+      "label": "पूर्व-अनुमोदन",
+      "short": "पूर्व-अनुमोदन"
+    },
+    "billing-claims": {
+      "label": "बीमा दावे",
+      "short": "दावे"
+    },
+    "billing-packages": {
+      "label": "उपचार पैकेज",
+      "short": "पैकेज"
+    },
+    "billing-dayclose": {
+      "label": "दिन का समापन",
+      "short": "समापन"
+    },
+    "ph-dispense": {
+      "label": "ई-आरएक्स कतार और वितरण",
+      "short": "वितरण"
+    },
+    "ph-pos": {
+      "label": "काउंटर बिक्री (POS)",
+      "short": "POS"
+    },
+    "ph-stock": {
+      "label": "स्टॉक गिनती",
+      "short": "स्टॉक"
+    },
+    "ph-purchase": {
+      "label": "खरीद और GRN",
+      "short": "खरीद"
+    },
+    "ph-registers": {
+      "label": "नियंत्रित रजिस्टर",
+      "short": "रजिस्टर"
+    },
+    "ph-insights": {
+      "label": "फ़ार्मेसी इनसाइट्स",
+      "short": "इनसाइट्स"
+    },
+    "lab-worklist": {
+      "label": "वर्कलिस्ट",
+      "short": "वर्कलिस्ट"
+    },
+    "lab-collect": {
+      "label": "नमूना संग्रह",
+      "short": "संग्रह"
+    },
+    "lab-results": {
+      "label": "परिणाम प्रविष्टि",
+      "short": "परिणाम"
+    },
+    "lab-validate": {
+      "label": "सत्यापन",
+      "short": "सत्यापन"
+    },
+    "lab-catalog": {
+      "label": "जाँच सूची",
+      "short": "सूची"
+    }
   }
 }

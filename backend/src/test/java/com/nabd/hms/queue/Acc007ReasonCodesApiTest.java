@@ -217,6 +217,18 @@ class Acc007ReasonCodesApiTest extends ApiTestBase {
     }
 
     @Test
+    void aBillingOnlyDeskCanListDiscountReasons() {
+        // FIN-018: discounts need a coded reason, so billing:create without queue:view must still read the list
+        Clinic a = clinic();
+        UUID billingOnly = seedRole(a.tenant.id(), "Bill " + UUID.randomUUID().toString().substring(0, 6), false, new com.nabd.hms.common.ModuleGrant("billing", true, true, false, false, false, false, false));
+        int n = SEQ.incrementAndGet();
+        Clinic desk = new Clinic(a.tenant, a.doctor, loginAndGetAccessToken(seedStaff(a.tenant, billingOnly, "b" + n + "@a.com", "+9195" + (4700000 + n), false)));
+        assertThat(get(desk, "/v1/reason-codes?kind=discount").getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(codes(get(desk, "/v1/reason-codes?kind=discount"))).isNotEmpty();
+        assertThat(post(desk, "/v1/reason-codes", Map.of("kind", "discount", "code", "x1", "labels", Map.of("en", "X"))).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void theEdgeReadsTheSameListInThePatientsLanguage() {
         Clinic a = clinic();
         Clinic b = clinic();

@@ -143,6 +143,24 @@ class RealtimeSseApiTest extends ApiTestBase {
         assertThat(d.path("fields").path("status").asString()).isEqualTo("read");
     }
 
+    // ---- FIN-018: the owner's decision reaches the desk's checkout (billing topic) within 2 s ----
+
+    @Test
+    void discountApprovalDecisionReachesTheBillingTopicWithinTwoSeconds() throws Exception {
+        Stream s = connectReady(token(fullStaff), "billing");
+        UUID approval = UUID.randomUUID();
+        long t0 = System.nanoTime();
+        xadd("ev:in:billing", envelope(nextId(), "billing.discount.approval_decided.v1", approval, Map.of("tenantId", tenant.id().toString(),
+                "approvalId", approval.toString(), "decision", "approved", "version", 1)));
+        drain();
+        JsonNode d = s.nextDelta(2000).json();
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)).isLessThan(2000);
+        assertThat(d.path("type").asString()).isEqualTo("billing.discount.approval_decided.v1");
+        assertThat(d.path("id").asString()).isEqualTo(approval.toString());
+        assertThat(d.path("topic").asString()).isEqualTo("billing");
+        assertThat(d.path("fields").path("decision").asString()).isEqualTo("approved");
+    }
+
     // ---- ACC-032: the desk exceptions inbox is live on the exceptions topic ----
 
     @Autowired com.nabd.hms.queue.DeskExceptions deskExceptions;

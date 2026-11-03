@@ -9,6 +9,7 @@ import TopBar from "./TopBar";
 import RouteChrome from "./RouteChrome";
 import CommandPalette from "./shell/CommandPalette";
 import ShellHotkeys from "./shell/ShellHotkeys";
+import RouteGate from "./shell/RouteGate";
 import "./lib/bffShim"; // FEF-009: cookie-mode fetch routing, before any screen calls Core
 
 const COLLAPSE_KEY = "nabd_sidebar_collapsed";
@@ -53,7 +54,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </Suspense>
       <div className="appShellContent">
         <TopBar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
-        <div className="appShellBody" id="app-body"><EntitlementsBanner />{children}</div>
+        <div className="appShellBody" id="app-body"><EntitlementsBanner /><RouteGate>{children}</RouteGate></div>
       </div>
     </div>
   );

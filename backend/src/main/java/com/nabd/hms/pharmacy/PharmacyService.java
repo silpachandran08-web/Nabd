@@ -203,7 +203,7 @@ public class PharmacyService {
         int opening = req.stockQtyOrZero();
         if (opening > 0) {
             // Opening stock is a stock change like any other: it gets a movement row and an audit event.
-            recordAdjustment(tenantId, callerStaffId, ipAddress, id, 0, opening, "Opening stock");
+            recordAdjustment(tenantId, callerStaffId, ipAddress, id, 0, opening, "other", "Opening stock");
         }
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
     }
@@ -254,12 +254,20 @@ public class PharmacyService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
                     "Send exactly one of 'delta' (a change) or 'setTo' (a counted total).");
         }
-        String reason = req.reason().trim();
-        if (reason.isEmpty()) {
+        // PHL-010: the reason code comes from the fixed list. A caller that sends only the older free-text reason is recorded
+        // as 'other' with that text, so every adjustment carries a code; 'other' always needs the text.
+        String code = req.reasonCode() == null ? "other" : req.reasonCode();
+        String text = req.reason() == null ? "" : req.reason().trim();
+        if ("other".equals(code) && text.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
-                    "A reason is required for every stock change.");
+                    req.reasonCode() == null ? "A reason is required for every stock change." : "Reason 'other' needs a note.");
         }
+        String reason = req.reasonCode() == null ? text : StockTakeService.reasonText(code, text.isEmpty() ? null : text);
         PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        if (item.registerType() != null) { // PHL-010: a controlled drug changes per batch with a second signer, never here
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "approval-required", "Second sign-off required",
+                    "Stock of a controlled drug is adjusted by batch, with a second sign-off.");
+        }
         long target = req.setTo() != null ? req.setTo() : (long) item.stockQty() + req.delta();
         if (target < 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Stock cannot go below zero",
@@ -269,7 +277,7 @@ public class PharmacyService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "no-change", "Nothing to change",
                     "The stock count is already " + item.stockQty() + ".");
         }
-        recordAdjustment(tenantId, callerStaffId, ipAddress, id, item.stockQty(), (int) target, reason);
+        recordAdjustment(tenantId, callerStaffId, ipAddress, id, item.stockQty(), (int) target, code, reason);
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
     }
 
@@ -304,14 +312,15 @@ public class PharmacyService {
                 .toList();
     }
 
-    private void recordAdjustment(UUID tenantId, UUID staffId, String ip, UUID itemId, int before, int after, String reason) {
-        stock.adjust(itemId, after - before, staffId, reason);
+    private void recordAdjustment(UUID tenantId, UUID staffId, String ip, UUID itemId, int before, int after, String reasonCode, String reason) {
+        stock.adjust(itemId, after - before, staffId, reasonCode, reason);
         Map<String, Object> beforeState = new LinkedHashMap<>();
         beforeState.put("stockQty", before);
         Map<String, Object> afterState = new LinkedHashMap<>();
         afterState.put("stockQty", after);
         afterState.put("delta", after - before);
         afterState.put("reason", reason);
+        afterState.put("reasonCode", reasonCode);
         audit(tenantId, staffId, ip, "pharmacy.stock_adjusted", itemId, beforeState, afterState);
     }
 

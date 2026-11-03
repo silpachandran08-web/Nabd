@@ -13,6 +13,11 @@ import StatusPill from "../../../components/ui/StatusPill";
 import RxLinkPicker from "../../../components/checkout/RxLinkPicker";
 import { rxErrorMessage, unlinkedRx } from "../../../components/checkout/rxLink";
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
+import { usePriceReasons } from "../../../components/checkout/priceReasons";
+import ApprovalBanner from "../../../components/checkout/ApprovalBanner";
+import { bannerApproval, needsApproval, type DiscountApproval } from "../../../components/checkout/discountApproval";
+import { useLiveRefresh } from "../../../lib/live";
+import { uuidv7 } from "@nabd/api-client";
 import type { Charge, Invoice, LineItem, OtcContext, RxLine } from "@nabd/api-client/types";
 
 // NB-186: a counter sale — no patient record, no queue token (GET /billing/otc-charges, POST /billing/otc-checkout).
@@ -48,6 +53,8 @@ function OtcCheckoutInner() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
+  const [discountReason, setDiscountReason] = useState(""); // FIN-018: every discount carries a coded reason
+  const reasons = usePriceReasons();
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [linking, setLinking] = useState<string | null>(null); // PHL-001: chargeCode whose prescription picker is open
@@ -59,6 +66,15 @@ function OtcCheckoutInner() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused when the same sale/payment is re-sent
+  // FIN-018: this sale's id for an owner approval (S18-BUG-7); a new one after each issued sale
+  const [draftId, setDraftId] = useState(() => uuidv7());
+  const [approval, setApproval] = useState<DiscountApproval | null>(null);
+  const canApprove = can("billing:approve"); // 'Enter owner PIN'
+  const loadApproval = useCallback(async () => {
+    const res = await api.get<{ items: DiscountApproval[] }>(`/billing/discount-approvals?invoiceDraftId=${draftId}`).catch(() => null);
+    if (res) setApproval(bannerApproval(res.items));
+  }, [draftId]);
+  useLiveRefresh(["discount-approvals"], () => (approval ? loadApproval() : undefined)); // the owner's decision lands here
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,17 +139,32 @@ function OtcCheckoutInner() {
       setCreateError("Add at least one charge.");
       return;
     }
+    if (discountNum > 0 && !discountReason) {
+      setCreateError("Pick a reason for the discount.");
+      return;
+    }
     setCreating(true);
     try {
       const body = {
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent,
           ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
-        ...(canDiscount ? { discount: discountNum } : {}),
+        ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
+        ...(approval?.billStatus === "approved" ? { discountApprovalId: approval.approvalId } : {}),
       };
-      setInvoice(await api.post<Invoice>("/billing/otc-checkout", body, { idempotencyKey: keys.current.get("sale", body) }));
-      keys.current.done("sale");
+      try {
+        setInvoice(await api.post<Invoice>("/billing/otc-checkout", body, { idempotencyKey: keys.current.get("sale", body) }));
+        keys.current.done("sale");
+        setApproval(null);
+        setDraftId(uuidv7());
+      } catch (e) {
+        // FIN-018: above the owner's threshold the sale waits; ask the owner with the same cart (inbox + push)
+        if (!(e instanceof ApiError && e.status === 409 && needsApproval(e.problem))) throw e;
+        const req = { invoiceDraftId: draftId, lineItems: body.lineItems, ...(body.discounts ? { discounts: body.discounts } : {}) };
+        setApproval(await api.post<DiscountApproval>("/billing/discount-approvals", req, { idempotencyKey: keys.current.get("approval", req) }));
+        keys.current.done("approval");
+      }
     } catch (e) {
-      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : errorText(e, ""));
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : errorText(e, ""));
     } finally {
       setCreating(false);
     }
@@ -177,6 +208,12 @@ function OtcCheckoutInner() {
         </div>
         {invoice && <BillingStatePill state={invoice.status} />}
       </div>
+
+      {!invoice && approval && canCheckout && (
+        // no 'Pay later' at the counter: there is no visit to come back to
+        <ApprovalBanner approval={approval} currency={context.currency} canPin={canApprove} canPayLater={false} reasonLabel={reasons.label}
+          onChange={setApproval} onPayLater={() => {}} reload={loadApproval} />
+      )}
 
       {invoice ? (
         <div className={styles.layout} style={{ gridTemplateColumns: "1fr 300px" }}>
@@ -314,6 +351,15 @@ function OtcCheckoutInner() {
                 <div className={styles.totalsRow}>
                   <span>Discount</span>
                   <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                </div>
+              )}
+              {canDiscount && discountNum > 0 && (
+                <div className={styles.totalsRow}>
+                  <span>Discount reason</span>
+                  <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
+                    <option value="">{reasons.error ? "Couldn't load reasons" : "Reason…"}</option>
+                    {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                  </select>
                 </div>
               )}
               <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>

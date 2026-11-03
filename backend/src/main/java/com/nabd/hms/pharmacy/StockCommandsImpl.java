@@ -148,11 +148,11 @@ class StockCommandsImpl implements StockCommands {
     }
 
     @Override
-    public StockResult adjust(UUID itemId, int delta, UUID actorId, String reason) {
+    public StockResult adjust(UUID itemId, int delta, UUID actorId, String reasonCode, String reason) {
         requireNonZero(delta);
         int have = lock(itemId);
         if (delta > 0) {
-            return apply(itemId, have, List.of(new Leg(implicitBatch(itemId), delta)), "adjustment", reason, actorId, null, null, null);
+            return apply(itemId, have, List.of(new Leg(implicitBatch(itemId), delta)), "adjustment", reason, reasonCode, actorId, null, null, null);
         }
         // shortcut: a stock-take reduction with several batches drains earliest expiry first (expired stock goes first); name a batch with adjustBatch to choose
         List<Leg> legs = new ArrayList<>();
@@ -168,15 +168,86 @@ class StockCommandsImpl implements StockCommands {
         if (left > 0) {
             throw insufficient(have, -delta);
         }
-        return apply(itemId, have, legs, "adjustment", reason, actorId, null, null, null);
+        return apply(itemId, have, legs, "adjustment", reason, reasonCode, actorId, null, null, null);
     }
 
     @Override
-    public StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reason) {
+    public StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reasonCode, String reason) {
         requireNonZero(delta);
         int have = lock(itemId);
         batches.itemOf(tenant.current(), batchId).filter(itemId::equals).orElseThrow(StockCommandsImpl::notFound);
-        return apply(itemId, have, List.of(new Leg(batchId, delta)), "adjustment", reason, actorId, null, null, null);
+        return apply(itemId, have, List.of(new Leg(batchId, delta)), "adjustment", reason, reasonCode, actorId, null, null, null);
+    }
+
+    @Override
+    public LockedBatch lockBatch(UUID batchId) {
+        UUID itemId = batches.itemOf(tenant.current(), batchId).orElseThrow(StockCommandsImpl::notFound);
+        lock(itemId);
+        return new LockedBatch(itemId, batches.lock(tenant.current(), batchId).orElseThrow(StockCommandsImpl::notFound).qtyOnHand());
+    }
+
+    @Override
+    public List<AdjustedBatch> adjustBatches(List<BatchAdjustment> adjustments, UUID actorId, UUID approverId, String sourceType, UUID sourceId) {
+        if (adjustments.isEmpty()) {
+            return List.of();
+        }
+        UUID t = tenant.current();
+        int n = adjustments.size();
+        UUID[] batchIds = new UUID[n];
+        Integer[] deltas = new Integer[n];
+        for (int i = 0; i < n; i++) {
+            requireNonZero(adjustments.get(i).delta());
+            batchIds[i] = adjustments.get(i).batchId();
+            deltas[i] = adjustments.get(i).delta();
+        }
+        if (java.util.Arrays.stream(batchIds).anyMatch(java.util.Objects::isNull) || java.util.Arrays.stream(batchIds).distinct().count() != n) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "Each batch may be adjusted once per request.");
+        }
+        Map<UUID, UUID> itemOf = batches.itemsOf(t, batchIds);
+        if (itemOf.size() != n) {
+            throw notFound();
+        }
+        UUID[] itemIds = itemOf.values().stream().distinct().sorted().toArray(UUID[]::new);
+        Map<UUID, Integer> have = repo.lockItems(t, itemIds);
+        if (have.size() != itemIds.length) {
+            throw notFound();
+        }
+        Map<UUID, Integer> sums = batches.sumQtys(t, itemIds);
+        have.forEach((item, qty) -> topUpOpening(item, qty - sums.getOrDefault(item, 0))); // rare: stock that reached stock_qty without a batch
+        Map<UUID, Integer> after = batches.applyDeltas(t, batchIds, deltas);
+        if (after.size() != n) {
+            UUID short_ = java.util.Arrays.stream(batchIds).filter(b -> !after.containsKey(b)).findFirst().orElseThrow();
+            throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Insufficient stock",
+                    "A batch would go below zero; nothing was changed.", Map.of("batchId", short_));
+        }
+        Map<UUID, Integer> itemTotals = new java.util.TreeMap<>();
+        for (int i = 0; i < n; i++) {
+            itemTotals.merge(itemOf.get(batchIds[i]), deltas[i], Integer::sum);
+        }
+        // the batches add up to the cache (just reconciled), so the guarded batch updates already proved no item goes negative
+        if (repo.applyDeltas(t, itemTotals.keySet().toArray(UUID[]::new), itemTotals.values().toArray(Integer[]::new)) != itemTotals.size()) {
+            throw new IllegalStateException("item stock cache out of step with its batches");
+        }
+        UUID[] items = new UUID[n];
+        Integer[] before = new Integer[n];
+        String[] reasons = new String[n];
+        String[] codes = new String[n];
+        List<AdjustedBatch> out = new ArrayList<>(n);
+        List<Map.Entry<UUID, Map<String, ?>>> evs = new ArrayList<>(n);
+        Map<UUID, Integer> running = new java.util.HashMap<>(have);
+        for (int i = 0; i < n; i++) {
+            BatchAdjustment a = adjustments.get(i);
+            items[i] = itemOf.get(a.batchId());
+            before[i] = after.get(a.batchId()) - a.delta();
+            reasons[i] = a.reason();
+            codes[i] = a.reasonCode();
+            int onHand = running.merge(items[i], a.delta(), Integer::sum);
+            out.add(new AdjustedBatch(a.batchId(), items[i], a.delta(), before[i], after.get(a.batchId())));
+            evs.add(Map.entry(items[i], Map.of("itemId", items[i], "batchId", a.batchId(), "delta", a.delta(), "kind", "adjustment", "onHand", onHand)));
+        }
+        batches.insertAdjustments(t, items, batchIds, deltas, before, reasons, codes, actorId, approverId, sourceType, sourceId);
+        events.publishAll(t, DomainEventType.PHARMACY_STOCK_BATCH_CHANGED, evs);
+        return out;
     }
 
     @Override
@@ -205,13 +276,17 @@ class StockCommandsImpl implements StockCommands {
     private int lock(UUID itemId) {
         UUID t = tenant.current();
         int have = repo.lockItem(t, itemId).orElseThrow(StockCommandsImpl::notFound).stockQty();
-        int missing = have - batches.sumQty(t, itemId);
+        topUpOpening(itemId, have - batches.sumQty(t, itemId));
+        return have;
+    }
+
+    private void topUpOpening(UUID itemId, int missing) {
         if (missing > 0) {
+            UUID t = tenant.current();
             UUID opening = openingBatch(itemId);
             int after = batches.applyDelta(t, opening, missing).orElseThrow();
             batches.insertMovement(t, itemId, opening, "opening", missing, after - missing, after, "Opening balance (PHL-005)", null, null, "migration", null, null);
         }
-        return have;
     }
 
     private UUID openingBatch(UUID itemId) {
@@ -248,6 +323,11 @@ class StockCommandsImpl implements StockCommands {
     /** The one write: item cache (guarded), then each batch (guarded) with its movement row and event. */
     private StockResult apply(UUID itemId, int have, List<Leg> legs, String kind, String reason, UUID actorId, UUID invoiceId,
                               String overrideReason, String[] source) {
+        return apply(itemId, have, legs, kind, reason, null, actorId, invoiceId, overrideReason, source);
+    }
+
+    private StockResult apply(UUID itemId, int have, List<Leg> legs, String kind, String reason, String reasonCode, UUID actorId, UUID invoiceId,
+                              String overrideReason, String[] source) {
         UUID t = tenant.current();
         int total = legs.stream().mapToInt(Leg::delta).sum();
         int after = repo.applyDelta(t, itemId, total).orElseThrow(() -> insufficient(have, -total));
@@ -255,7 +335,7 @@ class StockCommandsImpl implements StockCommands {
         for (Leg l : legs) {
             int batchAfter = batches.applyDelta(t, l.batchId(), l.delta()).orElseThrow(() -> insufficient(0, -l.delta()));
             running += l.delta();
-            batches.insertMovement(t, itemId, l.batchId(), kind, l.delta(), batchAfter - l.delta(), batchAfter, reason, actorId, invoiceId,
+            batches.insertMovement(t, itemId, l.batchId(), kind, l.delta(), batchAfter - l.delta(), batchAfter, reason, reasonCode, actorId, invoiceId,
                     source == null ? null : source[0], source == null ? null : UUID.fromString(source[1]), overrideReason);
             events.publish(t, DomainEventType.PHARMACY_STOCK_BATCH_CHANGED, itemId,
                     Map.of("itemId", itemId, "batchId", l.batchId(), "delta", l.delta(), "kind", kind, "onHand", running));

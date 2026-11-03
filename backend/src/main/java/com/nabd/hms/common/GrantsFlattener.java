@@ -20,6 +20,8 @@ public final class GrantsFlattener {
             if (g.refundDiscount()) out.add(g.module() + ":refundDiscount");
             // REC-043: the billing module's refund/discount flag also gates discounts at checkout.
             if (g.refundDiscount() && "billing".equals(g.module())) out.add("billing.discount");
+            // PHL-010: approving on the pharmacy module also makes the holder a second signer of controlled-drug stock adjustments.
+            if (g.approve() && "pharmacy".equals(g.module())) out.add("pharmacy:adjust_approve");
             if (g.export()) out.add(g.module() + ":export");
             if (g.breakGlass() && "clinical".equals(g.module())) out.add("clinical:breakGlass");
         }

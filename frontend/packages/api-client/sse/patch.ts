@@ -20,6 +20,7 @@ export function resourcesFor(type: string): readonly string[] {
   if (type.startsWith("comms.message.")) return ["patient-messages"]; // COM-006
   if (type.startsWith("scheduling.booking.") || type.startsWith("scheduling.appointment.")) return ["booking-requests"]; // ACC-010
   if (type.startsWith("desk.exception.")) return ["desk-exceptions"]; // ACC-032
+  if (type.startsWith("billing.discount.")) return ["discount-approvals"]; // FIN-018: desk banner + owner inbox
   return [];
 }
 

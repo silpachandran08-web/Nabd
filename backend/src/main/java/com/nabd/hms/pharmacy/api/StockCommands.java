@@ -30,8 +30,9 @@ public interface StockCommands {
     /** Goods received: adds {@code qty}. */
     StockResult receive(UUID itemId, int qty, UUID actorId, String reason);
 
-    /** Manual correction by a signed delta (stock-take callers compute the delta from the locked count). */
-    StockResult adjust(UUID itemId, int delta, UUID actorId, String reason);
+    /** Manual correction by a signed delta (stock-take callers compute the delta from the locked count).
+     * @param reasonCode PHL-010 fixed list: damaged, count_correction, theft_loss, expired or other (the caller validates it) */
+    StockResult adjust(UUID itemId, int delta, UUID actorId, String reasonCode, String reason);
 
     /** Puts {@code qty} back after a void or return of an invoice. */
     StockResult returnIn(UUID itemId, int qty, UUID invoiceId, UUID actorId, String reason);
@@ -54,7 +55,28 @@ public interface StockCommands {
     BatchStockResult receiveBatch(UUID itemId, BatchReceipt receipt, UUID actorId, String reason);
 
     /** Signed correction of one named batch (stock take). */
-    StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reason);
+    StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reasonCode, String reason);
+
+    // ---- PHL-010: stock take and reasoned batch adjustments ----
+
+    /** @param reasonCode damaged, count_correction, theft_loss, expired or other (the caller validates the list) */
+    record BatchAdjustment(UUID batchId, int delta, String reasonCode, String reason) {
+    }
+
+    record AdjustedBatch(UUID batchId, UUID itemId, int delta, int qtyBefore, int qtyAfter) {
+    }
+
+    record LockedBatch(UUID itemId, int qtyOnHand) {
+    }
+
+    /** Locks the batch's item to the end of the transaction (404 when unknown) and returns the batch's quantity, for a caller that
+     * turns a counted total into a delta before {@link #adjustBatches}. */
+    LockedBatch lockBatch(UUID batchId);
+
+    /** Several batch corrections at once, set-based (one statement per step, not per batch): items locked in id order, every
+     * batch kept at zero or above (else 400 insufficient-stock and nothing changes), one 'adjustment' movement per batch with the
+     * maker as actor and {@code approverId} as second signer (null when none was needed). A batch may appear once only. */
+    List<AdjustedBatch> adjustBatches(List<BatchAdjustment> adjustments, UUID actorId, UUID approverId, String sourceType, UUID sourceId);
 
     /** Preview of the FEFO pick for {@code qty}, no stock change. Expired, quarantined and empty batches are never picked;
      * with {@code courseDays}, batches that expire mid-course are skipped when the rest of the stock covers the quantity.

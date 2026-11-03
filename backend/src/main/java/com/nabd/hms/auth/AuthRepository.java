@@ -93,6 +93,12 @@ class AuthRepository {
         ).stream().findFirst();
     }
 
+    /** FIN-018: active staff of the bound tenant on the built-in Owner role (RefundService.OWNER_ROLE). */
+    List<Staff> findActiveOwners() {
+        return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = app_tenant_id() AND status = 'active' "
+                + "AND role_id IN (SELECT id FROM roles WHERE built_in AND name = 'Owner') ORDER BY id", staffMapper());
+    }
+
     /** WhatsApp OTP request — hash stored, 5-minute expiry, mirrors the invite-token pattern. */
     void setWhatsAppOtp(UUID staffId, String otpHash, Instant expiresAt) {
         jdbc.update("UPDATE staff SET whatsapp_otp_hash = ?, whatsapp_otp_expires_at = ? WHERE id = ?",
@@ -238,6 +244,23 @@ class AuthRepository {
                 Integer.class, staffId, staffId
         );
         return count == null ? 0 : count;
+    }
+
+    /** FIN-018: failed owner-PIN tries by this desk caller since their last good one (1 day at most), as for logins. */
+    int countFailedPinAssertionsSinceLastSuccess(UUID staffId) {
+        Integer count = jdbc.queryForObject("SELECT count(*) FROM pin_assertion_attempts WHERE staff_id = ? AND NOT succeeded AND attempted_at > "
+                + "COALESCE((SELECT max(attempted_at) FROM pin_assertion_attempts WHERE staff_id = ? AND succeeded), now() - interval '1 day')",
+                Integer.class, staffId, staffId);
+        return count == null ? 0 : count;
+    }
+
+    Optional<Instant> lastFailedPinAssertionAt(UUID staffId) {
+        return jdbc.query("SELECT max(attempted_at) AS t FROM pin_assertion_attempts WHERE staff_id = ? AND NOT succeeded",
+                (rs, i) -> rs.getTimestamp("t"), staffId).stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
+    }
+
+    void recordPinAssertionAttempt(UUID tenantId, UUID staffId, boolean succeeded) {
+        jdbc.update("INSERT INTO pin_assertion_attempts (tenant_id, staff_id, succeeded) VALUES (?,?,?)", tenantId, staffId, succeeded);
     }
 
     Optional<Instant> lastFailedAttemptAt(UUID staffId) {

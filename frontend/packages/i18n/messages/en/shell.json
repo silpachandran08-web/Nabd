@@ -137,5 +137,75 @@
       "label": "Command Centre",
       "short": "Today"
     }
+  },
+  "counterNav": {
+    "billing-checkout": {
+      "label": "Checkout queue",
+      "short": "Checkout"
+    },
+    "billing-invoices": {
+      "label": "Invoices",
+      "short": "Invoices"
+    },
+    "billing-preauth": {
+      "label": "Pre-authorisations",
+      "short": "Pre-auth"
+    },
+    "billing-claims": {
+      "label": "Insurance claims",
+      "short": "Claims"
+    },
+    "billing-packages": {
+      "label": "Treatment Packages",
+      "short": "Packages"
+    },
+    "billing-dayclose": {
+      "label": "Day Close",
+      "short": "Day close"
+    },
+    "ph-dispense": {
+      "label": "e-Rx queue & Dispense",
+      "short": "Dispense"
+    },
+    "ph-pos": {
+      "label": "Counter sale (POS)",
+      "short": "POS"
+    },
+    "ph-stock": {
+      "label": "Stock take",
+      "short": "Stock"
+    },
+    "ph-purchase": {
+      "label": "Purchase & GRN",
+      "short": "Purchase"
+    },
+    "ph-registers": {
+      "label": "Controlled registers",
+      "short": "Registers"
+    },
+    "ph-insights": {
+      "label": "Pharmacy insights",
+      "short": "Insights"
+    },
+    "lab-worklist": {
+      "label": "Worklist",
+      "short": "Worklist"
+    },
+    "lab-collect": {
+      "label": "Sample collection",
+      "short": "Collect"
+    },
+    "lab-results": {
+      "label": "Result entry",
+      "short": "Results"
+    },
+    "lab-validate": {
+      "label": "Validation",
+      "short": "Validate"
+    },
+    "lab-catalog": {
+      "label": "Test catalogue",
+      "short": "Catalogue"
+    }
   }
 }
