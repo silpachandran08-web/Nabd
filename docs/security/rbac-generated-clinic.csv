@@ -131,6 +131,7 @@ owner,GET /v1/pharmacy/settings,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
+owner,GET /v1/pharmacy/worklist,pharmacy:dispense,allow
 owner,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 owner,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -345,6 +346,7 @@ owner,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 owner,POST /v1/pharmacy/stock-takes,pharmacy:edit,allow
 owner,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,allow
 owner,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,allow
+owner,POST /v1/pharmacy/worklist/{id}/claim,pharmacy:dispense,allow
 owner,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 owner,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 owner,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -554,6 +556,7 @@ owner_doctor,GET /v1/pharmacy/settings,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
+owner_doctor,GET /v1/pharmacy/worklist,pharmacy:dispense,allow
 owner_doctor,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -768,6 +771,7 @@ owner_doctor,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 owner_doctor,POST /v1/pharmacy/stock-takes,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,allow
+owner_doctor,POST /v1/pharmacy/worklist/{id}/claim,pharmacy:dispense,allow
 owner_doctor,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 owner_doctor,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 owner_doctor,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -977,6 +981,7 @@ doctor,GET /v1/pharmacy/settings,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
+doctor,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
 doctor,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1191,6 +1196,7 @@ doctor,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
 doctor,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
+doctor,POST /v1/pharmacy/worklist/{id}/claim,pharmacy:dispense,deny-403
 doctor,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 doctor,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 doctor,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -1400,6 +1406,7 @@ nurse,GET /v1/pharmacy/settings,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
+nurse,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
 nurse,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 nurse,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 nurse,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1614,6 +1621,7 @@ nurse,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
 nurse,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
+nurse,POST /v1/pharmacy/worklist/{id}/claim,pharmacy:dispense,deny-403
 nurse,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 nurse,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 nurse,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -1823,6 +1831,7 @@ receptionist,GET /v1/pharmacy/settings,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
+receptionist,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
 receptionist,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -2037,6 +2046,7 @@ receptionist,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 receptionist,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
+receptionist,POST /v1/pharmacy/worklist/{id}/claim,pharmacy:dispense,deny-403
 receptionist,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 receptionist,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 receptionist,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401
@@ -2246,6 +2256,7 @@ frontdesk_vitals,GET /v1/pharmacy/settings,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
+frontdesk_vitals,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
 frontdesk_vitals,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 frontdesk_vitals,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 frontdesk_vitals,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -2460,6 +2471,7 @@ frontdesk_vitals,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 frontdesk_vitals,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/stock-takes/{id}/post,pharmacy:edit,deny-403
+frontdesk_vitals,POST /v1/pharmacy/worklist/{id}/claim,pharmacy:dispense,deny-403
 frontdesk_vitals,POST /v1/platform/billing/discounts,billing_revenue:edit,deny-401
 frontdesk_vitals,POST /v1/platform/billing/discounts/{id}/approve,billing_revenue:approve,deny-401
 frontdesk_vitals,POST /v1/platform/billing/discounts/{id}/reject,billing_revenue:approve,deny-401

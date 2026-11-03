@@ -32,6 +32,9 @@ class DomainEventHandlers {
                     if (t == DomainEventType.NOTIFICATION_REQUESTED) {
                         continue; // COM-004: messaging.NotificationRequestedHandler consumes it
                     }
+                    if (t == DomainEventType.RX_SIGNED) {
+                        continue; // PHL-012: pharmacy.RxSignedWorklistConsumer creates the worklist entry
+                    }
                     registry.registerBeanDefinition("domainEventLogHandler." + t.type(),
                             new RootBeanDefinition(LogOnly.class, () -> new LogOnly(t.type())));
                 }

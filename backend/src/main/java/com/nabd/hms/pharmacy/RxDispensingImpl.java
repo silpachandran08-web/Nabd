@@ -30,9 +30,11 @@ class RxDispensingImpl implements RxDispensing {
     private final TenantContext tenant;
     private final AuditService audit;
     private final ActorDirectory actors;
+    private final PharmacyWorklistService worklist;
 
     RxDispensingImpl(StockCommands stock, PharmacyRepository items, RxDispensingRepository repo, TenantContext tenant, AuditService audit,
-                     ActorDirectory actors) {
+                     ActorDirectory actors, PharmacyWorklistService worklist) {
+        this.worklist = worklist;
         this.stock = stock;
         this.items = items;
         this.repo = repo;
@@ -65,6 +67,7 @@ class RxDispensingImpl implements RxDispensing {
 
     @Override
     public void record(UUID invoiceId, UUID actorId, List<Line> lines) {
+        worklist.onDispensed(lines.stream().map(Line::prescriptionItemId).filter(java.util.Objects::nonNull).toList()); // PHL-012
         if (lines.isEmpty()) {
             return;
         }

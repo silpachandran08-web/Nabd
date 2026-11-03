@@ -13,4 +13,11 @@ public interface SignedRxLines {
 
     /** Signed lines of the queue entry in the caller's tenant, in prescription order; drafts are never returned. */
     List<Line> forVisit(UUID queueEntryId);
+
+    /** PHL-012: who and when of the visit's signed prescription (one per visit), for the pharmacy worklist. */
+    record Signed(UUID prescriptionId, UUID patientId, UUID doctorId, java.time.Instant signedAt) {
+    }
+
+    /** The visit's signed prescription in the caller's tenant; empty for a draft or none. */
+    java.util.Optional<Signed> signed(UUID queueEntryId);
 }

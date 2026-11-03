@@ -436,6 +436,9 @@ export const PharmacySettingsResponseSchema = z.object({ alertRecipientStaffId: 
 export const PharmacySettingsWriteRequestSchema = z.object({ alertRecipientStaffId: z.string().optional(), licenceNumbers: z.record(z.string(), z.string()).optional(), mode: z.string().optional(), pharmacistInChargeStaffId: z.string().optional(), reason: z.string().optional() });
 export const PharmacyStockAdjustmentRequestSchema = z.object({ delta: z.number().int().gte(-1000000).lte(1000000).optional(), reason: z.string().min(0).max(500).optional(), reasonCode: z.string().optional(), setTo: z.number().int().gte(0).lte(10000000).optional() });
 export const PharmacyStockMovementResponseSchema = z.object({ actorId: z.string().optional(), actorName: z.string().optional(), delta: z.number().int().optional(), id: z.string().optional(), kind: z.string().optional(), occurredAt: z.string().optional(), qtyAfter: z.number().int().optional(), qtyBefore: z.number().int().optional(), reason: z.string().optional() });
+export const PharmacyWorklistLineSchema = z.object({ drug: z.string().optional(), inStock: z.boolean().optional(), prescriptionItemId: z.string().optional(), qtyDispensed: z.number().optional(), qtyPrescribed: z.number().optional() });
+export const PharmacyWorklistEntrySchema = z.object({ claimedBy: z.string().optional(), claimedByName: z.string().optional(), doctorName: z.string().optional(), id: z.string().optional(), lines: z.array(PharmacyWorklistLineSchema).optional(), patientName: z.string().optional(), prescriptionId: z.string().optional(), queueEntryId: z.string().optional(), signedAt: z.string().optional(), status: z.string().optional(), token: z.number().int().optional(), validUntil: z.string().optional() });
+export const PharmacyWorklistPageSchema = z.object({ items: z.array(PharmacyWorklistEntrySchema).optional(), nextCursor: z.string().optional() });
 export const QuestionSchema = z.object({ answers: z.array(AnswerSchema).optional(), id: z.string().optional(), text: z.string().optional() });
 export const PickerSchema = z.object({ jurisdiction: z.string().optional(), outcomes: z.array(OutcomeSchema).optional(), questions: z.array(QuestionSchema).optional() });
 export const PinAssertionRequestSchema = z.object({ approvalId: z.string().optional(), pin: z.string().min(1) });
@@ -985,6 +988,8 @@ export const operationSchemas = {
   StockTakeController_cancel: { response: StockTakeSummarySchema },
   StockTakeController_counts: { body: StockTakeCountsRequestSchema, response: StockTakeCountsResponseSchema },
   StockTakeController_post: { body: StockTakePostRequestSchema, response: StockTakePostedSchema },
+  PharmacyWorklistController_list: { response: PharmacyWorklistPageSchema },
+  PharmacyWorklistController_claim: { response: PharmacyWorklistEntrySchema },
   PhiReadAlertController_phiReadAlerts: { response: AlertsResponseSchema },
   LinkOpenController_linkOpens: { response: LinkOpensResponseSchema },
   PlanCatalogueController_catalogue: { response: z.array(PlanCatalogueEntrySchema) },
