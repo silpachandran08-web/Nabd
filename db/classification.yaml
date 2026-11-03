@@ -855,6 +855,7 @@ schemas:
       tax_inclusive: financial
       inter_state: financial
       sac_hsn: financial
+      batch_id: operational
     invoice_line_taxes:
       id: operational
       tenant_id: operational
@@ -1411,6 +1412,8 @@ schemas:
       zero_rated: operational
       hsn_code: operational
       mrp: financial
+      returnable: operational
+      cold_chain: operational
     pharmacy_schedule_rules:
       market: operational
       schedule_class: operational

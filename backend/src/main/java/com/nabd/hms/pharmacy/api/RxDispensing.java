@@ -9,8 +9,9 @@ import java.util.UUID;
  */
 public interface RxDispensing {
 
-    /** @param scheduleClass the item's class as sold (PHL-002); @param shortQty units the shelf could not cover (0 unless a shortfall reason was given) */
-    record Issued(String scheduleClass, int shortQty) {
+    /** @param scheduleClass the item's class as sold (PHL-002); @param shortQty units the shelf could not cover (0 unless a shortfall reason was given);
+     *  @param batchId the one batch the units came from (PHL-011), null when several or none */
+    record Issued(String scheduleClass, int shortQty, UUID batchId) {
     }
 
     /** One stocked line of a checkout, for the dispense record. */

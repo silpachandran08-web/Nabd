@@ -44,7 +44,8 @@ class RxDispensingImpl implements RxDispensing {
     @Override
     public Issued issue(UUID itemId, int qty, UUID invoiceId, String shortfallReason) {
         if (shortfallReason == null) {
-            return new Issued(stock.issue(itemId, qty, invoiceId, "Dispensed at checkout").scheduleClass(), 0);
+            StockCommands.StockResult r = stock.issue(itemId, qty, invoiceId, "Dispensed at checkout");
+            return new Issued(r.scheduleClass(), 0, r.batchId());
         }
         if (shortfallReason.isBlank()) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "reason-required", "Reason required",
@@ -53,9 +54,9 @@ class RxDispensingImpl implements RxDispensing {
         int have = items.lockItem(tenant.current(), itemId).map(PharmacyModels.PharmacyItemRow::stockQty)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested pharmacy item was not found."));
         int take = Math.min(have, qty);
-        String cls = take > 0 ? stock.issue(itemId, take, invoiceId, "Dispensed at checkout").scheduleClass()
-                : items.scheduleClassOf(tenant.current(), itemId).orElse(null);
-        return new Issued(cls, qty - take);
+        StockCommands.StockResult r = take > 0 ? stock.issue(itemId, take, invoiceId, "Dispensed at checkout") : null;
+        String cls = r != null ? r.scheduleClass() : items.scheduleClassOf(tenant.current(), itemId).orElse(null);
+        return new Issued(cls, qty - take, r == null ? null : r.batchId());
     }
 
     @Override

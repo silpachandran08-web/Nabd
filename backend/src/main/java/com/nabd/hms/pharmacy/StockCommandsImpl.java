@@ -254,9 +254,36 @@ class StockCommandsImpl implements StockCommands {
     public StockResult returnIn(UUID itemId, int qty, UUID invoiceId, UUID actorId, String reason) {
         requirePositive(qty);
         int have = lock(itemId);
+        return apply(itemId, have, invoiceLegs(itemId, qty, invoiceId), "restock", reason, actorId, invoiceId, null, null);
+    }
+
+    @Override
+    public List<ReturnedLeg> customerReturn(UUID itemId, UUID batchId, int qty, UUID invoiceId, UUID actorId, String reason) {
+        requirePositive(qty);
+        int have = lock(itemId);
+        UUID t = tenant.current();
+        List<Batch> all = batches.list(t, itemId, true);
+        List<Leg> legs = batchId != null && all.stream().anyMatch(b -> b.id().equals(batchId))
+                ? List.of(new Leg(batchId, qty)) : invoiceLegs(itemId, qty, invoiceId);
+        LocalDate today = clock.today(t);
+        List<ReturnedLeg> out = new ArrayList<>();
+        for (Leg l : legs) {
+            Batch b = all.stream().filter(x -> x.id().equals(l.batchId())).findFirst().orElse(null);
+            boolean expired = b != null && b.expiryDate() != null && b.expiryDate().isBefore(today);
+            if (expired && "active".equals(b.status())) {
+                batches.setStatus(t, b.id(), "quarantined"); // the whole batch is past expiry, so nothing sellable is locked away
+            }
+            out.add(new ReturnedLeg(l.batchId(), l.delta(), expired || (b != null && !"active".equals(b.status()))));
+        }
+        boolean quarantined = out.stream().anyMatch(ReturnedLeg::quarantined);
+        apply(itemId, have, legs, "return_in", quarantined ? reason + " (expired batch: quarantined, not sellable)" : reason, actorId, invoiceId, null, null);
+        return out;
+    }
+
+    /** Back into the batches this invoice took the item from, then (more than was dispensed) the implicit batch. */
+    private List<Leg> invoiceLegs(UUID itemId, int qty, UUID invoiceId) {
         List<Leg> legs = new ArrayList<>();
         int left = qty;
-        // back into the batches this invoice took it from, then (a return of more than was dispensed) the implicit batch
         for (Object[] o : batches.outstandingForInvoice(tenant.current(), itemId, invoiceId)) {
             int put = Math.min(left, (Integer) o[1]);
             legs.add(new Leg((UUID) o[0], put));
@@ -268,7 +295,7 @@ class StockCommandsImpl implements StockCommands {
         if (left > 0) {
             legs.add(new Leg(implicitBatch(itemId), left));
         }
-        return apply(itemId, have, legs, "restock", reason, actorId, invoiceId, null, null);
+        return legs;
     }
 
     /** Locks the item (404 when unknown), then keeps the batches adding up to the cached sum: stock that reached
@@ -340,11 +367,15 @@ class StockCommandsImpl implements StockCommands {
             events.publish(t, DomainEventType.PHARMACY_STOCK_BATCH_CHANGED, itemId,
                     Map.of("itemId", itemId, "batchId", l.batchId(), "delta", l.delta(), "kind", kind, "onHand", running));
         }
-        return result(itemId, have, after);
+        return result(itemId, have, after, legs.size() == 1 ? legs.get(0).batchId() : null);
     }
 
     private StockResult result(UUID itemId, int before, int after) {
-        return new StockResult(itemId, before, after, repo.scheduleClassOf(tenant.current(), itemId).orElse(null));
+        return result(itemId, before, after, null);
+    }
+
+    private StockResult result(UUID itemId, int before, int after, UUID batchId) {
+        return new StockResult(itemId, before, after, repo.scheduleClassOf(tenant.current(), itemId).orElse(null), batchId);
     }
 
     private static void requirePositive(int qty) {

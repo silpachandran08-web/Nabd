@@ -126,6 +126,7 @@ super_admin,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+super_admin,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 super_admin,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -341,6 +342,7 @@ super_admin,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 super_admin,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 super_admin,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 super_admin,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+super_admin,POST /v1/pharmacy/returns,billing:edit,deny-401
 super_admin,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 super_admin,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 super_admin,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401
@@ -549,6 +551,7 @@ implementation,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+implementation,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 implementation,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -764,6 +767,7 @@ implementation,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 implementation,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 implementation,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 implementation,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+implementation,POST /v1/pharmacy/returns,billing:edit,deny-401
 implementation,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 implementation,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 implementation,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401
@@ -972,6 +976,7 @@ support_engineer,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+support_engineer,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 support_engineer,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -1187,6 +1192,7 @@ support_engineer,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 support_engineer,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 support_engineer,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 support_engineer,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+support_engineer,POST /v1/pharmacy/returns,billing:edit,deny-401
 support_engineer,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 support_engineer,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 support_engineer,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401
@@ -1395,6 +1401,7 @@ billing,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+billing,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 billing,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -1610,6 +1617,7 @@ billing,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 billing,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 billing,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 billing,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+billing,POST /v1/pharmacy/returns,billing:edit,deny-401
 billing,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 billing,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 billing,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401
@@ -1818,6 +1826,7 @@ sre,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+sre,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 sre,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -2033,6 +2042,7 @@ sre,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 sre,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 sre,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 sre,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+sre,POST /v1/pharmacy/returns,billing:edit,deny-401
 sre,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 sre,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 sre,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401
@@ -2241,6 +2251,7 @@ commercial,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+commercial,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 commercial,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -2456,6 +2467,7 @@ commercial,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 commercial,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 commercial,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 commercial,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+commercial,POST /v1/pharmacy/returns,billing:edit,deny-401
 commercial,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 commercial,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 commercial,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401
@@ -2664,6 +2676,7 @@ compliance_dpo,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
+compliance_dpo,GET /v1/pharmacy/returns/bill,billing:edit,deny-401
 compliance_dpo,GET /v1/pharmacy/schedule-classes,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/settings,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/stock,pharmacy:view,deny-401
@@ -2879,6 +2892,7 @@ compliance_dpo,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/picks,pharmacy:view,deny-401
 compliance_dpo,POST /v1/pharmacy/receipts,pharmacy:edit,deny-401
+compliance_dpo,POST /v1/pharmacy/returns,billing:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
 compliance_dpo,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-401

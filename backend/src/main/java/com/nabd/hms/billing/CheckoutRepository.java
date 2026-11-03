@@ -154,16 +154,17 @@ class CheckoutRepository {
         int order = startOrder;
         List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed = new java.util.ArrayList<>();
         for (LineItemInput item : items) {
-            String scheduleClass = decrementPharmacyStockIfApplicable(invoiceId, item, dispensed);
+            var issued = decrementPharmacyStockIfApplicable(invoiceId, item, dispensed);
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
-                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class, batch_id) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
-                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(), scheduleClass);
+                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(),
+                    issued == null ? null : issued.scheduleClass(), issued == null ? null : issued.batchId());
         }
         dispensing.record(invoiceId, staffId, dispensed); // PHL-018: dispenses row + stock discrepancies
     }
@@ -218,15 +219,16 @@ class CheckoutRepository {
     }
 
     /** Billing a stocked pharmacy item takes it off the shelf in the same transaction, through the pharmacy module's
-     * StockCommands (PHL-003); an ordinary charge is untouched. Returns the item's schedule class as sold (PHL-002), else null. */
-    private String decrementPharmacyStockIfApplicable(UUID invoiceId, LineItemInput line, List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed) {
+     * StockCommands (PHL-003); an ordinary charge is untouched. Returns the item's schedule class as sold (PHL-002) and the batch
+     * it came from (PHL-011), else null. */
+    private com.nabd.hms.pharmacy.api.RxDispensing.Issued decrementPharmacyStockIfApplicable(UUID invoiceId, LineItemInput line, List<com.nabd.hms.pharmacy.api.RxDispensing.Line> dispensed) {
         return stock.stockedItem(line.chargeCode()).map(item -> {
             var issued = dispensing.issue(item, line.quantity(), invoiceId, line.shortfallReason()); // PHL-018: a reason lets a shortfall through
             if (line.prescriptionItemId() != null || issued.shortQty() > 0) {
                 dispensed.add(new com.nabd.hms.pharmacy.api.RxDispensing.Line(line.chargeCode(), item, line.quantity(), issued.shortQty(),
                         line.shortfallReason(), line.prescriptionItemId()));
             }
-            return issued.scheduleClass();
+            return issued;
         }).orElse(null);
     }
 

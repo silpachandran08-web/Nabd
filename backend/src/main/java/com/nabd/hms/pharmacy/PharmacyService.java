@@ -196,6 +196,7 @@ public class PharmacyService {
         UUID id = repo.insertItem(tenantId, code, req.withTaxRatePercent(rate));
         repo.upsertProfile(tenantId, id, cls, req.genericName(), req.packSize(), req.unit(), req.inHouse());
         taxInputs.setInputs(tenantId, id, req.priceInclusiveOfTax(), req.zeroRated(), req.mrp());
+        repo.setReturnFlags(tenantId, id, req.coldChain(), req.returnable());
         if (drugId != null) {
             repo.setDrug(tenantId, id, drugId);
         }
@@ -219,6 +220,7 @@ public class PharmacyService {
         repo.updateItem(tenantId, id, req);
         repo.upsertProfile(tenantId, id, cls, req.genericName(), req.packSize(), req.unit(), req.inHouse());
         taxInputs.setInputs(tenantId, id, req.priceInclusiveOfTax(), req.zeroRated(), req.mrp());
+        repo.setReturnFlags(tenantId, id, req.coldChain(), req.returnable());
         if (drugId != null && !drugId.equals(before.drugId())) {
             repo.setDrug(tenantId, id, drugId);
         }
@@ -348,7 +350,7 @@ public class PharmacyService {
     private PharmacyItemResponse toResponse(PharmacyItemRow r) {
         return new PharmacyItemResponse(r.id().toString(), r.code(), r.name(), r.isRx(), r.hsnCode(), r.price(),
                 r.taxRatePercent(), r.stockQty(), r.active(), r.drugId(), r.scheduleClass(), r.registerType(), r.genericName(),
-                r.packSize(), r.unit(), r.inHouse(), r.priceInclusiveOfTax(), r.zeroRated(), r.mrp());
+                r.packSize(), r.unit(), r.inHouse(), r.priceInclusiveOfTax(), r.zeroRated(), r.mrp(), r.coldChain(), r.returnable());
     }
 
     /** CLN-019: owner maps an in-house item to a drug master id. is_rx is only SUGGESTED (scheduled product => prescription-only);

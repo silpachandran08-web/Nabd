@@ -177,12 +177,17 @@ class BatchRepository {
         });
     }
 
-    /** Units of this invoice and item still out of each batch it was dispensed from (dispensed minus restocked). */
+    /** Units of this invoice and item still out of each batch it was dispensed from (dispensed minus restocked and returned). */
     List<Object[]> outstandingForInvoice(UUID tenantId, UUID itemId, UUID invoiceId) {
         return jdbc.query("SELECT batch_id, -sum(delta) AS out FROM pharmacy_stock_movements WHERE tenant_id = ? AND item_id = ? " +
-                        "AND invoice_id = ? AND batch_id IS NOT NULL AND kind IN ('dispense', 'restock') GROUP BY batch_id HAVING -sum(delta) > 0 " +
+                        "AND invoice_id = ? AND batch_id IS NOT NULL AND kind IN ('dispense', 'restock', 'return_in') GROUP BY batch_id HAVING -sum(delta) > 0 " +
                         "ORDER BY batch_id",
                 (rs, i) -> new Object[]{UUID.fromString(rs.getString(1)), rs.getInt(2)}, tenantId, itemId, invoiceId);
+    }
+
+    /** PHL-011: an expired batch that takes back a customer return becomes 'quarantined' (never picked by FEFO). */
+    void setStatus(UUID tenantId, UUID batchId, String status) {
+        jdbc.update("UPDATE stock_batches SET status = ? WHERE tenant_id = ? AND id = ?", status, tenantId, batchId);
     }
 
     void patch(UUID tenantId, UUID batchId, String batchNo, LocalDate expiry, String location) {

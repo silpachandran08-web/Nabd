@@ -290,6 +290,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.DISCOUNT_APPROVAL_REQUESTED.type()); // FIN-018: Fin018DiscountApprovalApiTest
         expected.remove(DomainEventType.DISCOUNT_APPROVAL_DECIDED.type()); // FIN-018: Fin018DiscountApprovalApiTest
         expected.remove(DomainEventType.PHARMACY_STOCK_TAKE_POSTED.type()); // PHL-010: Phl010StockTakeApiTest
+        expected.remove(DomainEventType.PHARMACY_RETURN_ACCEPTED.type()); // PHL-011: Phl011PharmacyReturnApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

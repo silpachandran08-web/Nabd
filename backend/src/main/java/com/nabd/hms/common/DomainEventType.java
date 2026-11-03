@@ -44,7 +44,8 @@ public enum DomainEventType {
     PHARMACY_STOCK_BATCH_CHANGED("pharmacy.stock.batch_changed.v1", "core/pharmacy"),
     DISCOUNT_APPROVAL_REQUESTED("billing.discount.approval_requested.v1", "core/billing"),
     DISCOUNT_APPROVAL_DECIDED("billing.discount.approval_decided.v1", "core/billing"),
-    PHARMACY_STOCK_TAKE_POSTED("pharmacy.stock_take.posted.v1", "core/pharmacy");
+    PHARMACY_STOCK_TAKE_POSTED("pharmacy.stock_take.posted.v1", "core/pharmacy"),
+    PHARMACY_RETURN_ACCEPTED("pharmacy.return.accepted.v1", "core/pharmacy");
 
     private final String type;
     private final String source;

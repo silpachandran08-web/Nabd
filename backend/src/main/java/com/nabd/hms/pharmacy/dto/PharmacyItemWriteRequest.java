@@ -29,11 +29,15 @@ public record PharmacyItemWriteRequest(
         /** PHL-021: zero-rated medicine (VAT 0% with the reason on the invoice). Omitted = unchanged (false on create). */
         Boolean zeroRated,
         /** PHL-021: maximum retail price; a selling price above it is refused at billing (422 price-above-mrp). Omitted = unchanged. */
-        @PositiveOrZero BigDecimal mrp
+        @PositiveOrZero BigDecimal mrp,
+        /** PHL-011: a cold-chain item is never taken back from a customer. Omitted = unchanged (false on create). */
+        Boolean coldChain,
+        /** PHL-011: false = customer returns are refused. Omitted = unchanged (true on create). */
+        Boolean returnable
 ) {
     public PharmacyItemWriteRequest withTaxRatePercent(BigDecimal rate) {
         return new PharmacyItemWriteRequest(name, isRx, hsnCode, price, rate, stockQty, scheduleClass, drugMasterId, genericName, packSize,
-                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp);
+                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp, coldChain, returnable);
     }
 
     public BigDecimal taxRatePercentOrZero() {
