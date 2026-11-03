@@ -351,6 +351,7 @@
   gap: var(--nb-space-8);
 }
 
+/* FEF-032: a native <progress> (it was a div with an inline width); the track and fill keep the old look. */
 .progressBar {
   flex: 1;
   height: 6px;
@@ -358,10 +359,20 @@
   background: var(--nb-surface-3);
   overflow: hidden;
   min-width: 60px;
+  appearance: none;
+  border: 0;
 }
 
-.progressFill {
-  height: 100%;
+.progressBar::-webkit-progress-bar {
+  background: var(--nb-surface-3);
+  border-radius: 999px;
+}
+
+.progressBar::-webkit-progress-value {
+  background: var(--nb-accent-gradient);
+}
+
+.progressBar::-moz-progress-bar {
   background: var(--nb-accent-gradient);
 }
 
@@ -433,3 +444,17 @@
 .flagRow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--nb-space-12); margin-block-end: var(--nb-space-16); }
 .methodRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
 @media (max-width: 430px) { .steps { gap: var(--nb-space-4); } .page { padding: var(--nb-space-16); } }
+
+/* FEF-032: these were inline styles on the page. */
+.cardTitleSpaced { margin-block-start: var(--nb-space-16); }
+.itemRow { margin-block-end: var(--nb-space-8); align-items: end; }
+.fieldFlush { margin-block-end: 0; }
+.fieldGrow { flex: 1; }
+.itemNumbers { display: flex; gap: var(--nb-space-8); }
+.doctorList { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.floorInput { max-width: 160px; }
+.actionsStart { justify-content: flex-start; }
+.mutedSpaced { margin-block-start: var(--nb-space-16); }
+.rowSpaced { margin-block-start: var(--nb-space-24); }
+.cardFlush { margin: 0; }
+.fieldSpaced { margin-block-start: var(--nb-space-12); }
