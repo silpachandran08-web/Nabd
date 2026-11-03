@@ -34,6 +34,8 @@ export type SectionId = "run" | "people" | "money" | "growth" | "compliance";
 export const OWNER_SECTIONS: readonly SectionId[] = ["run", "people", "money", "growth", "compliance"];
 export const SECTION_LABEL: Record<SectionId, string> = { run: "Run the clinic", people: "People & access", money: "Money", growth: "Growth", compliance: "Compliance" };
 export const OWNER_PROTOTYPE_ORDER = ["overview", "ops", "finance", "workflows", "privacy", "staff", "integrations", "compliance", "plan", "setup", "prices", "reports", "growth", "bookingpage", "payouts", "hr"];
+// FEF-032: a Setup tab is its own route (/setup/licences); the old /setup?tab=licences form still opens it (redirect).
+const setupTabOf = (p: string, t: string | null) => (p === "/setup" ? t : p.startsWith("/setup/") ? p.split("/")[2] : null);
 const DI = "Diagnostics & Interop", PT = "Platform & Trust", HOS = "Hospital";
 const OWNER_ITEMS: NavItem[] = [
   { id: "overview", href: "/overview", label: "Overview", short: "Overview", icon: "home", perms: ["reports:view"], owner: "Data & Infra + Patient Access", section: "run", active: (p) => p === "/overview" },
@@ -41,7 +43,7 @@ const OWNER_ITEMS: NavItem[] = [
   { id: "workflows", href: "/workflows", label: "Workflows", short: "Workflows", icon: "refresh", perms: ["setup:view"], owner: ACC, section: "run", planned: { module: ["whatsapp_booking", "queue_eta"] } },
   { id: "integrations", href: "/integrations", label: "Integrations", short: "Integrations", icon: "globe", perms: ["setup:view"], owner: DI, section: "run", planned: { module: ["lab", "insurance", "patient_app"] } },
   { id: "setup", href: "/setup", label: "Clinic Setup", short: "Setup", icon: "settings", perms: ["setup:view"], owner: PT, section: "run",
-    active: (p, t) => p.startsWith("/setup") && t !== "licences" && t !== "subscription" },
+    active: (p, t) => p.startsWith("/setup") && setupTabOf(p, t) !== "licences" && setupTabOf(p, t) !== "subscription" },
   { id: "reports", href: "/reports", label: "Reports", short: "Reports", icon: "chart", perms: ["reports:view"], owner: "Data & Infra + Patient Access", section: "run" },
   { id: "staff", href: "/staff", label: "Staff & Access", short: "Staff", icon: "shield", perms: ["staff:view"], owner: PT, section: "people" },
   { id: "hr", href: "/hr", label: "HR & Payroll", short: "HR", icon: "users", perms: ["staff:view"], owner: HOS, section: "people", planned: { module: ["hr"] } },
@@ -52,7 +54,7 @@ const OWNER_ITEMS: NavItem[] = [
   { id: "growth", href: "/growth", label: "Growth", short: "Growth", icon: "sparkle", perms: ["reports:view"], owner: ACC, section: "growth", planned: { module: ["whatsapp_booking"] } },
   { id: "bookingpage", href: "/booking-page", label: "Booking page", short: "Booking", icon: "globe", perms: ["setup:view"], owner: ACC, section: "growth", planned: { module: ["branded_site"] } },
   { id: "privacy", href: "/compliance", label: "Privacy & Support access", short: "Privacy", icon: "shield", perms: ["compliance:view"], owner: PT, section: "compliance" },
-  { id: "compliance", href: "/setup?tab=licences", label: "Compliance & Audit", short: "Audit", icon: "shield", perms: ["setup:view"], owner: PT, section: "compliance", active: (p, t) => p === "/setup" && t === "licences" },
+  { id: "compliance", href: "/setup?tab=licences", label: "Compliance & Audit", short: "Audit", icon: "shield", perms: ["setup:view"], owner: PT, section: "compliance", active: (p, t) => setupTabOf(p, t) === "licences" },
 ];
 const OWNER: NavItem[] = OWNER_SECTIONS.flatMap((sec) => OWNER_ITEMS.filter((i) => i.section === sec));
 
