@@ -72,7 +72,7 @@ class Phl004PharmacyModeApiTest extends ApiTestBase {
                 if (a == null) { missing.add(e.getKey() + " " + e.getValue()); continue; }
                 if (a.value() != PharmacyMode.EXTERNAL) {
                     for (var m : e.getKey().getMethodsCondition().getMethods()) {
-                        gated.add(new String[]{m.name(), p.replaceAll("\\{[^}]+}", UUID.randomUUID().toString())});
+                        gated.add(new String[]{m.name(), p.replaceAll("\\{[^}]+}", UUID.randomUUID().toString()), a.value().name()});
                     }
                 }
             }
@@ -91,6 +91,11 @@ class Phl004PharmacyModeApiTest extends ApiTestBase {
             assertThat(setMode(c, mode).getStatusCode()).isEqualTo(HttpStatus.OK);
             for (String[] g : gated) {
                 ResponseEntity<String> r = exchange(g[1], HttpMethod.valueOf(g[0]), "GET".equals(g[0]) ? authed(c.token()) : authedJsonBody(c.token(), Map.of()), String.class);
+                if ("hybrid".equals(mode) && "IN_HOUSE".equals(g[2])) { // PHL-012: the worklist is In-house only
+                    assertThat(r.getStatusCode()).as(mode + " " + g[0] + " " + g[1]).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(r.getBody()).contains("feature-requires-inhouse");
+                    continue;
+                }
                 assertThat(r.getStatusCode()).as(mode + " " + g[0] + " " + g[1]).isNotIn(HttpStatus.FORBIDDEN, HttpStatus.CONFLICT);
             }
         }

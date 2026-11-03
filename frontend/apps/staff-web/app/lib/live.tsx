@@ -26,6 +26,7 @@ function topicsFor(): string[] {
   if (perms.includes("nursing:view")) t.push("nursing");
   if (perms.includes("patients:view")) t.push("messages"); // COM-006: delivery ticks on the patient file
   if (perms.includes("billing:view")) t.push("billing"); // FIN-018: discount approvals reach the desk and the owner
+  if (perms.includes("pharmacy:dispense")) t.push("pharmacy.worklist"); // PHL-012: signed prescriptions reach every pharmacist
   return t;
 }
 

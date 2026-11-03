@@ -385,6 +385,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("billing.discount.approval_requested.v1"); // FIN-018: Fin018DiscountApprovalApiTest
         expected.remove("billing.discount.approval_decided.v1"); // FIN-018: Fin018DiscountApprovalApiTest
         expected.remove("pharmacy.stock_take.posted.v1"); // PHL-010: Phl010StockTakeApiTest
+        expected.remove("pharmacy.worklist.entry_created.v1"); // PHL-012: Phl012WorklistApiTest
+        expected.remove("pharmacy.worklist.status_changed.v1"); // PHL-012: Phl012WorklistApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

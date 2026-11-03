@@ -410,6 +410,9 @@ export type PharmacySettingsResponse = { alertRecipientStaffId?: string; licence
 export type PharmacySettingsWriteRequest = { alertRecipientStaffId?: string; licenceNumbers?: Record<string, string>; mode?: string; pharmacistInChargeStaffId?: string; reason?: string; };
 export type PharmacyStockAdjustmentRequest = { delta?: number; reason?: string; reasonCode?: string; setTo?: number; };
 export type PharmacyStockMovementResponse = { actorId?: string; actorName?: string; delta?: number; id?: string; kind?: string; occurredAt?: string; qtyAfter?: number; qtyBefore?: number; reason?: string; };
+export type PharmacyWorklistEntry = { claimedBy?: string; claimedByName?: string; doctorName?: string; id?: string; lines?: Array<PharmacyWorklistLine>; patientName?: string; prescriptionId?: string; queueEntryId?: string; signedAt?: string; status?: string; token?: number; validUntil?: string; };
+export type PharmacyWorklistLine = { drug?: string; inStock?: boolean; prescriptionItemId?: string; qtyDispensed?: number; qtyPrescribed?: number; };
+export type PharmacyWorklistPage = { items?: Array<PharmacyWorklistEntry>; nextCursor?: string; };
 export type Picker = { jurisdiction?: string; outcomes?: Array<Outcome>; questions?: Array<Question>; };
 export type PinAssertionRequest = { approvalId?: string; pin: string; };
 export type PinChangeRequest = { currentPin: string; newPin: string; };
@@ -983,6 +986,8 @@ export type Operations = {
   StockTakeController_cancel: { method: "post"; path: "/v1/pharmacy/stock-takes/{id}/cancel"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: never; response: StockTakeSummary };
   StockTakeController_counts: { method: "put"; path: "/v1/pharmacy/stock-takes/{id}/counts"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: StockTakeCountsRequest; response: StockTakeCountsResponse };
   StockTakeController_post: { method: "post"; path: "/v1/pharmacy/stock-takes/{id}/post"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: StockTakePostRequest; response: StockTakePosted };
+  PharmacyWorklistController_list: { method: "get"; path: "/v1/pharmacy/worklist"; permission: "pharmacy:dispense"; pathParams: never; query: { status?: string; cursor?: string; limit?: number; }; body: never; response: PharmacyWorklistPage };
+  PharmacyWorklistController_claim: { method: "post"; path: "/v1/pharmacy/worklist/{id}/claim"; permission: "pharmacy:dispense"; pathParams: { id: string; }; query: never; body: never; response: PharmacyWorklistEntry };
   PhiReadAlertController_phiReadAlerts: { method: "get"; path: "/v1/phi-read/alerts"; permission: "authenticated"; pathParams: never; query: never; body: never; response: AlertsResponse };
   LinkOpenController_linkOpens: { method: "get"; path: "/v1/phi-read/link-opens"; permission: "authenticated"; pathParams: never; query: { patientId?: string; limit?: number; }; body: never; response: LinkOpensResponse };
   PlanCatalogueController_catalogue: { method: "get"; path: "/v1/plans/catalogue"; permission: "public"; pathParams: never; query: { market?: string; }; body: never; response: Array<PlanCatalogueEntry> };
@@ -1218,6 +1223,7 @@ export type Permission =
   | "patients:delete"
   | "patients:edit"
   | "patients:view"
+  | "pharmacy:dispense"
   | "pharmacy:edit"
   | "pharmacy:view"
   | "pricing_packaging:view"

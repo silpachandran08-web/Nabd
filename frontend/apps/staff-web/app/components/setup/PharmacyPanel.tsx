@@ -9,6 +9,7 @@ import StockPill, { LOW_STOCK } from "../ui/StockPill";
 import Link from "next/link";
 import Dialog from "../ui/Dialog";
 import BatchAdjustDialog from "./BatchAdjustDialog";
+import WorklistBoard from "./WorklistBoard";
 import { REASONS, type ReasonCode } from "../../lib/stockTake";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
@@ -27,6 +28,9 @@ type PharmacyItem = Full<PharmacyItemResponse, "hsnCode"> & { scheduleClass: str
 type DispensingQueueEntry = Omit<Full<DispensingQueueEntryResponse>, "items" | "token"> & {
   token?: number | null; items: Full<DispensingQueueItem, "stockQty" | "dosage" | "frequency" | "duration" | "instructions">[];
 };
+
+/** PHL-012: In-house pharmacists work the live worklist instead of the read-only dispensing queue. */
+const boardMode = (mode: PharmacyMode) => mode === "in_house" && can("pharmacy:dispense");
 
 const MODE_RANK: Record<PharmacyMode, number> = { external: 0, hybrid: 1, in_house: 2 };
 export const MODE_LABEL: Record<PharmacyMode, string> = { external: "External", hybrid: "Hybrid", in_house: "In-house" };
@@ -177,7 +181,7 @@ export default function PharmacyPanel() {
       setSettings(s.value);
       const [i, q, c] = await Promise.allSettled([
         api.get<PharmacyItem[]>("/pharmacy/items"),
-        api.get<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"),
+        boardMode(s.value.mode) ? Promise.resolve([]) : api.get<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"), // PHL-012: the worklist replaces it
         api.get<ScheduleClass[]>("/pharmacy/schedule-classes"),
       ]);
       if (i.status === "rejected") setLoadError(problemText(i.reason));
@@ -433,6 +437,7 @@ export default function PharmacyPanel() {
           )}
 
           {canWrite && <p>{mode === "hybrid" && <><Link href="/pharmacy/receipt" className={styles.btn}>Enter supplier bill</Link>{" "}</>}<Link href="/pharmacy/stock-take" className={styles.btn}>Stock take</Link></p>}
+          {boardMode(mode) ? <WorklistBoard /> : <>
           <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
           <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. Open a row to dispense on that patient&apos;s billing screen.</p>
           {queueError ? (
@@ -473,6 +478,7 @@ export default function PharmacyPanel() {
               </table>
             </div>
           )}
+          </>}
         </>
       )}
 

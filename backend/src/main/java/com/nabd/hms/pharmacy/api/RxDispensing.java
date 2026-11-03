@@ -26,6 +26,7 @@ public interface RxDispensing {
     /** Units of {@code itemId} that were billed on the invoice but never left the shelf (shortfall); a void must not put those back. */
     int shortfallOf(UUID invoiceId, UUID itemId);
 
-    /** Writes the dispenses row (source nabd_rx) and one stock_discrepancies row per shortfall line; no-op for an empty list. */
+    /** Writes the dispenses row (source nabd_rx) and one stock_discrepancies row per shortfall line; no-op for an empty list.
+     * PHL-012: also moves the worklist entries holding the prescription lines to partially_dispensed or dispensed. */
     void record(UUID invoiceId, UUID actorId, List<Line> lines);
 }

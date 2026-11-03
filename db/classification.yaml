@@ -1421,6 +1421,7 @@ schemas:
       retention_years: operational
       refill_self_serve_allowed: operational
       drug_master_flag: operational
+      rx_validity_days: operational
     pharmacy_settings:
       tenant_id: operational
       mode: operational
@@ -1449,6 +1450,22 @@ schemas:
       invoice_id: operational
       actor_id: operational
       occurred_at: operational
+    pharmacy_worklist_entries:
+      id: operational
+      tenant_id: operational
+      prescription_id: operational
+      patient_id: pii
+      queue_entry_id: operational
+      doctor_id: operational
+      signed_at: operational
+      lines: operational
+      status: operational
+      claimed_by: operational
+      claimed_at: operational
+      valid_until: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
     phi_read_batches:
       tenant_id: operational
       batch_id: operational

@@ -44,6 +44,9 @@ class SseFanoutConsumer implements EventConsumer {
         Route approvals = new Route(List.of(RealtimeTopic.BILLING), "approvalId"); // FIN-018: the desk banner and the owner inbox
         all.put("billing.discount.approval_requested.v1", approvals);
         all.put("billing.discount.approval_decided.v1", approvals);
+        Route worklist = new Route(List.of(RealtimeTopic.PHARMACY_WORKLIST), "entryId"); // PHL-012: ids and status only
+        all.put("pharmacy.worklist.entry_created.v1", worklist);
+        all.put("pharmacy.worklist.status_changed.v1", worklist);
         ROUTES = java.util.Map.copyOf(all);
     }
     /** Revocation: these end the staff member's open streams (or the tenant's, for a role) so permissions are re-checked on reconnect. */
