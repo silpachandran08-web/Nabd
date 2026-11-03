@@ -126,6 +126,7 @@ owner,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner,GET /v1/pharmacy/items,pharmacy:view,allow
 owner,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,allow
 owner,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
+owner,GET /v1/pharmacy/returns/bill,billing:edit,allow
 owner,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 owner,GET /v1/pharmacy/settings,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock,pharmacy:view,allow
@@ -342,6 +343,7 @@ owner,POST /v1/pharmacy/items,pharmacy:edit,allow
 owner,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,allow
 owner,POST /v1/pharmacy/picks,pharmacy:view,allow
 owner,POST /v1/pharmacy/receipts,pharmacy:edit,allow
+owner,POST /v1/pharmacy/returns,billing:edit,allow
 owner,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 owner,POST /v1/pharmacy/stock-takes,pharmacy:edit,allow
 owner,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,allow
@@ -551,6 +553,7 @@ owner_doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
+owner_doctor,GET /v1/pharmacy/returns/bill,billing:edit,allow
 owner_doctor,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/settings,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
@@ -767,6 +770,7 @@ owner_doctor,POST /v1/pharmacy/items,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/picks,pharmacy:view,allow
 owner_doctor,POST /v1/pharmacy/receipts,pharmacy:edit,allow
+owner_doctor,POST /v1/pharmacy/returns,billing:edit,allow
 owner_doctor,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 owner_doctor,POST /v1/pharmacy/stock-takes,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,allow
@@ -976,6 +980,7 @@ doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
+doctor,GET /v1/pharmacy/returns/bill,billing:edit,deny-403
 doctor,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 doctor,GET /v1/pharmacy/settings,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
@@ -1192,6 +1197,7 @@ doctor,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/picks,pharmacy:view,allow
 doctor,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
+doctor,POST /v1/pharmacy/returns,billing:edit,deny-403
 doctor,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
 doctor,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
@@ -1401,6 +1407,7 @@ nurse,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
+nurse,GET /v1/pharmacy/returns/bill,billing:edit,deny-403
 nurse,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 nurse,GET /v1/pharmacy/settings,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock,pharmacy:view,allow
@@ -1617,6 +1624,7 @@ nurse,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/picks,pharmacy:view,allow
 nurse,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
+nurse,POST /v1/pharmacy/returns,billing:edit,deny-403
 nurse,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
 nurse,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
@@ -1826,6 +1834,7 @@ receptionist,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
+receptionist,GET /v1/pharmacy/returns/bill,billing:edit,allow
 receptionist,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/settings,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock,pharmacy:view,allow
@@ -2042,6 +2051,7 @@ receptionist,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/picks,pharmacy:view,allow
 receptionist,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
+receptionist,POST /v1/pharmacy/returns,billing:edit,allow
 receptionist,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 receptionist,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403
@@ -2251,6 +2261,7 @@ frontdesk_vitals,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items/{id}/batches,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
+frontdesk_vitals,GET /v1/pharmacy/returns/bill,billing:edit,allow
 frontdesk_vitals,GET /v1/pharmacy/schedule-classes,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/settings,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock,pharmacy:view,allow
@@ -2467,6 +2478,7 @@ frontdesk_vitals,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/picks,pharmacy:view,allow
 frontdesk_vitals,POST /v1/pharmacy/receipts,pharmacy:edit,deny-403
+frontdesk_vitals,POST /v1/pharmacy/returns,billing:edit,allow
 frontdesk_vitals,POST /v1/pharmacy/rx-lines/search,billing:create,allow
 frontdesk_vitals,POST /v1/pharmacy/stock-takes,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/stock-takes/{id}/cancel,pharmacy:edit,deny-403

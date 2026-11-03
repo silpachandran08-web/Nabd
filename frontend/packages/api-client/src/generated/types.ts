@@ -138,6 +138,7 @@ export type ConsultExtendResponse = { extendedBy?: number; queueEntryId?: string
 export type Counts = { appointments?: number; freeSlots?: number; walkIns?: number; };
 export type CreateProvisioningJobRequest = { brandName: string; ownerEmail: string; ownerMobile: string; ownerName: string; path: string; region: string; tenantName: string; tenantSlug: string; };
 export type CreateRequest = { body?: Record<string, string>; type?: string; };
+export type CreditNotes = { count?: number; tax?: number; taxable?: number; total?: number; };
 export type Current = { account?: AccountView; connected?: boolean; };
 export type DailyMoneyResponse = { billedToday?: number; collectedToday?: number; invoiceCountToday?: number; outstandingTotal?: number; paymentCountToday?: number; };
 export type DataQualityItem = { displayName?: string; patientId?: string; rawPhone?: string; };
@@ -147,7 +148,7 @@ export type DayClose = { closed?: boolean; pendingCheckouts?: number; unbilledCo
 export type DayCloseHistoryItem = { action?: string; actorName?: string; at?: string; countedCash?: number; date?: string; expectedCash?: number; id?: string; note?: string; variance?: number; };
 export type DayCloseHistoryResponse = { items?: Array<DayCloseHistoryItem>; nextCursor?: string; };
 export type DayCloseRequest = { countedCash: number; date?: string; note?: string; };
-export type DayCloseSummaryResponse = { cashTolerance?: number; close?: Close; currency?: string; date?: string; methods?: Array<Method>; outstanding?: Outstanding; pendingCheckouts?: number; refunds?: Array<Method>; splitPaymentBills?: number; taxBands?: Array<TaxBand>; taxLabel?: string; today?: boolean; totals?: Totals; unbilled?: Array<Unbilled>; voidedCount?: number; voidedTotal?: number; };
+export type DayCloseSummaryResponse = { cashTolerance?: number; close?: Close; creditNotes?: CreditNotes; currency?: string; date?: string; methods?: Array<Method>; outstanding?: Outstanding; pendingCheckouts?: number; refunds?: Array<Method>; splitPaymentBills?: number; taxBands?: Array<TaxBand>; taxLabel?: string; today?: boolean; totals?: Totals; unbilled?: Array<Unbilled>; voidedCount?: number; voidedTotal?: number; };
 export type DayReopenRequest = { date?: string; reason: string; };
 export type DecisionRequest = { decision: string; note?: string; };
 export type DecisionResponse = { status?: string; windowEndsAt?: string; };
@@ -402,9 +403,12 @@ export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: s
 export type PaymentSplit = { amount?: number; method?: string; };
 export type PayrollExportRowResponse = { days?: number; hours?: number; notes?: string; role?: string; salary?: number; staffId?: string; staffName?: string; };
 export type PharmacyCapabilitiesResponse = { features?: Array<string>; mode?: string; };
-export type PharmacyItemResponse = { active?: boolean; code?: string; drugId?: string; genericName?: string; hsnCode?: string; id?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name?: string; packSize?: number; price?: number; priceInclusiveOfTax?: boolean; register?: string; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
+export type PharmacyItemResponse = { active?: boolean; code?: string; coldChain?: boolean; drugId?: string; genericName?: string; hsnCode?: string; id?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name?: string; packSize?: number; price?: number; priceInclusiveOfTax?: boolean; register?: string; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
 export type PharmacyItemStatusRequest = { active: boolean; reason?: string; };
-export type PharmacyItemWriteRequest = { drugMasterId?: string; genericName?: string; hsnCode?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name: string; packSize?: number; price: number; priceInclusiveOfTax?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
+export type PharmacyItemWriteRequest = { coldChain?: boolean; drugMasterId?: string; genericName?: string; hsnCode?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name: string; packSize?: number; price: number; priceInclusiveOfTax?: boolean; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
+export type PharmacyReturnLine = { condition: string; invoiceLineId: string; qty?: number; };
+export type PharmacyReturnRequest = { invoiceId: string; lines: Array<PharmacyReturnLine>; note?: string; refundMethod?: string; };
+export type PharmacyReturnResponse = { amount: number; currency: string; refundId: string; refundTo: Array<RefundTarget>; status: string; };
 export type PharmacyScheduleClassResponse = { code?: string; duplicateRxCopy?: boolean; label?: string; refillSelfServeAllowed?: boolean; register?: string; requiresRx?: boolean; retentionYears?: number; };
 export type PharmacySettingsResponse = { alertRecipientStaffId?: string; licenceNumbers?: Record<string, string>; mode?: string; modeChangedAt?: string; pharmacistInChargeStaffId?: string; };
 export type PharmacySettingsWriteRequest = { alertRecipientStaffId?: string; licenceNumbers?: Record<string, string>; mode?: string; pharmacistInChargeStaffId?: string; reason?: string; };
@@ -507,6 +511,8 @@ export type RequestGrantRequest = { minutes?: number; reason: string; scope?: st
 export type RescheduleRequest = { newStartTime: string; };
 export type Response = { allowedRates?: Array<number>; gstRate?: number; id?: string; preview?: Preview; sacHsn?: string; taxCategory?: string; taxInclusive?: boolean; };
 export type RetentionResponse = { avgVisitsPerPatient?: number; repeatPatients?: number; repeatRatePercent?: number; totalPatients?: number; };
+export type ReturnableBill = { currency: string; invoiceId: string; invoiceNumber: string; lines: Array<ReturnableBillLine>; pendingRefundId?: string; refundMethods: Array<string>; status: string; };
+export type ReturnableBillLine = { allowed: boolean; chargeCode: string; invoiceLineId: string; name: string; reason?: string; returnableQty: number; returnedQty: number; soldQty: number; taxRatePercent: number; unitPrice: number; };
 export type RoleResponse = { builtIn?: boolean; grants?: Array<ModuleGrant>; id?: string; mfaRequired?: boolean; name?: string; presetCode?: string; presetVersion?: number; };
 export type RoleWriteRequest = { grants: Array<ModuleGrant>; mfaRequired?: boolean; name: string; };
 export type Row = { cells?: Array<Cell>; time?: string; };
@@ -975,6 +981,8 @@ export type Operations = {
   PharmacyController_stockMovements: { method: "get"; path: "/v1/pharmacy/items/{id}/stock-movements"; permission: "pharmacy:view"; pathParams: { id: string; }; query: never; body: never; response: Array<PharmacyStockMovementResponse> };
   PharmacyController_picks: { method: "post"; path: "/v1/pharmacy/picks"; permission: "pharmacy:view"; pathParams: never; query: never; body: FefoPickRequest; response: FefoPickResponse };
   GoodsReceiptController_post: { method: "post"; path: "/v1/pharmacy/receipts"; permission: "pharmacy:edit"; pathParams: never; query: never; body: GoodsReceiptRequest; response: GoodsReceiptResponse };
+  PharmacyReturnController_create: { method: "post"; path: "/v1/pharmacy/returns"; permission: "billing:edit"; pathParams: never; query: never; body: PharmacyReturnRequest; response: PharmacyReturnResponse };
+  PharmacyReturnController_bill: { method: "get"; path: "/v1/pharmacy/returns/bill"; permission: "billing:edit"; pathParams: never; query: { invoiceId?: string; number?: string; }; body: never; response: ReturnableBill };
   RxLineController_search: { method: "post"; path: "/v1/pharmacy/rx-lines/search"; permission: "billing:create"; pathParams: never; query: never; body: RxLineSearchRequest; response: Array<RxLineResponse> };
   PharmacyController_scheduleClasses: { method: "get"; path: "/v1/pharmacy/schedule-classes"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: Array<PharmacyScheduleClassResponse> };
   PharmacyController_settings: { method: "get"; path: "/v1/pharmacy/settings"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: PharmacySettingsResponse };

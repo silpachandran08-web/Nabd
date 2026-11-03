@@ -14,8 +14,9 @@ import java.util.UUID;
  */
 public interface StockCommands {
 
-    /** @param scheduleClass the item's statutory class at this moment (PHL-002), for callers that snapshot it on a sale */
-    record StockResult(UUID itemId, int qtyBefore, int qtyAfter, String scheduleClass) {
+    /** @param scheduleClass the item's statutory class at this moment (PHL-002), for callers that snapshot it on a sale
+     *  @param batchId the one batch the change touched (PHL-011: the invoice line keeps it); null when several or none */
+    record StockResult(UUID itemId, int qtyBefore, int qtyAfter, String scheduleClass, UUID batchId) {
     }
 
     /** The stocked pharmacy item behind a charge code; empty for an ordinary (non-stocked) charge. */
@@ -36,6 +37,17 @@ public interface StockCommands {
 
     /** Puts {@code qty} back after a void or return of an invoice. */
     StockResult returnIn(UUID itemId, int qty, UUID invoiceId, UUID actorId, String reason);
+
+    /** @param quarantined the batch had expired since the sale: the units went in as quarantined stock, never sellable */
+    record ReturnedLeg(UUID batchId, int qty, boolean quarantined) {
+    }
+
+    /**
+     * PHL-011: a customer's sealed units come back ('return_in' movement): into {@code batchId} (the batch the invoice line was sold
+     * from) when it is this item's, else into the batches this invoice took the item from, else the implicit batch. A batch that has
+     * expired since the sale is quarantined, so the returned units never count as sellable (FEFO skips non-active batches).
+     */
+    List<ReturnedLeg> customerReturn(UUID itemId, UUID batchId, int qty, UUID invoiceId, UUID actorId, String reason);
 
     // ---- PHL-005 / PHL-006: stock by batch (first-expiry-first-out) ----
 

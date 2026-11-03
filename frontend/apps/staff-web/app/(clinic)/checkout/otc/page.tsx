@@ -15,6 +15,8 @@ import { rxErrorMessage, unlinkedRx } from "../../../components/checkout/rxLink"
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
 import { usePriceReasons } from "../../../components/checkout/priceReasons";
 import ApprovalBanner from "../../../components/checkout/ApprovalBanner";
+import ReturnDialog from "../../../components/checkout/ReturnDialog";
+import returnStyles from "../../../components/checkout/pharmacyReturn.module.css";
 import { bannerApproval, needsApproval, type DiscountApproval } from "../../../components/checkout/discountApproval";
 import { useLiveRefresh } from "../../../lib/live";
 import { uuidv7 } from "@nabd/api-client";
@@ -43,6 +45,8 @@ function OtcCheckoutInner() {
   const canCheckout = can("billing:create"); // the API requires billing:create; absent otherwise
   const canPay = can("billing:edit"); // POST /billing/invoices/{id}/payments requires billing:edit
   const canDiscount = can("billing.discount"); // REC-043: input absent, and discount not sent, without it
+  const canReturn = can("billing:edit"); // PHL-011: POST /pharmacy/returns and GET /pharmacy/returns/bill need billing:edit
+  const [returning, setReturning] = useState(false);
 
   const [context, setContext] = useState<OtcContext | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -206,8 +210,12 @@ function OtcCheckoutInner() {
           <span className={styles.stripName}>Counter sale</span>
           <span className={styles.stripMeta}>Walk-in · no patient record, no queue token</span>
         </div>
-        {invoice && <BillingStatePill state={invoice.status} />}
+        <div className={styles.stripIdentity}>
+          {invoice && <BillingStatePill state={invoice.status} />}
+          {canReturn && <button type="button" className={returnStyles.btn} onClick={() => setReturning(true)}>Customer return</button>}
+        </div>
       </div>
+      {returning && <ReturnDialog initialNumber={invoice?.status === "paid" ? invoice.invoiceNumber : undefined} onClose={() => setReturning(false)} />}
 
       {!invoice && approval && canCheckout && (
         // no 'Pay later' at the counter: there is no visit to come back to

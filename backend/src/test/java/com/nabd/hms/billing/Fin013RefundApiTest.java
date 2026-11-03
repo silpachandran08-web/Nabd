@@ -362,6 +362,6 @@ class Fin013RefundApiTest extends S10QaBillingSupport {
         }
         Integer stock = inTenantTx(e.tenant().id(), () -> jdbc.queryForObject("SELECT stock_qty FROM charge_catalogue WHERE tenant_id = ? AND code = ?", Integer.class, e.tenant().id(), code));
         assertThat(stock).isEqualTo(7);
-        assertThat(count(e, "SELECT count(*) FROM pharmacy_stock_movements WHERE kind = 'restock' AND invoice_id = ?::uuid", inv)).isEqualTo(1);
+        assertThat(count(e, "SELECT count(*) FROM pharmacy_stock_movements WHERE kind = 'return_in' AND invoice_id = ?::uuid", inv)).isEqualTo(1); // PHL-011
     }
 }

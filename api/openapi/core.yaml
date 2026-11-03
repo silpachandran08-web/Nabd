@@ -12262,6 +12262,86 @@ paths:
       tags:
       - pharmacy
       x-required-permission: pharmacy:edit
+  /v1/pharmacy/returns:
+    post:
+      operationId: PharmacyReturnController_create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PharmacyReturnRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PharmacyReturnResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:edit
+  /v1/pharmacy/returns/bill:
+    get:
+      operationId: PharmacyReturnController_bill
+      parameters:
+      - in: query
+        name: invoiceId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: number
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReturnableBill"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:edit
   /v1/pharmacy/rx-lines/search:
     post:
       operationId: RxLineController_search
@@ -22453,6 +22533,18 @@ components:
             type: string
         type:
           type: string
+    CreditNotes:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int32
+        tax:
+          type: number
+        taxable:
+          type: number
+        total:
+          type: number
     Current:
       type: object
       properties:
@@ -22573,6 +22665,8 @@ components:
           type: number
         close:
           $ref: "#/components/schemas/Close"
+        creditNotes:
+          $ref: "#/components/schemas/CreditNotes"
         currency:
           type: string
         date:
@@ -26851,6 +26945,8 @@ components:
           type: boolean
         code:
           type: string
+        coldChain:
+          type: boolean
         drugId:
           type: string
         genericName:
@@ -26876,6 +26972,8 @@ components:
           type: boolean
         register:
           type: string
+        returnable:
+          type: boolean
         scheduleClass:
           type: string
         stockQty:
@@ -26901,6 +26999,8 @@ components:
     PharmacyItemWriteRequest:
       type: object
       properties:
+        coldChain:
+          type: boolean
         drugMasterId:
           type: string
           maxLength: 80
@@ -26931,6 +27031,8 @@ components:
           minimum: 0
         priceInclusiveOfTax:
           type: boolean
+        returnable:
+          type: boolean
         scheduleClass:
           type: string
           maxLength: 40
@@ -26951,6 +27053,67 @@ components:
       required:
       - name
       - price
+    PharmacyReturnLine:
+      type: object
+      properties:
+        condition:
+          type: string
+          pattern: sealed|opened
+        invoiceLineId:
+          type: string
+          format: uuid
+        qty:
+          type: integer
+          format: int32
+          maximum: 100000
+          minimum: 1
+      required:
+      - condition
+      - invoiceLineId
+    PharmacyReturnRequest:
+      type: object
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/PharmacyReturnLine"
+          maxItems: 100
+          minItems: 0
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        refundMethod:
+          type: string
+          pattern: cash|card|upi|other
+      required:
+      - invoiceId
+      - lines
+    PharmacyReturnResponse:
+      type: object
+      properties:
+        amount:
+          type: number
+        currency:
+          type: string
+        refundId:
+          type: string
+          format: uuid
+        refundTo:
+          type: array
+          items:
+            $ref: "#/components/schemas/RefundTarget"
+        status:
+          type: string
+      required:
+      - amount
+      - currency
+      - refundId
+      - refundTo
+      - status
     PharmacyScheduleClassResponse:
       type: object
       properties:
@@ -28777,6 +28940,73 @@ components:
         totalPatients:
           type: integer
           format: int32
+    ReturnableBill:
+      type: object
+      properties:
+        currency:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReturnableBillLine"
+        pendingRefundId:
+          type: string
+          format: uuid
+        refundMethods:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+      required:
+      - currency
+      - invoiceId
+      - invoiceNumber
+      - lines
+      - refundMethods
+      - status
+    ReturnableBillLine:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        chargeCode:
+          type: string
+        invoiceLineId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        reason:
+          type: string
+        returnableQty:
+          type: integer
+          format: int32
+        returnedQty:
+          type: integer
+          format: int32
+        soldQty:
+          type: integer
+          format: int32
+        taxRatePercent:
+          type: number
+        unitPrice:
+          type: number
+      required:
+      - allowed
+      - chargeCode
+      - invoiceLineId
+      - name
+      - returnableQty
+      - returnedQty
+      - soldQty
+      - taxRatePercent
+      - unitPrice
     RoleResponse:
       type: object
       properties:

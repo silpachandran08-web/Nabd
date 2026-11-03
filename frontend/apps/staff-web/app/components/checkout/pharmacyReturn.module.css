@@ -1,0 +1,110 @@
+/* PHL-011: counter return overlay. 44 px targets, logical properties. */
+.find {
+  display: flex;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-16);
+}
+
+.input {
+  min-height: 44px;
+  flex: 1;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-12);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+}
+
+.qty {
+  min-height: 44px;
+  width: 72px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-8);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+}
+
+.btn,
+.primary {
+  min-height: 44px;
+  padding: 0 var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-1);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  border: none;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+}
+
+.btn:disabled,
+.primary:disabled {
+  background: var(--nb-surface-3);
+  color: var(--nb-text-disabled);
+  cursor: not-allowed;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+}
+
+.reason {
+  color: var(--nb-danger-500);
+  font-size: 12px;
+}
+
+.notice {
+  background: var(--nb-success-tint);
+  color: var(--nb-success-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  margin-bottom: var(--nb-space-16);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  align-items: center;
+  margin-top: var(--nb-space-16);
+}
+
+.section {
+  margin-top: var(--nb-space-24);
+  padding-top: var(--nb-space-16);
+  border-top: 1px solid var(--nb-border-subtle);
+}
+
+.pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--nb-space-8);
+  border-bottom: 1px solid var(--nb-border-subtle);
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--nb-space-8);
+}

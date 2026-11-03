@@ -90,7 +90,7 @@ public class DayCloseService {
                 toleranceOf(tenantId, currency), repo.totals(tenantId, start, end), repo.methods(tenantId, start, end),
                 repo.outstanding(tenantId, start, end), repo.pendingCheckouts(tenantId, day), repo.unbilled(tenantId, day),
                 repo.taxBands(tenantId, start, end), repo.splitPaymentBills(tenantId, start, end), close,
-                voided.count(), voided.total(), repo.refunds(tenantId, start, end));
+                voided.count(), voided.total(), repo.refunds(tenantId, start, end), repo.creditNotes(tenantId, start, end));
     }
 
     /** ADM-044: the reception desk's end-of-day summary. Scoped to the caller's clinic by tenant id and RLS; collections

@@ -53,6 +53,34 @@ class RefundRepository {
                         rs.getString("currency"), rs.getLong("total_minor"), rs.getLong("round_off_minor")), tenantId, invoiceId).stream().findFirst();
     }
 
+    /** PHL-011: {@link #lockInvoice} without the lock, for the return screen's read. */
+    Optional<InvoiceHead> findInvoice(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT id, invoice_number, status, currency, total_minor, round_off_minor FROM invoices WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> new InvoiceHead(rs.getObject("id", UUID.class), rs.getString("invoice_number"), rs.getString("status"),
+                        rs.getString("currency"), rs.getLong("total_minor"), rs.getLong("round_off_minor")), tenantId, invoiceId).stream().findFirst();
+    }
+
+    Optional<UUID> invoiceIdByNumber(UUID tenantId, String number) {
+        return jdbc.query("SELECT id FROM invoices WHERE tenant_id = ? AND invoice_number = ?", (rs, i) -> rs.getObject("id", UUID.class),
+                tenantId, number).stream().findFirst();
+    }
+
+    Optional<UUID> pendingRequestId(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT id FROM refund_requests WHERE tenant_id = ? AND invoice_id = ? AND status = 'pending'",
+                (rs, i) -> rs.getObject("id", UUID.class), tenantId, invoiceId).stream().findFirst();
+    }
+
+    record BillLine(UUID id, String chargeCode, String chargeName, int quantity, BigDecimal unitPrice, BigDecimal taxRatePercent) {
+    }
+
+    /** PHL-011: the invoice's lines as the return screen lists them. */
+    List<BillLine> billLines(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT id, charge_code, charge_name, quantity, unit_price, tax_rate_percent FROM invoice_line_items " +
+                        "WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order, id",
+                (rs, i) -> new BillLine(rs.getObject("id", UUID.class), rs.getString("charge_code"), rs.getString("charge_name"), rs.getInt("quantity"),
+                        rs.getBigDecimal("unit_price"), rs.getBigDecimal("tax_rate_percent")), tenantId, invoiceId);
+    }
+
     List<LineHead> lines(UUID tenantId, UUID invoiceId) {
         return jdbc.query("SELECT id, charge_code, quantity, taxable_minor, line_total, tax_rate_percent FROM invoice_line_items " +
                         "WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order, id",
@@ -154,13 +182,22 @@ class RefundRepository {
                 "status = ?, version = version + 1 WHERE tenant_id = ? AND id = ?", tenantId, invoiceId, status, tenantId, invoiceId);
     }
 
-    /** Puts {@code qty} of a stocked pharmacy line back on the shelf with an immutable 'restock' movement; false when the line is not a stocked item. */
-    boolean restock(UUID tenantId, UUID invoiceId, UUID lineId, int qty, String reason, UUID staffId) {
-        List<UUID> item = jdbc.query("SELECT c.id FROM invoice_line_items li JOIN charge_catalogue c ON c.tenant_id = li.tenant_id AND c.code = li.charge_code " +
-                "AND c.stock_qty IS NOT NULL WHERE li.tenant_id = ? AND li.id = ?", (rs, i) -> rs.getObject("id", UUID.class), tenantId, lineId);
-        if (item.isEmpty()) return false;
-        stock.returnIn(item.get(0), qty, invoiceId, staffId, reason);
-        return true;
+    /** PHL-011: a line of this invoice that sold a stocked pharmacy item: the item, its class as sold and the batch it came from. */
+    record StockedLine(UUID itemId, String scheduleClass, UUID batchId) {
+    }
+
+    Optional<StockedLine> stockedLine(UUID tenantId, UUID invoiceId, UUID lineId) {
+        return jdbc.query("SELECT c.id, li.schedule_class, li.batch_id FROM invoice_line_items li JOIN charge_catalogue c ON c.tenant_id = li.tenant_id " +
+                        "AND c.code = li.charge_code AND c.stock_qty IS NOT NULL WHERE li.tenant_id = ? AND li.invoice_id = ? AND li.id = ?",
+                (rs, i) -> new StockedLine(rs.getObject("id", UUID.class), rs.getString("schedule_class"), rs.getObject("batch_id", UUID.class)),
+                tenantId, invoiceId, lineId).stream().findFirst();
+    }
+
+    /** Puts {@code qty} of a stocked pharmacy line back into the batch it was sold from ('return_in', PHL-011; an expired batch is
+     * quarantined); empty when the line is not a stocked item. */
+    List<com.nabd.hms.pharmacy.api.StockCommands.ReturnedLeg> restock(UUID tenantId, UUID invoiceId, UUID lineId, int qty, String reason, UUID staffId) {
+        return stockedLine(tenantId, invoiceId, lineId).map(l -> stock.customerReturn(l.itemId(), l.batchId(), qty, invoiceId, staffId, reason))
+                .orElse(List.of());
     }
 
     private RequestRow mapRequest(java.sql.ResultSet rs, int i) throws java.sql.SQLException {

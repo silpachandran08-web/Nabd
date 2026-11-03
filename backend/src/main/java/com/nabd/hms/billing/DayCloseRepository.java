@@ -66,6 +66,18 @@ class DayCloseRepository {
                         rs.getInt("transactions")), tenantId, ts(dayStart), ts(dayEnd));
     }
 
+    /** PHL-011: credit notes issued in the window (FIN-013 refunds and pharmacy returns). */
+    DayCloseSummaryResponse.CreditNotes creditNotes(UUID tenantId, Instant dayStart, Instant dayEnd) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS n,
+                       trim_scale(COALESCE(SUM(taxable_minor / power(10::numeric, currency_exponent(currency))), 0)) AS taxable,
+                       trim_scale(COALESCE(SUM(tax_minor / power(10::numeric, currency_exponent(currency))), 0)) AS tax,
+                       trim_scale(COALESCE(SUM(total_minor / power(10::numeric, currency_exponent(currency))), 0)) AS total
+                FROM credit_notes WHERE tenant_id = ? AND issued_at >= ? AND issued_at < ?
+                """, (rs, i) -> new DayCloseSummaryResponse.CreditNotes(rs.getInt("n"), rs.getBigDecimal("taxable"), rs.getBigDecimal("tax"),
+                        rs.getBigDecimal("total")), tenantId, ts(dayStart), ts(dayEnd));
+    }
+
     /** Balances still owed on the day's own bills. */
     DayCloseSummaryResponse.Outstanding outstanding(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.queryForObject("""

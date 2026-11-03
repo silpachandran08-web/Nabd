@@ -53,9 +53,10 @@ public class RefundService {
     private final EventPublisher events;
     private final ActorDirectory actors;
     private final ClinicPolicies policies;
+    private final com.nabd.hms.pharmacy.api.ReturnPolicy returnPolicy;
 
     RefundService(RefundRepository repo, TenantContext tenantContext, DayCloseService dayClose, SeriesAllocator series, AuditService audit,
-                  EventPublisher events, ActorDirectory actors, ClinicPolicies policies) {
+                  EventPublisher events, ActorDirectory actors, ClinicPolicies policies, com.nabd.hms.pharmacy.api.ReturnPolicy returnPolicy) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.dayClose = dayClose;
@@ -64,6 +65,7 @@ public class RefundService {
         this.events = events;
         this.actors = actors;
         this.policies = policies;
+        this.returnPolicy = returnPolicy;
     }
 
     // ---------------------------------------------------------------- request
@@ -77,6 +79,14 @@ public class RefundService {
         }
         if ((req.lines() == null || req.lines().isEmpty()) == (req.amount() == null)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "refund-basis", "Lines or amount", "Send either the lines to reverse or an amount, not both and not neither.");
+        }
+        if (req.lines() != null) { // PHL-011: units go back on the shelf only when the item may be taken back
+            for (var l : req.lines()) {
+                if (Boolean.TRUE.equals(l.resaleable())) {
+                    repo.stockedLine(tenantId, invoiceId, l.lineId()).flatMap(sl -> returnPolicy.refusal(sl.itemId(), sl.scheduleClass()))
+                            .ifPresent(reason -> { throw returnNotAllowed(l.lineId(), reason); });
+                }
+            }
         }
         if (repo.hasPending(tenantId, invoiceId)) {
             throw new ApiException(HttpStatus.CONFLICT, "open-request-exists", "Refund already open", "This invoice already has a refund awaiting approval.",
@@ -148,10 +158,13 @@ public class RefundService {
             repo.insertRefundPayment(tenantId, invoice.id(), methodOf.get(t.paymentId()),
                     BigDecimal.valueOf(-t.amountMinor(), exponent(req.currency())), staffId, requestId, t.paymentId());
         }
+        List<Map<String, Object>> returned = new ArrayList<>();
         if (lines != null) {
             for (var l : lines) {
                 if (Boolean.TRUE.equals(l.resaleable())) {
-                    repo.restock(tenantId, invoice.id(), l.lineId(), l.quantity(), "Credit note " + number + " (resaleable return)", staffId);
+                    for (var leg : repo.restock(tenantId, invoice.id(), l.lineId(), l.quantity(), "Credit note " + number + " (resaleable return)", staffId)) {
+                        returned.add(Map.of("invoiceLineId", l.lineId(), "batchId", leg.batchId(), "qty", leg.qty(), "quarantined", leg.quarantined()));
+                    }
                 }
             }
         }
@@ -168,6 +181,10 @@ public class RefundService {
                 "amountMinor", note.totalMinor(), "methods", List.copyOf(methods)));
         events.publish(tenantId, CREDIT_NOTE_ISSUED, Map.of("tenantId", tenantId, "invoiceId", invoice.id(), "creditNoteId", creditNoteId,
                 "totalMinor", note.totalMinor(), "currency", req.currency()));
+        if (!returned.isEmpty()) { // PHL-011: goods came back into stock with this credit note
+            events.publish(tenantId, DomainEventType.PHARMACY_RETURN_ACCEPTED, creditNoteId, Map.of("invoiceId", invoice.id(), "creditId", creditNoteId,
+                    "refundRequestId", requestId, "lines", returned));
+        }
         return new RefundDecisionRequests.Approved(creditNoteId, number);
     }
 
@@ -233,7 +250,7 @@ public class RefundService {
         return out;
     }
 
-    private CreditNoteMath.Note compute(UUID tenantId, RefundRepository.InvoiceHead invoice, List<RefundRequestRequest.RefundLine> reqLines, BigDecimal amount) {
+    CreditNoteMath.Note compute(UUID tenantId, RefundRepository.InvoiceHead invoice, List<RefundRequestRequest.RefundLine> reqLines, BigDecimal amount) {
         var lines = repo.lines(tenantId, invoice.id());
         var open = open(tenantId, invoice, lines);
         long roundOffLeft = invoice.roundOffMinor() - repo.sumCreditRoundOff(tenantId, invoice.id());
@@ -301,7 +318,7 @@ public class RefundService {
 
     // ---------------------------------------------------------------- helpers
 
-    private static int exponent(String currency) {
+    static int exponent(String currency) {
         return java.util.Currency.getInstance(currency).getDefaultFractionDigits();
     }
 
@@ -309,9 +326,14 @@ public class RefundService {
         return BigDecimal.valueOf(minor, exponent(currency));
     }
 
-    private static ApiException exceeds() {
+    static ApiException exceeds() {
         return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "exceeds-refundable", "More than can be refunded",
                 "The refund is more than what is left to reverse or what was paid.", Map.of("code", "EXCEEDS_REFUNDABLE"));
+    }
+
+    static ApiException returnNotAllowed(UUID lineId, String reason) {
+        return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "return-not-allowed", "Return not allowed", reason,
+                Map.of("code", "RETURN_NOT_ALLOWED", "invoiceLineId", lineId, "reason", reason));
     }
 
     private static ApiException notFound(String detail) {
