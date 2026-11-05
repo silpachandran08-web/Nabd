@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import styles from "../setup.module.css";
 import LicenceTable, { type LicenceRow } from "../../../components/setup/LicenceTable";
 import { ISSUING_BODIES } from "@nabd/domain";
 import { clinicToday } from "../../../lib/clinicTime";
 import { getIdentity } from "../../../lib/session";
+import { useSetupState } from "../setupStore";
 import { SetupTabBody, useSetupTab, type StaffSummary } from "../setupTab";
 
 type Licence = LicenceRow;
@@ -15,7 +15,7 @@ export default function LicencesTab() {
   const { licences, staff } = tab.data;
   // The API accepts IN, AE, SA or QA; default to the clinic's own region (fixed at provisioning).
   const licenceRegion = ["IN", "AE", "SA", "QA"].find((c) => c === getIdentity()?.tenantRegion) ?? "IN";
-  const [newLicence, setNewLicence] = useState<Partial<Licence>>({ region: licenceRegion, licenceType: "clinician" });
+  const [newLicence, setNewLicence] = useSetupState<Partial<Licence>>("newLicence", { region: licenceRegion, licenceType: "clinician" });
   const addLicence = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLicence.licenceType || !newLicence.number || !newLicence.expiryDate || !newLicence.region) return;

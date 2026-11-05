@@ -2,8 +2,10 @@
 
 // FEF-032: what every Clinic Setup tab route shares (moved unchanged from the old single setup page): the
 // per-tab load (each tab loads only its own data, so one tab's missing grant or failing endpoint can't blank the others),
-// the save helper with its Retry banner, and the loading / error frame around a tab's content.
+// the save helper with its Retry banner, and the loading / error frame around a tab's content. Loaded lists and the
+// failed save live in the setup store (setupStore.ts), so they survive tab switches as on the old page.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useSetupState } from "./setupStore";
 import styles from "./setup.module.css";
 import { ErrorState, Skeleton } from "../../components/ui/StateViews";
 import { api, ApiError, reasonText } from "../../lib/api";
@@ -19,11 +21,14 @@ export type StaffSummary = { id: string; name: string; roleName: string };
 /** Loads this tab's endpoints (key -> GET path). A refused read shows the error state; a value only replaces what is held when it arrived. */
 export function useSetupTab<T extends Record<string, unknown>>(paths: { [K in keyof T]: string }, initial: T) {
   const tabPaths = useRef(paths);
-  const [data, setData] = useState<T>(initial);
+  // One record for every tab, as the old page's state: Charges and Policies share `policies`, Shifts and Licences `staff`.
+  const [shared, setShared] = useSetupState<Record<string, unknown>>("data", {});
+  const data = Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, k in shared ? shared[k] : v])) as T;
+  const setData = useCallback((patch: Partial<T>) => setShared((prev) => ({ ...prev, ...patch })), [setShared]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // A failed save keeps the form as it is: the tab stays, and a banner offers Retry (same body, same Idempotency-Key).
-  const [saveFail, setSaveFail] = useState<{ message: string; retry: () => void } | null>(null);
+  // A failed save keeps the form as it is, and a banner (in the setup layout, on every tab) offers Retry (same body, same Idempotency-Key).
+  const [saveFail, setSaveFail] = useSetupState<SaveFail | null>("saveFail", null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -41,13 +46,13 @@ export function useSetupTab<T extends Record<string, unknown>>(paths: { [K in ke
       const keys = Object.keys(tabPaths.current) as (keyof T)[];
       const values = await Promise.all(keys.map((k) => fetchJson(tabPaths.current[k])));
       const got = Object.fromEntries(keys.map((k, i) => [k, values[i]]).filter(([, v]) => v)) as Partial<T>;
-      setData((prev) => ({ ...prev, ...got }));
+      setData(got);
     } catch (e) {
       setError(reasonText(e, ""));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setData]);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState
@@ -73,21 +78,24 @@ export function useSetupTab<T extends Record<string, unknown>>(paths: { [K in ke
   return { data, setData, loading, error, loadAll, saveFail, mutate, post, patch };
 }
 
-type TabState = { loading: boolean; error: string | null; loadAll: () => void; saveFail: { message: string; retry: () => void } | null };
+type SaveFail = { message: string; retry: () => void };
+type TabState = { loading: boolean; error: string | null; loadAll: () => void };
 
-/** The Retry banner of a failed save, then the tab's skeleton, error state or content. */
-export function SetupTabBody({ tab, children }: { tab: TabState; children: ReactNode }) {
+/** The last failed save with Retry; shown by the setup layout above whichever tab is open, until a save succeeds. */
+export function SaveFailBanner() {
+  const [saveFail] = useSetupState<SaveFail | null>("saveFail", null);
+  if (!saveFail) return null;
   return (
-    <>
-      {tab.saveFail && (
-        <div className={styles.errorState} role="alert">
-          {tab.saveFail.message}{" "}
-          <button type="button" className={styles.wizardBtn} onClick={tab.saveFail.retry}>Retry</button>
-        </div>
-      )}
-      {tab.loading ? <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>
-        : tab.error ? <div className={styles.card}><ErrorState message={tab.error} onRetry={tab.loadAll} /></div>
-        : children}
-    </>
+    <div className={styles.errorState} role="alert">
+      {saveFail.message}{" "}
+      <button type="button" className={styles.wizardBtn} onClick={saveFail.retry}>Retry</button>
+    </div>
   );
+}
+
+/** The tab's skeleton, error state or content. */
+export function SetupTabBody({ tab, children }: { tab: TabState; children: ReactNode }) {
+  return tab.loading ? <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>
+    : tab.error ? <div className={styles.card}><ErrorState message={tab.error} onRetry={tab.loadAll} /></div>
+    : <>{children}</>;
 }
