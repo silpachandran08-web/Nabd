@@ -4,8 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "../setup.module.css";
 import { EmptyState, ErrorState, Skeleton } from "../../../components/ui/StateViews";
 import { api, ApiError, reasonText } from "../../../lib/api";
+import { useSetupState } from "../setupStore";
 
 type PayrollRow = { staffId: string; staffName: string; role: string; days: number; hours: number; salary: number; notes: string };
+
+const localMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }; // local month, not UTC
 
 function csvCell(v: string | number): string {
   let t = String(v ?? "");
@@ -15,7 +18,7 @@ function csvCell(v: string | number): string {
 
 export default function PayrollTab() {
   const [payroll, setPayroll] = useState<PayrollRow[]>([]);
-  const [payrollMonth, setPayrollMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }); // local month, not UTC
+  const [payrollMonth, setPayrollMonth] = useSetupState("payrollMonth", localMonth());
   const [payrollError, setPayrollError] = useState<string | null>(null);
   const [payrollLoading, setPayrollLoading] = useState(false);
 

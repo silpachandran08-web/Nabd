@@ -9,6 +9,8 @@ import styles from "./setup.module.css";
 import AccessGate from "../../components/ui/AccessGate";
 import { can } from "../../lib/permissions";
 import { TABS, isSetupTab, isTabRoute, tabHref } from "./setupTabs";
+import { SetupStoreProvider } from "./setupStore";
+import { SaveFailBanner } from "./setupTab";
 
 export default function SetupLayout({ children }: { children: ReactNode }) {
   const segment = useSelectedLayoutSegment();
@@ -27,7 +29,11 @@ export default function SetupLayout({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <SetupTabs />
         </Suspense>
-        {children}
+        {/* drafts, loaded lists and the failed save outlive a tab switch; leaving the frame drops them (as the old page) */}
+        <SetupStoreProvider>
+          <SaveFailBanner />
+          {children}
+        </SetupStoreProvider>
       </main>
     </AccessGate>
   );

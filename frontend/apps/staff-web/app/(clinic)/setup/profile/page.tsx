@@ -8,6 +8,7 @@ import { can } from "../../../lib/permissions";
 import { regionLabel } from "../../../lib/session";
 import { api, ApiError, reasonText } from "../../../lib/api";
 import { SetupTabBody, intents, useSetupTab } from "../setupTab";
+import { useSetupState } from "../setupStore";
 
 type Profile = { id: string; name: string; region: string; timezone: string; taxId: string | null; taxIdType: string | null; whatsappNumber: string | null; specialties: string[]; status: string; setupCompletedAt: string | null };
 
@@ -16,11 +17,11 @@ export default function ProfileTab() {
   const profile = tab.data.profile;
   const setProfile = (p: Profile) => tab.setData({ profile: p });
   const [notice, setNotice] = useState<string | null>(null);
-  const [specialtyDraft, setSpecialtyDraft] = useState("");
+  const [specialtyDraft, setSpecialtyDraft] = useSetupState("specialtyDraft", "");
   // Profile edits need setup:edit (PATCH /setup/profile); without it the profile is shown read-only.
   const [canEditProfile, setCanEditProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useSetupState<string | null>("profileError", null);
   useEffect(() => {
     void Promise.resolve().then(() => setCanEditProfile(can("setup:edit")));
   }, []);

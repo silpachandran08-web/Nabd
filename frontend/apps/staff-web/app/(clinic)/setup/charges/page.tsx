@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import styles from "../setup.module.css";
 import PricingPanel from "../../../components/setup/PricingPanel";
+import { useSetupState } from "../setupStore";
 import { SetupTabBody, useSetupTab, type Charge, type Policy } from "../setupTab";
 
 const freshCharge = (): Partial<Charge> => ({ active: true, displayOrder: 0, effectiveFrom: new Date().toLocaleDateString("en-CA") });
@@ -12,7 +12,7 @@ export default function ChargesTab() {
   const { charges, policies } = tab.data;
   // effectiveFrom has no visible input below — defaulted to today (matching the column's own
   // CURRENT_DATE default) since addCharge()'s own guard requires it truthy to submit at all.
-  const [newCharge, setNewCharge] = useState<Partial<Charge>>(freshCharge);
+  const [newCharge, setNewCharge] = useSetupState<Partial<Charge>>("newCharge", freshCharge());
   const addCharge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCharge.code || !newCharge.name || !newCharge.category || newCharge.baseAmount == null || !newCharge.effectiveFrom) return;

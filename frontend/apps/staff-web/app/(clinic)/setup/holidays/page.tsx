@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import styles from "../setup.module.css";
 import RegionalCalendar, { type CalHoliday } from "../../../components/setup/RegionalCalendar";
 import { can } from "../../../lib/permissions";
+import { useSetupState } from "../setupStore";
 import { SetupTabBody, useSetupTab } from "../setupTab";
 
 type Holiday = CalHoliday;
@@ -11,7 +11,7 @@ type Holiday = CalHoliday;
 export default function HolidaysTab() {
   const tab = useSetupTab<{ holidays: Holiday[] }>({ holidays: "/setup/holidays" }, { holidays: [] });
   const { holidays } = tab.data;
-  const [newHoliday, setNewHoliday] = useState<Partial<Holiday>>({ recurring: false });
+  const [newHoliday, setNewHoliday] = useSetupState<Partial<Holiday>>("newHoliday", { recurring: false });
   const addHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHoliday.holidayDate || !newHoliday.name) return;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import styles from "../setup.module.css";
+import { useSetupState } from "../setupStore";
 import { SetupTabBody, useSetupTab, type StaffSummary } from "../setupTab";
 
 type Shift = { id: string; staffId: string; staffName: string | null; patternJson: string; effectiveFrom: string; effectiveTo: string | null };
@@ -9,7 +9,7 @@ type Shift = { id: string; staffId: string; staffName: string | null; patternJso
 export default function ShiftsTab() {
   const tab = useSetupTab<{ shifts: Shift[]; staff: StaffSummary[] }>({ shifts: "/setup/shifts", staff: "/setup/staff" }, { shifts: [], staff: [] });
   const { shifts, staff } = tab.data;
-  const [newShift, setNewShift] = useState<Partial<Shift>>({ patternJson: "{}" });
+  const [newShift, setNewShift] = useSetupState<Partial<Shift>>("newShift", { patternJson: "{}" });
   const addShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newShift.staffId || !newShift.patternJson || !newShift.effectiveFrom) return;
