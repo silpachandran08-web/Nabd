@@ -143,17 +143,18 @@ class S19QaPhl011ReturnApiTest extends S10QaBillingSupport {
         assertThat(Math.round(num(r.getBody().get("amount")) * 100)).as("refund of the whole bill = what was paid").isEqualTo(billTotal);
     }
 
-    // R-API-03: IN_H1 on a stocked item without a pharmacy profile row (legacy stocked charge)
+    // R-API-03: a line sold before the class snapshot existed (schedule_class NULL) of an item now classed IN_H1 is still refused
     @Test
-    void rApi03_anH1LineIsRefusedEvenWithoutAnItemProfile() {
+    void rApi03_anH1ItemIsRefusedWhenTheLineHasNoClassSnapshot() {
         Fx f = fx("in_house");
-        String[] x = item(f, "Qa h1 profile", Map.of());
-        su().update("DELETE FROM pharmacy_item_profiles WHERE item_id = ?::uuid", UUID.fromString(x[0]));
+        String[] x = item(f, "Qa h1 legacy", Map.of());
         Map<?, ?> inv = sale(f, x[1], 1);
-        su().update("UPDATE invoice_line_items SET schedule_class = 'IN_H1' WHERE id = ?::uuid", UUID.fromString(lineId(inv, 0)));
+        su().update("UPDATE invoice_line_items SET schedule_class = NULL WHERE id = ?::uuid", UUID.fromString(lineId(inv, 0)));
+        su().update("UPDATE pharmacy_item_profiles SET schedule_class = 'IN_H1' WHERE item_id = ?::uuid", UUID.fromString(x[0]));
         ResponseEntity<Map> r = post(f.maker(), ret(inv, 0, 1));
         assertThat(r.getStatusCode()).as("%s", r.getBody()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(r)).endsWith("return-not-allowed");
+        assertThat((String) r.getBody().get("detail")).contains("H1");
     }
 
     // R-API-04: controlled classes, and flags set after the sale
@@ -163,9 +164,9 @@ class S19QaPhl011ReturnApiTest extends S10QaBillingSupport {
         String[] ndps = item(f, "Qa ndps", Map.of()), later = item(f, "Qa later cold", Map.of()), nr = item(f, "Qa later nr", Map.of());
         Map<?, ?> inv = sale(f, ndps[1], 1, later[1], 1, nr[1], 1);
         su().update("UPDATE invoice_line_items SET schedule_class = 'IN_NDPS' WHERE id = ?::uuid", UUID.fromString(lineId(inv, 0)));
-        assertThat(exchange("/v1/pharmacy/items/" + later[0], HttpMethod.PATCH, authedJsonBody(f.e().token(), Map.of("coldChain", true)), Map.class)
+        assertThat(exchange("/v1/pharmacy/items/" + later[0], HttpMethod.PATCH, authedJsonBody(f.e().token(), Map.of("name", "Qa flag", "isRx", false, "hsnCode", "3004", "price", 20.00, "taxRatePercent", 12.00, "coldChain", true)), Map.class)
                 .getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(exchange("/v1/pharmacy/items/" + nr[0], HttpMethod.PATCH, authedJsonBody(f.e().token(), Map.of("returnable", false)), Map.class)
+        assertThat(exchange("/v1/pharmacy/items/" + nr[0], HttpMethod.PATCH, authedJsonBody(f.e().token(), Map.of("name", "Qa flag2", "isRx", false, "hsnCode", "3004", "price", 20.00, "taxRatePercent", 12.00, "returnable", false)), Map.class)
                 .getStatusCode().is2xxSuccessful()).isTrue();
         for (int i = 0; i < 3; i++) {
             ResponseEntity<Map> r = post(f.maker(), ret(inv, i, 1));
