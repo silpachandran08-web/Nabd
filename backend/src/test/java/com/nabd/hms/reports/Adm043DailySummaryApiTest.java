@@ -195,6 +195,25 @@ class Adm043DailySummaryApiTest extends ApiTestBase {
         assertThat(requests(d)).isEmpty();
     }
 
+    /** T20-BUG-3: 'combined' ticked in two sibling clinics is still one chain message per brand and day. */
+    @Test
+    void combinedInTwoSiblings_sendsTheChainSummaryOnce_perBrandAndDay() {
+        Clinic a = clinic();
+        SeededBrand brand = seedBrand(seedOwner("chain" + SEQ.incrementAndGet() + "@a.com"), "Chain " + SEQ.get());
+        Clinic b = clinic();
+        jdbc.update("UPDATE tenants SET brand_id = ?, name = 'Alpha Branch' WHERE id = ?", brand.id(), a.tenant().id());
+        jdbc.update("UPDATE tenants SET brand_id = ?, name = 'Beta Branch' WHERE id = ?", brand.id(), b.tenant().id());
+        settings(a, true, true, "close");
+        settings(b, true, true, "close");
+        visit(a, true);
+        visit(b, true);
+        at("21:31");
+        assertThat(job.run()).as("one chain message per brand").isEqualTo(1);
+        assertThat(requests(a).size() + requests(b).size()).isEqualTo(1);
+        assertThat(job.run()).as("the other sibling's day is marked done, nothing later").isZero();
+        assertThat(requests(a).size() + requests(b).size()).isEqualTo(1);
+    }
+
     @Test
     void ac4_notOptedIn_nothingIsSent_andOnlyAnOwnerMayChangeTheSettings() {
         Clinic c = clinic();
