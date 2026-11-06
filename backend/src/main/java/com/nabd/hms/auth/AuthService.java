@@ -296,7 +296,7 @@ public class AuthService {
      * code is checked directly against their own secret.
      */
     @Transactional(noRollbackFor = ApiException.class)
-    public StepUpTokenResponse issueStepUpToken(Jwt callerJwt, String code) {
+    public StepUpTokenResponse issueStepUpToken(Jwt callerJwt, String code, String target) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::mfaFailed);
@@ -318,11 +318,13 @@ public class AuthService {
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
+                .id(UUID.randomUUID().toString()) // IDC-013: consumed once by the gates that bind to an object (StepUpVerifier.requireFor)
                 .subject(staffId.toString())
                 .claim("purpose", "step_up")
                 // PLT-007: bound to the minting session and tenant; StepUpVerifier compares them with the caller's token
                 .claim("sid", callerJwt.getClaimAsString("sid"))
                 .claim("tenantId", callerJwt.getClaimAsString("tenantId"));
+        if (target != null && !target.isBlank()) claimsB.claim("target", target);
         TokenType.STEP_UP.stamp(claimsB, Audience.STEP_UP);
         JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();

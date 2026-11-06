@@ -26036,6 +26036,11 @@ components:
           type: string
           minLength: 1
           pattern: "^[0-9]{6}$"
+        target:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "^[A-Za-z0-9_:-]*$"
       required:
       - challengeId
       - code
