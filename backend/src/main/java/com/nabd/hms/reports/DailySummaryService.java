@@ -146,9 +146,20 @@ public class DailySummaryService {
         }
         List<DailySummaryRepository.Figures> figures = new ArrayList<>();
         for (DailySummaryRepository.Branch b : plan.branches()) {
+            if (!b.id().equals(tenantId) && tenantScope.run(b.id(), () -> combinedSentToday(b.id(), plan.day()))) {
+                // T20-BUG-3: the chain summary is one message per brand and clinic day; a sibling already sent it, so this clinic's day is done
+                tenantScope.run(tenantId, () -> repo.markSent(tenantId, plan.day()));
+                return false;
+            }
             figures.add(tenantScope.run(b.id(), () -> figures(b, plan.day())));
         }
         return tenantScope.run(tenantId, () -> send(tenantId, plan, figures));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    boolean combinedSentToday(UUID tenantId, LocalDate day) {
+        DailySummaryRepository.Settings s = repo.settings(tenantId);
+        return s.combined() && day.equals(s.lastSentDay());
     }
 
     /** Null when nothing is to be sent now: opted out, nobody to send to, already sent today, not yet due, or waiting for the rollup. */
