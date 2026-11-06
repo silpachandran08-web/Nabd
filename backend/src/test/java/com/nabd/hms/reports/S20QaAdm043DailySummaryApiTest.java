@@ -206,16 +206,23 @@ class S20QaAdm043DailySummaryApiTest extends ApiTestBase {
         visit(a, true);
         visit(b, false);
         at("21:31");
-        int sent = job.run();
-        assertThat(requests(a)).hasSize(1);
-        String fa = claim(a, requests(a).get(0)).params().get(1);
-        assertThat(fa).contains("Alpha Branch: 1 visits, INR 500.00 collected").contains("Beta Branch: 1 visits, INR 0.00 collected").contains("Total: 2 visits, INR 500.00");
-        // Documented: each clinic's own row sends, so an owner who ticked "combined" in both branches gets the same chain summary twice.
-        assertThat(sent).as("two sibling clinics both combined").isEqualTo(2);
-        assertThat(requests(b)).hasSize(1);
-        assertThat(claim(b, requests(b).get(0)).params().get(1)).contains("Alpha Branch").contains("Beta Branch").contains("Total: 2 visits");
-        // the combined attention line counts the sibling's unbilled consult too
-        assertThat(claim(a, requests(a).get(0)).params().get(2)).contains("1 consultation done with no bill");
+        job.run();
+        // T20-BUG-3 retest: one chain message per brand and clinic day, whichever sibling sends it; the other is marked done
+        List<UUID> all = new java.util.ArrayList<>(requests(a));
+        all.addAll(requests(b));
+        assertThat(all).as("exactly one chain message across both siblings").hasSize(1);
+        Clinic sender = requests(a).isEmpty() ? b : a;
+        String figures = claim(sender, all.get(0)).params().get(1);
+        assertThat(figures).contains("Alpha Branch: 1 visits, INR 500.00 collected").contains("Beta Branch: 1 visits, INR 0.00 collected").contains("Total: 2 visits, INR 500.00");
+        assertThat(claim(sender, all.get(0)).params().get(2)).contains("1 consultation done with no bill");
+        at("22:30");
+        job.run();
+        at("23:30");
+        job.run();
+        assertThat(requests(a).size() + requests(b).size()).as("no second message later in the day").isEqualTo(1);
+        for (Clinic x : List.of(a, b)) {
+            assertThat(inTenantTx(x.tenant().id(), () -> jdbc.queryForObject("SELECT last_sent_day = ? FROM daily_summary_settings WHERE tenant_id = ?", Boolean.class, java.sql.Date.valueOf(DAY), x.tenant().id()))).isTrue();
+        }
     }
 
     @Test

@@ -81,15 +81,22 @@ class S20QaIdc013ProxyChangeApiTest extends ApiTestBase {
     }
 
     private String stepUp(String access, String purpose, long ttlSeconds, String subjectOverride) throws Exception {
+        return stepUp(access, purpose, ttlSeconds, subjectOverride, null, true);
+    }
+
+    /** Fix round (T20-BUG-2): a step-up token now carries a jti and the target it was minted for (the proxy id). */
+    private String stepUp(String access, String purpose, long ttlSeconds, String subjectOverride, String target, boolean withJti) throws Exception {
         Map<String, Object> c = objectMapper.readValue(java.util.Base64.getUrlDecoder().decode(access.split("\\.")[1]), Map.class);
         Instant now = Instant.now();
         JwtClaimsSet.Builder b = JwtClaimsSet.builder().issuer("https://api.nabd.health").issuedAt(now.minusSeconds(ttlSeconds < 0 ? -ttlSeconds + 1 : 0)).expiresAt(now.plusSeconds(ttlSeconds))
                 .subject(subjectOverride != null ? subjectOverride : (String) c.get("sub")).claim("purpose", purpose).claim("sid", c.get("sid")).claim("tenantId", c.get("tenantId"));
+        if (withJti) b.id(UUID.randomUUID().toString());
+        if (target != null) b.claim("target", target);
         TokenType.STEP_UP.stamp(b, Audience.STEP_UP);
         return encoder.encode(JwtEncoderParameters.from(b.build())).getTokenValue();
     }
 
-    private String stepUp(String access) throws Exception { return stepUp(access, "step_up", 300, null); }
+    private String stepUpFor(String access, UUID proxy) throws Exception { return stepUp(access, "step_up", 300, null, proxy.toString(), true); }
 
     private ResponseEntity<Map> clinicRevoke(String token, UUID patient, UUID proxy, String stepUpToken, String reason) {
         return exchange("/v1/patients/" + patient + "/proxies/" + proxy + "/revoke", HttpMethod.POST,
@@ -157,19 +164,19 @@ class S20QaIdc013ProxyChangeApiTest extends ApiTestBase {
 
         // another staff member's step-up (sub mismatch)
         SeededStaff other = seedStaff(c.t(), c.reception().roleId(), "o" + c.t().slug() + "@a.com", phone(), false);
-        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "step_up", 300, other.id().toString()), "x").getStatusCode()).as("sub mismatch").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "step_up", 300, other.id().toString(), c.proxy().toString(), true), "x").getStatusCode()).as("sub mismatch").isEqualTo(HttpStatus.FORBIDDEN);
         // the same staff member's step-up from another session (sid mismatch)
         String rec2 = loginAndGetAccessToken(c.reception());
-        ResponseEntity<Map> sid = clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec2), "x");
+        ResponseEntity<Map> sid = clinicRevoke(rec, c.subject(), c.proxy(), stepUpFor(rec2, c.proxy()), "x");
         assertThat(sid.getStatusCode()).as("sid mismatch").isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(String.valueOf(sid.getBody())).contains("STEP_UP");
         // wrong purpose and expired
-        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "pin_step_up", 300, null), "x").getStatusCode()).as("wrong purpose").isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "step_up", -60, null), "x").getStatusCode()).as("expired").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "pin_step_up", 300, null, c.proxy().toString(), true), "x").getStatusCode()).as("wrong purpose").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "step_up", -60, null, c.proxy().toString(), true), "x").getStatusCode()).as("expired").isEqualTo(HttpStatus.FORBIDDEN);
         // patients:view only, with a perfectly good step-up
         SeededStaff viewer = seedStaff(c.t(), seedRole(c.t().id(), "Viewer", false, new ModuleGrant("patients", true, false, false, false, false, false, false)), "v" + c.t().slug() + "@a.com", phone(), false);
         String view = loginAndGetAccessToken(viewer);
-        assertThat(clinicRevoke(view, c.subject(), c.proxy(), stepUp(view), "x").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(clinicRevoke(view, c.subject(), c.proxy(), stepUpFor(view, c.proxy()), "x").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
         assertThat(row(c, c.proxy())).isEqualTo("active/FULL/-");
         assertThat(audits(c, c.proxy(), "patient.proxy_revoked")).isZero();
@@ -181,7 +188,12 @@ class S20QaIdc013ProxyChangeApiTest extends ApiTestBase {
         Clinic c = clinic();
         UUID second = secondProxy(c);
         String rec = loginAndGetAccessToken(c.reception());
-        String token = stepUp(rec);
+        // fix round (T20-BUG-2): no target, no jti, or a target naming the other proxy -> refused
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "step_up", 300, null, null, true), "x").getStatusCode()).as("no target").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec, "step_up", 300, null, c.proxy().toString(), false), "x").getStatusCode()).as("no jti").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUpFor(rec, second), "x").getStatusCode()).as("token for the other proxy").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(row(c, c.proxy())).isEqualTo("active/FULL/-");
+        String token = stepUpFor(rec, c.proxy());
         assertThat(clinicRevoke(rec, c.subject(), c.proxy(), token, "Patient asked at the desk").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(row(c, c.proxy())).isEqualTo("revoked/FULL/clinic");
         Map<String, Object> audit = inTenantTx(c.t().id(), () -> jdbc.queryForMap("SELECT actor_type, actor_id, after->>'reason' AS reason, after->>'revokedBy' AS by, before->>'scope' AS before_scope FROM audit_log WHERE action = 'patient.proxy_revoked' AND entity_id = ?", c.proxy()));
@@ -190,10 +202,20 @@ class S20QaIdc013ProxyChangeApiTest extends ApiTestBase {
         assertThat(access(c, "book").getBody()).containsEntry("code", "not-a-proxy");
         assertThat(events(c, "revoked")).isEqualTo(1);
 
-        // Boundary (S17-S19 lesson: an authorising token should be single-use and bound to the thing it authorises).
-        // The step-up token is a 5-minute JWT bound to the session only, so the same token revokes a second proxy. Recorded, see the QA report.
+        assertThat(inTenantTx(c.t().id(), () -> jdbc.queryForObject("SELECT after->>'stepUpId' IS NOT NULL FROM audit_log WHERE action = 'patient.proxy_revoked' AND entity_id = ?", Boolean.class, c.proxy()))).as("jti audited").isTrue();
+        // T20-BUG-2 retest: the consumed token is refused on the second proxy (wrong target) and on its own proxy again is idempotent 204
         ResponseEntity<Map> reuse = clinicRevoke(rec, c.subject(), second, token, "Second one");
-        assertThat(reuse.getStatusCode()).as("documented behaviour: step-up reused on another proxy").isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(reuse.getStatusCode()).as("step-up reused on another proxy").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(row(c, second)).isEqualTo("active/FULL/-");
+        // a forged token with the consumed jti but the second proxy as target: still refused (jti single-use)
+        Map<String, Object> claims = objectMapper.readValue(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]), Map.class);
+        Instant now = Instant.now();
+        JwtClaimsSet.Builder forged = JwtClaimsSet.builder().issuer("https://api.nabd.health").issuedAt(now).expiresAt(now.plusSeconds(300)).id((String) claims.get("jti"))
+                .subject((String) claims.get("sub")).claim("purpose", "step_up").claim("sid", claims.get("sid")).claim("tenantId", claims.get("tenantId")).claim("target", second.toString());
+        TokenType.STEP_UP.stamp(forged, Audience.STEP_UP);
+        assertThat(clinicRevoke(rec, c.subject(), second, encoder.encode(JwtEncoderParameters.from(forged.build())).getTokenValue(), "replay").getStatusCode()).as("consumed jti replayed with a new target").isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(row(c, second)).isEqualTo("active/FULL/-");
+        assertThat(clinicRevoke(rec, c.subject(), second, stepUpFor(rec, second), "Second one").getStatusCode()).as("a fresh token for the second proxy").isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(row(c, second)).isEqualTo("revoked/FULL/clinic");
     }
 
@@ -202,20 +224,22 @@ class S20QaIdc013ProxyChangeApiTest extends ApiTestBase {
         Clinic a = clinic();
         Clinic b = clinic();
         String rec = loginAndGetAccessToken(a.reception());
-        assertThat(clinicRevoke(rec, a.subject(), a.proxy(), stepUp(rec), " ").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(clinicRevoke(rec, a.subject(), a.proxy(), stepUp(rec), "r".repeat(201)).getStatusCode()).as("reason > 200").isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(clinicRevoke(rec, a.caregiver(), a.proxy(), stepUp(rec), "x").getStatusCode()).as("proxy not under that patient").isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(clinicRevoke(rec, a.subject(), UUID.randomUUID(), stepUp(rec), "x").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(clinicRevoke(rec, a.subject(), a.proxy(), stepUpFor(rec, a.proxy()), " ").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(clinicRevoke(rec, a.subject(), a.proxy(), stepUpFor(rec, a.proxy()), "r".repeat(201)).getStatusCode()).as("reason > 200").isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(clinicRevoke(rec, a.caregiver(), a.proxy(), stepUpFor(rec, a.proxy()), "x").getStatusCode()).as("proxy not under that patient").isEqualTo(HttpStatus.NOT_FOUND);
+        UUID ghost = UUID.randomUUID();
+        assertThat(clinicRevoke(rec, a.subject(), ghost, stepUpFor(rec, ghost), "x").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(clinicRevoke(rec, a.subject(), ghost, stepUpFor(rec, a.proxy()), "x").getStatusCode()).as("target mismatch is checked first").isEqualTo(HttpStatus.FORBIDDEN);
         // no Idempotency-Key on an @Idempotent endpoint
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);
         h.setBearerAuth(rec);
-        h.set("X-Step-Up-Token", stepUp(rec));
+        h.set("X-Step-Up-Token", stepUpFor(rec, a.proxy()));
         ResponseEntity<Map> noKey = exchange("/v1/patients/" + a.subject() + "/proxies/" + a.proxy() + "/revoke", HttpMethod.POST, new HttpEntity<>("{\"reason\":\"x\"}", h), Map.class);
         assertThat(noKey.getStatusCode().value()).as("no idempotency key: 4xx, never 5xx").isLessThan(500);
         // tenant B's reception with B's own step-up against A's patient/proxy
         String brec = loginAndGetAccessToken(b.reception());
-        assertThat(clinicRevoke(brec, a.subject(), a.proxy(), stepUp(brec), "x").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(clinicRevoke(brec, a.subject(), a.proxy(), stepUpFor(brec, a.proxy()), "x").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(row(a, a.proxy())).as("A untouched").matches("active/FULL/-|revoked/FULL/clinic");
         if (row(a, a.proxy()).startsWith("revoked")) {
             // only the key-less call could have done it: say so explicitly
@@ -229,7 +253,7 @@ class S20QaIdc013ProxyChangeApiTest extends ApiTestBase {
         Clinic c = clinic("pending", "FULL");
         inTenantTx(c.t().id(), () -> jdbc.update("INSERT INTO proxy_invites (token_hash, tenant_id, proxy_id, otp_hash, expires_at) VALUES (?,?,?, 'hash', now() + interval '10 minutes')", "a".repeat(64), c.t().id(), c.proxy()));
         String rec = loginAndGetAccessToken(c.reception());
-        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUp(rec), "Wrong number").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(clinicRevoke(rec, c.subject(), c.proxy(), stepUpFor(rec, c.proxy()), "Wrong number").getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(row(c, c.proxy())).isEqualTo("revoked/FULL/clinic");
         Map<String, Object> inv = inTenantTx(c.t().id(), () -> jdbc.queryForMap("SELECT used_at IS NOT NULL AS used, otp_hash FROM proxy_invites WHERE proxy_id = ?", c.proxy()));
         assertThat(inv).containsEntry("used", true).containsEntry("otp_hash", null);
