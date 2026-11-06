@@ -15913,6 +15913,104 @@ paths:
       tags:
       - reports
       x-required-permission: reports:view
+  /v1/reports/daily-summary/preview:
+    get:
+      operationId: DailySummaryController_preview
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DailySummaryPreviewResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - reports
+      x-required-permission: reports:view
+  /v1/reports/daily-summary/settings:
+    get:
+      operationId: DailySummaryController_settings
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DailySummarySettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - reports
+      x-required-permission: reports:view
+    put:
+      operationId: DailySummaryController_update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailySummarySettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DailySummarySettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - reports
+      x-required-permission: reports:view
   /v1/reports/desk-summary:
     get:
       operationId: DeskSummaryController_deskSummary
@@ -22701,6 +22799,72 @@ components:
         paymentCountToday:
           type: integer
           format: int32
+    DailySummaryCandidate:
+      type: object
+      properties:
+        hasPhone:
+          type: boolean
+        name:
+          type: string
+        staffId:
+          type: string
+          format: uuid
+    DailySummaryPreviewResponse:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        params:
+          type: array
+          items:
+            type: string
+        partial:
+          type: boolean
+    DailySummaryRecipient:
+      type: object
+      properties:
+        staffId:
+          type: string
+          format: uuid
+    DailySummarySettingsRequest:
+      type: object
+      properties:
+        combined:
+          type: boolean
+        enabled:
+          type: boolean
+        recipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailySummaryRecipient"
+          maxItems: 20
+          minItems: 0
+        sendAt:
+          type: string
+          pattern: "close|([01][0-9]|2[0-3]):[0-5][0-9]"
+      required:
+      - recipients
+    DailySummarySettingsResponse:
+      type: object
+      properties:
+        branches:
+          type: integer
+          format: int32
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailySummaryCandidate"
+        combined:
+          type: boolean
+        enabled:
+          type: boolean
+        recipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailySummaryRecipient"
+        sendAt:
+          type: string
     DataQualityItem:
       type: object
       properties:

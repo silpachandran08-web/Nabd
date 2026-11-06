@@ -13,6 +13,7 @@ import { api, ApiError, reasonText } from "../../lib/api";
 import { DpaReacceptBanner } from "../../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
 import EtaAccuracyTile from "./EtaAccuracyTile";
+import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
 
@@ -90,6 +91,8 @@ function OverviewInner() {
   const [forbidden, setForbidden] = useState(false);
   const [currency, setCurrency] = useState<string | null>(null);
   const [now, setNow] = useState(0);
+  const [dailySummary, setDailySummary] = useState(false);
+  const [canDailySummary, setCanDailySummary] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -113,6 +116,8 @@ function OverviewInner() {
         setSetupHidden(localStorage.getItem(hideKey(getIdentity()?.tenantName ?? "")) === "1");
         // The owner's workspace picker needs the pending owner token from the owner login.
         setCanSwitchClinic(isOwner() && !!sessionStorage.getItem("nabd_owner_pending_token"));
+        // ADM-043: the settings endpoints are reports:view and owner-only; the button is absent for anyone else.
+        setCanDailySummary(isOwner() && can("reports:view"));
       } catch { /* storage blocked: card simply stays visible */ }
       const region = getIdentity()?.tenantRegion;
       // shortcut: static region -> currency/locale pairs mirror the regions table; read GET /v1/regions once the client caches it
@@ -344,6 +349,16 @@ function OverviewInner() {
             </div>
             <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
           </Link>
+          {canDailySummary && (
+            <button type="button" className={styles.dsOpen} onClick={() => setDailySummary(true)}>
+              <div>
+                <div className={styles.quickTitle}>Daily WhatsApp summary</div>
+                <div className={styles.quickSub}>Visits, collections and no-shows at clinic close</div>
+              </div>
+              <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
+            </button>
+          )}
+          {dailySummary && <DailySummaryDialog onClose={() => setDailySummary(false)} />}
           {canSwitchClinic && (
             <Link className={styles.quickLink} href="/owner/workspaces">
               <div>

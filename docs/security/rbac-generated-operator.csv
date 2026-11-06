@@ -158,6 +158,8 @@ super_admin,GET /v1/reason-codes,billing:create|queue:view,deny-401
 super_admin,GET /v1/reports/billing-leakage,reports:view,deny-401
 super_admin,GET /v1/reports/booking-reasons,reports:view,deny-401
 super_admin,GET /v1/reports/daily-money,reports:view,deny-401
+super_admin,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+super_admin,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 super_admin,GET /v1/reports/desk-summary,queue:view,deny-401
 super_admin,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 super_admin,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -420,6 +422,7 @@ super_admin,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 super_admin,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,allow
 super_admin,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,allow
 super_admin,PUT /v1/queue-settings/facility,setup:edit,deny-401
+super_admin,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 super_admin,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 super_admin,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 super_admin,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401
@@ -586,6 +589,8 @@ implementation,GET /v1/reason-codes,billing:create|queue:view,deny-401
 implementation,GET /v1/reports/billing-leakage,reports:view,deny-401
 implementation,GET /v1/reports/booking-reasons,reports:view,deny-401
 implementation,GET /v1/reports/daily-money,reports:view,deny-401
+implementation,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+implementation,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 implementation,GET /v1/reports/desk-summary,queue:view,deny-401
 implementation,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 implementation,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -848,6 +853,7 @@ implementation,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 implementation,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 implementation,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 implementation,PUT /v1/queue-settings/facility,setup:edit,deny-401
+implementation,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 implementation,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 implementation,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 implementation,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401
@@ -1014,6 +1020,8 @@ support_engineer,GET /v1/reason-codes,billing:create|queue:view,deny-401
 support_engineer,GET /v1/reports/billing-leakage,reports:view,deny-401
 support_engineer,GET /v1/reports/booking-reasons,reports:view,deny-401
 support_engineer,GET /v1/reports/daily-money,reports:view,deny-401
+support_engineer,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+support_engineer,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 support_engineer,GET /v1/reports/desk-summary,queue:view,deny-401
 support_engineer,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 support_engineer,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -1276,6 +1284,7 @@ support_engineer,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 support_engineer,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 support_engineer,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 support_engineer,PUT /v1/queue-settings/facility,setup:edit,deny-401
+support_engineer,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 support_engineer,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 support_engineer,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 support_engineer,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401
@@ -1442,6 +1451,8 @@ billing,GET /v1/reason-codes,billing:create|queue:view,deny-401
 billing,GET /v1/reports/billing-leakage,reports:view,deny-401
 billing,GET /v1/reports/booking-reasons,reports:view,deny-401
 billing,GET /v1/reports/daily-money,reports:view,deny-401
+billing,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+billing,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 billing,GET /v1/reports/desk-summary,queue:view,deny-401
 billing,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 billing,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -1704,6 +1715,7 @@ billing,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 billing,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 billing,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 billing,PUT /v1/queue-settings/facility,setup:edit,deny-401
+billing,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 billing,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 billing,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 billing,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401
@@ -1870,6 +1882,8 @@ sre,GET /v1/reason-codes,billing:create|queue:view,deny-401
 sre,GET /v1/reports/billing-leakage,reports:view,deny-401
 sre,GET /v1/reports/booking-reasons,reports:view,deny-401
 sre,GET /v1/reports/daily-money,reports:view,deny-401
+sre,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+sre,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 sre,GET /v1/reports/desk-summary,queue:view,deny-401
 sre,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 sre,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -2132,6 +2146,7 @@ sre,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 sre,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 sre,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 sre,PUT /v1/queue-settings/facility,setup:edit,deny-401
+sre,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 sre,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 sre,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 sre,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401
@@ -2298,6 +2313,8 @@ commercial,GET /v1/reason-codes,billing:create|queue:view,deny-401
 commercial,GET /v1/reports/billing-leakage,reports:view,deny-401
 commercial,GET /v1/reports/booking-reasons,reports:view,deny-401
 commercial,GET /v1/reports/daily-money,reports:view,deny-401
+commercial,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+commercial,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 commercial,GET /v1/reports/desk-summary,queue:view,deny-401
 commercial,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 commercial,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -2560,6 +2577,7 @@ commercial,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 commercial,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 commercial,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 commercial,PUT /v1/queue-settings/facility,setup:edit,deny-401
+commercial,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 commercial,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 commercial,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 commercial,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401
@@ -2726,6 +2744,8 @@ compliance_dpo,GET /v1/reason-codes,billing:create|queue:view,deny-401
 compliance_dpo,GET /v1/reports/billing-leakage,reports:view,deny-401
 compliance_dpo,GET /v1/reports/booking-reasons,reports:view,deny-401
 compliance_dpo,GET /v1/reports/daily-money,reports:view,deny-401
+compliance_dpo,GET /v1/reports/daily-summary/preview,reports:view,deny-401
+compliance_dpo,GET /v1/reports/daily-summary/settings,reports:view,deny-401
 compliance_dpo,GET /v1/reports/desk-summary,queue:view,deny-401
 compliance_dpo,GET /v1/reports/doctor-punctuality,reports:view,deny-401
 compliance_dpo,GET /v1/reports/eta-accuracy,reports:view,deny-401
@@ -2988,6 +3008,7 @@ compliance_dpo,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-401
 compliance_dpo,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 compliance_dpo,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
 compliance_dpo,PUT /v1/queue-settings/facility,setup:edit,deny-401
+compliance_dpo,PUT /v1/reports/daily-summary/settings,reports:view,deny-401
 compliance_dpo,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 compliance_dpo,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 compliance_dpo,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-401

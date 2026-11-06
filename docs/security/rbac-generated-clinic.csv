@@ -158,6 +158,8 @@ owner,GET /v1/reason-codes,billing:create|queue:view,allow
 owner,GET /v1/reports/billing-leakage,reports:view,allow
 owner,GET /v1/reports/booking-reasons,reports:view,allow
 owner,GET /v1/reports/daily-money,reports:view,allow
+owner,GET /v1/reports/daily-summary/preview,reports:view,allow
+owner,GET /v1/reports/daily-summary/settings,reports:view,allow
 owner,GET /v1/reports/desk-summary,queue:view,allow
 owner,GET /v1/reports/doctor-punctuality,reports:view,allow
 owner,GET /v1/reports/eta-accuracy,reports:view,allow
@@ -420,6 +422,7 @@ owner,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,allow
 owner,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 owner,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 owner,PUT /v1/queue-settings/facility,setup:edit,allow
+owner,PUT /v1/reports/daily-summary/settings,reports:view,allow
 owner,PUT /v1/settings/integrations/abdm,setup:edit,allow
 owner,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
 owner,PUT /v1/setup/calendar/quiet-hours,setup:edit,allow
@@ -586,6 +589,8 @@ owner_doctor,GET /v1/reason-codes,billing:create|queue:view,allow
 owner_doctor,GET /v1/reports/billing-leakage,reports:view,allow
 owner_doctor,GET /v1/reports/booking-reasons,reports:view,allow
 owner_doctor,GET /v1/reports/daily-money,reports:view,allow
+owner_doctor,GET /v1/reports/daily-summary/preview,reports:view,allow
+owner_doctor,GET /v1/reports/daily-summary/settings,reports:view,allow
 owner_doctor,GET /v1/reports/desk-summary,queue:view,allow
 owner_doctor,GET /v1/reports/doctor-punctuality,reports:view,allow
 owner_doctor,GET /v1/reports/eta-accuracy,reports:view,allow
@@ -848,6 +853,7 @@ owner_doctor,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,allow
 owner_doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 owner_doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 owner_doctor,PUT /v1/queue-settings/facility,setup:edit,allow
+owner_doctor,PUT /v1/reports/daily-summary/settings,reports:view,allow
 owner_doctor,PUT /v1/settings/integrations/abdm,setup:edit,allow
 owner_doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
 owner_doctor,PUT /v1/setup/calendar/quiet-hours,setup:edit,allow
@@ -1014,6 +1020,8 @@ doctor,GET /v1/reason-codes,billing:create|queue:view,allow
 doctor,GET /v1/reports/billing-leakage,reports:view,allow
 doctor,GET /v1/reports/booking-reasons,reports:view,allow
 doctor,GET /v1/reports/daily-money,reports:view,allow
+doctor,GET /v1/reports/daily-summary/preview,reports:view,allow
+doctor,GET /v1/reports/daily-summary/settings,reports:view,allow
 doctor,GET /v1/reports/desk-summary,queue:view,allow
 doctor,GET /v1/reports/doctor-punctuality,reports:view,allow
 doctor,GET /v1/reports/eta-accuracy,reports:view,allow
@@ -1276,6 +1284,7 @@ doctor,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 doctor,PUT /v1/queue-settings/facility,setup:edit,deny-403
+doctor,PUT /v1/reports/daily-summary/settings,reports:view,allow
 doctor,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 doctor,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
@@ -1442,6 +1451,8 @@ nurse,GET /v1/reason-codes,billing:create|queue:view,allow
 nurse,GET /v1/reports/billing-leakage,reports:view,deny-403
 nurse,GET /v1/reports/booking-reasons,reports:view,deny-403
 nurse,GET /v1/reports/daily-money,reports:view,deny-403
+nurse,GET /v1/reports/daily-summary/preview,reports:view,deny-403
+nurse,GET /v1/reports/daily-summary/settings,reports:view,deny-403
 nurse,GET /v1/reports/desk-summary,queue:view,allow
 nurse,GET /v1/reports/doctor-punctuality,reports:view,deny-403
 nurse,GET /v1/reports/eta-accuracy,reports:view,deny-403
@@ -1704,6 +1715,7 @@ nurse,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 nurse,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 nurse,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 nurse,PUT /v1/queue-settings/facility,setup:edit,deny-403
+nurse,PUT /v1/reports/daily-summary/settings,reports:view,deny-403
 nurse,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 nurse,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 nurse,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
@@ -1870,6 +1882,8 @@ receptionist,GET /v1/reason-codes,billing:create|queue:view,allow
 receptionist,GET /v1/reports/billing-leakage,reports:view,deny-403
 receptionist,GET /v1/reports/booking-reasons,reports:view,deny-403
 receptionist,GET /v1/reports/daily-money,reports:view,deny-403
+receptionist,GET /v1/reports/daily-summary/preview,reports:view,deny-403
+receptionist,GET /v1/reports/daily-summary/settings,reports:view,deny-403
 receptionist,GET /v1/reports/desk-summary,queue:view,allow
 receptionist,GET /v1/reports/doctor-punctuality,reports:view,deny-403
 receptionist,GET /v1/reports/eta-accuracy,reports:view,deny-403
@@ -2132,6 +2146,7 @@ receptionist,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 receptionist,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 receptionist,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 receptionist,PUT /v1/queue-settings/facility,setup:edit,deny-403
+receptionist,PUT /v1/reports/daily-summary/settings,reports:view,deny-403
 receptionist,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 receptionist,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 receptionist,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
@@ -2298,6 +2313,8 @@ frontdesk_vitals,GET /v1/reason-codes,billing:create|queue:view,allow
 frontdesk_vitals,GET /v1/reports/billing-leakage,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/booking-reasons,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/daily-money,reports:view,deny-403
+frontdesk_vitals,GET /v1/reports/daily-summary/preview,reports:view,deny-403
+frontdesk_vitals,GET /v1/reports/daily-summary/settings,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/desk-summary,queue:view,allow
 frontdesk_vitals,GET /v1/reports/doctor-punctuality,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/eta-accuracy,reports:view,deny-403
@@ -2560,6 +2577,7 @@ frontdesk_vitals,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 frontdesk_vitals,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 frontdesk_vitals,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 frontdesk_vitals,PUT /v1/queue-settings/facility,setup:edit,deny-403
+frontdesk_vitals,PUT /v1/reports/daily-summary/settings,reports:view,deny-403
 frontdesk_vitals,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403

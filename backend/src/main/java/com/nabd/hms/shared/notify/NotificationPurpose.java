@@ -35,7 +35,9 @@ public enum NotificationPurpose {
     /** ADM-032: licence expiry reminder to the holder and the owners (staff recipients, no patient consent); 4 params: holder, kind, expiry date, days left. */
     LICENCE_EXPIRING("licence_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** ADM-004: the owner is told how many trial days are left (one param: the number; no clinical content). */
-    TRIAL_EXPIRING("trial_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS);
+    TRIAL_EXPIRING("trial_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** ADM-043: the owner's end-of-day summary (staff recipient); 4 params: day, figures, attention items, overview link. Counts and amounts only. */
+    DAILY_SUMMARY("daily_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;
