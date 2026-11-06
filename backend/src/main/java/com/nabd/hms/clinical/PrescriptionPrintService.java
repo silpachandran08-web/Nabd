@@ -47,7 +47,13 @@ public class PrescriptionPrintService {
         // PHL-013: the signed QR payload the pharmacy scans; ids, times, the registration number and the signature only.
         String qr = RxQr.encode(new RxQr.Claims(tenantId, h.prescriptionId(), h.signedAt(), validity.validUntil(h.prescriptionId(), queueEntryId),
                 keys.activeKid(), reg), keys);
+        String svg;
+        try {
+            svg = Qr.svg(Qr.encode(qr));
+        } catch (IllegalArgumentException e) {
+            qr = svg = null; // shortcut: a registration number too long for the encoder's 213 bytes prints without a QR, widen Qr if it happens
+        }
         return new PrescriptionPrintHeaderResponse(h.prescriptionId(), h.signedAt(), h.clinicName(), h.clinicRegion(),
-                h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg, coding.genericFirst(), qr, Qr.svg(Qr.encode(qr)));
+                h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg, coding.genericFirst(), qr, svg);
     }
 }
