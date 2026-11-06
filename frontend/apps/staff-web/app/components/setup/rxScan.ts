@@ -5,7 +5,7 @@ import type { RxVerification } from "@nabd/api-client/generated";
 export type RxQrClaims = { tenantId: string; prescriptionId: string; signedAt: string; validUntil: string | null; kid: string; regNo: string | null };
 export type Jwks = { keys: (JsonWebKey & { kid?: string })[] };
 export type OfflineResult =
-  | { status: "invalid"; reason: "unreadable" | "signature" | "unknown-key" }
+  | { status: "invalid"; reason: "unreadable" | "signature" | "unknown-key" | "other-tenant" }
   | { status: "valid" | "expired"; claims: RxQrClaims };
 export type ScanStatus = RxVerification["status"] | OfflineResult["status"];
 
@@ -57,8 +57,9 @@ export function parseRxQr(raw: string): { claims: RxQrClaims; head: string; sig:
   }
 }
 
-/** Signature against the cached public keys and expiry against `now`, all in the browser (WebCrypto ES256). */
-export async function verifyOffline(raw: string, jwks: Jwks | null, now: Date = new Date(), subtle: SubtleCrypto = crypto.subtle): Promise<OfflineResult> {
+/** Signature against the cached public keys, the clinic against the session's tenant (the signing key is platform-wide, so a
+ * genuine signature alone does not make it ours) and expiry against `now`, all in the browser (WebCrypto ES256). */
+export async function verifyOffline(raw: string, jwks: Jwks | null, tenantId: string | null, now: Date = new Date(), subtle: SubtleCrypto = crypto.subtle): Promise<OfflineResult> {
   const p = parseRxQr(raw);
   if (!p) return { status: "invalid", reason: "unreadable" };
   const jwk = jwks?.keys.find((k) => k.kid === p.claims.kid);
@@ -71,6 +72,7 @@ export async function verifyOffline(raw: string, jwks: Jwks | null, now: Date = 
     ok = false;
   }
   if (!ok) return { status: "invalid", reason: "signature" };
+  if (!tenantId || p.claims.tenantId.toLowerCase() !== tenantId.toLowerCase()) return { status: "invalid", reason: "other-tenant" };
   const expired = p.claims.validUntil !== null && now.getTime() >= new Date(p.claims.validUntil).getTime();
   return { status: expired ? "expired" : "valid", claims: p.claims };
 }
