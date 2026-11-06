@@ -25,6 +25,13 @@ export function decodeAccessToken(token: string): AccessTokenClaims | null {
   return decodeJwtPayload<AccessTokenClaims>(token);
 }
 
+/** PHL-013: the signed-in clinic, so an offline Rx check can refuse another clinic's QR the way the server does. */
+export function getTenantId(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("nabd_access_token");
+  return (token && decodeAccessToken(token)?.tenantId) || null;
+}
+
 export function getPermissions(): string[] {
   if (typeof window === "undefined") return [];
   const token = localStorage.getItem("nabd_access_token");

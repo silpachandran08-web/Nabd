@@ -6,6 +6,7 @@ import type { RxVerification } from "@nabd/api-client/generated";
 import Dialog from "../ui/Dialog";
 import { api, ApiError, errorText } from "../../lib/api";
 import { usePermissions } from "../../lib/usePermissions";
+import { getTenantId } from "../../lib/session";
 import { cacheKeys, cachedKeys, headline, isOffline, tone, verifyOffline, type Jwks, type OfflineResult } from "./rxScan";
 import styles from "./rxScan.module.css";
 
@@ -81,7 +82,7 @@ export default function RxScanOverlay({ onClose }: { onClose: () => void }) {
       setResult({ kind: "server", v: await api.post<RxVerification>("/pharmacy/rx-verifications", { qrPayload }) });
     } catch (e) {
       if (e instanceof ApiError && e.status === 422) setResult({ kind: "offline", r: { status: "invalid", reason: "unreadable" } });
-      else if (isOffline(e)) setResult({ kind: "offline", r: await verifyOffline(qrPayload, cachedKeys()) });
+      else if (isOffline(e)) setResult({ kind: "offline", r: await verifyOffline(qrPayload, cachedKeys(), getTenantId()) });
       else setError(errorText(e, "Couldn't verify this prescription."));
     } finally {
       setBusy(false);
