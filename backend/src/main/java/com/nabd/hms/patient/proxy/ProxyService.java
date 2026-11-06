@@ -211,14 +211,18 @@ class ProxyService implements ProxyAccess {
         return new Access((String) p.get("relation"), scope, (String) p.get("status"));
     }
 
-    /** The clinic revokes on the patient's verified request: the controller has checked step-up; the reason goes to the audit row. Idempotent. */
-    public void clinicRevoke(UUID patientId, UUID proxyId, UUID staffId, String reason, String ip) {
+    /** The clinic revokes on the patient's verified request: the controller has checked that the step-up names this proxy; its jti is
+     * stored here (unique), so the same token cannot revoke anything else. The reason goes to the audit row. Idempotent. */
+    public void clinicRevoke(UUID patientId, UUID proxyId, UUID staffId, UUID stepUpId, String reason, String ip) {
         Map<String, Object> p = lockedProxy(patientId, proxyId);
         if ("revoked".equals(p.get("status"))) {
             return;
         }
+        if (jdbc.update("UPDATE patient_proxies SET revoke_step_up_id = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM patient_proxies WHERE revoke_step_up_id = ?)", stepUpId, proxyId, stepUpId) == 0) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "step-up-required", "Step-up verification required", "This confirmation was already used; confirm again.", Map.of("code", "STEP_UP_REQUIRED"));
+        }
         ActorDirectory.Actor actor = actors.findActor(tenantContext.current(), staffId).orElseThrow(ProxyService::notFound);
-        revoke(p, "clinic", "staff", staffId, actor.name(), actor.role(), ip, Map.of("reason", reason));
+        revoke(p, "clinic", "staff", staffId, actor.name(), actor.role(), ip, Map.of("reason", reason, "stepUpId", stepUpId.toString()));
     }
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)

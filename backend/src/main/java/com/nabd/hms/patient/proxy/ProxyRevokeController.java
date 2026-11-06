@@ -20,7 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** IDC-013: the clinic revokes a caregiver on the patient's verified request. Step-up (X-Step-Up-Token) like staff suspend; the reason is audited. */
+/** IDC-013: the clinic revokes a caregiver on the patient's verified request. The step-up (X-Step-Up-Token, asked for with
+ * target = the proxy id at /v1/auth/mfa/verify) names this proxy and is used once; the reason is audited. */
 @RestController
 class ProxyRevokeController {
 
@@ -43,7 +44,7 @@ class ProxyRevokeController {
     void revoke(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @PathVariable UUID proxyId, @Valid @RequestBody Request req, HttpServletRequest http,
                 @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
         UUID staff = UUID.fromString(jwt.getSubject());
-        stepUp.require(stepUpToken, staff);
-        service.clinicRevoke(id, proxyId, staff, req.reason(), RequestMeta.clientIp(http));
+        StepUpVerifier.StepUp su = stepUp.requireFor(stepUpToken, staff, proxyId.toString());
+        service.clinicRevoke(id, proxyId, staff, su.assertionId(), req.reason(), RequestMeta.clientIp(http));
     }
 }

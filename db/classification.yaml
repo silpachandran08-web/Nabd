@@ -1591,6 +1591,7 @@ schemas:
       revoked_by: operational
       evidence: pii
       notice_version: operational
+      revoke_step_up_id: operational
     proxy_invites:
       token_hash: pii
       tenant_id: operational
