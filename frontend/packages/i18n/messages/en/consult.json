@@ -457,6 +457,8 @@
     "pattern": "Pattern",
     "signedElectronicallyBy": "Signed electronically by",
     "signedAt": "Signed at",
+    "qrAlt": "Prescription verification QR code",
+    "qrCaption": "Scan at the pharmacy to verify",
     "nabdSafetyDictionary": "Nabd safety dictionary {safetyDictionaryVersion}",
     "thereIsNoPrescriptionFor": "There is no prescription for this visit.",
     "couldnTLoadThePrescription": "Couldn't load the prescription.",

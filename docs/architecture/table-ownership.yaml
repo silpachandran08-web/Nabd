@@ -51,7 +51,7 @@ modules:
     owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_proxies, patient_registry_summary, patients, privacy_notices, proxy_invites, registry_dirty, secure_link_opens, secure_links]
     reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
-    owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
+    owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
     reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
     owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, tenant_lifecycle_events, tenants]

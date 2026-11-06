@@ -100,6 +100,10 @@ class PharmacyWorklistRepository {
         return jdbc.query(SELECT + "WHERE e.id = ?", ENTRY, tenantId, id).stream().findFirst();
     }
 
+    Optional<EntryRow> findByPrescription(UUID tenantId, UUID prescriptionId) {
+        return jdbc.query(SELECT + "WHERE e.prescription_id = ?", ENTRY, tenantId, prescriptionId).stream().findFirst();
+    }
+
     /** The race-safe claim: one statement, so of two concurrent claims exactly one changes the row. */
     boolean claim(UUID tenantId, UUID id, UUID staffId) {
         return jdbc.update("UPDATE pharmacy_worklist_entries SET status = 'in_progress', claimed_by = ?, claimed_at = now(), updated_at = now() " +

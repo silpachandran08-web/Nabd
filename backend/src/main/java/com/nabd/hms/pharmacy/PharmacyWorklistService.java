@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.clinical.api.RxValidity;
 import com.nabd.hms.clinical.api.SignedRxLines;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -37,7 +38,7 @@ import java.util.UUID;
  */
 @Service
 @Transactional
-public class PharmacyWorklistService {
+public class PharmacyWorklistService implements RxValidity {
 
     static final Set<String> STATUSES = Set.of("new", "in_progress", "partially_dispensed", "dispensed", "cancelled", "expired");
 
@@ -100,6 +101,22 @@ public class PharmacyWorklistService {
                         qtys.toArray(String[]::new), validUntil)
                 .ifPresent(id -> events.publish(t, DomainEventType.PHARMACY_WORKLIST_ENTRY_CREATED, id,
                         Map.of("entryId", id, "prescriptionId", prescriptionId)));
+    }
+
+    /** PHL-013: the entry's valid_until when the prescription has one, else the same schedule-class rule applied to its lines now
+     * (the entry is created asynchronously; a printout right after signing must carry the same date). */
+    @Override
+    public Instant validUntil(UUID prescriptionId, UUID queueEntryId) {
+        UUID t = tenant.current();
+        PharmacyWorklistRepository.EntryRow entry = repo.findByPrescription(t, prescriptionId).orElse(null);
+        if (entry != null) {
+            return entry.validUntil();
+        }
+        SignedRxLines.Signed signed = rx.signed(queueEntryId).filter(s -> s.prescriptionId().equals(prescriptionId)).orElse(null);
+        List<SignedRxLines.Line> lines = signed == null ? List.of() : rx.forVisit(queueEntryId);
+        UUID[] ids = lines.isEmpty() ? new UUID[0] : items(t, lines).stream().map(PharmacyWorklistRepository.ItemRow::id).toArray(UUID[]::new);
+        Integer days = ids.length == 0 ? null : repo.validityDays(t, items.tenantMarket(t), ids);
+        return days == null ? null : signed.signedAt().plus(Duration.ofDays(days));
     }
 
     private List<PharmacyWorklistRepository.ItemRow> items(UUID t, List<SignedRxLines.Line> lines) {

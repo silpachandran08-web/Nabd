@@ -10,6 +10,7 @@ import Link from "next/link";
 import Dialog from "../ui/Dialog";
 import BatchAdjustDialog from "./BatchAdjustDialog";
 import WorklistBoard from "./WorklistBoard";
+import RxScanOverlay from "./RxScanOverlay";
 import { REASONS, type ReasonCode } from "../../lib/stockTake";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
@@ -152,6 +153,7 @@ export default function PharmacyPanel() {
   const [adjustBusy, setAdjustBusy] = useState(false);
   // PHL-010: a controlled item (a class with a register) changes only by batch, with a second sign-off
   const [batchAdjust, setBatchAdjust] = useState<PharmacyItem | null>(null);
+  const [scanning, setScanning] = useState(false); // PHL-013
   const closeBatchAdjust = useCallback(() => setBatchAdjust(null), [setBatchAdjust]);
   const [deactivating, setDeactivating] = useState<{ item: PharmacyItem; reason: string; error: string | null } | null>(null);
   const [deactivateBusy, setDeactivateBusy] = useState(false);
@@ -437,6 +439,10 @@ export default function PharmacyPanel() {
           )}
 
           {canWrite && <p>{mode === "hybrid" && <><Link href="/pharmacy/receipt" className={styles.btn}>Enter supplier bill</Link>{" "}</>}<Link href="/pharmacy/stock-take" className={styles.btn}>Stock take</Link></p>}
+          {can("pharmacy:dispense") && (
+            <p><button type="button" className={styles.btn} data-testid="scan-rx" onClick={() => setScanning(true)}><Icon name="qr" size={14} /> Scan prescription QR</button></p>
+          )}
+          {scanning && <RxScanOverlay onClose={() => setScanning(false)} />}
           {boardMode(mode) ? <WorklistBoard /> : <>
           <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
           <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. Open a row to dispense on that patient&apos;s billing screen.</p>

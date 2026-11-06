@@ -25,6 +25,7 @@ type PrintHeader = {
   prescriptionId: string; signedAt: string | null; clinicName: string; clinicRegion: string; clinicPhone: string | null;
   prescriberId: string | null; prescriberName: string | null; professionalRegistrationNo: string | null;
   genericFirst?: boolean; // CLN-021: print the generic (salt) first, the brand in brackets only if one was chosen
+  qrPayload?: string | null; qrSvg?: string | null; // PHL-013: the signed Rx QR the pharmacy scans (server-rendered SVG)
 };
 type RxFull = Prescription & { patientId: string };
 type AllergyView =
@@ -254,6 +255,12 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
               <div className={r.metaLabel}>{g("rx.safetyChecks")}</div>
               <div>{tx("nabdSafetyDictionary", { safetyDictionaryVersion: rx.safetyDictionaryVersion })}</div>
             </div>
+          )}
+          {header.qrSvg && (
+            <figure className={r.qr} data-testid="rx-qr">
+              <img className={r.qrImg} alt={tx("qrAlt")} src={`data:image/svg+xml;utf8,${encodeURIComponent(header.qrSvg)}`} />
+              <figcaption className={r.metaLabel}>{tx("qrCaption")}</figcaption>
+            </figure>
           )}
         </footer>
       </article>

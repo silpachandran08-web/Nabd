@@ -12515,6 +12515,76 @@ paths:
       tags:
       - pharmacy
       x-required-permission: billing:create
+  /v1/pharmacy/rx-verifications:
+    post:
+      operationId: RxVerificationController_verify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RxVerificationRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RxVerification"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:dispense
+  /v1/pharmacy/rx-verifications/keys:
+    get:
+      operationId: RxVerificationController_keys
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:dispense
   /v1/pharmacy/schedule-classes:
     get:
       operationId: PharmacyController_scheduleClasses
@@ -28037,6 +28107,10 @@ components:
           format: uuid
         professionalRegistrationNo:
           type: string
+        qrPayload:
+          type: string
+        qrSvg:
+          type: string
         signedAt:
           type: string
           format: date-time
@@ -29458,6 +29532,74 @@ components:
           type: string
         label:
           type: string
+    RxVerification:
+      type: object
+      properties:
+        dispensed:
+          $ref: "#/components/schemas/RxVerificationDispense"
+        prescriber:
+          $ref: "#/components/schemas/RxVerificationPrescriber"
+        prescriptionId:
+          type: string
+          format: uuid
+        queueEntryId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        remaining:
+          type: array
+          items:
+            $ref: "#/components/schemas/RxVerificationLine"
+        signedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        validUntil:
+          type: string
+          format: date-time
+        worklistEntryId:
+          type: string
+          format: uuid
+    RxVerificationDispense:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+        where:
+          type: string
+    RxVerificationLine:
+      type: object
+      properties:
+        drug:
+          type: string
+        prescriptionItemId:
+          type: string
+          format: uuid
+        qtyDispensed:
+          type: number
+        qtyPrescribed:
+          type: number
+        remaining:
+          type: number
+    RxVerificationPrescriber:
+      type: object
+      properties:
+        name:
+          type: string
+        regNo:
+          type: string
+    RxVerificationRequest:
+      type: object
+      properties:
+        qrPayload:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - qrPayload
     RxWarningDecision:
       type: object
       properties:

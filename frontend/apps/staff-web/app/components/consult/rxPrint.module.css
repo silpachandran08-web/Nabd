@@ -225,3 +225,7 @@
   .sheet { gap: var(--nb-space-8); font-size: 12px; }
   .letterhead { padding-block-end: var(--nb-space-8); }
 }
+
+/* PHL-013: the verification QR on the signed sheet */
+.qr { margin: 0; display: flex; flex-direction: column; align-items: center; gap: var(--nb-space-4); }
+.qrImg { inline-size: 96px; block-size: 96px; }
