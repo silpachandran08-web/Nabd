@@ -7,11 +7,11 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { can } from "../../../lib/permissions";
 import { FRESH_MS, loadPatients, visitIsWarm, visitRead, visitReadKey } from "../../../lib/doctorQueries";
-import { deleteDraft, readDraft, takeLostDrafts } from "../draftStore";
+import { deleteDraft, readDraft, takeLostDrafts, type NoteFields } from "../draftStore";
 import { BLANK_DRAFT, sameFields, toFields } from "../note/noteLogic";
 import type { useNoteEditor } from "../note/useNoteEditor";
-import { BLANK_RX_ITEM, padItems } from "../rx/rxLogic";
-import type { RxPad } from "../rx/useRxPad";
+import { BLANK_RX_ITEM, padItems, rxFingerprint } from "../rx/rxLogic";
+import type { RxDraftData, RxPad } from "../rx/useRxPad";
 import type { SignAuthority } from "../signAuthority";
 import type { Amendments } from "../amend/useAmendments";
 import type { AuthedFetch, PatientDetail, Prescription, Row } from "../shared";
@@ -70,7 +70,7 @@ export function useVisitLoad(a: LoadArgs) {
 
         // A local draft means the last save never reached the server (offline, crash, reload).
         // Not when the note failed to load: the draft is kept untouched for the next successful open.
-        const draft = n.ctl.loadState() === "ok" ? await readDraft(row.id) : null;
+        const draft = n.ctl.loadState() === "ok" ? await readDraft<NoteFields>(row.id) : null;
         if (stale()) return;
         if (takeLostDrafts() > 0) a.setNotice("An unsent local draft could not be recovered after the page reloaded. Re-check this note.");
         if (draft) {
@@ -78,16 +78,16 @@ export function useVisitLoad(a: LoadArgs) {
           if (server?.status === "signed") {
             // Same as the reconnect path: never applied to a signed note, but listed for an amendment.
             void deleteDraft(row.id);
-            if (!sameFields(draft.note, serverFields)) n.load.setOrphanText(draft.note);
-          } else if (sameFields(draft.note, serverFields)) {
+            if (!sameFields(draft.data, serverFields)) n.load.setOrphanText(draft.data);
+          } else if (sameFields(draft.data, serverFields)) {
             void deleteDraft(row.id);
           } else if ((server?.updatedAt ?? null) === draft.baseUpdatedAt) {
-            n.load.setNote(draft.note);
+            n.load.setNote(draft.data);
             n.load.setDirty(true);
             n.ctl.flagServerCheck();
             a.setNotice(`Restored an unsaved local draft from ${new Date(draft.savedAt).toLocaleString()}.`);
           } else {
-            n.load.setConflict({ mine: draft.note, server: serverFields, serverUpdatedAt: server?.updatedAt ?? null });
+            n.load.setConflict({ mine: draft.data, server: serverFields, serverUpdatedAt: server?.updatedAt ?? null });
             n.load.setConflictOpen(true);
             a.setNotice("The note changed on the server since your local draft. Choose what to keep.");
           }
@@ -95,11 +95,25 @@ export function useVisitLoad(a: LoadArgs) {
 
         const rRes = await visitRead<Prescription>(qc, "rx", row.id, FRESH_MS);
         if (stale()) return;
-        if (rRes.status === 200) {
-          pad.load.setRxItems(padItems(rRes.body!));
-          pad.load.setRxStatus(rRes.body!.status as "draft" | "signed");
-        } else {
-          pad.load.setRxItems([{ ...BLANK_RX_ITEM }]);
+        const serverRx = rRes.status === 200 ? padItems(rRes.body!) : [{ ...BLANK_RX_ITEM }];
+        const rxSigned = rRes.status === 200 && rRes.body!.status === "signed";
+        pad.load.setServer(serverRx);
+        if (rRes.status === 200) pad.load.setRxStatus(rRes.body!.status as "draft" | "signed");
+        // FEF-035: an Rx draft left by a crash/reload or an offline spell, same rules as the note above.
+        const rxDraft = rRes.status === 200 || rRes.status === 404 ? await readDraft<RxDraftData>(row.id, "rx") : null;
+        if (stale()) return;
+        if (takeLostDrafts() > 0) a.setNotice("An unsent local draft could not be recovered after the page reloaded. Re-check this prescription.");
+        if (rxDraft) {
+          const serverFp = rxFingerprint(serverRx);
+          if (rxSigned || rxFingerprint(rxDraft.data.items) === serverFp) {
+            void deleteDraft(row.id, "rx");
+          } else if (rxDraft.data.base === serverFp) {
+            pad.load.restore(rxDraft.data.items);
+            a.setNotice(`Restored an unsaved local draft from ${new Date(rxDraft.savedAt).toLocaleString()}.`);
+          } else {
+            pad.load.setConflict({ mine: rxDraft.data.items, server: serverRx });
+            a.setNotice("The prescription changed on the server since your local draft. Choose what to keep.");
+          }
         }
         const sRes = await visitRead<SignAuthority>(qc, "sign-authority", row.id, FRESH_MS);
         if (stale()) return;

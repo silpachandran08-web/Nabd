@@ -7,6 +7,7 @@ import Icon from "../ui/Icon";
 import StatusPill, { type PillTone } from "../ui/StatusPill";
 import { ErrorState, Skeleton } from "../ui/StateViews";
 import type { Allergy, AllergyStatus, AuthedFetch, Problem } from "./shared";
+import { useSectionDraft } from "./useSectionDraft";
 import s from "./consultParts.module.css";
 
 type AllergyEvent = {
@@ -38,9 +39,13 @@ function changeSummary(e: AllergyEvent, tx: Tr): string {
  * source; fast add (category, then substance, then severity/reaction); corrections and removals that always
  * need a reason and keep the original in the history. "None recorded" (nobody asked) is shown apart from a
  * documented "no known allergies". Editing needs clinical:edit; without it the dialog is read-only. */
+const BLANK_ADD = { category: "", add: { substance: "", severity: "", reaction: "", source: "clinician" } };
+
 export default function AllergyRegister({
-  authedFetch, patientId, patientName, canEdit, onClose, onChanged,
-}: { authedFetch: AuthedFetch; patientId: string; patientName: string; canEdit: boolean; onClose: () => void; onChanged: () => void }) {
+  authedFetch, patientId, patientName, canEdit, draftKey, onClose, onChanged,
+}: { authedFetch: AuthedFetch; patientId: string; patientName: string; canEdit: boolean;
+  /** FEF-035: the fast-add form drafts under this key (the visit's queue entry, or the patient before a visit). */
+  draftKey: string; onClose: () => void; onChanged: () => void }) {
   const tx = useTranslations("consult.allergyRegister");
   const g = useTranslations("glossary");
   const [allergies, setAllergies] = useState<Allergy[] | null>(null);
@@ -48,8 +53,9 @@ export default function AllergyRegister({
   const [history, setHistory] = useState<AllergyEvent[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [tick, setTick] = useState(0);
-  const [category, setCategory] = useState<string>("");
-  const [add, setAdd] = useState({ substance: "", severity: "", reaction: "", source: "clinician" });
+  const [category, setCategory] = useState<string>(BLANK_ADD.category);
+  const [add, setAdd] = useState(BLANK_ADD.add);
+  const draft = useSectionDraft(draftKey, "allergy", { category, add }, (v) => { setCategory(v.category); setAdd(v.add); }, BLANK_ADD);
   const [fixing, setFixing] = useState<{ id: string; substance: string; category: string; severity: string; reaction: string; reason: string } | null>(null);
   const [removing, setRemoving] = useState<{ id: string; reason: string } | null>(null);
   // FEF-030: busy and error travel together (one state keeps this component at 10 hooks); the setters keep their old names.
@@ -111,7 +117,7 @@ export default function AllergyRegister({
       substance: add.substance.trim(), category: category || undefined, severity: add.severity,
       reaction: add.reaction.trim() || undefined, source: add.source,
     }, tx("couldnTRecordTheAllergy"));
-    if (ok) { setCategory(""); setAdd({ substance: "", severity: "", reaction: "", source: "clinician" }); }
+    if (ok) { setCategory(BLANK_ADD.category); setAdd(BLANK_ADD.add); }
   }
 
   async function saveFix() {
@@ -216,7 +222,7 @@ export default function AllergyRegister({
 
           {canEdit && (
             <section className={s.card} aria-label={tx("addAnAllergy")}>
-              <h3 className={s.cardTitle}>{tx("fastAdd")}</h3>
+              <h3 className={s.cardTitle}>{tx("fastAdd")}{" "}{draft.restored && <StatusPill tone="info" icon="clock" label={tx("restoredDraft")} />}</h3>
               <div className={s.stack}>
                 <div className={s.radioRow} role="group" aria-label={tx("category")}>
                   {CATEGORIES.map((c) => (

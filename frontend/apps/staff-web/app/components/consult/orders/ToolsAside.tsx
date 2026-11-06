@@ -25,7 +25,7 @@ export default function ToolsAside({ entry, patient, authedFetch, rxItems, rxSta
       <PanelBoundary panel="rxSummary"><RxSummary items={rxItems} status={rxStatus} onOpen={onOpenRx} /></PanelBoundary>
       <PanelBoundary panel="orders"><DoctorOrders authedFetch={authedFetch} queueEntryId={entry.id} /></PanelBoundary>
       <PanelBoundary panel="followUp">
-        <FollowUpPanel key={entry.id} authedFetch={authedFetch} doctorId={entry.doctorId} patientId={entry.patientId} onBooked={onFollowUp} canBook={can("queue:create")} />
+        <FollowUpPanel key={entry.id} authedFetch={authedFetch} entryId={entry.id} doctorId={entry.doctorId} patientId={entry.patientId} onBooked={onFollowUp} canBook={can("queue:create")} />
       </PanelBoundary>
       <section className={p.card} aria-label={t("package")}>
         <h3 className={p.cardTitle}>{t("package")}</h3>

@@ -80,7 +80,7 @@ export default function PreConsultDialog({
       </div>
     </Dialog>
       {showAllergies && p && (
-        <AllergyRegister authedFetch={authedFetch} patientId={p.id} patientName={p.name} canEdit={canEditAllergies}
+        <AllergyRegister authedFetch={authedFetch} patientId={p.id} patientName={p.name} canEdit={canEditAllergies} draftKey={p.id}
           onClose={() => setShowAllergies(false)} onChanged={reload} />
       )}
     </>

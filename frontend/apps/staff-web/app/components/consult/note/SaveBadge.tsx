@@ -2,11 +2,10 @@
 
 import type { useTranslations } from "next-intl";
 import StatusPill from "../../ui/StatusPill";
-import type { Conflict } from "./useNoteEditor";
 import type { SaveState } from "../visit/types";
 
 // FEF-030: the one-line save state shown in the patient strip and in the action bar.
-export function saveBadge(t: ReturnType<typeof useTranslations>, a: { conflict: Conflict | null; online: boolean; saveState: SaveState; dirty: boolean; lastSavedAt: Date | null }) {
+export function saveBadge(t: ReturnType<typeof useTranslations>, a: { conflict: boolean; online: boolean; saveState: SaveState; dirty: boolean; lastSavedAt: Date | null }) {
   if (a.conflict) return <StatusPill tone="warn" icon="alert" label={t("syncConflictReview")} />;
   if (!a.online || a.saveState === "offline") return <StatusPill tone="sync" icon="sync" label={t("offlineLocalDraft")} />;
   if (a.saveState === "saving") return <StatusPill tone="sync" icon="sync" label={t("saving")} />;

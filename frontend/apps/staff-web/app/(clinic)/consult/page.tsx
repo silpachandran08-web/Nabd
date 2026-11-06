@@ -13,6 +13,7 @@ import type { Row } from "../../components/consult/shared";
 import { useAuthedFetch } from "../../components/consult/visit/useAuthedFetch";
 import VisitWorkspace from "../../components/consult/visit/VisitWorkspace";
 import { isStep, type Step } from "../../components/consult/workflow/consultWorkflow";
+import { useUnsavedGuard } from "../../lib/formValidation";
 import { moveBody, moveErrorMessage } from "../../lib/queueMove";
 
 interface Active { row: Row; step: Step; nonce: number }
@@ -30,7 +31,8 @@ export default function ConsultPage() {
   // The URL mirrors the open visit, but only once a ?entry= deep link has been read; otherwise the
   // mirror effect would strip the params on mount, before the deep link is consumed.
   const [urlReady, setUrlReady] = useState(false);
-  const [dirty, setDirty] = useState(false); // the open visit's note holds unsaved text
+  const [dirty, setDirty] = useState(false); // the open visit holds unsaved text in any section (FEF-035)
+  useUnsavedGuard(dirty); // FEF-035: the browser asks before the tab is closed while anything is unsaved
   const deepLinkRef = useRef<{ entry: string; step: Step | null } | null>(null);
   const stepRef = useRef<Step>("reason");
 
