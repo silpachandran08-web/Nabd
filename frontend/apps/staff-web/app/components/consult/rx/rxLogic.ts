@@ -13,3 +13,8 @@ export function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
 export const padItems = (rx: Prescription): PrescriptionItem[] => (rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
 
 export const openWarningCount = (items: PrescriptionItem[]) => items.reduce((n, i) => n + (i.warnings ?? []).filter((w) => w.requiresDecision && !w.resolved).length, 0);
+
+/** FEF-035: the lines as the API would store them (blank lines and display-only fields dropped), for change and conflict detection. */
+export const rxFingerprint = (items: PrescriptionItem[]) => JSON.stringify(items.filter((i) => i.drugName.trim() !== "").map((i) => [
+  i.drugName, i.dosage ?? "", i.frequency ?? "", i.duration ?? "", i.instructions ?? "", i.brandName?.trim() || "", i.sigPattern || "", i.route || "", i.quantity ?? null, i.quantityUnit?.trim() || "", i.drugId || "",
+]));

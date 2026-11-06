@@ -52,7 +52,7 @@ export function useNoteEditor(authedFetch: AuthedFetch, entryId: string, setNoti
     if (localTimerRef.current) clearTimeout(localTimerRef.current);
     localTimerRef.current = setTimeout(() => {
       if (!dirtyRef.current) return;
-      void writeDraft({ entryId, note: noteRef.current, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+      void writeDraft({ entryId, data: noteRef.current, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
     }, LOCAL_DRAFT_MS);
   }
 
@@ -62,7 +62,7 @@ export function useNoteEditor(authedFetch: AuthedFetch, entryId: string, setNoti
     const sent = noteRef.current;
     if (!navigator.onLine) { // rule 3
       setSaveState("offline");
-      await writeDraft({ entryId, note: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+      await writeDraft({ entryId, data: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
       needsServerCheckRef.current = true;
       return null;
     }
@@ -112,13 +112,13 @@ export function useNoteEditor(authedFetch: AuthedFetch, entryId: string, setNoti
       } else { // rule 6
         setSaveState("error");
         needsServerCheckRef.current = true;
-        await writeDraft({ entryId, note: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+        await writeDraft({ entryId, data: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
       }
       return res;
     } catch {
       setSaveState(navigator.onLine ? "error" : "offline");
       needsServerCheckRef.current = true;
-      await writeDraft({ entryId, note: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+      await writeDraft({ entryId, data: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
       return null;
     }
   }

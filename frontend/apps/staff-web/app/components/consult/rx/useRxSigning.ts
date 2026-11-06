@@ -3,6 +3,7 @@
 // FEF-030: signing a prescription and recording a warning decision (override), moved out of consult/page.tsx.
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { deleteDraft } from "../draftStore";
 import type { AuthedFetch, Prescription, Problem, RxWarning } from "../shared";
 import type { RxPad } from "./useRxPad";
 
@@ -47,6 +48,7 @@ export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxP
         return;
       }
       pad.setRxStatus("signed");
+      void deleteDraft(entryId, "rx"); // FEF-035
       setShowSignConfirm(false);
       setNotice(t("signed"));
       reloadCtx();

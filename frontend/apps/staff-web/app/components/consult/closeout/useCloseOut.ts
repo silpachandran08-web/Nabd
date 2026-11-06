@@ -4,6 +4,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { moveBody } from "../../../lib/queueMove";
+import { deleteVisitDrafts } from "../draftStore";
 import type { AuthedFetch, Problem, Row } from "../shared";
 import type { useNoteEditor } from "../note/useNoteEditor";
 import type { Note } from "../visit/types";
@@ -35,6 +36,7 @@ export function useCloseOut(authedFetch: AuthedFetch, entry: Row, n: Editor, han
           return;
         }
         n.setNoteStatus("signed");
+        void deleteVisitDrafts(entry.id); // FEF-035: nothing of a signed visit stays on the device
         const signed: Partial<Note> | null = await signRes.json().catch(() => null);
         n.setSignedAt(typeof signed?.signedAt === "string" ? signed.signedAt : new Date().toISOString());
       }

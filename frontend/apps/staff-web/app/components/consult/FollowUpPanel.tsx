@@ -8,6 +8,7 @@ import StatusPill from "../ui/StatusPill";
 import { Skeleton } from "../ui/StateViews";
 import { upcomingFollowUp, type AppointmentLite } from "@nabd/domain";
 import type { AuthedFetch, Problem } from "./shared";
+import { useSectionDraft } from "./useSectionDraft";
 import s from "./consultParts.module.css";
 
 const INTERVALS: { id: string; label: string; days?: number; months?: number }[] = [
@@ -24,10 +25,12 @@ function addToDate(ymd: string, days: number, months: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+const BLANK_PICK = { interval: null as string | null, date: "", slot: "" };
+
 export default function FollowUpPanel({
-  authedFetch, doctorId, patientId, onBooked, canBook,
+  authedFetch, entryId, doctorId, patientId, onBooked, canBook,
 }: {
-  authedFetch: AuthedFetch; doctorId: string; patientId: string; onBooked: (label: string | null | undefined) => void;
+  authedFetch: AuthedFetch; entryId: string; doctorId: string; patientId: string; onBooked: (label: string | null | undefined) => void;
   /** queue:create — booking controls are absent without it; the existing follow-up still shows. */
   canBook: boolean;
 }) {
@@ -42,6 +45,8 @@ export default function FollowUpPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [booked, setBooked] = useState<string | null>(null);
   const [existing, setExisting] = useState<"loading" | "error" | "done">("loading");
+  // FEF-035: the pick in progress (interval, date, slot) survives a crash/reload until it is booked.
+  const draft = useSectionDraft(entryId, "followUp", { interval, date, slot }, (v) => { setIntervalId(v.interval); setDate(v.date); setSlot(v.slot); }, BLANK_PICK);
 
   const fmtSlot = (iso: string) => formatClinicTime(iso, tz);
   const fmtFull = (iso: string) => `${formatClinicDate(iso, { weekday: "short", day: "2-digit", month: "short" }, tz)} ${fmtSlot(iso)}`;
@@ -78,12 +83,13 @@ export default function FollowUpPanel({
       if (cancelled) return;
       setSlots(null);
       setSlotsError(false);
-      setSlot("");
       try {
         const res = await authedFetch(`/doctors/${doctorId}/availability?date=${date}`);
         if (cancelled) return;
-        if (!res?.ok) { setSlotsError(true); setSlots([]); return; }
-        setSlots(await res.json());
+        if (!res?.ok) { setSlotsError(true); setSlots([]); setSlot(""); return; }
+        const free: string[] = await res.json();
+        setSlots(free);
+        setSlot((cur) => (free.includes(cur) ? cur : "")); // a restored pick is kept only while that slot is still free
       } catch {
         if (!cancelled) { setSlotsError(true); setSlots([]); }
       }
@@ -135,6 +141,7 @@ export default function FollowUpPanel({
       {existing === "error" && <p className={s.muted}>{tx("couldnTCheckForAn")}</p>}
       {canBook && (<>
       {booked && <p className={s.muted}>{tx("bookAnotherOnlyIfA")}</p>}
+      {draft.restored && <StatusPill tone="info" icon="clock" label={tx("restoredDraft")} />}
       <div className={s.row} role="group" aria-label={tx("followUpInterval")}>
         {INTERVALS.map((i) => (
           <button key={i.id} type="button" className={`${s.chip} ${interval === i.id ? s.chipOn : ""}`} aria-pressed={interval === i.id} onClick={() => pick(i.id)}>

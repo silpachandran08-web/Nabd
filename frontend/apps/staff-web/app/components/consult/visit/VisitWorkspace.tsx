@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { nextPatient } from "@nabd/domain";
 import { can } from "../../../lib/permissions";
+import { combineSave, useAnySectionDirty } from "../draftStatus";
 import Icon from "../../ui/Icon";
 import AllergyRegister from "../AllergyRegister";
 import { useClinicalContext } from "../clinical";
@@ -25,8 +26,9 @@ import { AssessStep, ExamineStep, PlanField, ReasonStep } from "../note/NoteStep
 import { saveBadge } from "../note/SaveBadge";
 import { useNoteEditor } from "../note/useNoteEditor";
 import ToolsAside from "../orders/ToolsAside";
+import RxConflictDialog from "../rx/RxConflictDialog";
 import RxPanel from "../rx/RxPanel";
-import { useRxPad } from "../rx/useRxPad";
+import { useRxPad, type RxConflict } from "../rx/useRxPad";
 import { useRxSigning } from "../rx/useRxSigning";
 import TimelinePanel from "../timeline/TimelinePanel";
 import TransferDialog from "../transfer/TransferDialog";
@@ -61,6 +63,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
   // undefined = not known (still checking, or the lookup failed): never shown as "Not set" (T1-BUG-2).
   const [followUpLabel, setFollowUpLabel] = useState<string | null | undefined>(undefined);
   const [notice, setNotice] = useState<string | null>(null);
+  const [rxDismissed, setRxDismissed] = useState<RxConflict | null>(null); // "Decide later" hides that Rx conflict until "Review differences"
   const [shellError, setShellError] = useState<string | null>(null);
   const [wf, dispatch] = useReducer(workflowReducer, w.initialStep, initialWorkflow);
 
@@ -83,9 +86,15 @@ export default function VisitWorkspace(w: WorkspaceProps) {
     w.onStep(wf.step);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.id, wf.step]);
+  // FEF-035: one save state for every section: note and Rx (server-synced) plus the local-only forms (follow-up, orders, allergy).
+  const localDirty = useAnySectionDirty();
+  const save = combineSave([
+    { saveState: n.saveState, dirty: n.dirty, lastSavedAt: n.lastSavedAt, conflict: !!n.conflict },
+    { saveState: pad.rxSaveState, dirty: pad.rxDirty || localDirty, lastSavedAt: pad.rxSavedAt, conflict: !!pad.rxConflict },
+  ]);
   const reportDirty = useRef(w.onDirty);
   useEffect(() => { reportDirty.current = w.onDirty; });
-  useEffect(() => { reportDirty.current(n.dirty); }, [n.dirty]);
+  useEffect(() => { reportDirty.current(save.dirty); }, [save.dirty]);
 
   async function saveThen(failure: string): Promise<boolean> {
     if (n.ctl.dirtyNow()) {
@@ -139,7 +148,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
   const mayDecideRx = (entry.doctorId === selfId || can("clinical:approve")) && sa !== null && sa !== "error" && sa.canSign;
   // CLN-006: signing and amending are the visit doctor's (or a clinical:approve holder's); others see the note read-only.
   const mayAmendNote = canEditNote && mayDecideRx;
-  const badge = saveBadge(tb, { conflict: n.conflict, online: n.online, saveState: n.saveState, dirty: n.dirty, lastSavedAt: n.lastSavedAt });
+  const badge = saveBadge(tb, { ...save, online: n.online });
   const next = view.closedOut ? nextPatient(w.rows, entry.id, selfId, w.canStartRow) : null;
   const primaryLabel = closeOut.completing ? tx("working") : view.handoffPending ? tx("retryHandoff") : view.closedOut ? tx("sentToCheckout") : tx("signAndSend");
   const field = { note: n.note, disabled: fieldsDisabled, onChange: n.updateField };
@@ -147,8 +156,8 @@ export default function VisitWorkspace(w: WorkspaceProps) {
   return (
     <main className={`${styles.page} ${styles.pageWide}`}>
       <VisitStrip entry={entry} patient={patient} badge={badge} timer={{ show: entry.status === "in_consult" || locked, ended: locked }} onBack={() => void close()} />
-      <NoteBanners online={n.online} shellError={shellError} loadFailed={n.noteLoad === "error"} notice={notice} orphanText={n.orphanText} hasConflict={!!n.conflict}
-        onRetryLoad={w.onReload} onDismissNotice={() => setNotice(null)} onDismissOrphan={() => n.setOrphanText(null)} onReviewConflict={() => n.setConflictOpen(true)} />
+      <NoteBanners online={n.online} shellError={shellError} loadFailed={n.noteLoad === "error"} notice={notice} orphanText={n.orphanText} hasConflict={!!n.conflict || !!pad.rxConflict}
+        onRetryLoad={w.onReload} onDismissNotice={() => setNotice(null)} onDismissOrphan={() => n.setOrphanText(null)} onReviewConflict={() => { n.setConflictOpen(true); setRxDismissed(null); }} />
 
       <PanelBoundary panel="safety">
         <SafetyStrip patient={patient} ctx={ctx} onRetry={reloadCtx} onManageAllergies={can("clinical:view") ? () => dispatch({ type: "allergies", open: true }) : undefined} canEditPregnancy={can("clinical:edit")} authedFetch={authedFetch} />
@@ -199,9 +208,10 @@ export default function VisitWorkspace(w: WorkspaceProps) {
         onSaveDraft={() => void n.saveNote()} onTransfer={() => void transfer.openTransfer()} onCloseStep={() => dispatch({ type: "goto", step: "close" })} onComplete={() => void closeOut.completeConsultation()} />
 
       {n.conflict && n.conflictOpen && <ConflictDialog mine={n.conflict.mine} server={n.conflict.server} onResolve={n.resolveConflict} onClose={() => n.setConflictOpen(false)} />}
+      {pad.rxConflict && pad.rxConflict !== rxDismissed && <RxConflictDialog mine={pad.rxConflict.mine} server={pad.rxConflict.server} onResolve={pad.resolveRxConflict} onClose={() => setRxDismissed(pad.rxConflict)} />}
       <TransferDialog t={transfer} />
       {wf.showAllergies && patient && (
-        <AllergyRegister authedFetch={authedFetch} patientId={patient.id} patientName={patient.name} canEdit={can("clinical:edit")}
+        <AllergyRegister authedFetch={authedFetch} patientId={patient.id} patientName={patient.name} canEdit={can("clinical:edit")} draftKey={entry.id}
           onClose={() => dispatch({ type: "allergies", open: false })}
           onChanged={() => { reloadCtx(); void authedFetch(`/patients/${patient.id}`).then(async (r) => { if (r?.ok) setPatient(await r.json()); }); }} />
       )}

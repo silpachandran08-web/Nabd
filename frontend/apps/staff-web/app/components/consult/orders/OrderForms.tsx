@@ -10,7 +10,12 @@ import { Skeleton } from "../../ui/StateViews";
 import type { AdminOrder, ChargeHead, ProcOrder } from "../doctorOrders";
 import { ROUTES } from "../doctorOrders";
 import type { AuthedFetch, Problem } from "../shared";
+import { useSectionDraft } from "../useSectionDraft";
+import StatusPill from "../../ui/StatusPill";
 import s from "../consultParts.module.css";
+
+const BLANK_ADMIN = { drugName: "", dose: "", route: "", site: "" };
+const BLANK_PROC = { chargeCode: "", prepNotes: "", consentNote: "" };
 
 async function problemText(res: Response, fallback: string): Promise<string> {
   const p: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
@@ -22,10 +27,12 @@ export function AdminForm({ authedFetch, queueEntryId, onClose, onCreated }: {
 }) {
   const tx = useTranslations("consult.orderForms");
   const g = useTranslations("glossary");
-  const [f, setF] = useState({ drugName: "", dose: "", route: "", site: "" });
+  const [f, setF] = useState(BLANK_ADMIN);
+  const draft = useSectionDraft(queueEntryId, "orders.admin", f, setF, BLANK_ADMIN); // FEF-035
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ok = f.drugName.trim() && f.dose.trim();
+  const cancel = () => { draft.clear(); onClose(); };
 
   async function submit() {
     if (!ok) return;
@@ -36,6 +43,7 @@ export function AdminForm({ authedFetch, queueEntryId, onClose, onCreated }: {
       const res = await authedFetch("/nursing/administration-orders", { method: "POST", body: JSON.stringify(body) });
       if (!res) return;
       if (!res.ok) { setError(await problemText(res, tx("theOrderWasNotPlaced"))); return; }
+      draft.clear();
       onCreated((await res.json()) as AdminOrder);
     } catch {
       setError(tx("couldnTReachTheServer"));
@@ -45,8 +53,9 @@ export function AdminForm({ authedFetch, queueEntryId, onClose, onCreated }: {
   }
 
   return (
-    <Dialog title={tx("orderVaccineOrInjection")} onClose={onClose}>
+    <Dialog title={tx("orderVaccineOrInjection")} onClose={cancel}>
       <div className={s.stack}>
+        {draft.restored && <StatusPill tone="info" icon="clock" label={tx("restoredDraft")} />}
         <div className={s.field}>
           <label htmlFor="doDrug">{tx("itemAsYouWantIt")}</label>
           <input id="doDrug" className={s.input} value={f.drugName} onChange={(e) => setF({ ...f, drugName: e.target.value })} autoComplete="off" autoFocus />
@@ -72,7 +81,7 @@ export function AdminForm({ authedFetch, queueEntryId, onClose, onCreated }: {
         {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert"><Icon name="alert" size={16} /><span>{error}</span></div>}
       </div>
       <div className={s.dialogActions}>
-        <button type="button" className={s.btn} onClick={onClose}>{tx("cancel")}</button>
+        <button type="button" className={s.btn} onClick={cancel}>{tx("cancel")}</button>
         <button type="button" className={s.btnPrimary} onClick={submit} disabled={busy || !ok}>{busy ? tx("placing") : tx("placeOrder")}</button>
       </div>
     </Dialog>
@@ -86,9 +95,11 @@ export function ProcForm({ authedFetch, queueEntryId, onClose, onCreated }: {
   const maySetup = can("setup:view");
   const [charges, setCharges] = useState<ChargeHead[] | null>(maySetup ? null : []);
   const [chargesError, setChargesError] = useState(false);
-  const [f, setF] = useState({ chargeCode: "", prepNotes: "", consentNote: "" });
+  const [f, setF] = useState(BLANK_PROC);
+  const draft = useSectionDraft(queueEntryId, "orders.proc", f, setF, BLANK_PROC); // FEF-035
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cancel = () => { draft.clear(); onClose(); };
 
   useEffect(() => {
     if (!maySetup) return;
@@ -115,6 +126,7 @@ export function ProcForm({ authedFetch, queueEntryId, onClose, onCreated }: {
       const res = await authedFetch("/nursing/procedure-orders", { method: "POST", body: JSON.stringify(body) });
       if (!res) return;
       if (!res.ok) { setError(await problemText(res, tx("theOrderWasNotPlaced"))); return; }
+      draft.clear();
       onCreated((await res.json()) as ProcOrder);
     } catch {
       setError(tx("couldnTReachTheServer"));
@@ -125,8 +137,9 @@ export function ProcForm({ authedFetch, queueEntryId, onClose, onCreated }: {
 
   const picker = charges && charges.length > 0;
   return (
-    <Dialog title={tx("orderProcedure")} onClose={onClose}>
+    <Dialog title={tx("orderProcedure")} onClose={cancel}>
       <div className={s.stack}>
+        {draft.restored && <StatusPill tone="info" icon="clock" label={tx("restoredDraft")} />}
         <div className={s.field}>
           <label htmlFor="doCharge">{tx("procedureChargeCodeFromThe")}</label>
           {charges === null ? <Skeleton rows={1} label={tx("loadingProcedures")} /> : picker ? (
@@ -151,7 +164,7 @@ export function ProcForm({ authedFetch, queueEntryId, onClose, onCreated }: {
         {error && <div className={`${s.notice} ${s.noticeDanger}`} role="alert"><Icon name="alert" size={16} /><span>{error}</span></div>}
       </div>
       <div className={s.dialogActions}>
-        <button type="button" className={s.btn} onClick={onClose}>{tx("cancel")}</button>
+        <button type="button" className={s.btn} onClick={cancel}>{tx("cancel")}</button>
         <button type="button" className={s.btnPrimary} onClick={submit} disabled={busy || !f.chargeCode.trim()}>{busy ? tx("placing") : tx("placeOrder")}</button>
       </div>
     </Dialog>
