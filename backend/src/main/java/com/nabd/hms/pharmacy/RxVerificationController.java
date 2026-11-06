@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 import java.util.UUID;
 
-/** PHL-013: verify a scanned Rx QR. Idempotent (each call adds one audit row and changes nothing else). */
+/** PHL-013: verify a scanned Rx QR. Idempotent (each call adds one audit row and changes nothing else). Mode EXTERNAL: a forged
+ * or expired Rx must be refusable at any counter, and the keys are public material, so neither endpoint needs a pharmacy model. */
 @RestController
 @RequestMapping("/v1/pharmacy/rx-verifications")
 public class RxVerificationController {
@@ -27,6 +28,7 @@ public class RxVerificationController {
 
     /** 422 qr-unreadable when the text is not an Rx QR; otherwise 200 with status valid, expired, dispensed or invalid. */
     @PostMapping
+    @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
     @PreAuthorize("hasAuthority('pharmacy:dispense')")
     public RxVerificationDtos.Response verify(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RxVerificationDtos.Request req) {
         return service.verify(req.qrPayload(), UUID.fromString(jwt.getSubject()));
@@ -34,6 +36,7 @@ public class RxVerificationController {
 
     /** The Rx signing keys' public JWKS (ES256), which the browser caches to verify signature and expiry offline. */
     @GetMapping("/keys")
+    @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
     @PreAuthorize("hasAuthority('pharmacy:dispense')")
     public Map<String, Object> keys() {
         return service.publicKeys();

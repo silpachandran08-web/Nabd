@@ -2,6 +2,7 @@ package com.nabd.hms.auth;
 
 import com.nabd.hms.NabdHmsApplication;
 import com.nabd.hms.config.SigningKeyProvider;
+import com.nabd.hms.shared.rxsign.RxSigningKeys;
 import com.nabd.hms.support.ApiTestBase;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -44,6 +45,7 @@ class S11QaProdBootGuardsTest extends ApiTestBase {
                 "--app.jwt.keys-json=" + jwks,
                 "--app.jwt.owner.keys-json=" + otherJwks(), "--app.jwt.platform.keys-json=" + otherJwks(), // PLT-009: one key set per population
                 "--app.jwt.internal.jwks-json=" + new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen()))).toString(true),
+                "--app.rx.keys-json=" + new JWKSet(new ArrayList<JWK>(List.of(RxSigningKeys.ephemeral()))).toString(false), // PHL-013: the Rx QR signing key
                 "--app.auth.otp.phone-hmac-key=" + Base64.getEncoder().encodeToString(pepper),
                 // src/test/resources/application.properties sets enforce-privileged=false for every boot on the test classpath
                 "--app.auth.mfa.enforce-privileged=true",
