@@ -1469,6 +1469,14 @@ schemas:
       created_at: operational
       updated_at: operational
       change_seq: operational
+    rx_verifications:
+      id: operational
+      tenant_id: operational
+      prescription_id: operational
+      result: operational
+      reason: operational
+      scanned_by: operational
+      scanned_at: operational
     phi_read_batches:
       tenant_id: operational
       batch_id: operational

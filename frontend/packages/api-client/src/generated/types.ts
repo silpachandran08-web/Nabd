@@ -436,7 +436,7 @@ export type PrescribedItemResponse = { dosage?: string; drugName?: string; durat
 export type PrescriptionAllergySnapshotResponse = { allergies?: Array<Allergy>; documentedAt?: string; documentedBy?: string; documentedByName?: string; state?: string; };
 export type PrescriptionItemRequest = { brandName?: string; dosage?: string; drugId?: string; drugName: string; duration?: string; frequency?: string; instructions?: string; overrides?: Array<RxWarningDecision>; quantity?: number; quantityUnit?: string; route?: string; sigPattern?: string; };
 export type PrescriptionItemResponse = { allergyOverrideReason?: string; allergyWarning?: string; brandName?: string; coded?: boolean; controlledSubstanceWarning?: string; displayOrder?: number; dosage?: string; drugId?: string; drugName?: string; duration?: string; frequency?: string; genericName?: string; id?: string; instructions?: string; pregnancyWarning?: string; quantity?: number; quantityUnit?: string; route?: string; sigPattern?: string; warnings?: Array<RxWarningResponse>; };
-export type PrescriptionPrintHeaderResponse = { clinicName?: string; clinicPhone?: string; clinicRegion?: string; genericFirst?: boolean; prescriberId?: string; prescriberName?: string; prescriptionId?: string; professionalRegistrationNo?: string; signedAt?: string; };
+export type PrescriptionPrintHeaderResponse = { clinicName?: string; clinicPhone?: string; clinicRegion?: string; genericFirst?: boolean; prescriberId?: string; prescriberName?: string; prescriptionId?: string; professionalRegistrationNo?: string; qrPayload?: string; qrSvg?: string; signedAt?: string; };
 export type PrescriptionResponse = { allergySnapshot?: PrescriptionAllergySnapshotResponse; createdAt?: string; doctorId?: string; id?: string; items?: Array<PrescriptionItemResponse>; patientId?: string; queueEntryId?: string; safetyDictionaryVersion?: string; signedAt?: string; signedBy?: string; signedByRegistrationNo?: string; status?: string; unresolvedWarnings?: number; warnings?: Array<PrescriptionWarningResponse>; };
 export type PrescriptionUpsertRequest = { items: Array<PrescriptionItemRequest>; };
 export type PrescriptionWarningResponse = { itemIndex?: number; kind?: string; message?: string; severity?: string; };
@@ -521,6 +521,11 @@ export type RxDecisionView = { at?: string; by?: string; byName?: string; kind?:
 export type RxLineResponse = { dosage?: string; drugName?: string; patientId?: string; patientName?: string; prescriptionItemId?: string; quantity?: number; remainingQty?: number; signedAt?: string; };
 export type RxLineSearchRequest = { phone: string; };
 export type RxReasonOption = { code?: string; label?: string; };
+export type RxVerification = { dispensed?: RxVerificationDispense; prescriber?: RxVerificationPrescriber; prescriptionId?: string; queueEntryId?: string; reason?: string; remaining?: Array<RxVerificationLine>; signedAt?: string; status?: string; validUntil?: string; worklistEntryId?: string; };
+export type RxVerificationDispense = { at?: string; where?: string; };
+export type RxVerificationLine = { drug?: string; prescriptionItemId?: string; qtyDispensed?: number; qtyPrescribed?: number; remaining?: number; };
+export type RxVerificationPrescriber = { name?: string; regNo?: string; };
+export type RxVerificationRequest = { qrPayload: string; };
 export type RxWarningDecision = { kind: string; note?: string; reasonCode: string; };
 export type RxWarningResponse = { decision?: RxDecisionView; kind?: string; matched?: string; message?: string; reasonOptions?: Array<RxReasonOption>; requiresDecision?: boolean; resolved?: boolean; severity?: string; };
 export type SafetyDictionaryBundle = { classes?: Array<ClassDef>; controlled?: Array<Item>; exclusions?: Array<Item>; labels?: Record<string, Record<string, string>>; pregnancyRisk?: Array<Item>; stems?: Array<Item>; terms?: Array<Item>; };
@@ -984,6 +989,8 @@ export type Operations = {
   PharmacyReturnController_create: { method: "post"; path: "/v1/pharmacy/returns"; permission: "billing:edit"; pathParams: never; query: never; body: PharmacyReturnRequest; response: PharmacyReturnResponse };
   PharmacyReturnController_bill: { method: "get"; path: "/v1/pharmacy/returns/bill"; permission: "billing:edit"; pathParams: never; query: { invoiceId?: string; number?: string; }; body: never; response: ReturnableBill };
   RxLineController_search: { method: "post"; path: "/v1/pharmacy/rx-lines/search"; permission: "billing:create"; pathParams: never; query: never; body: RxLineSearchRequest; response: Array<RxLineResponse> };
+  RxVerificationController_verify: { method: "post"; path: "/v1/pharmacy/rx-verifications"; permission: "pharmacy:dispense"; pathParams: never; query: never; body: RxVerificationRequest; response: RxVerification };
+  RxVerificationController_keys: { method: "get"; path: "/v1/pharmacy/rx-verifications/keys"; permission: "pharmacy:dispense"; pathParams: never; query: never; body: never; response: Record<string, Record<string, unknown>> };
   PharmacyController_scheduleClasses: { method: "get"; path: "/v1/pharmacy/schedule-classes"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: Array<PharmacyScheduleClassResponse> };
   PharmacyController_settings: { method: "get"; path: "/v1/pharmacy/settings"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: PharmacySettingsResponse };
   PharmacyController_updateSettings: { method: "patch"; path: "/v1/pharmacy/settings"; permission: "pharmacy:edit"; pathParams: never; query: never; body: PharmacySettingsWriteRequest; response: PharmacySettingsResponse };
