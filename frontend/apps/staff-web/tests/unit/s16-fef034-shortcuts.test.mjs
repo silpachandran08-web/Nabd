@@ -10,8 +10,8 @@ const DOC = ["clinical:edit", "queue:view", "patients:view"];
 const ids = (rows) => rows.map((r) => r.id);
 
 test("registry scoping: global keys everywhere, N only on My Day for a doctor, Ctrl+S only on /consult", () => {
-  assert.deepEqual(ids(shortcutsFor("/billing", REC, "reception")), ["palette", "search", "walkin", "submit", "help"]);
-  assert.deepEqual(ids(shortcutsFor("/my-day", DOC, "doctor")), ["palette", "search", "next", "submit", "help"]);
+  assert.deepEqual(ids(shortcutsFor("/billing", REC, "reception")), ["palette", "search", "walkin", "submit", "help", "screenhelp"]);
+  assert.deepEqual(ids(shortcutsFor("/my-day", DOC, "doctor")), ["palette", "search", "next", "submit", "help", "screenhelp"]);
   assert.ok(ids(shortcutsFor("/consult", DOC, "doctor")).includes("save"));
   assert.ok(!ids(shortcutsFor("/my-day", DOC, "doctor")).includes("save"));
   assert.ok(!ids(shortcutsFor("/consult/x", ["queue:view"], "doctor")).includes("save"), "no clinical:edit, no save-note shortcut");
@@ -36,7 +36,8 @@ test("registry conflicts: no two shortcuts share a key combination in an overlap
 });
 
 test("single-key shortcuts are marked single (disabled while typing); chords are not", () => {
-  for (const s of SHORTCUTS) assert.equal(!!s.single, s.keys.length === 1, s.id);
+  // FEF-062: F1 is one key but not a character, so it works while typing (like the desk's F2/F3/F4).
+  for (const s of SHORTCUTS) assert.equal(!!s.single, s.keys.length === 1 && s.keys[0].length === 1, s.id);
   assert.equal(isTyping({ tagName: "INPUT" }), true);
   assert.equal(isTyping({ tagName: "TEXTAREA" }), true);
   assert.equal(isTyping({ tagName: "SELECT" }), true);

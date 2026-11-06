@@ -24,6 +24,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: "save", keys: ["Ctrl", "S"], aria: "Control+S Meta+S", label: "Save the note", scope: ["/consult"], needs: ["clinical:edit"] },
   { id: "submit", keys: ["Ctrl", "Enter"], aria: "Control+Enter Meta+Enter", label: "Submit the open dialog", scope: "all" },
   { id: "help", keys: ["?"], aria: "?", label: "Show this list", single: true, scope: "all" },
+  { id: "screenhelp", keys: ["F1"], aria: "F1", label: "Help for this screen", scope: "all" },
 ];
 
 const inScope = (s: Shortcut, path: string) => s.scope === "all" || s.scope.some((p) => path === p || path.startsWith(`${p}/`));

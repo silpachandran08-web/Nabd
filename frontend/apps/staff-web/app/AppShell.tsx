@@ -10,6 +10,8 @@ import RouteChrome from "./RouteChrome";
 import CommandPalette from "./shell/CommandPalette";
 import ShellHotkeys from "./shell/ShellHotkeys";
 import RouteGate from "./shell/RouteGate";
+import HelpPanel from "./shell/HelpPanel";
+import TourCard from "./shell/TourCard";
 import "./lib/bffShim"; // FEF-009: cookie-mode fetch routing, before any screen calls Core
 
 const COLLAPSE_KEY = "nabd_sidebar_collapsed";
@@ -47,6 +49,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <RouteChrome />
       <CommandPalette />
       <ShellHotkeys />
+      <HelpPanel />
+      {/* FEF-062: the tour lives above the route (survives navigation); it reads ?entry= to defer during a consult. */}
+      <Suspense fallback={null}>
+        <TourCard />
+      </Suspense>
       {/* ClinicNav reads useSearchParams (nursing's deep-linked sidebar items), which requires
           a Suspense boundary or every other page's static prerender breaks. */}
       <Suspense fallback={null}>
