@@ -566,6 +566,15 @@ schemas:
       note: financial
       actor_id: operational
       created_at: operational
+    daily_summary_settings:  # ADM-043: owner opt-in for the daily WhatsApp summary; recipients are staff ids
+      tenant_id: operational
+      enabled: operational
+      combined: operational
+      recipients: operational
+      send_at: operational
+      last_sent_day: operational
+      updated_by: operational
+      updated_at: operational
     dental_chart_entries:
       id: operational
       tenant_id: operational

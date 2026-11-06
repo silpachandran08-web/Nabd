@@ -353,3 +353,18 @@
   block-size: 40px;
   margin-block: var(--nb-space-8);
 }
+
+/* ADM-043: daily WhatsApp summary dialog */
+.dsSub { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-12); }
+.dsRow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--nb-space-8); min-height: 44px; font-size: 13px; color: var(--nb-text-primary); }
+.dsFieldset { border: 0; padding: 0; margin: 0 0 var(--nb-space-8); }
+.dsInput { height: 36px; padding: 0 var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font-family: inherit; font-size: 13px; }
+.dsPreview { composes: card; margin-block-start: var(--nb-space-12); }
+.dsLine { font-size: 13px; color: var(--nb-text-primary); padding-block: 4px; overflow-wrap: anywhere; }
+.dsError { background: var(--nb-danger-tint); color: var(--nb-danger-500); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); font-size: 13px; margin-block-start: var(--nb-space-12); }
+.dsOk { font-size: 13px; color: var(--nb-text-secondary); margin-block-start: var(--nb-space-12); }
+.dsActions { display: flex; justify-content: flex-end; gap: var(--nb-space-8); margin-block-start: var(--nb-space-16); }
+.dsBtn { min-height: 44px; padding: 0 var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.dsOpen { composes: quickLink; width: 100%; text-align: start; font-family: inherit; font-size: inherit; cursor: pointer; }
+.dsSave { composes: primaryLink; border: 0; font-family: inherit; cursor: pointer; min-height: 44px; }
+.dsSave:disabled { opacity: 0.5; cursor: default; }

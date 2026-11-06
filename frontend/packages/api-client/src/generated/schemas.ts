@@ -158,6 +158,11 @@ export const CreateRequestSchema = z.object({ body: z.record(z.string(), z.strin
 export const CreditNotesSchema = z.object({ count: z.number().int().optional(), tax: z.number().optional(), taxable: z.number().optional(), total: z.number().optional() });
 export const CurrentSchema = z.object({ account: AccountViewSchema.optional(), connected: z.boolean().optional() });
 export const DailyMoneyResponseSchema = z.object({ billedToday: z.number().optional(), collectedToday: z.number().optional(), invoiceCountToday: z.number().int().optional(), outstandingTotal: z.number().optional(), paymentCountToday: z.number().int().optional() });
+export const DailySummaryCandidateSchema = z.object({ hasPhone: z.boolean().optional(), name: z.string().optional(), staffId: z.string().optional() });
+export const DailySummaryPreviewResponseSchema = z.object({ date: z.string().optional(), params: z.array(z.string()).optional(), partial: z.boolean().optional() });
+export const DailySummaryRecipientSchema = z.object({ staffId: z.string().optional() });
+export const DailySummarySettingsRequestSchema = z.object({ combined: z.boolean().optional(), enabled: z.boolean().optional(), recipients: z.array(DailySummaryRecipientSchema), sendAt: z.string().optional() });
+export const DailySummarySettingsResponseSchema = z.object({ branches: z.number().int().optional(), candidates: z.array(DailySummaryCandidateSchema).optional(), combined: z.boolean().optional(), enabled: z.boolean().optional(), recipients: z.array(DailySummaryRecipientSchema).optional(), sendAt: z.string().optional() });
 export const DataQualityItemSchema = z.object({ displayName: z.string().optional(), patientId: z.string().optional(), rawPhone: z.string().optional() });
 export const DataQualityPageSchema = z.object({ items: z.array(DataQualityItemSchema).optional(), nextCursor: z.string().optional() });
 export const SessionCountSchema = z.object({ booked: z.number().int().optional(), free: z.number().int().optional(), label: z.string().optional() });
@@ -1075,6 +1080,9 @@ export const operationSchemas = {
   ReportsController_billingLeakage: { response: BillingLeakageResponseSchema },
   BookingReasonsReportController_report: { response: BookingReasonsResponseSchema },
   ReportsController_dailyMoney: { response: DailyMoneyResponseSchema },
+  DailySummaryController_preview: { response: DailySummaryPreviewResponseSchema },
+  DailySummaryController_settings: { response: DailySummarySettingsResponseSchema },
+  DailySummaryController_update: { body: DailySummarySettingsRequestSchema, response: DailySummarySettingsResponseSchema },
   DeskSummaryController_deskSummary: { response: DeskSummaryResponseSchema },
   ReportsController_doctorPunctuality: { response: DoctorPunctualityResponseSchema },
   EtaAccuracyController_get: { response: EtaAccuracyResponseSchema },
