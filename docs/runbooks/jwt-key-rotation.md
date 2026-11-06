@@ -12,6 +12,8 @@ Four token populations, each with its own issuer and keys, so a token of one can
 | platform (operators) | `https://api.nabd.health/platform` | `JWT_PLATFORM_KEYS_FILE` / `JWT_PLATFORM_KEYS_JSON` | `/.well-known/jwks/platform.json` |
 | internal (services) | `https://api.nabd.health/internal` | `JWT_INTERNAL_JWKS_FILE` / `JWT_INTERNAL_JWKS_JSON`: PUBLIC keys of the calling services (1 to 4), Core never mints these | not published |
 
+Related, not a token population: `RX_KEYS_FILE` / `RX_KEYS_JSON` (PHL-013) hold the EC P-256 keys that sign the prescription QR (1+ private keys with `kid`, first signs, all verify; public parts at `GET /v1/pharmacy/rx-verifications/keys`). Also required under prod; rotate by prepending a new key and keeping the old one for as long as printed prescriptions may still be presented.
+
 Each prefix has its own filter chain: `/v1/platform/**` accepts only platform access tokens, `/internal/v1/**` only internal service tokens (plus platform tokens for the few operator-driven endpoints that live there), `/v1/owners/**` none (owner endpoints read their own challenge token), `/v1/**` only staff access tokens. Under `prod` the app refuses to boot unless all four are configured. Rotate each population on its own using the steps below; the other three are not touched. The internal keys are rotated by the owner of the calling service: add the new public key to the JWKS, roll Core, then let the service switch.
 
 ## Configuration (every replica must see the same secret)

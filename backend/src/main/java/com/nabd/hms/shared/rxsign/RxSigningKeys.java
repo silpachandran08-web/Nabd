@@ -69,7 +69,8 @@ public class RxSigningKeys {
         return out;
     }
 
-    static ECKey ephemeral() {
+    /** One fresh P-256 key with a short kid (dev/test boots, and tests that assemble a prod config). */
+    public static ECKey ephemeral() {
         try {
             byte[] kid = new byte[4];
             new SecureRandom().nextBytes(kid);
