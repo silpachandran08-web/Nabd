@@ -215,8 +215,11 @@ class InternalSchedulingService {
             UUID patientId = patientRefs.patientIdFor(patientRef).orElseThrow(InternalSchedulingService::notOwner);
             AppointmentRow a = appointmentRepo.findById(tid, id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));
             if (!a.patientId().equals(patientId)) throw notOwner();
-            return Map.of("appointmentId", id, "doctorId", a.doctorId(), "startTime", a.startTime(), "status", a.status(),
-                    "zone", clock.zone(tid).getId(), "windowHours", windowHours(tid));
+            Map<String, Object> out = new java.util.LinkedHashMap<>(Map.of("appointmentId", id, "doctorId", a.doctorId(), "startTime", a.startTime(), "status", a.status(),
+                    "zone", clock.zone(tid).getId(), "windowHours", windowHours(tid)));
+            String bookedBy = appointmentRepo.actedByRelation(tid, id);
+            if (bookedBy != null) out.put("bookedByRelation", bookedBy); // IDC-013: "booked by your son", even after that caregiver was removed
+            return out;
         });
     }
 

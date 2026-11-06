@@ -42,6 +42,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/internal/v1/tenants/:tid/family/members`, () => HttpResponse.json({"memberRef":"string","proxyStatus":"string"}, { status: 201 })), // InternalFamilyController_add
     http.get(`${baseUrl}/internal/v1/tenants/:tid/family/members/:memberRef/access`, () => HttpResponse.json({"relation":"string","scope":"string","status":"string"}, { status: 200 })), // InternalFamilyController_access
     http.post(`${baseUrl}/internal/v1/tenants/:tid/family/members/:memberRef/resend`, () => HttpResponse.json({}, { status: 202 })), // InternalFamilyController_resend
+    http.get(`${baseUrl}/internal/v1/tenants/:tid/family/proxies`, () => HttpResponse.json({"proxies":[{"caregiverFirstName":"string","id":"00000000-0000-7000-8000-000000000000","relation":"string","scope":"string","status":"string"}]}, { status: 200 })), // InternalFamilyController_proxies
+    http.patch(`${baseUrl}/internal/v1/tenants/:tid/family/proxies/:id`, () => HttpResponse.json({"relation":"string","scope":"string","status":"string"}, { status: 200 })), // InternalFamilyController_change
     http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash`, () => HttpResponse.json({}, { status: 200 })), // InternalHouseholdController_household
     http.post(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/dependants`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // InternalDependantController_add
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // ChatRegistrationController_create
@@ -305,6 +307,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.delete(`${baseUrl}/v1/patients/:id/guardian`, () => new HttpResponse(null, { status: 200 })), // PatientController_revokeGuardian
     http.post(`${baseUrl}/v1/patients/:id/guardian/review`, () => HttpResponse.json({"activePackages":0,"allergies":["string"],"chronicConditions":["string"],"dob":"2026-01-01","gender":"string","guardianConsentGrantedAt":"2026-01-01T00:00:00Z","guardianId":"00000000-0000-7000-8000-000000000000","guardianName":"string","guardianReviewKeptAt":"2026-01-01T00:00:00Z","id":"00000000-0000-7000-8000-000000000000","isMinor":false,"lastVisit":"2026-01-01","lastVisitAt":"2026-01-01T00:00:00Z","mrn":"string","name":"string","outstandingBalance":0,"phone":"string","status":"string"}, { status: 200 })), // PatientController_keepGuardian
     http.post(`${baseUrl}/v1/patients/:id/merge`, () => HttpResponse.json({"activePackages":0,"allergies":["string"],"chronicConditions":["string"],"dob":"2026-01-01","gender":"string","guardianConsentGrantedAt":"2026-01-01T00:00:00Z","guardianId":"00000000-0000-7000-8000-000000000000","guardianName":"string","guardianReviewKeptAt":"2026-01-01T00:00:00Z","id":"00000000-0000-7000-8000-000000000000","isMinor":false,"lastVisit":"2026-01-01","lastVisitAt":"2026-01-01T00:00:00Z","mrn":"string","name":"string","outstandingBalance":0,"phone":"string","status":"string"}, { status: 200 })), // PatientController_merge
+    http.post(`${baseUrl}/v1/patients/:id/proxies/:proxyId/revoke`, () => new HttpResponse(null, { status: 204 })), // ProxyRevokeController_revoke
     http.get(`${baseUrl}/v1/patients/:patientId/messages`, () => HttpResponse.json({"items":[{"classId":"string","lang":"string","matchKind":"string","value":"string"}],"nextCursor":"string"}, { status: 200 })), // PatientMessagesController_messages
     http.get(`${baseUrl}/v1/patients/:patientId/privacy-notice`, () => HttpResponse.json({"acceptedVersion":"string","currentVersion":"string","language":"string","needsReAcknowledgement":false}, { status: 200 })), // NoticeController_status
     http.post(`${baseUrl}/v1/patients/:patientId/privacy-notice/acknowledge`, () => HttpResponse.json({"acceptedVersion":"string","currentVersion":"string","language":"string","needsReAcknowledgement":false}, { status: 200 })), // NoticeController_acknowledge
@@ -539,4 +542,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 525;
+export const operationCount = 528;

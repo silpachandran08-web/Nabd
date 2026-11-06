@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -91,6 +92,32 @@ class InternalFamilyController {
                                @RequestParam(defaultValue = "book") @Pattern(regexp = "book|records") String need) {
         allowed(tid);
         return tenantScope.run(tid, () -> service.access(caregiverRef, memberRef, "records".equals(need)));
+    }
+
+    @Schema(name = "FamilyProxyList")
+    record ProxyList(List<ProxyService.Granted> proxies) {
+    }
+
+    @Schema(name = "FamilyProxyChange")
+    record ChangeRequest(@NotBlank @Size(max = 64) String subjectRef, @Pattern(regexp = "BOOK_ONLY|BOOK_AND_RECORDS|FULL") String scope, Boolean revoke) {
+    }
+
+    /** IDC-013: who may act for this patient (the patient's own view on patient-web / WhatsApp "Family"). */
+    @GetMapping("/internal/v1/tenants/{tid}/family/proxies")
+    ProxyList proxies(@PathVariable UUID tid, @RequestParam @Size(max = 64) String subjectRef) {
+        allowed(tid);
+        return tenantScope.run(tid, () -> new ProxyList(service.granted(subjectRef)));
+    }
+
+    /** IDC-013: the patient downgrades (scope) or removes (revoke: true) a caregiver; effective on the next request. 404 for a proxy that is not theirs. */
+    @PatchMapping("/internal/v1/tenants/{tid}/family/proxies/{id}")
+    ProxyService.Access change(@PathVariable UUID tid, @PathVariable UUID id, @Valid @RequestBody ChangeRequest r) {
+        ServiceIdentity edge = allowed(tid);
+        boolean revoke = Boolean.TRUE.equals(r.revoke());
+        if (!revoke && r.scope() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "Send scope or revoke: true.");
+        }
+        return tenantScope.run(tid, () -> service.change(r.subjectRef(), id, r.scope(), revoke, edge.serviceId()));
     }
 
     private static ServiceIdentity allowed(UUID tid) {

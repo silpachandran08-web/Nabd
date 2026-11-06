@@ -47,7 +47,8 @@ public enum DomainEventType {
     PHARMACY_STOCK_TAKE_POSTED("pharmacy.stock_take.posted.v1", "core/pharmacy"),
     PHARMACY_WORKLIST_ENTRY_CREATED("pharmacy.worklist.entry_created.v1", "core/pharmacy"),
     PHARMACY_WORKLIST_STATUS_CHANGED("pharmacy.worklist.status_changed.v1", "core/pharmacy"),
-    PHARMACY_RETURN_ACCEPTED("pharmacy.return.accepted.v1", "core/pharmacy");
+    PHARMACY_RETURN_ACCEPTED("pharmacy.return.accepted.v1", "core/pharmacy"),
+    PATIENT_PROXY_CHANGED("patient.proxy.changed.v1", "core/patient");
 
     private final String type;
     private final String source;

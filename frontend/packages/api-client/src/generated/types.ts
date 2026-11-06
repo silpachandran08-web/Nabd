@@ -234,6 +234,8 @@ export type FamilyMemberAdd = { caregiverRef: string; dob: string; name: string;
 export type FamilyMemberAdded = { memberRef?: string; proxyStatus?: string; };
 export type FamilyMemberList = { members?: Array<Member>; };
 export type FamilyMemberResend = { caregiverRef: string; };
+export type FamilyProxyChange = { revoke?: boolean; scope?: string; subjectRef: string; };
+export type FamilyProxyList = { proxies?: Array<Granted>; };
 export type FavouriteRxSetItemResponse = { brandName?: string; codeSuggestion?: RxCodeSuggestion; dosage?: string; drugId?: string; drugName?: string; duration?: string; frequency?: string; genericName?: string; instructions?: string; quantity?: number; quantityUnit?: string; route?: string; sigPattern?: string; stale?: boolean; };
 export type FavouriteRxSetRequest = { items: Array<PrescriptionItemRequest>; name: string; scope?: string; };
 export type FavouriteRxSetResponse = { canEdit?: boolean; createdAt?: string; doctorId?: string; id?: string; items?: Array<FavouriteRxSetItemResponse>; lastUsedAt?: string; name?: string; ownerName?: string; scope?: string; shared?: boolean; staleCheckAvailable?: boolean; staleItemCount?: number; updatedAt?: string; };
@@ -265,6 +267,7 @@ export type GoodsReceiptLineRequest = { batchNo: string; expiryDate: string; fre
 export type GoodsReceiptRequest = { billDate: string; billNumber: string; lines: Array<GoodsReceiptLineRequest>; supplierId?: string; supplierName: string; };
 export type GoodsReceiptResponse = { batches?: Array<GoodsReceiptBatch>; billDate?: string; billNumber?: string; receiptId?: string; subtotal?: number; supplierName?: string; };
 export type GrantResponse = { active?: boolean; declineNote?: string; expiresAt?: string; grantedAt?: string; id?: string; minutes?: number; operatorId?: string; operatorName?: string; operatorRole?: string; reason?: string; revokedAt?: string; scope?: string; status?: string; tenantId?: string; ticketId?: string; windowEndsAt?: string; windowStartedAt?: string; };
+export type Granted = { caregiverFirstName?: string; id?: string; relation?: string; scope?: string; status?: string; };
 export type GuardianConsent = { channel?: string; confirmed?: boolean; };
 export type GuardianReviewDecisionRequest = { decision: string; };
 export type GuardianReviewResponse = { dob?: string; guardianId?: string; guardianName?: string; mrn?: string; patientId?: string; patientName?: string; };
@@ -460,6 +463,7 @@ export type ProvisioningJobResponse = { approvedAt?: string; createdTenantId?: s
 export type ProvisioningStepResponse = { completedAt?: string; errorDetail?: string; startedAt?: string; status?: string; stepName?: string; stepOrder?: number; };
 export type ProxyInviteAcceptRequest = { otp: string; scope: string; };
 export type ProxyInviteAccepted = { scope?: string; status?: string; };
+export type ProxyRevokeRequest = { reason: string; };
 export type Question = { answers?: Array<Answer>; id?: string; text?: string; };
 export type QueueBoard = { date?: string; doctors?: Array<QueueBoardDoctor>; v?: number; };
 export type QueueBoardDoctor = { delayMinutes?: number; doctorId?: string; entries?: Array<QueueBoardEntry>; name?: string; nowServing?: number; state?: string; };
@@ -698,6 +702,8 @@ export type Operations = {
   InternalFamilyController_add: { method: "post"; path: "/internal/v1/tenants/{tid}/family/members"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: FamilyMemberAdd; response: FamilyMemberAdded };
   InternalFamilyController_access: { method: "get"; path: "/internal/v1/tenants/{tid}/family/members/{memberRef}/access"; permission: "authenticated"; pathParams: { tid: string; memberRef: string; }; query: { caregiverRef: string; need?: string; }; body: never; response: Access };
   InternalFamilyController_resend: { method: "post"; path: "/internal/v1/tenants/{tid}/family/members/{memberRef}/resend"; permission: "authenticated"; pathParams: { tid: string; memberRef: string; }; query: never; body: FamilyMemberResend; response: Record<string, boolean> };
+  InternalFamilyController_proxies: { method: "get"; path: "/internal/v1/tenants/{tid}/family/proxies"; permission: "authenticated"; pathParams: { tid: string; }; query: { subjectRef: string; }; body: never; response: FamilyProxyList };
+  InternalFamilyController_change: { method: "patch"; path: "/internal/v1/tenants/{tid}/family/proxies/{id}"; permission: "authenticated"; pathParams: { tid: string; id: string; }; query: never; body: FamilyProxyChange; response: Access };
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
   InternalDependantController_add: { method: "post"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}/dependants"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: ChatDependantRequest; response: ChatDependantResponse };
   ChatRegistrationController_create: { method: "post"; path: "/internal/v1/tenants/{tid}/patients"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatPatientCreate; response: ChatPatientRef };
@@ -961,6 +967,7 @@ export type Operations = {
   PatientController_revokeGuardian: { method: "delete"; path: "/v1/patients/{id}/guardian"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   PatientController_keepGuardian: { method: "post"; path: "/v1/patients/{id}/guardian/review"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: GuardianReviewDecisionRequest; response: PatientDetailResponse };
   PatientController_merge: { method: "post"; path: "/v1/patients/{id}/merge"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: MergeRequest; response: PatientDetailResponse };
+  ProxyRevokeController_revoke: { method: "post"; path: "/v1/patients/{id}/proxies/{proxyId}/revoke"; permission: "patients:edit"; pathParams: { id: string; proxyId: string; }; query: never; body: ProxyRevokeRequest; response: void };
   PatientMessagesController_messages: { method: "get"; path: "/v1/patients/{patientId}/messages"; permission: "patients:view"; pathParams: { patientId: string; }; query: { cursor?: string; limit?: number; }; body: never; response: Page };
   NoticeController_status: { method: "get"; path: "/v1/patients/{patientId}/privacy-notice"; permission: "patients:view"; pathParams: { patientId: string; }; query: never; body: never; response: PrivacyNoticeStatus };
   NoticeController_acknowledge: { method: "post"; path: "/v1/patients/{patientId}/privacy-notice/acknowledge"; permission: "patients:edit"; pathParams: { patientId: string; }; query: never; body: never; response: PrivacyNoticeStatus };

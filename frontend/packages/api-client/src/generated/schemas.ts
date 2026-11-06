@@ -258,6 +258,9 @@ export const FamilyMemberAddedSchema = z.object({ memberRef: z.string().optional
 export const MemberSchema = z.object({ age: z.number().int().optional(), displayName: z.string().optional(), guardianId: z.string().optional(), lastVisitAt: z.string().optional(), patientId: z.string().optional(), relation: z.string().optional(), sex: z.string().optional() });
 export const FamilyMemberListSchema = z.object({ members: z.array(MemberSchema).optional() });
 export const FamilyMemberResendSchema = z.object({ caregiverRef: z.string().min(0).max(64) });
+export const FamilyProxyChangeSchema = z.object({ revoke: z.boolean().optional(), scope: z.string().optional(), subjectRef: z.string().min(0).max(64) });
+export const GrantedSchema = z.object({ caregiverFirstName: z.string().optional(), id: z.string().optional(), relation: z.string().optional(), scope: z.string().optional(), status: z.string().optional() });
+export const FamilyProxyListSchema = z.object({ proxies: z.array(GrantedSchema).optional() });
 export const RxCodeSuggestionSchema = z.object({ display: z.string().optional(), drugId: z.string().optional() });
 export const FavouriteRxSetItemResponseSchema = z.object({ brandName: z.string().optional(), codeSuggestion: RxCodeSuggestionSchema.optional(), dosage: z.string().optional(), drugId: z.string().optional(), drugName: z.string().optional(), duration: z.string().optional(), frequency: z.string().optional(), genericName: z.string().optional(), instructions: z.string().optional(), quantity: z.number().optional(), quantityUnit: z.string().optional(), route: z.string().optional(), sigPattern: z.string().optional(), stale: z.boolean().optional() });
 export const RxWarningDecisionSchema = z.object({ kind: z.string().min(1), note: z.string().min(0).max(500).optional(), reasonCode: z.string().min(1) });
@@ -488,6 +491,7 @@ export const ProvisioningStepResponseSchema = z.object({ completedAt: z.string()
 export const ProvisioningJobResponseSchema = z.object({ approvedAt: z.string().optional(), createdTenantId: z.string().optional(), id: z.string().optional(), ownerAccountInviteToken: z.string().optional(), ownerInviteToken: z.string().optional(), path: z.string().optional(), region: z.string().optional(), status: z.string().optional(), steps: z.array(ProvisioningStepResponseSchema).optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional() });
 export const ProxyInviteAcceptRequestSchema = z.object({ otp: z.string().min(1), scope: z.string().min(1) });
 export const ProxyInviteAcceptedSchema = z.object({ scope: z.string().optional(), status: z.string().optional() });
+export const ProxyRevokeRequestSchema = z.object({ reason: z.string().min(0).max(200) });
 export const QueueBoardEntrySchema = z.object({ allergyFlag: z.boolean().optional(), displayName: z.string().optional(), flags: z.array(z.string()).optional(), id: z.string().optional(), mrn: z.string().optional(), p50At: z.string().optional(), p80At: z.string().optional(), patientId: z.string().optional(), position: z.number().int().optional(), previousToken: z.number().int().optional(), priority: z.boolean().optional(), stage: z.string().optional(), token: z.number().int().optional(), vitalsRecorded: z.boolean().optional() });
 export const QueueBoardDoctorSchema = z.object({ delayMinutes: z.number().int().optional(), doctorId: z.string().optional(), entries: z.array(QueueBoardEntrySchema).optional(), name: z.string().optional(), nowServing: z.number().int().optional(), state: z.string().optional() });
 export const QueueBoardSchema = z.object({ date: z.string().optional(), doctors: z.array(QueueBoardDoctorSchema).optional(), v: z.number().int().optional() });
@@ -700,6 +704,8 @@ export const operationSchemas = {
   InternalFamilyController_add: { body: FamilyMemberAddSchema, response: FamilyMemberAddedSchema },
   InternalFamilyController_access: { response: AccessSchema },
   InternalFamilyController_resend: { body: FamilyMemberResendSchema, response: z.record(z.string(), z.boolean()) },
+  InternalFamilyController_proxies: { response: FamilyProxyListSchema },
+  InternalFamilyController_change: { body: FamilyProxyChangeSchema, response: AccessSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   InternalDependantController_add: { body: ChatDependantRequestSchema, response: ChatDependantResponseSchema },
   ChatRegistrationController_create: { body: ChatPatientCreateSchema, response: ChatPatientRefSchema },
@@ -963,6 +969,7 @@ export const operationSchemas = {
   PatientController_revokeGuardian: {  },
   PatientController_keepGuardian: { body: GuardianReviewDecisionRequestSchema, response: PatientDetailResponseSchema },
   PatientController_merge: { body: MergeRequestSchema, response: PatientDetailResponseSchema },
+  ProxyRevokeController_revoke: { body: ProxyRevokeRequestSchema },
   PatientMessagesController_messages: { response: PageSchema },
   NoticeController_status: { response: PrivacyNoticeStatusSchema },
   NoticeController_acknowledge: { response: PrivacyNoticeStatusSchema },
