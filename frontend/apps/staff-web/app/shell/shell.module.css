@@ -27,3 +27,14 @@
 .keyRow dt { font-weight: 600; white-space: nowrap; }
 .keyRow dd { margin: 0; color: var(--nb-text-secondary); text-align: end; }
 .keyList kbd, .resultSub kbd { padding-inline: var(--nb-space-8); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-sm, 4px); background: var(--nb-surface-2); font-size: 12px; }
+/* FEF-062: help panel body and the non-modal tour card (bottom inline-end; full width on phones). */
+.helpBody { display: flex; flex-direction: column; gap: var(--nb-space-12); font-size: 14px; color: var(--nb-text-primary); }
+.helpBody p { margin: 0; }
+.helpBody .empty { padding: 0; }
+.helpLink { min-height: 44px; display: inline-flex; align-items: center; color: var(--nb-text-primary); font-weight: 600; text-decoration: underline; }
+.tour { position: fixed; inset-block-end: var(--nb-space-16); inset-inline-end: var(--nb-space-16); z-index: var(--z-dropdown); width: 360px; max-width: calc(100vw - 32px); padding: var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-1, var(--nb-surface-2)); box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.tourStep { margin: 0; font-size: 12px; color: var(--nb-text-tertiary); }
+.tourTitle { margin: 0; font-size: 16px; font-weight: 600; color: var(--nb-text-primary); }
+.tourBody { margin: 0; font-size: 14px; color: var(--nb-text-secondary); }
+.tourActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--nb-space-8); }
+.tourPrimary { border: none; background: var(--nb-accent-gradient); color: var(--nb-on-accent); }
