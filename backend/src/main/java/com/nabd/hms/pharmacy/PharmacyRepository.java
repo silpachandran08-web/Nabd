@@ -71,7 +71,8 @@ class PharmacyRepository {
                     "COALESCE(p.schedule_class, 'OTC') AS schedule_class, " +
                     "(SELECT max(r.register_type) FROM pharmacy_schedule_rules r WHERE r.schedule_class = p.schedule_class) AS register_type, " +
                     "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house, " +
-                    "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp " +
+                    "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp, " +
+                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable " +
                     "FROM charge_catalogue c LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id ";
 
     /** @param scheduleClass optional PHL-002 filter (index on tenant_id, schedule_class) */
@@ -147,6 +148,12 @@ class PharmacyRepository {
                 itemId, tenantId, scheduleClass, genericName, packSize, unit, inHouse, genericName, packSize, unit, inHouse);
     }
 
+    /** PHL-011: null leaves the stored flag. */
+    void setReturnFlags(UUID tenantId, UUID itemId, Boolean coldChain, Boolean returnable) {
+        jdbc.update("UPDATE pharmacy_item_profiles SET cold_chain = COALESCE(?, cold_chain), returnable = COALESCE(?, returnable) WHERE tenant_id = ? AND item_id = ?",
+                coldChain, returnable, tenantId, itemId);
+    }
+
     List<RuleRow> rulesForMarket(String market) {
         return jdbc.query("SELECT schedule_class, label, requires_rx, register_type, duplicate_rx_copy, retention_years, " +
                         "refill_self_serve_allowed, drug_master_flag FROM pharmacy_schedule_rules WHERE market = ? ORDER BY schedule_class <> 'OTC', schedule_class",
@@ -160,6 +167,18 @@ class PharmacyRepository {
         return jdbc.queryForList("SELECT lower(btrim(c.name)) FROM charge_catalogue c JOIN pharmacy_item_profiles p " +
                 "ON p.item_id = c.id AND p.tenant_id = c.tenant_id WHERE c.tenant_id = ? AND c.active AND NOT p.in_house ORDER BY 1",
                 String.class, tenantId);
+    }
+
+    record ReturnFlags(boolean returnable, boolean coldChain, String classLabel, String register) {
+    }
+
+    /** PHL-011: the item's return flags and the label / register of its class ({@code classAsSold}, else the current one) in the tenant's market. */
+    Optional<ReturnFlags> returnFlags(UUID tenantId, UUID itemId, String classAsSold) {
+        return jdbc.query("SELECT p.returnable, p.cold_chain, COALESCE(r.label, ?, p.schedule_class) AS label, r.register_type FROM pharmacy_item_profiles p " +
+                        "LEFT JOIN pharmacy_schedule_rules r ON r.schedule_class = COALESCE(?, p.schedule_class) " +
+                        "AND r.market = (SELECT trim(t.region_code) FROM tenants t WHERE t.id = p.tenant_id) WHERE p.tenant_id = ? AND p.item_id = ?",
+                (rs, i) -> new ReturnFlags(rs.getBoolean("returnable"), rs.getBoolean("cold_chain"), rs.getString("label"), rs.getString("register_type")),
+                classAsSold, classAsSold, tenantId, itemId).stream().findFirst();
     }
 
     String tenantMarket(UUID tenantId) {
@@ -252,6 +271,7 @@ class PharmacyRepository {
                 rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"), rs.getString("drug_id"),
                 rs.getString("schedule_class"), rs.getString("register_type"), rs.getString("generic_name"),
                 (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"),
-                (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"));
+                (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"),
+                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"));
     }
 }

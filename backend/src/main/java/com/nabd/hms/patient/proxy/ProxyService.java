@@ -3,9 +3,12 @@ package com.nabd.hms.patient.proxy;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.ClinicClock;
+import com.nabd.hms.common.DomainEventType;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.organization.api.DataGatePort;
 import com.nabd.hms.patient.api.ConsentRegistry;
 import com.nabd.hms.patient.api.PatientRefs;
@@ -71,6 +74,10 @@ class ProxyService implements ProxyAccess {
     public record Accepted(Outcome outcome, String scope) {
     }
 
+    /** IDC-013: a proxy as the subject (the patient) sees it. */
+    public record Granted(UUID id, String caregiverFirstName, String relation, String scope, String status) {
+    }
+
     private final JdbcTemplate jdbc;
     private final TenantContext tenantContext;
     private final ClinicClock clock;
@@ -81,11 +88,15 @@ class ProxyService implements ProxyAccess {
     private final DataGatePort dataGate;
     private final String patientWebBase;
     private final ObjectMapper json;
+    private final EventPublisher events;
+    private final ActorDirectory actors;
 
     ProxyService(JdbcTemplate jdbc, TenantContext tenantContext, ClinicClock clock, PatientRefs refs, ConsentRegistry consents,
-                 NotificationPort notifications, AuditService audit, DataGatePort dataGate,
+                 NotificationPort notifications, AuditService audit, DataGatePort dataGate, EventPublisher events, ActorDirectory actors,
                  ObjectMapper json, @Value("${app.patient-web-base-url:http://localhost:3810}") String patientWebBase) {
         this.json = json;
+        this.events = events;
+        this.actors = actors;
         this.jdbc = jdbc;
         this.tenantContext = tenantContext;
         this.clock = clock;
@@ -165,6 +176,82 @@ class ProxyService implements ProxyAccess {
             requireRecords(caregiver, subject);
         }
         return new Access(a.relation(), a.scope(), a.status());
+    }
+
+    // ---- the subject side (IDC-013): the patient downgrades or removes a caregiver ----
+
+    /** The people who may act for this patient (pending or active), oldest first. */
+    public List<Granted> granted(String subjectRef) {
+        UUID subject = refs.patientIdFor(subjectRef).orElseThrow(ProxyService::notFound);
+        return jdbc.query("SELECT p.id, split_part(c.name, ' ', 1) AS first_name, p.relation, p.scope, p.status FROM patient_proxies p "
+                        + "JOIN patients c ON c.id = p.proxy_patient_id WHERE p.subject_patient_id = ? AND p.status <> 'revoked' ORDER BY p.invited_at",
+                (rs, i) -> new Granted(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4) == null ? "BOOK_ONLY" : rs.getString(4), rs.getString(5)), subject);
+    }
+
+    /** Scope change or revoke by the patient (patient session / Edge on the verified phone). Idempotent: a revoked proxy revoked again stays revoked. 404 for someone else's proxy. */
+    public Access change(String subjectRef, UUID proxyId, String scope, boolean revoke, String serviceId) {
+        UUID subject = refs.patientIdFor(subjectRef).orElseThrow(ProxyService::notFound);
+        Map<String, Object> p = lockedProxy(subject, proxyId);
+        if ("revoked".equals(p.get("status"))) {
+            if (revoke) {
+                return new Access((String) p.get("relation"), (String) p.get("scope"), "revoked");
+            }
+            throw notFound();
+        }
+        if (revoke) {
+            return revoke(p, "patient", "system", null, "patient", serviceId, null, Map.of());
+        }
+        if (!SCOPES.contains(scope)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "scope must be BOOK_ONLY, BOOK_AND_RECORDS or FULL.");
+        }
+        jdbc.update("UPDATE patient_proxies SET scope = ? WHERE id = ?", scope, proxyId);
+        audit.record(tenantContext.current(), "system", null, "patient", serviceId, null, "patient.proxy_scope_changed", "patient_proxy", proxyId,
+                Map.of("scope", String.valueOf(p.get("scope"))), Map.of("scope", scope));
+        publishChanged(p, scope, (String) p.get("status"));
+        return new Access((String) p.get("relation"), scope, (String) p.get("status"));
+    }
+
+    /** The clinic revokes on the patient's verified request: the controller has checked that the step-up names this proxy; its jti is
+     * stored here (unique), so the same token cannot revoke anything else. The reason goes to the audit row. Idempotent. */
+    public void clinicRevoke(UUID patientId, UUID proxyId, UUID staffId, UUID stepUpId, String reason, String ip) {
+        Map<String, Object> p = lockedProxy(patientId, proxyId);
+        if ("revoked".equals(p.get("status"))) {
+            return;
+        }
+        if (jdbc.update("UPDATE patient_proxies SET revoke_step_up_id = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM patient_proxies WHERE revoke_step_up_id = ?)", stepUpId, proxyId, stepUpId) == 0) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "step-up-required", "Step-up verification required", "This confirmation was already used; confirm again.", Map.of("code", "STEP_UP_REQUIRED"));
+        }
+        ActorDirectory.Actor actor = actors.findActor(tenantContext.current(), staffId).orElseThrow(ProxyService::notFound);
+        revoke(p, "clinic", "staff", staffId, actor.name(), actor.role(), ip, Map.of("reason", reason, "stepUpId", stepUpId.toString()));
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    Map<String, Object> lockedProxy(UUID subject, UUID proxyId) {
+        return jdbc.queryForList("SELECT id, proxy_patient_id, subject_patient_id, relation, scope, status FROM patient_proxies WHERE id = ? AND subject_patient_id = ? FOR UPDATE",
+                proxyId, subject).stream().findFirst().orElseThrow(ProxyService::notFound);
+    }
+
+    private Access revoke(Map<String, Object> p, String revokedBy, String actorType, UUID actorId, String actorName, String actorRole, String ip, Map<String, String> extra) {
+        UUID id = (UUID) p.get("id");
+        jdbc.update("UPDATE patient_proxies SET status = 'revoked', revoked_at = now(), revoked_by = ? WHERE id = ?", revokedBy, id);
+        jdbc.update("UPDATE proxy_invites SET used_at = now(), otp_hash = NULL WHERE proxy_id = ? AND used_at IS NULL", id);
+        Map<String, String> after = new java.util.LinkedHashMap<>(extra);
+        after.put("status", "revoked");
+        after.put("revokedBy", revokedBy);
+        audit.record(tenantContext.current(), actorType, actorId, actorName, actorRole, ip, "patient.proxy_revoked", "patient_proxy", id,
+                Map.of("status", String.valueOf(p.get("status")), "scope", String.valueOf(p.get("scope"))), after);
+        publishChanged(p, (String) p.get("scope"), "revoked");
+        return new Access((String) p.get("relation"), (String) p.get("scope"), "revoked");
+    }
+
+    /** patient.proxy.changed.v1: Comms drops the proxy from any dual-delivery list, the Edge and realtime refresh the caregiver's picker. Refs only. */
+    private void publishChanged(Map<String, Object> p, String scope, String status) {
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("proxyRef", refs.refFor((UUID) p.get("proxy_patient_id")));
+        data.put("subjectRef", refs.refFor((UUID) p.get("subject_patient_id")));
+        data.put("scope", scope == null ? "BOOK_ONLY" : scope);
+        data.put("status", status);
+        events.publish(tenantContext.current(), DomainEventType.PATIENT_PROXY_CHANGED, (UUID) p.get("id"), data);
     }
 
     @Override

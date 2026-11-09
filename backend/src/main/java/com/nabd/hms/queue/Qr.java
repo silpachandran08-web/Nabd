@@ -14,7 +14,7 @@ import java.util.List;
  * (up to 213 bytes: a wa.me link fits), mask 0 (any mask is valid; the penalty search only helps marginal scanners).
  * shortcut: no mask search and no versions above 10, upgrade if a longer payload is ever needed.
  */
-final class Qr {
+public final class Qr {
 
     private static final int[] ECC_PER_BLOCK = {10, 16, 26, 18, 24, 16, 18, 22, 22, 26}; // level M, versions 1..10
     private static final int[] BLOCKS = {1, 1, 1, 2, 2, 4, 4, 4, 5, 5};
@@ -23,7 +23,7 @@ final class Qr {
     private Qr() {
     }
 
-    static boolean[][] encode(String text) {
+    public static boolean[][] encode(String text) {
         byte[] data = text.getBytes(StandardCharsets.UTF_8);
         int ver = 1;
         while (ver <= 10 && dataCodewords(ver) * 8 < 4 + (ver < 10 ? 8 : 16) + data.length * 8) ver++;
@@ -206,6 +206,15 @@ final class Qr {
 
     private static boolean bit(int x, int i) {
         return ((x >>> i) & 1) != 0;
+    }
+
+    /** PHL-013: the modules as one SVG path (viewBox in modules, quiet zone included), for an inline <img> or <svg> in the browser. */
+    public static String svg(boolean[][] m) {
+        int n = m.length + 8;
+        StringBuilder d = new StringBuilder();
+        for (int y = 0; y < m.length; y++) for (int x = 0; x < m.length; x++) if (m[y][x]) d.append('M').append(x + 4).append(' ').append(y + 4).append("h1v1h-1z");
+        return "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + n + " " + n + "\" shape-rendering=\"crispEdges\">"
+                + "<rect width=\"" + n + "\" height=\"" + n + "\" fill=\"#fff\"/><path d=\"" + d + "\" fill=\"#000\"/></svg>";
     }
 
     /** A black-on-white PNG with the 4-module quiet zone. */

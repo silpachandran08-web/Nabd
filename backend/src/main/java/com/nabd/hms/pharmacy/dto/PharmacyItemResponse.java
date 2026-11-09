@@ -25,6 +25,9 @@ public record PharmacyItemResponse(
         /** PHL-021: null = the charge head decides. */
         Boolean priceInclusiveOfTax,
         boolean zeroRated,
-        BigDecimal mrp
+        BigDecimal mrp,
+        /** PHL-011: customer returns of a cold-chain or not-returnable item are refused. */
+        boolean coldChain,
+        boolean returnable
 ) {
 }

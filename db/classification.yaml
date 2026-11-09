@@ -566,6 +566,15 @@ schemas:
       note: financial
       actor_id: operational
       created_at: operational
+    daily_summary_settings:  # ADM-043: owner opt-in for the daily WhatsApp summary; recipients are staff ids
+      tenant_id: operational
+      enabled: operational
+      combined: operational
+      recipients: operational
+      send_at: operational
+      last_sent_day: operational
+      updated_by: operational
+      updated_at: operational
     dental_chart_entries:
       id: operational
       tenant_id: operational
@@ -855,6 +864,7 @@ schemas:
       tax_inclusive: financial
       inter_state: financial
       sac_hsn: financial
+      batch_id: operational
     invoice_line_taxes:
       id: operational
       tenant_id: operational
@@ -1411,6 +1421,8 @@ schemas:
       zero_rated: operational
       hsn_code: operational
       mrp: financial
+      returnable: operational
+      cold_chain: operational
     pharmacy_schedule_rules:
       market: operational
       schedule_class: operational
@@ -1421,6 +1433,7 @@ schemas:
       retention_years: operational
       refill_self_serve_allowed: operational
       drug_master_flag: operational
+      rx_validity_days: operational
     pharmacy_settings:
       tenant_id: operational
       mode: operational
@@ -1449,6 +1462,30 @@ schemas:
       invoice_id: operational
       actor_id: operational
       occurred_at: operational
+    pharmacy_worklist_entries:
+      id: operational
+      tenant_id: operational
+      prescription_id: operational
+      patient_id: pii
+      queue_entry_id: operational
+      doctor_id: operational
+      signed_at: operational
+      lines: operational
+      status: operational
+      claimed_by: operational
+      claimed_at: operational
+      valid_until: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
+    rx_verifications:
+      id: operational
+      tenant_id: operational
+      prescription_id: operational
+      result: operational
+      reason: operational
+      scanned_by: operational
+      scanned_at: operational
     phi_read_batches:
       tenant_id: operational
       batch_id: operational
@@ -1554,6 +1591,7 @@ schemas:
       revoked_by: operational
       evidence: pii
       notice_version: operational
+      revoke_step_up_id: operational
     proxy_invites:
       token_hash: pii
       tenant_id: operational

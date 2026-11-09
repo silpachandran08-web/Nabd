@@ -16,7 +16,7 @@ import java.util.UUID;
  * PHL-001 (hazard H-04): the counter and the visit checkout may bill a prescription-only item (charge_catalogue.is_rx,
  * set by the clinic) only against a signed prescription line of the same tenant and patient with quantity left.
  * Which items are prescription-only is the clinic's data, not decided here. A refusal is 422 Problem+JSON with a
- * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted) plus an audit row and event
+ * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted, PHL-012 rx-expired) plus an audit row and event
  * that survive the rolled-back checkout. The outside-prescription path (paper/photo Rx) is PHL-020.
  */
 @Service
@@ -36,8 +36,10 @@ public class RxGate {
     private final RxGateRepository repo;
     private final RxGateBlockRecorder recorder;
     private final com.nabd.hms.common.TenantContext tenantContext;
+    private final PharmacyWorklistRepository worklist;
 
-    RxGate(RxGateRepository repo, RxGateBlockRecorder recorder, com.nabd.hms.common.TenantContext tenantContext) {
+    RxGate(RxGateRepository repo, RxGateBlockRecorder recorder, com.nabd.hms.common.TenantContext tenantContext, PharmacyWorklistRepository worklist) {
+        this.worklist = worklist;
         this.repo = repo;
         this.recorder = recorder;
         this.tenantContext = tenantContext;
@@ -83,6 +85,13 @@ public class RxGate {
             else if (!owner.equals(row.patientId())) {
                 block(tenantId, staffId, ip, l, "rx-patient-mismatch", "Prescription is for another patient",
                         "The linked prescription line for " + l.chargeCode() + " belongs to a different patient.");
+            }
+        }
+        java.util.Set<UUID> lapsed = worklist.lapsedLines(tenantId, requested.keySet().toArray(UUID[]::new)); // PHL-012: In-house Rx validity
+        for (Line l : lines) {
+            if (l.prescriptionItemId() != null && lapsed.contains(l.prescriptionItemId())) {
+                block(tenantId, staffId, ip, l, "rx-expired", "Prescription expired",
+                        "The prescription for " + l.chargeCode() + " has passed its validity date and can no longer be dispensed.");
             }
         }
         for (Line l : lines) {

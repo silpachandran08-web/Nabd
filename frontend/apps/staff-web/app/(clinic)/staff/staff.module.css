@@ -410,3 +410,7 @@
 .tabs { display: flex; gap: var(--nb-space-8); margin-block-end: var(--nb-space-16); overflow-x: auto; }
 .tab { min-block-size: 44px; padding-inline: var(--nb-space-16); background: transparent; border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); color: var(--nb-text-secondary); font: inherit; cursor: pointer; white-space: nowrap; }
 .tabActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); border-color: var(--nb-accent-500); }
+
+/* FEF-032: were inline styles on the role builder. */
+.inputFull { width: 100%; }
+.formErrorSpaced { margin-block-start: var(--nb-space-12); }

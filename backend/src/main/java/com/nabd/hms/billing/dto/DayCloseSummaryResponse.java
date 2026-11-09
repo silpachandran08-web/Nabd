@@ -27,8 +27,13 @@ public record DayCloseSummaryResponse(
         Close close,                 // null until the day is closed at least once
         int voidedCount,             // OWN-019: invoices whose voided_at falls in this day (whenever they were raised)
         BigDecimal voidedTotal,      // sum of those invoices' total
-        List<Method> refunds         // FIN-013: money handed back today by method (positive amounts); methods[] and expected cash already net them
+        List<Method> refunds,        // FIN-013: money handed back today by method (positive amounts); methods[] and expected cash already net them
+        CreditNotes creditNotes      // PHL-011: credit notes issued today (refunds and pharmacy returns), tax reversed included
 ) {
+    /** Positive amounts in major units; tax is the output tax the day's credit notes reversed. */
+    public record CreditNotes(int count, BigDecimal taxable, BigDecimal tax, BigDecimal total) {
+    }
+
     public record Totals(BigDecimal billed, int bills, BigDecimal collected, int payments, BigDecimal tax) {
     }
 

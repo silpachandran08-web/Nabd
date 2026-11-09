@@ -71,7 +71,7 @@ public class AuthController {
         // an Authorization header was sent and validated -> this is an already-logged-in caller
         // re-proving MFA for a step-up token, not someone completing a fresh login challenge
         if (callerJwt != null) {
-            return authService.issueStepUpToken(callerJwt, req.code());
+            return authService.issueStepUpToken(callerJwt, req.code(), req.target());
         }
         return authService.verifyMfa(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
     }

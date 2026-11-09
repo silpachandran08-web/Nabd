@@ -133,6 +133,11 @@ app:
     otp:  # PLT-006 (OtpSendLimiter)
       tenant-hourly-cap: ${OTP_TENANT_HOURLY_CAP:200}   # default when the tenant's plan has no otp_hourly_cap
       phone-hmac-key: ${OTP_PHONE_HMAC_KEY:}            # base64 pepper from the secret manager; required under prod
+  rx:
+    # PHL-013: Rx QR signing keys, a JWKS of EC P-256 private keys with kids (first signs, all verify). Required under prod;
+    # elsewhere a fresh key per boot (printed QRs stop verifying after a restart).
+    keys-file: ${RX_KEYS_FILE:}
+    keys-json: ${RX_KEYS_JSON:}
   jwt:
     # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
     keys-file: ${JWT_KEYS_FILE:}

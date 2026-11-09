@@ -22,6 +22,8 @@ public final class GrantsFlattener {
             if (g.refundDiscount() && "billing".equals(g.module())) out.add("billing.discount");
             // PHL-010: approving on the pharmacy module also makes the holder a second signer of controlled-drug stock adjustments.
             if (g.approve() && "pharmacy".equals(g.module())) out.add("pharmacy:adjust_approve");
+            // PHL-012: editing the pharmacy (the pharmacist's grant) also lets the holder work the in-house dispensing worklist.
+            if (g.edit() && "pharmacy".equals(g.module())) out.add("pharmacy:dispense");
             if (g.export()) out.add(g.module() + ":export");
             if (g.breakGlass() && "clinical".equals(g.module())) out.add("clinical:breakGlass");
         }

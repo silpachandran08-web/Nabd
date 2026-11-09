@@ -9,8 +9,9 @@ import java.util.UUID;
  */
 public interface RxDispensing {
 
-    /** @param scheduleClass the item's class as sold (PHL-002); @param shortQty units the shelf could not cover (0 unless a shortfall reason was given) */
-    record Issued(String scheduleClass, int shortQty) {
+    /** @param scheduleClass the item's class as sold (PHL-002); @param shortQty units the shelf could not cover (0 unless a shortfall reason was given);
+     *  @param batchId the one batch the units came from (PHL-011), null when several or none */
+    record Issued(String scheduleClass, int shortQty, UUID batchId) {
     }
 
     /** One stocked line of a checkout, for the dispense record. */
@@ -26,6 +27,7 @@ public interface RxDispensing {
     /** Units of {@code itemId} that were billed on the invoice but never left the shelf (shortfall); a void must not put those back. */
     int shortfallOf(UUID invoiceId, UUID itemId);
 
-    /** Writes the dispenses row (source nabd_rx) and one stock_discrepancies row per shortfall line; no-op for an empty list. */
+    /** Writes the dispenses row (source nabd_rx) and one stock_discrepancies row per shortfall line; no-op for an empty list.
+     * PHL-012: also moves the worklist entries holding the prescription lines to partially_dispensed or dispensed. */
     void record(UUID invoiceId, UUID actorId, List<Line> lines);
 }

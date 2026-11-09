@@ -54,6 +54,7 @@ Run steps 1 and 2 in the Neon SQL editor (or `psql`) as the default owner login.
    every column. Rotation: add `2:<new key>` to the keyring, set `APP_CRYPTO_ACTIVE_KID=2`, run the job again; remove a kid
    (and finally APP_CRYPTO_KEY) only after a clean verify.
    OPS-012/PLT-005: set `OTP_PHONE_HMAC_KEY` (base64 pepper; hashes phone numbers in the OTP send counters; required under prod).
+   PHL-013: set `RX_KEYS_FILE` or `RX_KEYS_JSON` (a JWKS with 1+ EC P-256 private keys, each with a `kid`; signs the prescription QR; the first key signs, all verify; required under prod, generate once and keep it: printed QRs stop verifying without it).
    PLT-008: set `VALKEY_URL` (`rediss://...`, TLS required under prod) to turn on the shared API rate limits; unset = no limits, the API still serves (docs/architecture/valkey.md).
    `REAL_DATA_ONBOARDING`: unset means `blocked` under the prod profile, so tenant provisioning returns 409. Set it to `open`
    only after `docs/gates/phase0.md` records a passed gate (pending decision).

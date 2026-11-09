@@ -177,3 +177,11 @@
 
 /* LIVE-01: Retry after a sign-in timeout; 44px target. */
 .retryBtn { min-block-size: 44px; min-inline-size: 44px; margin-block: 0 var(--nb-space-12); }
+
+/* FEF-032: the "use a recovery code / use the authenticator" switch (was an inline style). */
+.altSubmit {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  margin-block-start: var(--nb-space-8);
+}

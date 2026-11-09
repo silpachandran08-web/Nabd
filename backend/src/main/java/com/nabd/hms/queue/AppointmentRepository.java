@@ -64,6 +64,11 @@ class AppointmentRepository {
                 tenantId);
     }
 
+    /** IDC-013: the relation of the caregiver who booked (null when the patient booked); survives a later revoke, so the patient is still told who booked. */
+    String actedByRelation(UUID tenantId, UUID id) {
+        return jdbc.queryForList("SELECT acted_by_relation FROM appointments WHERE tenant_id = ? AND id = ?", String.class, tenantId, id).stream().filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    }
+
     Optional<AppointmentRow> findById(UUID tenantId, UUID id) {
         return jdbc.query("SELECT " + COLUMNS + "FROM appointments WHERE tenant_id = ? AND id = ?",
                 mapper(), tenantId, id).stream().findFirst();

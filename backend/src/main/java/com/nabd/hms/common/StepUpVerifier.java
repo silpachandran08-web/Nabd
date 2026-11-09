@@ -23,6 +23,24 @@ public class StepUpVerifier {
         decode(stepUpToken, "step_up", expectedStaffId);
     }
 
+    /** IDC-013: a step-up token's one-time id (jti) and the object it names (claim "target", asked for at /v1/auth/mfa/verify). */
+    public record StepUp(UUID assertionId, String target) {
+    }
+
+    /** IDC-013: like {@link #require} but the token must name {@code target} and carry a jti, which the caller stores once
+     * (unique column) so a replay fails; the older gates (staff suspend, merge, ABDM) keep {@link #require}. */
+    public StepUp requireFor(String stepUpToken, UUID expectedStaffId, String target) {
+        Jwt t = decode(stepUpToken, "step_up", expectedStaffId);
+        if (t.getId() == null || target == null || !target.equals(t.getClaimAsString("target"))) {
+            throw stepUpError();
+        }
+        try {
+            return new StepUp(UUID.fromString(t.getId()), target);
+        } catch (IllegalArgumentException e) {
+            throw stepUpError();
+        }
+    }
+
     /** FIN-018: who the PIN assertion names, its one-time id (jti) and the approval it was asked for (null = any one approval). */
     public record PinAssertion(UUID ownerId, UUID assertionId, UUID approvalId) {
     }

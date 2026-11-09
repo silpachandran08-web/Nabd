@@ -1,0 +1,120 @@
+{
+  "menu": {
+    "help": "Help for this screen",
+    "replayTour": "Replay the tour"
+  },
+  "panel": {
+    "title": "Help: {screen}",
+    "shortcut": "Press F1 on any screen to open help for it.",
+    "video": "Watch the 2-minute video for this task",
+    "videoMissing": "The 2-minute video for this task is not available yet."
+  },
+  "tour": {
+    "label": "Guided tour",
+    "step": "Step {n} of {total}",
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip tour",
+    "done": "Finish"
+  },
+  "screens": {
+    "generic": {
+      "title": "This screen",
+      "p1": "Use the sidebar to move between screens. Your role decides which screens you see.",
+      "p2": "Press Ctrl+K to search screens and actions by name. Press ? to list the keyboard shortcuts on this screen.",
+      "p3": "The pill at the top right shows whether you are online. Wait for it to say Online or Live before you rely on a save."
+    },
+    "arrivals": {
+      "title": "Today / Arrivals",
+      "p1": "Walk-in: press W (or F2) or the Register walk-in button, search the patient by name or phone, then confirm. A new patient is created from the same dialog.",
+      "p2": "Check-in: find the patient in the Waiting tab or press F4, pick the doctor and the payment method, then check in. The patient joins the queue.",
+      "p3": "Tabs filter the board: Waiting, In consultation, Checkout pending and Completed. The counts update live as other desks work."
+    },
+    "schedule": {
+      "title": "Queue & Appointments",
+      "p1": "The board shows each doctor's queue and bookings for the day. Register walk-in is the primary action at the top.",
+      "p2": "Open a patient row to move them in the queue, reschedule or cancel. Changes made by other desks appear within seconds."
+    },
+    "patients": {
+      "title": "Patients",
+      "p1": "Search by name or phone. The / key focuses the search box from any screen.",
+      "p2": "Open a patient to see their details, visits and documents. Only what your role may see is shown."
+    },
+    "consult": {
+      "title": "Consultation Workspace",
+      "p1": "The open visit's note, prescriptions, orders and follow-up live in this workspace. Ctrl+S saves the note.",
+      "p2": "Drafts are kept in this browser until you sign or discard them. Close the visit from the action bar when you are done."
+    },
+    "myday": {
+      "title": "My Day",
+      "p1": "Your queue for today. Start your session so reception can send patients to you; pause it for a break.",
+      "p2": "Press N to call the next waiting patient. The consult workspace opens with their visit."
+    },
+    "nursing": {
+      "title": "Triage & Vitals",
+      "p1": "Capture vitals from the top-bar button or from a patient row. Mark a patient urgent from the row when they need the doctor first.",
+      "p2": "The tabs hold nursing orders, today's procedures, vaccines and injections, priority patients and completed activity."
+    },
+    "overview": {
+      "title": "Overview",
+      "p1": "Today's clinic at a glance: who is waiting, what was billed and what needs your attention.",
+      "p2": "Start day close from the top bar when the last patient has checked out. The sidebar sections group everything you can set up."
+    },
+    "billing": {
+      "title": "Checkout & Billing",
+      "p1": "Patients whose consult is finished wait in the checkout queue. Open one to review the charges and take payment.",
+      "p2": "Day close reconciles the day's collections. It needs the billing approval permission."
+    },
+    "pharmacy": {
+      "title": "Pharmacy",
+      "p1": "Prescriptions sent by doctors wait in the dispense queue; counter sales go through POS.",
+      "p2": "Stock, expiry and purchases are under their own tabs."
+    },
+    "requests": {
+      "title": "Booking requests",
+      "p1": "Requests that came in from WhatsApp or the booking page. Accept one to turn it into a booking or decline it with a reason."
+    },
+    "setup": {
+      "title": "Clinic Setup",
+      "p1": "Clinic details, hours, doctors, services and prices. Each tab saves on its own."
+    },
+    "staff": {
+      "title": "Staff & Access",
+      "p1": "Invite staff, assign roles and remove access. What a person can do comes from their role."
+    },
+    "reports": {
+      "title": "Reports",
+      "p1": "Daily and monthly figures for the clinic. Pick a date range and export when you need a file."
+    }
+  },
+  "tours": {
+    "reception": {
+      "s1": { "title": "Welcome to the front desk", "body": "This short tour shows the five things you do most on Today / Arrivals. You can skip it any time and replay it from the account menu." },
+      "s2": { "title": "Register a walk-in", "body": "Press W or the Register walk-in button at the top. Search the patient by name or phone; if they are new, create them in the same dialog." },
+      "s3": { "title": "Check a patient in", "body": "Find the patient in the Waiting tab (or press F4), pick the doctor and the payment method, then check in. They join the doctor's queue." },
+      "s4": { "title": "Follow the board", "body": "The tabs show who is waiting, in consultation, pending checkout or done. The counts update by themselves as the day moves." },
+      "s5": { "title": "Help is one key away", "body": "Press F1 on any screen for help about it, ? for the keyboard shortcuts and Ctrl+K to find any screen or action by name." }
+    },
+    "nurse": {
+      "s1": { "title": "Welcome to Triage & Vitals", "body": "This short tour shows how the nursing screens work. Skip any time; replay from the account menu." },
+      "s2": { "title": "Capture vitals", "body": "Use the Capture vitals button at the top or open a waiting patient's row. Saved vitals appear on the doctor's screen at once." },
+      "s3": { "title": "Flag an urgent patient", "body": "From a patient row, mark them urgent with a reason. The doctor's queue shows them first." },
+      "s4": { "title": "Orders, procedures, vaccines", "body": "The tabs hold today's nursing orders, procedures and vaccines; priority patients and completed activity have their own tabs." },
+      "s5": { "title": "Help is one key away", "body": "Press F1 on any screen for help about it, ? for the keyboard shortcuts and Ctrl+K to find any screen or action by name." }
+    },
+    "doctor": {
+      "s1": { "title": "Welcome to My Day", "body": "This short tour shows your day from the queue to the signed note. Skip any time; replay from the account menu." },
+      "s2": { "title": "Start your session", "body": "Start your session so reception can send patients to you. Pause it for a break and end it when you leave." },
+      "s3": { "title": "Call the next patient", "body": "Press N or the call-next button. The consult workspace opens with that patient's visit." },
+      "s4": { "title": "Write and sign", "body": "Note, prescription, orders and follow-up are in the consult workspace. Ctrl+S saves; signing closes the visit and sends the patient to checkout." },
+      "s5": { "title": "Help is one key away", "body": "Press F1 on any screen for help about it, ? for the keyboard shortcuts and Ctrl+K to find any screen or action by name." }
+    },
+    "owner": {
+      "s1": { "title": "Welcome to your clinic", "body": "This short tour shows where the owner's screens are. Skip any time; replay from the account menu." },
+      "s2": { "title": "Overview", "body": "Today's clinic at a glance: waiting patients, collections and what needs attention." },
+      "s3": { "title": "Run, People, Money", "body": "The sidebar groups your screens: run the clinic, people and access, money, growth and compliance." },
+      "s4": { "title": "Close the day", "body": "Start day close from the top bar once the last patient has checked out. It reconciles the day's collections." },
+      "s5": { "title": "Help is one key away", "body": "Press F1 on any screen for help about it, ? for the keyboard shortcuts and Ctrl+K to find any screen or action by name." }
+    }
+  }
+}

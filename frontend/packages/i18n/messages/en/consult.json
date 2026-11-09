@@ -57,7 +57,8 @@
     "changeAtLeastOneField": "Change at least one field to record a correction.",
     "couldnTSaveTheCorrection": "Couldn't save the correction.",
     "couldnTRemoveTheAllergy": "Couldn't remove the allergy.",
-    "couldnTDocumentTheStatus": "Couldn't document the status."
+    "couldnTDocumentTheStatus": "Couldn't document the status.",
+    "restoredDraft": "Restored draft"
   },
   "attachmentsPanel": {
     "attachments": "Attachments",
@@ -249,7 +250,8 @@
     },
     "setBooked": "Set · {date}",
     "couldnTScheduleTheFollow": "Couldn't schedule the follow-up.",
-    "couldnTReachTheServer": "Couldn't reach the server. Check your connection and try again."
+    "couldnTReachTheServer": "Couldn't reach the server. Check your connection and try again.",
+    "restoredDraft": "Restored draft"
   },
   "medicinesList": {
     "loadingMedicines": "Loading medicines",
@@ -455,6 +457,8 @@
     "pattern": "Pattern",
     "signedElectronicallyBy": "Signed electronically by",
     "signedAt": "Signed at",
+    "qrAlt": "Prescription verification QR code",
+    "qrCaption": "Scan at the pharmacy to verify",
     "nabdSafetyDictionary": "Nabd safety dictionary {safetyDictionaryVersion}",
     "thereIsNoPrescriptionFor": "There is no prescription for this visit.",
     "couldnTLoadThePrescription": "Couldn't load the prescription.",
@@ -665,7 +669,8 @@
     "consentNoteOptionalInYour": "Consent note (optional, in your own words)",
     "consentMustBeRecordedBefore": "Consent must be recorded before this procedure can be marked ready or completed.",
     "theOrderWasNotPlaced": "The order was not placed. Try again.",
-    "couldnTReachTheServer": "Couldn't reach the server. The order was not placed."
+    "couldnTReachTheServer": "Couldn't reach the server. The order was not placed.",
+    "restoredDraft": "Restored draft"
   },
   "toolsAside": {
     "contextualTools": "Contextual tools",
@@ -886,5 +891,15 @@
       "restTo": "Rest until",
       "remarks": "Remarks"
     }
+  },
+  "rxConflictDialog": {
+    "title": "Prescription changed on the server",
+    "intro": "Your unsaved lines and the saved prescription both changed (another device, or a draft restored after a reload). Choose which to keep; nothing is overwritten until you confirm.",
+    "mine": "Mine (this device)",
+    "server": "Server",
+    "empty": "(no lines)",
+    "decideLater": "Decide later",
+    "keepServer": "Keep server",
+    "keepMine": "Keep mine"
   }
 }

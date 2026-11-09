@@ -30,4 +30,12 @@ class SignedRxLinesImpl implements SignedRxLines {
                 (rs, i) -> new Line(rs.getObject("id", UUID.class), rs.getString("drug_id"), rs.getString("drug_name"), rs.getBigDecimal("quantity")),
                 tenant.current(), queueEntryId);
     }
+
+    @Override
+    public java.util.Optional<Signed> signed(UUID queueEntryId) {
+        return jdbc.query("SELECT id, patient_id, doctor_id, signed_at FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'signed'",
+                (rs, i) -> new Signed(rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class), rs.getObject("doctor_id", UUID.class),
+                        rs.getTimestamp("signed_at").toInstant()),
+                tenant.current(), queueEntryId).stream().findFirst();
+    }
 }
