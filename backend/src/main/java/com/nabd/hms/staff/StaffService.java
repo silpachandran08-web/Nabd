@@ -102,8 +102,8 @@ public class StaffService {
         tenantContext.set(tenantId);
         // invitedBy == null is the provisioning bootstrap (system issues the first Owner invite); no caller to bound
         if (invitedBy != null) {
-            StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(this::notFound);
-            grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound),
+            StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(ApiException::notFound);
+            grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(ApiException::notFound),
                     req.scopeOrDefault(), null);
             // PLT-059: invited + active staff fill seats, suspended do not. Pending invites count, so accepting one (activation) never exceeds the limit.
             if (staffRepo.countSeats(tenantId) >= entitlements.seatLimit()) {
@@ -131,16 +131,16 @@ public class StaffService {
     @Transactional
     public StaffResponse get(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public StaffResponse patch(UUID tenantId, UUID callerStaffId, UUID id, StaffPatchRequest req, String ipAddress) {
         tenantContext.set(tenantId);
-        StaffRow current = staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        StaffRow current = staffRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
 
-        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElseThrow(this::notFound);
-        RoleRow newRole = req.roleId() == null ? null : roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound);
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
+        RoleRow newRole = req.roleId() == null ? null : roleRepo.findById(tenantId, req.roleId()).orElseThrow(ApiException::notFound);
         boolean roleChanged = newRole != null && !newRole.id().equals(current.roleId());
         boolean scopeChanged = req.scope() != null && !req.scope().equals(current.scope());
         boolean fieldsChanged = req.fieldGrants() != null
@@ -199,7 +199,7 @@ public class StaffService {
                     clinicianAfter ? "staff.clinician_set" : "staff.clinician_cleared", "staff", id,
                     Map.of("clinician", current.clinician()), Map.of("clinician", clinicianAfter));
         }
-        return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     /** PLT-016: the clinician backfill's ambiguous rows still waiting for the owner. */
@@ -241,7 +241,7 @@ public class StaffService {
     public void suspend(UUID tenantId, UUID id, UUID callerStaffId, String stepUpToken) {
         stepUpVerifier.require(stepUpToken, callerStaffId);
         tenantContext.set(tenantId);
-        staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        staffRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         staffRepo.suspend(tenantId, id);
         int revoked = revokeSessions(tenantId, id, "suspended"); // NB-047: every device
         staffChanged(tenantId, id, "suspended");
@@ -257,7 +257,7 @@ public class StaffService {
     public void resetMfa(UUID tenantId, UUID id, UUID callerStaffId, String stepUpToken, MfaResetRequest req, String ipAddress) {
         stepUpVerifier.require(stepUpToken, callerStaffId);
         tenantContext.set(tenantId);
-        staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        staffRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         staffRepo.resetMfa(tenantId, id);
         revokeSessions(tenantId, id, "admin_revoke");
         StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
@@ -281,7 +281,7 @@ public class StaffService {
     @Transactional
     public CallerInfo getCallerInfo(UUID tenantId, UUID staffId) {
         tenantContext.set(tenantId);
-        StaffRow row = staffRepo.findById(tenantId, staffId).orElseThrow(this::notFound);
+        StaffRow row = staffRepo.findById(tenantId, staffId).orElseThrow(ApiException::notFound);
         return new CallerInfo(row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants());
     }
 
@@ -348,10 +348,6 @@ public class StaffService {
                 "A staff member with this email already exists.");
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                "The requested resource was not found.");
-    }
 
     private ApiException inviteInvalid() {
         return new ApiException(HttpStatus.GONE, "invite-invalid", "Invite expired or already used",

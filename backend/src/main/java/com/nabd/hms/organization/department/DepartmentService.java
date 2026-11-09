@@ -86,7 +86,7 @@ public class DepartmentService implements OrganizationConfig {
     @Transactional
     public DepartmentResponse update(UUID tenantId, UUID callerStaffId, UUID id, DepartmentWriteRequest req) {
         tenantContext.set(tenantId);
-        DepartmentRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        DepartmentRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         // The default department is the check-in fallback for any doctor with no department
         // assigned (see QueueRepository.findCheckInDepartment) — it must always exist and stay
         // active, so renaming is fine but deactivating it would silently break check-in.
@@ -111,7 +111,7 @@ public class DepartmentService implements OrganizationConfig {
     @Transactional
     public void delete(UUID tenantId, UUID callerStaffId, UUID id) {
         tenantContext.set(tenantId);
-        DepartmentRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        DepartmentRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (current.isDefault()) {
             throw new ApiException(HttpStatus.CONFLICT, "default-department-undeletable", "Can't delete the default department",
                     "This is the clinic's fallback department for check-in, so it can't be deleted.");
@@ -150,7 +150,7 @@ public class DepartmentService implements OrganizationConfig {
     @Transactional
     public List<TransferTargetResponse> transferTargets(UUID tenantId, UUID fromDepartmentId) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, fromDepartmentId).orElseThrow(this::notFound);
+        repo.findById(tenantId, fromDepartmentId).orElseThrow(ApiException::notFound);
         return repo.listTransferTargets(tenantId, fromDepartmentId).stream()
                 .map(t -> new TransferTargetResponse(t.departmentId(), t.departmentName(), t.doctors()))
                 .toList();
@@ -164,7 +164,7 @@ public class DepartmentService implements OrganizationConfig {
     @Transactional
     public List<FlowStepResponse> listFlow(UUID tenantId, UUID departmentId) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, departmentId).orElseThrow(this::notFound);
+        repo.findById(tenantId, departmentId).orElseThrow(ApiException::notFound);
         return repo.findSelection(tenantId, departmentId)
                 .map(this::expandToggledSteps)
                 .orElse(DEFAULT_FLOW_STEP_TYPES)
@@ -174,7 +174,7 @@ public class DepartmentService implements OrganizationConfig {
     @Transactional
     public DepartmentWorkflowResponse getWorkflow(UUID tenantId, UUID departmentId) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, departmentId).orElseThrow(this::notFound);
+        repo.findById(tenantId, departmentId).orElseThrow(ApiException::notFound);
         Optional<WorkflowSelectionRow> selection = repo.findSelection(tenantId, departmentId);
         String templateCode = selection.map(WorkflowSelectionRow::templateCode).orElse(null);
         Map<String, Boolean> toggles = selection.map(s -> readToggles(s.togglesJson())).orElse(Map.of());
@@ -185,7 +185,7 @@ public class DepartmentService implements OrganizationConfig {
     @Transactional
     public DepartmentWorkflowResponse replaceWorkflow(UUID tenantId, UUID callerStaffId, UUID departmentId, DepartmentWorkflowRequest req) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, departmentId).orElseThrow(this::notFound);
+        repo.findById(tenantId, departmentId).orElseThrow(ApiException::notFound);
         WorkflowTemplateRow template = repo.findPlatformTemplate(req.templateCode()).orElseThrow(this::unknownTemplate);
 
         List<String> allowedToggleKeys = readList(template.toggleKeysJson());
@@ -268,9 +268,6 @@ public class DepartmentService implements OrganizationConfig {
         return new DepartmentResponse(row.id(), row.name(), row.isDefault(), row.active());
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 
     private ApiException duplicateName() {
         return new ApiException(HttpStatus.CONFLICT, "duplicate-department-name", "Department name already in use",

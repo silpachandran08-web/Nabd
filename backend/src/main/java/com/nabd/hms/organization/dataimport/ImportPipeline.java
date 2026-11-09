@@ -97,7 +97,7 @@ public class ImportPipeline {
     public ImportJobResponse create(UUID staffId, ImportJobRequest req) {
         gate.requireRealData();
         if (!"patients".equals(req.importType())) throw unprocessable("UNSUPPORTED_IMPORT_TYPE", "Only patient imports use the staged pipeline.");
-        ImportRepository.Upload up = repo.findUpload(req.uploadId()).orElseThrow(() -> notFound());
+        ImportRepository.Upload up = repo.findUpload(req.uploadId()).orElseThrow(() -> ApiException.notFound());
         if (req.sourceFormat() != null && !req.sourceFormat().equals(up.format())) {
             throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_FILE", "Unsupported file", "The file is not in the declared format.");
         }
@@ -110,13 +110,13 @@ public class ImportPipeline {
 
     @Transactional
     public ImportJobResponse get(UUID id) {
-        return view(repo.findJob(id, false).orElseThrow(() -> notFound()));
+        return view(repo.findJob(id, false).orElseThrow(() -> ApiException.notFound()));
     }
 
     /** Saves the column mapping and re-runs the dry run (staged rows get new outcomes; nothing else is written). */
     @Transactional
     public ImportMappingResponse saveMapping(UUID id, ImportMappingRequest req) {
-        Job job = repo.findJob(id, true).orElseThrow(() -> notFound());
+        Job job = repo.findJob(id, true).orElseThrow(() -> ApiException.notFound());
         if (!"dry_run".equals(job.status())) throw new ApiException(HttpStatus.CONFLICT, "DIFF_STALE", "Import is not at the review step", "The import is " + job.status() + "; the mapping can only change while the diff is shown.");
         String fmt = req.dateFormat() == null ? ImportMapper.DEFAULT_DATE_FORMAT : req.dateFormat();
         if (!ImportMapper.DATE_FORMATS.containsKey(fmt)) throw unprocessable("INVALID_DATE_FORMAT", "Choose one of: " + String.join(", ", ImportMapper.DATE_FORMATS.keySet().stream().sorted().toList()));
@@ -136,7 +136,7 @@ public class ImportPipeline {
 
     @Transactional
     public void commit(UUID id, ImportCommitRequest req, UUID staffId) {
-        Job job = repo.findJob(id, true).orElseThrow(() -> notFound());
+        Job job = repo.findJob(id, true).orElseThrow(() -> ApiException.notFound());
         Map<String, Object> diff = job.diff() == null ? Map.of() : read(job.diff());
         if (!"dry_run".equals(job.status())) throw new ApiException(HttpStatus.CONFLICT, "DIFF_STALE", "The diff is stale", "The import is " + job.status() + "; run the dry run again.");
         if (Boolean.TRUE.equals(diff.get("needsMapping"))) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "REQUIRED_FIELD_UNMAPPED", "Required field not mapped", "Map every required column before committing.");
@@ -153,7 +153,7 @@ public class ImportPipeline {
 
     @Transactional
     public ImportDuplicatePage duplicates(UUID id, int afterRow, int limit) {
-        Job job = repo.findJob(id, false).orElseThrow(() -> notFound());
+        Job job = repo.findJob(id, false).orElseThrow(() -> ApiException.notFound());
         Map<String, Integer> idx = columnIndex(job);
         String region = clock.region(tenant.current());
         List<ImportDuplicateRow> out = new ArrayList<>();
@@ -170,7 +170,7 @@ public class ImportPipeline {
     /** row,code,reason for every row the dry run rejected. Only our own codes and row numbers, never cell values. */
     @Transactional
     public String errorsCsv(UUID id) {
-        repo.findJob(id, false).orElseThrow(() -> notFound());
+        repo.findJob(id, false).orElseThrow(() -> ApiException.notFound());
         StringBuilder sb = new StringBuilder("row,code,reason\r\n");
         int after = 0;
         while (true) {
@@ -362,7 +362,4 @@ public class ImportPipeline {
         return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, code, "Cannot process the import", detail);
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

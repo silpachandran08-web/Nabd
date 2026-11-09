@@ -46,7 +46,7 @@ public class VaccineRecordService {
     @Transactional
     public VaccineRecordResponse record(UUID tenantId, UUID staffId, VaccineRecordRequest req) {
         tenantContext.set(tenantId);
-        repo.findPatientIdIfExists(tenantId, req.patientId()).orElseThrow(this::notFound);
+        repo.findPatientIdIfExists(tenantId, req.patientId()).orElseThrow(ApiException::notFound);
         if (req.queueEntryId() != null && !repo.queueEntryBelongsToPatient(tenantId, req.queueEntryId(), req.patientId())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "queue-entry-mismatch", "Visit does not match patient",
                     "The queue entry does not belong to this patient.");
@@ -55,7 +55,7 @@ public class VaccineRecordService {
                 req.dose().trim(), req.route(), blankToNull(req.site()), blankToNull(req.lotNumber()), req.expiryDate(),
                 blankToNull(req.notes()));
         VaccineRecordResponse out = toResponse(tenantId, repo.findVaccineRecord(tenantId, id).orElseThrow());
-        var actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
+        var actor = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null,
                 "nursing.vaccine_recorded", "vaccine_record", id, null, auditPayload(out));
         return out;
@@ -92,7 +92,4 @@ public class VaccineRecordService {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

@@ -33,8 +33,8 @@ class AttachmentService {
     @Transactional
     UUID attach(UUID visitId, UUID fileId, String kind, String note, UUID staffId, String ip) {
         UUID tenantId = tenantContext.current();
-        UUID patientId = repo.visitPatient(tenantId, visitId).orElseThrow(AttachmentService::notFound);
-        FileStore.FileInfo f = files.info(fileId).orElseThrow(AttachmentService::notFound);
+        UUID patientId = repo.visitPatient(tenantId, visitId).orElseThrow(ApiException::notFound);
+        FileStore.FileInfo f = files.info(fileId).orElseThrow(ApiException::notFound);
         if (!"available".equals(f.status()) || !files.bind(fileId, patientId, visitId)) {
             throw new ApiException(HttpStatus.CONFLICT, "FILE_NOT_AVAILABLE", "File not available", "The file is not scanned and clean, or belongs to another patient.");
         }
@@ -44,7 +44,7 @@ class AttachmentService {
         } catch (org.springframework.dao.DuplicateKeyException e) {
             throw new ApiException(HttpStatus.CONFLICT, "FILE_NOT_AVAILABLE", "File not available", "The file is already attached to this visit.");
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(AttachmentService::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
         audit.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, "attachment.added", "visit_attachment", id, null,
                 Map.of("kind", kind, "fileId", fileId.toString())); // ids and kind only: the note is free text
         return id;
@@ -56,7 +56,4 @@ class AttachmentService {
                 r.createdAt(), files.info(r.fileId()).map(FileStore.FileInfo::contentType).orElse(null))).toList();
     }
 
-    static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

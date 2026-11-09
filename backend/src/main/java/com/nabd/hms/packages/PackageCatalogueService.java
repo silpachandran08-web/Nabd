@@ -29,6 +29,8 @@ import static com.nabd.hms.packages.PackageModels.PackageRow;
 @Service
 public class PackageCatalogueService {
 
+    private static final String NOT_FOUND = "The requested package was not found.";
+
     private static final BigDecimal DEFAULT_PRICE_FLOOR_PERCENT = BigDecimal.valueOf(72);
 
     private final PackageRepository repo;
@@ -49,7 +51,7 @@ public class PackageCatalogueService {
     @Transactional
     public PackageResponse get(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        PackageRow row = repo.findPackage(tenantId, id).orElseThrow(this::notFound);
+        PackageRow row = repo.findPackage(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         return toResponse(tenantId, row, floorPercent(tenantId));
     }
 
@@ -67,7 +69,7 @@ public class PackageCatalogueService {
     @Transactional
     public PackageResponse update(UUID tenantId, UUID id, PackageWriteRequest req) {
         tenantContext.set(tenantId);
-        repo.findPackage(tenantId, id).orElseThrow(this::notFound);
+        repo.findPackage(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         repo.updatePackage(tenantId, id, req.name(), req.packageType(), req.speciality(), req.description(),
                 req.price(), req.taxInclusive(), req.validityDays(), req.validityStarts(), req.graceDaysOrDefault(),
                 req.refundNote());
@@ -79,7 +81,7 @@ public class PackageCatalogueService {
     @Transactional
     public PackageResponse activate(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        PackageRow row = repo.findPackage(tenantId, id).orElseThrow(this::notFound);
+        PackageRow row = repo.findPackage(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         BigDecimal listValue = listValue(tenantId, id);
         BigDecimal floor = priceFloor(listValue, floorPercent(tenantId));
         if (row.price().compareTo(floor) < 0) {
@@ -94,7 +96,7 @@ public class PackageCatalogueService {
     @Transactional
     public PackageResponse deactivate(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        repo.findPackage(tenantId, id).orElseThrow(this::notFound);
+        repo.findPackage(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         repo.updateStatus(tenantId, id, "inactive");
         return get(tenantId, id);
     }
@@ -149,7 +151,4 @@ public class PackageCatalogueService {
                 row.price().compareTo(floor) < 0, eligibleDoctorIds, items, doctorLeaveWarning);
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested package was not found.");
-    }
 }

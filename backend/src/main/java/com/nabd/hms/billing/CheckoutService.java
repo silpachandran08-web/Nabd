@@ -105,7 +105,7 @@ public class CheckoutService {
     @Transactional
     public CheckoutContextResponse getCheckoutContext(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         String patientName = repo.findPatientName(tenantId, ctx.patientId()).orElse("Unknown patient");
         String doctorName = repo.findStaffName(tenantId, ctx.doctorId()).orElse("Unknown doctor");
         ConsultationTier.Context tierCtx = tierContext(tenantId, queueEntryId, ctx);
@@ -151,7 +151,7 @@ public class CheckoutService {
     @Transactional
     public InvoiceResponse getExistingInvoice(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        InvoiceRow row = repo.findInvoiceByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        InvoiceRow row = repo.findInvoiceByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         return toInvoiceResponse(tenantId, row);
     }
 
@@ -168,7 +168,7 @@ public class CheckoutService {
     public InvoiceResponse checkout(UUID tenantId, UUID queueEntryId, UUID staffId, boolean canDiscount, String ip, CheckoutRequest req) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
-        QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
 
         List<String> sequence = departmentService.resolveStatusSequence(tenantId, ctx.departmentId());
         int currentIndex = sequence.indexOf(ctx.queueStatus());
@@ -202,7 +202,7 @@ public class CheckoutService {
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         } else {
             invoiceId = existing.get().id();
-            InvoiceRow locked = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound); // serialises with payments
+            InvoiceRow locked = repo.lockInvoice(tenantId, invoiceId).orElseThrow(ApiException::notFound); // serialises with payments
             List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
             BigDecimal earlier = repo.sumDiscounts(tenantId, invoiceId);
             Totals t = computeTotals(invoiceId, lineItems, existingItems, earlier, req, canDiscount);
@@ -493,7 +493,7 @@ public class CheckoutService {
     public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req, String idempotencyKey) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
-        InvoiceRow invoice = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
+        InvoiceRow invoice = repo.lockInvoice(tenantId, invoiceId).orElseThrow(ApiException::notFound);
         if (idempotencyKey != null) {
             Optional<UUID> prior = repo.findInvoiceByPaymentKey(tenantId, idempotencyKey);
             if (prior.isPresent()) {
@@ -550,7 +550,7 @@ public class CheckoutService {
     public InvoiceResponse voidInvoice(UUID tenantId, UUID invoiceId, UUID staffId, String ipAddress, VoidInvoiceRequest req) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
-        var inv = repo.lockInvoiceForVoid(tenantId, invoiceId).orElseThrow(this::notFound);
+        var inv = repo.lockInvoiceForVoid(tenantId, invoiceId).orElseThrow(ApiException::notFound);
         if ("void".equals(inv.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-already-void", "Invoice already void", "This invoice has already been voided.");
         }
@@ -583,7 +583,7 @@ public class CheckoutService {
     @Transactional
     public InvoiceResponse getInvoice(UUID tenantId, UUID invoiceId) {
         tenantContext.set(tenantId);
-        return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow(this::notFound));
+        return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow(ApiException::notFound));
     }
 
     private InvoiceResponse toInvoiceResponse(UUID tenantId, InvoiceRow row) {
@@ -627,7 +627,4 @@ public class CheckoutService {
         return regions.region(repo.findTenantRegion(tenantId).orElse("IN")).currency();
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

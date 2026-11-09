@@ -106,7 +106,7 @@ class ChangeOfferService {
     @Transactional
     Map<String, Object> offer(UUID staffId, UUID appointmentId, List<Instant> requested) {
         UUID tid = tenantContext.current();
-        AppointmentRow a = appointmentRepo.findById(tid, appointmentId).orElseThrow(ChangeOfferService::notFound);
+        AppointmentRow a = appointmentRepo.findById(tid, appointmentId).orElseThrow(ApiException::notFound);
         if (!"scheduled".equals(a.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "appointment-not-scheduled", "Appointment not scheduled",
                     "Only a confirmed booking can be offered other times.", Map.of("code", "APPOINTMENT_NOT_SCHEDULED"));
@@ -141,11 +141,11 @@ class ChangeOfferService {
 
     Map<String, Object> accept(UUID tid, ServiceIdentity edge, UUID offerId, Instant slotStart) {
         return tenantScope.run(tid, () -> {
-            ChangeOfferRepository.Offer o = repo.lock(tid, offerId).orElseThrow(ChangeOfferService::notFound);
+            ChangeOfferRepository.Offer o = repo.lock(tid, offerId).orElseThrow(ApiException::notFound);
             if ("accepted".equals(o.status())) {
                 return Map.of("newAppointmentId", o.newAppointmentId(), "status", "CONFIRMED"); // a repeated tap is the same answer
             }
-            AppointmentRow old = appointmentRepo.findById(tid, o.appointmentId()).orElseThrow(ChangeOfferService::notFound);
+            AppointmentRow old = appointmentRepo.findById(tid, o.appointmentId()).orElseThrow(ApiException::notFound);
             if (!"sent".equals(o.status()) || !o.expiresAt().isAfter(clock.now()) || !"scheduled".equals(old.status())) throw gone();
             if (!o.slots().contains(slotStart)) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Invalid slot", "slotStart must be one of the offered times.");
@@ -201,9 +201,6 @@ class ChangeOfferService {
         return repo.latestFor(tid, appointmentId).map(o -> "sent".equals(o.status()) && !o.expiresAt().isAfter(clock.now()) ? "expired" : o.status()).orElse(null);
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 
     private static ApiException gone() {
         return new ApiException(HttpStatus.GONE, "offer-expired", "Offer expired", "This offer is no longer open.", Map.of("code", "OFFER_EXPIRED"));

@@ -31,6 +31,8 @@ import java.util.UUID;
 @Transactional
 public class PharmacyReturnService {
 
+    private static final String NOT_FOUND = "Invoice not found.";
+
     static final String REASON_CODE = "customer_return";
     static final String OPENED = "Opened pack: only sealed packs can be taken back.";
     static final String NOT_STOCKED = "Not a stocked pharmacy item: only medicines from stock can be returned here.";
@@ -51,8 +53,8 @@ public class PharmacyReturnService {
     public PharmacyReturnDtos.Bill bill(UUID invoiceId, String number) {
         UUID t = tenantContext.current();
         UUID id = invoiceId != null ? invoiceId
-                : repo.invoiceIdByNumber(t, number == null ? "" : number.trim()).orElseThrow(PharmacyReturnService::notFound);
-        var invoice = repo.findInvoice(t, id).orElseThrow(PharmacyReturnService::notFound);
+                : repo.invoiceIdByNumber(t, number == null ? "" : number.trim()).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
+        var invoice = repo.findInvoice(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Map<UUID, Integer> returned = returnedQty(t, id);
         List<PharmacyReturnDtos.BillLine> lines = new ArrayList<>();
         for (var l : repo.billLines(t, id)) {
@@ -74,7 +76,7 @@ public class PharmacyReturnService {
     public PharmacyReturnDtos.ReturnResponse create(UUID staffId, String ip, PharmacyReturnDtos.ReturnRequest req) {
         UUID t = tenantContext.current();
         // the invoice row lock serialises returns, refunds and approvals of this bill, so the sold-minus-returned check below holds
-        var invoice = repo.lockInvoice(t, req.invoiceId()).orElseThrow(PharmacyReturnService::notFound);
+        var invoice = repo.lockInvoice(t, req.invoiceId()).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Optional<UUID> pending = repo.pendingRequestId(t, invoice.id());
         if (pending.isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "approval-pending", "Approval pending",
@@ -141,7 +143,4 @@ public class PharmacyReturnService {
         return out;
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "Invoice not found.");
-    }
 }

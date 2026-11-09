@@ -46,6 +46,8 @@ import java.util.UUID;
 @Service
 public class StockTakeService {
 
+    private static final String NOT_FOUND = "The requested stock take was not found.";
+
     static final String APPROVE = "pharmacy:adjust_approve";
     private static final Map<String, String> REASON_LABELS = Map.of("damaged", "Damaged", "count_correction", "Count correction",
             "theft_loss", "Theft/loss", "expired", "Expired", "other", "Other");
@@ -120,14 +122,14 @@ public class StockTakeService {
     @Transactional
     public Sheet sheet(UUID id) {
         UUID t = tenant.current();
-        Summary s = repo.summary(t, id).orElseThrow(StockTakeService::notFound);
+        Summary s = repo.summary(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         return new Sheet(s, repo.lines(t, id).stream().map(StockTakeRepository.LineRow::line).toList());
     }
 
     @Transactional
     public CountsResponse counts(UUID staffId, UUID id, CountsRequest req) {
         UUID t = tenant.current();
-        requireOpen(repo.lock(t, id).orElseThrow(StockTakeService::notFound));
+        requireOpen(repo.lock(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
         int n = req.counts().size();
         UUID[] batchIds = new UUID[n];
         Integer[] counted = new Integer[n];
@@ -157,7 +159,7 @@ public class StockTakeService {
     @Transactional
     public PostResponse post(UUID staffId, String ip, UUID id, PostRequest req) {
         UUID t = tenant.current();
-        StockTakeRepository.Session s = repo.lock(t, id).orElseThrow(StockTakeService::notFound);
+        StockTakeRepository.Session s = repo.lock(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if ("posted".equals(s.status())) {
             Summary sum = repo.summary(t, id).orElseThrow();
             List<AdjustmentView> done = repo.postedAdjustments(t, id);
@@ -201,7 +203,7 @@ public class StockTakeService {
     @Transactional
     public Summary cancel(UUID staffId, String ip, UUID id) {
         UUID t = tenant.current();
-        StockTakeRepository.Session s = repo.lock(t, id).orElseThrow(StockTakeService::notFound);
+        StockTakeRepository.Session s = repo.lock(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if (!"cancelled".equals(s.status())) {
             requireOpen(s);
             repo.close(t, id, "cancelled", null, null);
@@ -237,7 +239,7 @@ public class StockTakeService {
         UUID approverId = approver == null ? null : approver.staffId();
         AdjustedBatch a = stock.adjustBatches(List.of(new BatchAdjustment(batchId, delta, req.reasonCode(), reasonText(req.reasonCode(), note))),
                 staffId, approverId, null, null).get(0);
-        ActorDirectory.Actor maker = actors.findActor(t, staffId).orElseThrow(StockTakeService::notFound);
+        ActorDirectory.Actor maker = actors.findActor(t, staffId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Map<String, Object> before = new LinkedHashMap<>();
         before.put("qtyOnHand", a.qtyBefore());
         Map<String, Object> after = new LinkedHashMap<>();
@@ -289,7 +291,7 @@ public class StockTakeService {
     }
 
     private void record(UUID t, UUID staffId, String ip, String action, UUID id, Map<String, Object> after) {
-        ActorDirectory.Actor actor = actors.findActor(t, staffId).orElseThrow(StockTakeService::notFound);
+        ActorDirectory.Actor actor = actors.findActor(t, staffId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         audit.record(t, "staff", staffId, actor.name(), actor.role(), ip, action, "stock_take", id, null, after);
     }
 
@@ -320,7 +322,4 @@ public class StockTakeService {
         return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested batch was not found.");
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested stock take was not found.");
-    }
 }

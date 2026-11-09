@@ -41,6 +41,8 @@ import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
 @Service
 public class PharmacyService {
 
+    private static final String NOT_FOUND = "The requested pharmacy item was not found.";
+
     private final PharmacyRepository repo;
     private final TenantContext tenantContext;
     private final AuditService auditService;
@@ -136,7 +138,7 @@ public class PharmacyService {
             throw new IllegalStateException(e);
         }
         modes.evict(tenantId);
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if (modeChanged) {
             Map<String, Object> after = new LinkedHashMap<>();
             after.put("mode", target);
@@ -206,7 +208,7 @@ public class PharmacyService {
             // Opening stock is a stock change like any other: it gets a movement row and an audit event.
             recordAdjustment(tenantId, callerStaffId, ipAddress, id, 0, opening, "other", "Opening stock");
         }
-        return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+        return toResponse(repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
     }
 
     /** Edits name, price, tax, HSN, schedule class and the descriptive fields. A stockQty in the body is ignored on purpose (V2-004): stock only
@@ -214,7 +216,7 @@ public class PharmacyService {
     @Transactional
     public PharmacyItemResponse updateItem(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id, PharmacyItemWriteRequest req) {
         tenantContext.set(tenantId);
-        PharmacyItemRow before = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        PharmacyItemRow before = repo.lockItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         String drugId = linkedDrugId(req);
         String cls = schedules.resolve(req.scheduleClass(), drugId, req.isRx(), before.scheduleClass());
         repo.updateItem(tenantId, id, req);
@@ -229,7 +231,7 @@ public class PharmacyService {
                     Map.of("scheduleClass", before.scheduleClass()), Map.of("scheduleClass", cls, "itemCode", before.code()));
         }
         catalogueChanged(tenantId, id, "updated");
-        return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+        return toResponse(repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
     }
 
     /** The drug master id to link, checked like PUT drug-link (exists, not retired); null when the request sends none. */
@@ -265,7 +267,7 @@ public class PharmacyService {
                     req.reasonCode() == null ? "A reason is required for every stock change." : "Reason 'other' needs a note.");
         }
         String reason = req.reasonCode() == null ? text : StockTakeService.reasonText(code, text.isEmpty() ? null : text);
-        PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if (item.registerType() != null) { // PHL-010: a controlled drug changes per batch with a second signer, never here
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "approval-required", "Second sign-off required",
                     "Stock of a controlled drug is adjusted by batch, with a second sign-off.");
@@ -280,7 +282,7 @@ public class PharmacyService {
                     "The stock count is already " + item.stockQty() + ".");
         }
         recordAdjustment(tenantId, callerStaffId, ipAddress, id, item.stockQty(), (int) target, code, reason);
-        return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+        return toResponse(repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
     }
 
     /** V2-007: activate / deactivate. Idempotent; only a real change is audited. */
@@ -288,7 +290,7 @@ public class PharmacyService {
     public PharmacyItemResponse setActive(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id,
                                            PharmacyItemStatusRequest req) {
         tenantContext.set(tenantId);
-        PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         boolean active = Boolean.TRUE.equals(req.active());
         if (item.active() != active) {
             repo.setActive(tenantId, id, active);
@@ -301,13 +303,13 @@ public class PharmacyService {
             after.put("reason", req.reason() == null || req.reason().isBlank() ? null : req.reason().trim());
             audit(tenantId, callerStaffId, ipAddress, active ? "pharmacy.item_activated" : "pharmacy.item_deactivated", id, before, after);
         }
-        return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+        return toResponse(repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
     }
 
     @Transactional
     public List<PharmacyStockMovementResponse> movements(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        repo.findItem(tenantId, id).orElseThrow(this::notFound);
+        repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         return repo.listMovements(tenantId, id).stream()
                 .map(m -> new PharmacyStockMovementResponse(m.id(), m.kind(), m.delta(), m.qtyBefore(), m.qtyAfter(), m.reason(),
                         m.actorId(), m.actorName(), m.occurredAt()))
@@ -327,7 +329,7 @@ public class PharmacyService {
     }
 
     private void audit(UUID tenantId, UUID staffId, String ip, String action, UUID itemId, Object before, Object after) {
-        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "pharmacy_item", itemId, before, after);
     }
 
@@ -357,7 +359,7 @@ public class PharmacyService {
      * the clinic's own flag and the price stay as they are. A product retired in the KB cannot be linked to a new item. */
     @Transactional
     public Map<String, Object> linkDrug(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id, String drugId) {
-        PharmacyItemRow item = repo.findItem(tenantId, id).orElseThrow(this::notFound);
+        PharmacyItemRow item = repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         DrugMasterLookup.DrugRef drug = drugs.find(drugId).filter(DrugMasterLookup.DrugRef::active).orElseThrow(() ->
                 new ApiException(HttpStatus.NOT_FOUND, "DRUG_NOT_FOUND", "Drug not found", "No such drug in the drug master."));
         repo.setDrug(tenantId, id, drug.id());
@@ -368,7 +370,7 @@ public class PharmacyService {
             audit(tenantId, callerStaffId, ipAddress, "pharmacy.item_schedule_changed", id,
                     Map.of("scheduleClass", item.scheduleClass()), Map.of("scheduleClass", cls, "itemCode", item.code()));
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "pharmacy.item_drug_linked",
                 "pharmacy_item", id, item.drugId() == null ? null : Map.of("drugId", item.drugId()), Map.of("drugId", drug.id()));
         Map<String, Object> out = new LinkedHashMap<>();
@@ -379,7 +381,4 @@ public class PharmacyService {
         return out;
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested pharmacy item was not found.");
-    }
 }

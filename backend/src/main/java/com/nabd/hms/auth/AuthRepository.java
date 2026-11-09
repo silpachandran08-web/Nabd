@@ -31,7 +31,7 @@ import static com.nabd.hms.auth.AuthModels.Tenant;
  * exposed to the same gap, just masked in practice by callers normalizing to lowercase first.
  */
 @Repository
-class AuthRepository {
+public class AuthRepository {
 
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
@@ -47,7 +47,7 @@ class AuthRepository {
         return sessionIds;
     }
 
-    Optional<Tenant> findTenantBySlug(String slug) {
+    public Optional<Tenant> findTenantBySlug(String slug) {
         return jdbc.query(
                 "SELECT id, slug, status, name, region_code AS region FROM tenants WHERE slug = ?::citext",
                 tenantMapper(), slug
@@ -57,7 +57,7 @@ class AuthRepository {
     /** For the access token's tenantName claim (ClinicNav's clinic-info card) — looked up by id
      * since minting happens well past the slug-based login step (MFA verify, OTP verify, refresh
      * all mint a fresh token from just a staff/session row, no slug in hand). */
-    Optional<Tenant> findTenantById(UUID id) {
+    public Optional<Tenant> findTenantById(UUID id) {
         return jdbc.query(
                 "SELECT id, slug, status, name, region_code AS region FROM tenants WHERE id = ?",
                 tenantMapper(), id
@@ -68,7 +68,7 @@ class AuthRepository {
             "id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status, scope, " +
                     "email_verified, mobile_verified, mfa_enabled, mfa_secret_enc, mfa_pending_secret_enc, mfa_reset_required ";
 
-    Optional<Staff> findStaffByEmail(UUID tenantId, String email) {
+    public Optional<Staff> findStaffByEmail(UUID tenantId, String email) {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND email = ?::citext",
                 staffMapper(), tenantId, email
         ).stream().findFirst();
@@ -80,27 +80,27 @@ class AuthRepository {
      * region. An exact match on the raw text meant any other format silently found nobody (and,
      * by design, the OTP endpoint still answers "sent"), so no code was ever generated.
      */
-    Optional<Staff> findStaffByMobile(UUID tenantId, String region, String mobilePhone) {
+    public Optional<Staff> findStaffByMobile(UUID tenantId, String region, String mobilePhone) {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND mobile_phone IS NOT NULL " +
                         "AND regexp_replace(mobile_phone, '\\D', '', 'g') = ?",
                 staffMapper(), tenantId, PhoneNumbers.digits(mobilePhone, region)
         ).stream().findFirst();
     }
 
-    Optional<Staff> findStaffById(UUID staffId) {
+    public Optional<Staff> findStaffById(UUID staffId) {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE id = ?",
                 staffMapper(), staffId
         ).stream().findFirst();
     }
 
     /** FIN-018: active staff of the bound tenant on the built-in Owner role (RefundService.OWNER_ROLE). */
-    List<Staff> findActiveOwners() {
+    public List<Staff> findActiveOwners() {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = app_tenant_id() AND status = 'active' "
                 + "AND role_id IN (SELECT id FROM roles WHERE built_in AND name = 'Owner') ORDER BY id", staffMapper());
     }
 
     /** WhatsApp OTP request — hash stored, 5-minute expiry, mirrors the invite-token pattern. */
-    void setWhatsAppOtp(UUID staffId, String otpHash, Instant expiresAt) {
+    public void setWhatsAppOtp(UUID staffId, String otpHash, Instant expiresAt) {
         jdbc.update("UPDATE staff SET whatsapp_otp_hash = ?, whatsapp_otp_expires_at = ? WHERE id = ?",
                 otpHash, Timestamp.from(expiresAt), staffId);
     }
@@ -111,7 +111,7 @@ class AuthRepository {
      * so there's no read-then-clear race, and no RETURNING-sees-the-post-update-row trap (Postgres
      * evaluates RETURNING against the new row, so comparing the just-nulled hash would always miss).
      */
-    boolean consumeWhatsAppOtp(UUID staffId, String otpHash) {
+    public boolean consumeWhatsAppOtp(UUID staffId, String otpHash) {
         int rows = jdbc.update(
                 "UPDATE staff SET whatsapp_otp_hash = NULL, whatsapp_otp_expires_at = NULL " +
                         "WHERE id = ? AND whatsapp_otp_hash = ? AND whatsapp_otp_expires_at > now()",
@@ -119,40 +119,40 @@ class AuthRepository {
         return rows == 1;
     }
 
-    void markMobileVerified(UUID staffId) {
+    public void markMobileVerified(UUID staffId) {
         jdbc.update("UPDATE staff SET mobile_verified = true WHERE id = ?", staffId);
     }
 
     // ── MFA enrollment (NB-042) ──────────────────────────────────────────
 
     /** PLT-004: parks the new secret beside the active one; mfa_secret_enc / mfa_enabled only change in confirmPendingMfa. */
-    void setPendingMfaSecret(UUID staffId, byte[] encryptedSecret) {
+    public void setPendingMfaSecret(UUID staffId, byte[] encryptedSecret) {
         jdbc.update("UPDATE staff SET mfa_pending_secret_enc = ?, mfa_pending_created_at = now() WHERE id = ?", encryptedSecret, staffId);
     }
 
     /** Pending becomes active, MFA on, a pending admin reset is satisfied. */
-    void confirmPendingMfa(UUID staffId) {
+    public void confirmPendingMfa(UUID staffId) {
         jdbc.update("UPDATE staff SET mfa_secret_enc = mfa_pending_secret_enc, mfa_pending_secret_enc = NULL, "
                 + "mfa_pending_created_at = NULL, mfa_enabled = true, mfa_reset_required = false WHERE id = ?", staffId);
     }
 
     /** Old unused codes stop working when a new set is issued. */
-    void revokeUnusedRecoveryCodes(UUID staffId) {
+    public void revokeUnusedRecoveryCodes(UUID staffId) {
         jdbc.update("UPDATE mfa_recovery_codes SET revoked_at = now() WHERE staff_id = ? AND used_at IS NULL AND revoked_at IS NULL", staffId);
     }
 
-    int countLiveRecoveryCodes(UUID staffId) {
+    public int countLiveRecoveryCodes(UUID staffId) {
         return jdbc.queryForObject("SELECT count(*) FROM mfa_recovery_codes WHERE staff_id = ? AND used_at IS NULL AND revoked_at IS NULL",
                 Integer.class, staffId);
     }
 
-    void insertRecoveryCode(UUID tenantId, UUID staffId, String codeHash) {
+    public void insertRecoveryCode(UUID tenantId, UUID staffId, String codeHash) {
         jdbc.update("INSERT INTO mfa_recovery_codes (tenant_id, staff_id, code_hash) VALUES (?,?,?)",
                 tenantId, staffId, codeHash);
     }
 
     /** Atomic check-and-consume — same shape as consumeWhatsAppOtp, so a code can never be used twice. */
-    boolean consumeRecoveryCode(UUID staffId, String codeHash) {
+    public boolean consumeRecoveryCode(UUID staffId, String codeHash) {
         int rows = jdbc.update(
                 "UPDATE mfa_recovery_codes SET used_at = now() WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL AND revoked_at IS NULL",
                 staffId, codeHash);
@@ -161,13 +161,13 @@ class AuthRepository {
 
     // ── PIN reset (NB-046) ───────────────────────────────────────────────
 
-    void setPinResetToken(UUID staffId, String tokenHash, Instant expiresAt) {
+    public void setPinResetToken(UUID staffId, String tokenHash, Instant expiresAt) {
         jdbc.update("UPDATE staff SET pin_reset_token_hash = ?, pin_reset_expires_at = ? WHERE id = ?",
                 tokenHash, Timestamp.from(expiresAt), staffId);
     }
 
     /** Atomic check-and-consume, then set the new PIN in the same statement — no read-then-write race. */
-    boolean consumePinResetToken(UUID staffId, String tokenHash, String newPinHash) {
+    public boolean consumePinResetToken(UUID staffId, String tokenHash, String newPinHash) {
         int rows = jdbc.update(
                 "UPDATE staff SET pin_hash = ?, pin_policy_version = 2, pin_reset_token_hash = NULL, pin_reset_expires_at = NULL " +
                         "WHERE id = ? AND pin_reset_token_hash = ? AND pin_reset_expires_at > now()",
@@ -178,14 +178,14 @@ class AuthRepository {
     // ── break-glass (NB-048) ─────────────────────────────────────────────
 
     /** Same "detect and close on next read" shape as delegation expiry — see AuthService.mintTokenPair. */
-    List<UUID> expireStaleBreakGlass(UUID staffId) {
+    public List<UUID> expireStaleBreakGlass(UUID staffId) {
         return jdbc.query(
                 "UPDATE break_glass_grants SET deactivated_at = expires_at, deactivated_reason = 'expired' " +
                         "WHERE staff_id = ? AND deactivated_at IS NULL AND expires_at <= now() RETURNING id",
                 (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
     }
 
-    Optional<Role> findRole(UUID roleId) {
+    public Optional<Role> findRole(UUID roleId) {
         return jdbc.query(
                 "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required, built_in FROM roles WHERE id = ?",
                 roleMapper(), roleId
@@ -193,7 +193,7 @@ class AuthRepository {
     }
 
     /** NB-048: break-glass elevates to whatever the tenant's built-in Owner role currently grants. */
-    Optional<Role> findBuiltInOwnerRole(UUID tenantId) {
+    public Optional<Role> findBuiltInOwnerRole(UUID tenantId) {
         return jdbc.query(
                 "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required, built_in FROM roles WHERE tenant_id = ? AND built_in = true",
                 roleMapper(), tenantId
@@ -205,7 +205,7 @@ class AuthRepository {
      * query into the staff/roles module's table rather than injecting RoleRepository across package
      * boundaries (same convention as CheckoutRepository reading pharmacy/procedure_orders directly).
      */
-    List<Role> findActiveDelegatedRoles(UUID staffId) {
+    public List<Role> findActiveDelegatedRoles(UUID staffId) {
         return jdbc.query(
                 "SELECT r.id, r.tenant_id, r.name, r.grants::text AS grants_json, r.mfa_required, r.built_in " +
                         "FROM role_delegations d JOIN roles r ON r.id = d.delegated_role_id " +
@@ -219,14 +219,14 @@ class AuthRepository {
      * exists to do this the instant a delegation lapses, so the next login/refresh (at most one
      * access-token TTL later) is what notices and logs it — same shape as the lockout counter.
      */
-    List<UUID> expireStaleDelegations(UUID staffId) {
+    public List<UUID> expireStaleDelegations(UUID staffId) {
         return jdbc.query(
                 "UPDATE role_delegations SET revoked_at = expires_at, revoked_reason = 'expired' " +
                         "WHERE staff_id = ? AND revoked_at IS NULL AND expires_at <= now() RETURNING id",
                 (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
     }
 
-    void recordLoginAttempt(UUID tenantId, UUID staffId, String email, String ip, boolean succeeded) {
+    public void recordLoginAttempt(UUID tenantId, UUID staffId, String email, String ip, boolean succeeded) {
         jdbc.update(
                 "INSERT INTO login_attempts (tenant_id, staff_id, email, ip_address, succeeded) VALUES (?,?,?,?::inet,?)",
                 tenantId, staffId, email, ip, succeeded
@@ -234,7 +234,7 @@ class AuthRepository {
     }
 
     /** Failed attempts since the account's last success — the lockout window, no separate counter column needed. */
-    int countFailedAttemptsSinceLastSuccess(UUID staffId) {
+    public int countFailedAttemptsSinceLastSuccess(UUID staffId) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM login_attempts " +
                         "WHERE staff_id = ? AND succeeded = false " +
@@ -247,30 +247,30 @@ class AuthRepository {
     }
 
     /** FIN-018: failed owner-PIN tries by this desk caller since their last good one (1 day at most), as for logins. */
-    int countFailedPinAssertionsSinceLastSuccess(UUID staffId) {
+    public int countFailedPinAssertionsSinceLastSuccess(UUID staffId) {
         Integer count = jdbc.queryForObject("SELECT count(*) FROM pin_assertion_attempts WHERE staff_id = ? AND NOT succeeded AND attempted_at > "
                 + "COALESCE((SELECT max(attempted_at) FROM pin_assertion_attempts WHERE staff_id = ? AND succeeded), now() - interval '1 day')",
                 Integer.class, staffId, staffId);
         return count == null ? 0 : count;
     }
 
-    Optional<Instant> lastFailedPinAssertionAt(UUID staffId) {
+    public Optional<Instant> lastFailedPinAssertionAt(UUID staffId) {
         return jdbc.query("SELECT max(attempted_at) AS t FROM pin_assertion_attempts WHERE staff_id = ? AND NOT succeeded",
                 (rs, i) -> rs.getTimestamp("t"), staffId).stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
     }
 
-    void recordPinAssertionAttempt(UUID tenantId, UUID staffId, boolean succeeded) {
+    public void recordPinAssertionAttempt(UUID tenantId, UUID staffId, boolean succeeded) {
         jdbc.update("INSERT INTO pin_assertion_attempts (tenant_id, staff_id, succeeded) VALUES (?,?,?)", tenantId, staffId, succeeded);
     }
 
-    Optional<Instant> lastFailedAttemptAt(UUID staffId) {
+    public Optional<Instant> lastFailedAttemptAt(UUID staffId) {
         return jdbc.query(
                 "SELECT max(attempted_at) AS t FROM login_attempts WHERE staff_id = ? AND succeeded = false",
                 (rs, i) -> rs.getTimestamp("t"), staffId
         ).stream().filter(java.util.Objects::nonNull).findFirst().map(Timestamp::toInstant);
     }
 
-    int countAttemptsFromIpSince(String ip, Instant since) {
+    public int countAttemptsFromIpSince(String ip, Instant since) {
         Integer count = jdbc.queryForObject(
                 "SELECT login_attempts_count_from_ip(?::inet, ?)",
                 Integer.class, ip, Timestamp.from(since)
@@ -278,7 +278,7 @@ class AuthRepository {
         return count == null ? 0 : count;
     }
 
-    void insertSession(UUID id, UUID tenantId, UUID staffId, UUID familyId, String tokenHash,
+    public void insertSession(UUID id, UUID tenantId, UUID staffId, UUID familyId, String tokenHash,
                         Instant expiresAt, String deviceLabel, String ip, String userAgent, Instant now) {
         jdbc.update(
                 "INSERT INTO sessions (id, tenant_id, staff_id, family_id, token_hash, expires_at, device_label, ip_address, user_agent, family_started_at) " +
@@ -289,13 +289,13 @@ class AuthRepository {
     }
 
     /** PLT-007: when the refresh family of this session was first signed in. */
-    Instant familyStartedAt(UUID tenantId, UUID sessionId) {
+    public Instant familyStartedAt(UUID tenantId, UUID sessionId) {
         return jdbc.queryForObject("SELECT family_started_at FROM sessions WHERE tenant_id = ? AND id = ?",
                 Timestamp.class, tenantId, sessionId).toInstant();
     }
 
     /** PLT-007: tenant suspended/offboarded, one UPDATE for every live session (partial index on tenant_id); one staff id per revoked session. */
-    List<UUID> revokeAllForTenant(UUID tenantId, String reason) {
+    public List<UUID> revokeAllForTenant(UUID tenantId, String reason) {
         List<UUID[]> rows = jdbc.query("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
                 "WHERE tenant_id = ? AND revoked_at IS NULL RETURNING id, staff_id",
                 (rs, i) -> new UUID[] {rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)}, reason, tenantId);
@@ -308,7 +308,7 @@ class AuthRepository {
      * SECURITY DEFINER function defined in V1__staff_auth_core.sql. Every other session query in
      * this class goes through plain RLS-scoped SQL once TenantContext.set has been called.
      */
-    Optional<SessionRow> findSessionByTokenHash(String tokenHash) {
+    public Optional<SessionRow> findSessionByTokenHash(String tokenHash) {
         return jdbc.query(
                 "SELECT id, tenant_id, staff_id, family_id, token_hash, expires_at, revoked_at, revoked_reason, device_label, ip_address::text, last_seen_at " +
                         "FROM find_session_by_token_hash(?)",
@@ -316,7 +316,7 @@ class AuthRepository {
         ).stream().findFirst();
     }
 
-    List<SessionRow> listActiveSessions(UUID staffId) {
+    public List<SessionRow> listActiveSessions(UUID staffId) {
         return jdbc.query(
                 "SELECT id, tenant_id, staff_id, family_id, token_hash, expires_at, revoked_at, revoked_reason, device_label, ip_address::text, last_seen_at " +
                         "FROM sessions WHERE staff_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC",
@@ -325,14 +325,14 @@ class AuthRepository {
     }
 
     /** NB-043: is this specific session still live? — the check that makes a revoke take effect on the very next request, not just at the access token's natural (15 min) expiry. */
-    boolean isSessionActive(UUID tenantId, UUID sessionId) {
+    public boolean isSessionActive(UUID tenantId, UUID sessionId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sessions WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL AND expires_at > now()",
                 Integer.class, tenantId, sessionId);
         return count != null && count > 0;
     }
 
-    void revokeSession(UUID sessionId, String reason) {
+    public void revokeSession(UUID sessionId, String reason) {
         revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND revoked_at IS NULL RETURNING id",
                 UUID.class, reason, sessionId));
     }
@@ -342,25 +342,25 @@ class AuthRepository {
      * where the id is client-supplied and otherwise has no ownership check within the tenant.
      * Returns false if the session doesn't exist, is already revoked, or belongs to someone else.
      */
-    boolean revokeSessionOwnedBy(UUID staffId, UUID sessionId, String reason) {
+    public boolean revokeSessionOwnedBy(UUID staffId, UUID sessionId, String reason) {
         return revoked(jdbc.queryForList(
                 "UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id",
                 UUID.class, reason, sessionId, staffId)).size() == 1;
     }
 
     /** Logout: every still-active row in the family of the given session. */
-    void revokeFamilyOf(UUID sessionId, String reason) {
+    public void revokeFamilyOf(UUID sessionId, String reason) {
         revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE revoked_at IS NULL " +
                 "AND family_id = (SELECT family_id FROM sessions WHERE id = ?) RETURNING id", UUID.class, reason, sessionId));
     }
 
     /** Reuse detection: kill every still-active row in the chain, not just the one presented. */
     /** PLT-005: an owner's shadow staff row (staff.owner_id set) is reached only through the owner account's own MFA. */
-    boolean isOwnerLinked(UUID staffId) {
+    public boolean isOwnerLinked(UUID staffId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT owner_id IS NOT NULL FROM staff WHERE id = ?", Boolean.class, staffId));
     }
 
-    void revokeFamily(UUID familyId, String reason) {
+    public void revokeFamily(UUID familyId, String reason) {
         revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL RETURNING id",
                 UUID.class, reason, familyId));
     }

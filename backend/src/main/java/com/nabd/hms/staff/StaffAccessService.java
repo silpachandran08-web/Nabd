@@ -55,8 +55,8 @@ class StaffAccessService {
     @Transactional
     InviteResendResponse resendInvite(UUID id, UUID callerId, String ip) {
         UUID tenantId = tenantContext.current();
-        StaffRow target = staffRepo.findById(tenantId, id).orElseThrow(StaffAccessService::notFound);
-        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(StaffAccessService::notFound);
+        StaffRow target = staffRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
+        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(ApiException::notFound);
         grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, target.roleId()).orElseThrow(), null, null);
         String raw = OpaqueTokens.generate();
         Instant expiresAt = Instant.now(clock).plus(72, ChronoUnit.HOURS);
@@ -72,7 +72,7 @@ class StaffAccessService {
     @Transactional
     void remindMfa(UUID id, UUID callerId, String ip) {
         UUID tenantId = tenantContext.current();
-        StaffRow target = staffRepo.findById(tenantId, id).orElseThrow(StaffAccessService::notFound);
+        StaffRow target = staffRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (!"active".equals(target.status()) || !target.roleMfaRequired() || target.mfaEnabled() || target.ownerLinked()) {
             throw new ApiException(HttpStatus.CONFLICT, "mfa-not-pending", "No enrolment pending", "This person does not need to enrol an authenticator.");
         }
@@ -82,7 +82,7 @@ class StaffAccessService {
         // 422 TEMPLATE_NOT_SENDABLE (thrown here, in this transaction) when the clinic has no approved mfa_enrol_reminder template.
         notifications.request(new NotificationRequest(NotificationPurpose.MFA_ENROL_REMINDER, "staff", id, null, target.mobilePhone(), "en", List.of(),
                 null, null, null, "mfa-remind:" + id + ":" + clinicClock.today(tenantId)));
-        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(StaffAccessService::notFound);
+        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(ApiException::notFound);
         audit.record(tenantId, "staff", callerId, caller.name(), roleName(tenantId, caller), ip, "staff.mfa_reminder_sent", "staff", id, null, Map.of());
     }
 
@@ -91,7 +91,4 @@ class StaffAccessService {
         return roleRepo.findById(tenantId, s.roleId()).map(r -> r.name()).orElse("Staff");
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

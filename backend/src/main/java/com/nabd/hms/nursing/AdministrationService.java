@@ -42,7 +42,7 @@ public class AdministrationService {
     @Transactional
     public AdministrationOrderResponse order(UUID tenantId, UUID staffId, AdministrationOrderRequest req) {
         tenantContext.set(tenantId);
-        UUID patientId = repo.findPatientIdForQueueEntry(tenantId, req.queueEntryId()).orElseThrow(this::notFound);
+        UUID patientId = repo.findPatientIdForQueueEntry(tenantId, req.queueEntryId()).orElseThrow(ApiException::notFound);
         UUID id = repo.insertAdministrationOrder(tenantId, req.queueEntryId(), patientId, staffId, req.drugName(),
                 req.dose(), req.route(), req.site());
         return toResponse(tenantId, repo.findAdministrationOrder(tenantId, id).orElseThrow());
@@ -57,7 +57,7 @@ public class AdministrationService {
     @Transactional
     public AdministrationOrderResponse administer(UUID tenantId, UUID staffId, UUID orderId, AdministerRequest req) {
         tenantContext.set(tenantId);
-        repo.findAdministrationOrder(tenantId, orderId).orElseThrow(this::notFound);
+        repo.findAdministrationOrder(tenantId, orderId).orElseThrow(ApiException::notFound);
         if (staffId.equals(req.witnessedByStaffId())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "self-witness", "Cannot self-witness",
                     "The witness must be a different staff member from whoever is administering.");
@@ -69,7 +69,7 @@ public class AdministrationService {
     @Transactional
     public AdministrationOrderResponse refuse(UUID tenantId, UUID staffId, UUID orderId, RefuseRequest req) {
         tenantContext.set(tenantId);
-        repo.findAdministrationOrder(tenantId, orderId).orElseThrow(this::notFound);
+        repo.findAdministrationOrder(tenantId, orderId).orElseThrow(ApiException::notFound);
         repo.insertAdministrationRecord(tenantId, orderId, "refused", staffId, null, req.reason());
         return toResponse(tenantId, repo.findAdministrationOrder(tenantId, orderId).orElseThrow());
     }
@@ -89,7 +89,4 @@ public class AdministrationService {
                 refuseReason, recordedAt, row.createdAt());
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

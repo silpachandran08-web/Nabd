@@ -109,7 +109,7 @@ class QueueBoardService {
     @Transactional
     public Reassigned reassign(UUID callerStaffId, UUID id, UUID toDoctorId, String expectedStatus, String reasonCode) {
         UUID tenantId = tenantContext.current();
-        QueueEntryRow first = queueRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow first = queueRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (toDoctorId.equals(first.doctorId())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "Pick a different doctor.");
         }
@@ -128,14 +128,14 @@ class QueueBoardService {
         queueRepo.lockDoctorDay(tenantId, a, today);
         queueRepo.lockDoctorDay(tenantId, b, today);
 
-        QueueEntryRow current = queueRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = queueRepo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (!current.doctorId().equals(first.doctorId()) || !current.status().equals(expectedStatus) || !reassignable(tenantId, current)) {
             throw stale(current.status());
         }
         enforceSessionCapacity(tenantId, toDoctorId, today);
         int newToken = queueRepo.nextTokenNumber(tenantId, toDoctorId, today);
         if (repo.reassign(tenantId, id, expectedStatus, current.doctorId(), toDoctorId, newToken) == 0) {
-            throw stale(queueRepo.findById(tenantId, id).map(QueueEntryRow::status).orElseThrow(this::notFound));
+            throw stale(queueRepo.findById(tenantId, id).map(QueueEntryRow::status).orElseThrow(ApiException::notFound));
         }
         eventRepo.record(tenantId, id, current.status(), current.status(), "reassign", null, clock.now(), callerStaffId,
                 callerStaffId.equals(current.doctorId()) || callerStaffId.equals(toDoctorId) ? "doctor" : "desk");
@@ -179,7 +179,4 @@ class QueueBoardService {
                 "This visit is no longer at the stage your screen shows.", Map.of("currentStatus", currentStatus, "code", "STALE_STATUS"));
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

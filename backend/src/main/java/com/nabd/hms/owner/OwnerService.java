@@ -255,7 +255,7 @@ public class OwnerService {
      * the stale token with a fresh one, rather than being stuck with an expired link forever. */
     @Transactional
     public Optional<String> invite(UUID ownerId) {
-        Owner owner = repo.findById(ownerId).orElseThrow(this::notFound);
+        Owner owner = repo.findById(ownerId).orElseThrow(ApiException::notFound);
         if (owner.pinHash() != null) {
             return Optional.empty();
         }
@@ -287,12 +287,12 @@ public class OwnerService {
     public TokenPairResponse selectWorkspace(Jwt pendingToken, WorkspaceSelectRequest req,
                                               String ip, String device, String userAgent) {
         UUID ownerId = requirePendingWorkspaceToken(pendingToken);
-        Owner owner = repo.findById(ownerId).orElseThrow(this::notFound);
+        Owner owner = repo.findById(ownerId).orElseThrow(ApiException::notFound);
 
         // Data-scoped authorization, not a permission check — an owner selecting a clinic they don't
         // own gets 404, not 403, same "don't confirm existence" rule as every other scope gate here.
         if (!repo.ownsClinic(ownerId, req.clinicId())) {
-            throw notFound();
+            throw ApiException.notFound();
         }
 
         tenantContext.set(req.clinicId());
@@ -369,10 +369,6 @@ public class OwnerService {
                 "Too many failed attempts. Try again later.");
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                "The requested resource was not found.");
-    }
 
     private ApiException inviteInvalid() {
         return new ApiException(HttpStatus.BAD_REQUEST, "invite-invalid", "Invite invalid",

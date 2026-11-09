@@ -72,17 +72,14 @@ public class EtaController {
             throw new ApiException(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "This service identity may not act for that clinic.");
         }
         return tenantScope.run(tid, () -> {
-            var appt = appointments.findById(tid, appointmentId).orElseThrow(EtaController::notFound);
+            var appt = appointments.findById(tid, appointmentId).orElseThrow(ApiException::notFound);
             LocalDate day = clock.clinicDate(tid, appt.startTime());
             EtaService.Day d = eta.day(appt.doctorId(), day);
-            Result r = d.results().stream().filter(x -> appointmentId.equals(x.appointmentId())).findFirst().orElseThrow(EtaController::notFound);
+            Result r = d.results().stream().filter(x -> appointmentId.equals(x.appointmentId())).findFirst().orElseThrow(ApiException::notFound);
             String label = eta.label(r);
             return new Internal(r.position(), r.p50At(), r.p80At(),
                     Map.of("mode", "range", "from", label.substring(0, 5), "to", label.substring(6)), d.v());
         });
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

@@ -26,6 +26,8 @@ import java.util.UUID;
 @Service
 public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyclePort {
 
+    private static final String NOT_FOUND = "The requested tenant was not found.";
+
     private static final Logger log = LoggerFactory.getLogger(TenantLifecycleService.class);
 
     private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
@@ -73,7 +75,7 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
     @Transactional
     TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
                                          String ipAddress) {
-        String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(this::notFound);
+        String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());
         if (!allowed.contains(toStatus)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-lifecycle-transition", "Invalid lifecycle transition",
@@ -97,14 +99,11 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
     }
 
     public TenantLifecycleResponse getLifecycle(UUID tenantId) {
-        String status = repo.findTenantStatus(tenantId).orElseThrow(this::notFound);
+        String status = repo.findTenantStatus(tenantId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         var events = repo.listEvents(tenantId).stream()
                 .map(e -> new LifecycleEventResponse(e.fromStatus(), e.toStatus(), e.changedBy(), e.reason(), e.changedAt()))
                 .toList();
         return new TenantLifecycleResponse(tenantId, status, events);
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested tenant was not found.");
-    }
 }

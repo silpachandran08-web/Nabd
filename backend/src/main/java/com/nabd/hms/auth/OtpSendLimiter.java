@@ -38,7 +38,7 @@ public class OtpSendLimiter {
     private static final long BUCKET_SECONDS = 60; // counter rows are per minute; the limits sum the buckets they cover
     private static final byte[] TENANT_ALERT_KEY = "tenant-cap-alert".getBytes(StandardCharsets.US_ASCII);
 
-    enum Decision { SEND, LIMITED }
+    public enum Decision { SEND, LIMITED }
 
     private final OtpCounterRepository repo;
     private final EventPublisher events;
@@ -70,7 +70,7 @@ public class OtpSendLimiter {
     }
 
     /** Runs inside the caller's tenant transaction. Records the send when it returns SEND. */
-    Decision tryConsume(UUID tenantId, String e164Digits) {
+    public Decision tryConsume(UUID tenantId, String e164Digits) {
         byte[] h = phoneHmac(e164Digits);
         Instant now = Instant.now(clock);
         Instant bucket = Instant.ofEpochSecond(now.getEpochSecond() / BUCKET_SECONDS * BUCKET_SECONDS);

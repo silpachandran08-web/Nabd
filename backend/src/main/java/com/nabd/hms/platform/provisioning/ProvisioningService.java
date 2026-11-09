@@ -32,6 +32,8 @@ import static com.nabd.hms.platform.provisioning.ProvisioningModels.StepResult;
 @Service
 public class ProvisioningService {
 
+    private static final String NOT_FOUND = "The requested provisioning job was not found.";
+
     private static final Logger log = LoggerFactory.getLogger(ProvisioningService.class);
 
     private static final List<String> STEP_ORDER = List.of(
@@ -80,7 +82,7 @@ public class ProvisioningService {
      * place they differ. Self-serve has no gate, so isGatedAndUnapproved() is always false for it.
      */
     public ProvisioningJobResponse approve(UUID jobId, UUID approvedBy, String ip) {
-        Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        Job job = repo.findJob(jobId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if (!"enterprise".equals(job.path())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-enterprise-path", "Not an enterprise-path job",
                     "Only enterprise-path jobs require approval; this job has no gate to approve.");
@@ -94,7 +96,7 @@ public class ProvisioningService {
 
     public ProvisioningJobResponse getJob(UUID jobId) {
         if (repo.findJob(jobId).isEmpty()) {
-            throw notFound();
+            throw ApiException.notFound(NOT_FOUND);
         }
         return toResponse(jobId);
     }
@@ -108,7 +110,7 @@ public class ProvisioningService {
      * PLT-058: the step is claimed by compare-and-set, so of two concurrent calls exactly one runs it; the other gets 409.
      */
     public ProvisioningJobResponse advance(UUID jobId, UUID operatorId, String ip) {
-        Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        Job job = repo.findJob(jobId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         realDataGuard.check();
         if ("rolled_back".equals(job.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "JOB_TERMINAL", "Job is terminal",
@@ -206,7 +208,7 @@ public class ProvisioningService {
 
     /** Both tokens are reveal-once — only advance() ever has either to pass, right after verify_invite_owner runs. */
     private ProvisioningJobResponse toResponse(UUID jobId, String ownerInviteToken, String ownerAccountInviteToken) {
-        Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        Job job = repo.findJob(jobId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         return toResponse(job, repo.findSteps(jobId), ownerInviteToken, ownerAccountInviteToken);
     }
 
@@ -220,8 +222,4 @@ public class ProvisioningService {
                 ownerInviteToken, ownerAccountInviteToken);
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                "The requested provisioning job was not found.");
-    }
 }

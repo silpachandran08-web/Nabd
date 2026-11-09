@@ -153,7 +153,7 @@ public class AppointmentService {
     @Transactional
     public AppointmentResponse get(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        return repo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.findById(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
@@ -238,14 +238,14 @@ public class AppointmentService {
     }
 
     private AppointmentRow requireScheduled(UUID tenantId, UUID id) {
-        AppointmentRow a = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        AppointmentRow a = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if ("arrived".equals(a.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "appointment-arrived", "Appointment already arrived",
                     "The patient has checked in; the appointment can no longer be cancelled or rescheduled.",
                     java.util.Map.of("code", "APPOINTMENT_ARRIVED"));
         }
         if (!"scheduled".equals(a.status())) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         return a;
     }
@@ -317,9 +317,6 @@ public class AppointmentService {
         return SessionModes.expectedRange(row.startTime(), row.endTime(), row.sessionToken(), avg, clock.zone(row.tenantId()));
     }
 
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 
     private ApiException sessionFull(boolean online) {
         return new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",

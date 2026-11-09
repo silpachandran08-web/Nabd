@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.ApiException;
+
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.shared.FileStore;
 import com.nabd.hms.shared.phiread.PhiRead;
@@ -84,7 +86,7 @@ class AttachmentController {
     @PostMapping("/v1/files/{id}/download-url")
     @PreAuthorize("hasAuthority('clinical:view')")
     DownloadUrl downloadUrl(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        FileStore.FileInfo f = files.info(id).filter(i -> i.patientId() != null).orElseThrow(AttachmentService::notFound);
+        FileStore.FileInfo f = files.info(id).filter(i -> i.patientId() != null).orElseThrow(ApiException::notFound);
         scopes.requirePatient(scopes.resolve(jwt), f.patientId());
         FileStore.SignedUrl u = files.downloadUrl(id);
         return new DownloadUrl(u.url(), u.expiresAt(), f.patientId());

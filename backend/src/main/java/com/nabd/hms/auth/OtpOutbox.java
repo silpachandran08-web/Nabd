@@ -17,7 +17,7 @@ import java.util.UUID;
  * (never the code). {@link OtpRequestedHandler} sends it from the outbox with no transaction open.
  */
 @Component
-class OtpOutbox {
+public class OtpOutbox {
 
     static final String EVENT_TYPE = "iam.otp.requested.v1";
 
@@ -32,7 +32,7 @@ class OtpOutbox {
     }
 
     /** purpose: 'login' or 'pin_reset'. TenantContext must already be set (it is, in AuthService). */
-    UUID queue(UUID tenantId, UUID staffId, String purpose, String code, Instant expiresAt) {
+    public UUID queue(UUID tenantId, UUID staffId, String purpose, String code, Instant expiresAt) {
         UUID id = UUID.randomUUID(); // known before the insert: the ciphertext's AAD binds it to this row (PLT-044)
         jdbc.update("""
                 INSERT INTO otp_requests (id, tenant_id, staff_id, purpose, code_enc, expires_at) VALUES (?,?,?,?,?,?)
