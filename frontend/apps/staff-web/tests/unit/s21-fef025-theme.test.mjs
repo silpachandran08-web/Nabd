@@ -9,6 +9,14 @@ import { proxy, signInCookiesFrom } from "../../app/lib/bff.ts";
 import { printCss, PAPERS } from "../../../../packages/ui/src/print/paper.ts";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+/** [hue deg, saturation, lightness] of #rrggbb. */
+function hsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(h * 60 + 360) % 360, d / (1 - Math.abs(2 * l - 1)), l];
+}
 const tok = (f) => JSON.parse(read(`../../../../packages/tokens/src/source/${f}`));
 const { scan } = await import("../../scripts/check-tokens.mjs");
 
@@ -46,8 +54,14 @@ test("AC1: every dark token has a light counterpart equal to the prototype nb.cs
   }
   for (const [k, why] of Object.entries(dev)) assert.ok(keys.includes(k) && /AA|:1/.test(why), `deviation ${k} needs a contrast reason`);
   // The spec's named values hold exactly: accent text darkens, fills stay bright cyan with dark ink, clinical states darken.
-  const want = { "accent-500": "#0b7f8b", "accent-fill": "#2ed3e0", "on-accent": "#04231f", "danger-500": "#d42a2d", "urgent-500": "#b8530f", "warn-500": "#946200", "ok-500": "#0b7a52", "info-500": "#1c68aa" };
+  const want = { "accent-fill": "#2ed3e0", "on-accent": "#04231f", "urgent-500": "#b8530f", "warn-500": "#946200", "ok-500": "#0b7a52", "info-500": "#1c68aa" };
   for (const [k, v] of Object.entries(want)) assert.equal(light[k], v, k);
+  // T1-BUG-5: accent and crit text keep the spec's hue, darkened (a listed deviation) only as far as AA on the light page surfaces needs.
+  for (const [k, spec] of [["accent-500", "#0b7f8b"], ["danger-500", "#d42a2d"]]) {
+    assert.ok(k in dev, `${k} is a listed deviation`);
+    assert.ok(Math.abs(hsl(light[k])[0] - hsl(spec)[0]) < 1.5, `${k} keeps the hue of ${spec}`);
+    assert.ok(hsl(light[k])[2] < hsl(spec)[2], `${k} is darker than ${spec}`);
+  }
   const css = read("../../../../packages/tokens/dist/tokens.css");
   assert.match(css, /:root\[data-theme="light"\] \{\n {2}color-scheme: light;/);
   assert.match(css, /--nb-accent-fill: #2ed3e0;/);
@@ -64,6 +78,15 @@ test("AC4/AC5: contrast gate covers both themes; crit text on white >= 4.5 in li
     }
   }
   assert.equal(tok("color.light.json")["surface-1"], "#ffffff", "light crit pair is measured on white");
+  // T1-BUG-5: accent and crit text where the shell puts them (page, nav, inset surfaces, the active-nav tint), both themes.
+  const placed = [["accent-500", "bg-root"], ["accent-500", "bg-nav"], ["accent-500", "surface-2"], ["accent-500", "surface-3"], ["accent-500", "accent-tint", "bg-root"],
+    ["accent-500", "accent-tint", "bg-nav"], ["danger-500", "bg-root"], ["danger-500", "surface-2"], ["danger-500", "surface-3"], ["danger-500", "danger-tint", "bg-root"]];
+  for (const theme of ["dark", "light"]) {
+    for (const [fg, bg, base] of placed) {
+      const p = rep.pairs.find((x) => x.theme === theme && x.fg === fg && x.bg === bg && x.base === base);
+      assert.ok(p && p.ratio >= 4.5, `${theme} ${fg}/${bg}/${base} ${p?.ratio}`);
+    }
+  }
 });
 
 test("AC5: the allergy banner keeps its icon and shape in both themes (no theme-specific override)", () => {
