@@ -16,6 +16,10 @@ const MONEY_RULES = [
 
 // FEF-038: Login, MFA, accept-invite and Arrivals are fully extracted (ADR-11 order: Login -> Arrivals -> Consult -> Checkout).
 const MIGRATED = ["app/(auth)/login/**/*.tsx", "app/(auth)/accept-invite/**/*.tsx", "app/(clinic)/arrivals/**/*.tsx", "app/components/arrivals/**/*.tsx", "app/components/MfaEnrolCard.tsx", "app/(clinic)/consult/**/*.tsx", "app/components/consult/**/*.tsx"];
+// FEF-040: checkout, OTC, billing (day close), the app shell (nav, top bar, idle lock, error/not-found pages) — last Phase 1 slice.
+MIGRATED.push("app/(clinic)/checkout/**/*.tsx", "app/components/checkout/**/*.tsx", "app/(clinic)/billing/**/*.tsx",
+  "app/ClinicNav.tsx", "app/TopBar.tsx", "app/IdleLockGuard.tsx", "app/AppShell.tsx", "app/RouteChrome.tsx", "app/PlainFrame.tsx", "app/EntitlementsBanner.tsx",
+  "app/HomeRedirect.tsx", "app/LanguagePicker.tsx", "app/shell/**/*.tsx", "app/not-found.tsx", "app/global-error.tsx", "app/*/error.tsx", "app/*/not-found.tsx");
 const TEXT_TEMPLATE_RULES = [
   { selector: "JSXElement > JSXExpressionContainer > :matches(TemplateLiteral, ConditionalExpression > TemplateLiteral, LogicalExpression > TemplateLiteral)", message: "A template literal builds user-facing text. Use a next-intl ICU message with placeholders." },
   { selector: "JSXAttribute[name.name=/^(aria-label|aria-description|title|placeholder|alt|label|message|hint)$/] > JSXExpressionContainer > TemplateLiteral", message: "A template literal builds user-facing text. Use a next-intl ICU message with placeholders." },
@@ -43,7 +47,7 @@ const eslintConfig = defineConfig([
   { files: ["app/**/*.{ts,tsx}", "lint-fixtures/**/*.{ts,tsx}"], rules: { "no-restricted-syntax": ["error", ...MONEY_RULES] } },
   // FEF-036: migrated folders/files may not carry a literal UI string in JSX; text comes from next-intl catalogues (packages/i18n/messages).
   { files: ["app/TopBar.tsx", "app/LanguagePicker.tsx", ...MIGRATED, "lint-fixtures/i18n/**/*.tsx"], plugins: { i18next },
-    rules: { "i18next/no-literal-string": ["error", { mode: "jsx-text-only", words: { exclude: ["[^a-zA-Z]+", "[A-Z_-]+", "^[⌘⌥⌃⇧]\\w*$"] } }] } },
+    rules: { "i18next/no-literal-string": ["error", { mode: "jsx-text-only", words: { exclude: ["[^a-zA-Z]+", "[A-Z_-]+", "^[⌘⌥⌃⇧]\\w*$", "^F\\d{1,2}$"] } }] } },
   // FEF-038: in migrated folders no template literal may build user-facing text (JSX child or text attribute): use an ICU message.
   { files: [...MIGRATED, "lint-fixtures/i18n/**/*.tsx"], rules: { "no-restricted-syntax": ["error", ...MONEY_RULES, ...TEXT_TEMPLATE_RULES] } },
   // FEF-011: dates and times in migrated files go through app/lib/clinicTime.ts (clinic timezone, one locale).

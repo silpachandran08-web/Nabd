@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api, ApiError, intentKeys } from "../../lib/api";
 import { can } from "../../lib/permissions";
 import styles from "../../(clinic)/checkout/checkout.module.css";
@@ -10,6 +11,7 @@ import styles from "../../(clinic)/checkout/checkout.module.css";
 // Print opens the print route (which prints as soon as the document is on screen). Share calls POST /billing/invoices/{id}/share
 // (Core billing, FIN-012): the patient gets a secure link, never a file in chat.
 export default function InvoiceActions({ invoiceId, reprint = false }: { invoiceId: string; reprint?: boolean }) {
+  const tr = useTranslations("checkout.invoiceActions");
   const keys = useRef(intentKeys());
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,18 +33,18 @@ export default function InvoiceActions({ invoiceId, reprint = false }: { invoice
     try {
       await api.post(`/billing/invoices/${encodeURIComponent(invoiceId)}/share`, body, { idempotencyKey: keys.current.get("share", body) });
       keys.current.done("share");
-      setMsg("Secure link sent on WhatsApp.");
+      setMsg(tr("sent"));
     } catch (e) {
       const t = e instanceof ApiError ? String(e.problem?.type ?? "") : "";
-      setMsg(t.endsWith("no-messaging-consent") ? "The patient hasn't agreed to WhatsApp messages." : t.endsWith("no-phone") ? "There is no phone number for this patient." : "Couldn't send the link. Try again.");
+      setMsg(t.endsWith("no-messaging-consent") ? tr("noConsent") : t.endsWith("no-phone") ? tr("noPhone") : tr("sendFailed"));
     } finally { setBusy(false); }
   };
 
   return (
     <div className={styles.docActions}>
-      <Link ref={receiptLink} className={styles.backBtn} href={receiptHref}>Print receipt</Link>
-      <Link className={styles.backBtn} href={`${base}?kind=invoice&auto=1${copy}`}>Print invoice</Link>
-      {can("billing:edit") && <button type="button" onClick={() => void send()} disabled={busy}>{busy ? "Sending…" : "Send on WhatsApp"}</button>}
+      <Link ref={receiptLink} className={styles.backBtn} href={receiptHref}>{tr("printReceipt")}</Link>
+      <Link className={styles.backBtn} href={`${base}?kind=invoice&auto=1${copy}`}>{tr("printInvoice")}</Link>
+      {can("billing:edit") && <button type="button" onClick={() => void send()} disabled={busy}>{busy ? tr("sending") : tr("sendWhatsapp")}</button>}
       {msg && <div role="status" className={styles.muted}>{msg}</div>}
     </div>
   );
