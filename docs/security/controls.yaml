@@ -2,6 +2,7 @@
 # tests: JUnit test classes (or Class#method) whose latest results verify the control; all must pass.
 # evidence: in-repo path or URL; counts as verified only once accepted_by and accepted_on are filled by the owner.
 # owner: placeholder GitHub team (Needs external action: name a person per control).
+# due: OPS-050 Phase 1 gate: every control still unverified needs an ISO date (YYYY-MM-DD) set by its owner (phase1_gate.py controls).
 # Checked by: python3 scripts/ci/phase0_gate.py controls  (see docs/gates/README.md)
 controls:
   - id: SC-01
@@ -22,7 +23,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [PatientApiTest#listRequiresFullyVerifiedCaller]
     evidence: []
   - id: SC-03
     domain: "Identity"
@@ -92,7 +93,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [PatientApiTest#restrictedFieldGrantOmitsOutstandingBalanceFromTheResponse]
     evidence: []
   - id: SC-10
     domain: "Access control"

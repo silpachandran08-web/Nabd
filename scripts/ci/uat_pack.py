@@ -6,6 +6,7 @@ from pathlib import Path
 
 PERSONAS = ["reception", "doctor", "nurse", "billing", "solo", "owner"]
 TARGETS = {"walk_in": 45, "booking": 60, "repeat_rx": 30, "checkout": 60}  # seconds, median; mirrored in docs/uat/stopwatch.md
+OPTIONAL = {"dispense": 20}  # OPS-050: timed from cohort B on (pharmacy); reported when sampled, not required for the OPS-049 pack
 SLA_DAYS = {"S1": 1, "S2": 5}
 TRIAGE_COLS = "id,clinic,date_found,persona,screen,severity,description,owner,sla_due,status,fixed_on,notes".split(",")
 STATUSES = {"open", "in_progress", "fixed", "wont_fix"}
@@ -42,7 +43,7 @@ def check_pack(root="docs/uat"):
 def stopwatch(path):
     by = {}
     for r in rows(path, "clinic,moment,sample,seconds,date,timer,notes".split(",")):
-        if r["moment"] not in TARGETS: raise SystemExit(f"unknown moment {r['moment']!r}")
+        if r["moment"] not in TARGETS and r["moment"] not in OPTIONAL: raise SystemExit(f"unknown moment {r['moment']!r}")
         by.setdefault((r["clinic"], r["moment"]), []).append(float(r["seconds"]))
     clinics = sorted({c for c, _ in by})
     out, ok = [], bool(clinics)
@@ -52,6 +53,11 @@ def stopwatch(path):
             if not xs: out.append(f"{c} {m}: NO SAMPLES (target {t} s)"); ok = False; continue
             med = statistics.median(xs); hit = med <= t; ok &= hit
             out.append(f"{c} {m}: median {med:g} s over {len(xs)} samples, target {t} s -> {'OK' if hit else 'MISS'}")
+        for m, t in OPTIONAL.items():
+            xs = by.get((c, m))
+            if xs:
+                med = statistics.median(xs); ok &= med <= t
+                out.append(f"{c} {m}: median {med:g} s over {len(xs)} samples, target {t} s -> {'OK' if med <= t else 'MISS'}")
     return ok, out
 
 
