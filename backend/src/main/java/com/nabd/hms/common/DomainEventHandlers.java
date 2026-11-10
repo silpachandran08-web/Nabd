@@ -35,6 +35,9 @@ class DomainEventHandlers {
                     if (t == DomainEventType.RX_SIGNED) {
                         continue; // PHL-012: pharmacy.RxSignedWorklistConsumer creates the worklist entry
                     }
+                    if (t == DomainEventType.VISIT_COMPLETED || t == DomainEventType.APPOINTMENT_NO_SHOW) {
+                        continue; // IDC-014: patient.proxy.VisitInstructionsConsumer / MissedVisitAlertConsumer (care fan-out)
+                    }
                     registry.registerBeanDefinition("domainEventLogHandler." + t.type(),
                             new RootBeanDefinition(LogOnly.class, () -> new LogOnly(t.type())));
                 }

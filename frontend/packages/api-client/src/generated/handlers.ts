@@ -22,6 +22,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/internal/v1/drug-master/imports/:importId`, () => HttpResponse.json({}, { status: 200 })), // DrugMasterImportController_status
     http.post(`${baseUrl}/internal/v1/drug-master/imports/:importId/activate`, () => HttpResponse.json({}, { status: 200 })), // DrugMasterImportController_activate
     http.get(`${baseUrl}/internal/v1/notification-requests/:id`, () => HttpResponse.json({"consentClass":"string","language":"string","notAfter":"2026-01-01T00:00:00Z","notBefore":"2026-01-01T00:00:00Z","params":["string"],"purpose":"string","recipient":{"patientId":"00000000-0000-7000-8000-000000000000","phoneE164":"string"},"requestId":"00000000-0000-7000-8000-000000000000","templateKey":"string","tenantId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // NotificationClaimController_claim
+    http.get(`${baseUrl}/internal/v1/patients/:ref/recipients`, () => HttpResponse.json([{"channel":"string","recipientRef":"string","relation":"string"}], { status: 200 })), // InternalRecipientsController_recipients
     http.get(`${baseUrl}/internal/v1/safety-dictionaries/:region/versions`, () => HttpResponse.json([{}], { status: 200 })), // SafetyDictionaryController_listSafetyDictionaryVersions
     http.post(`${baseUrl}/internal/v1/safety-dictionaries/:region/versions`, () => HttpResponse.json({}, { status: 200 })), // SafetyDictionaryController_uploadSafetyDictionaryVersion
     http.post(`${baseUrl}/internal/v1/safety-dictionaries/:region/versions/:versionId/activate`, () => HttpResponse.json({}, { status: 200 })), // SafetyDictionaryController_activateSafetyDictionaryVersion
@@ -552,4 +553,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 538;
+export const operationCount = 539;

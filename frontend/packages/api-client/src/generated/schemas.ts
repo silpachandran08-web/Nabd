@@ -93,6 +93,7 @@ export const QueueEntryResponseSchema = z.object({ ageYears: z.number().int().op
 export const CallNextResponseSchema = z.object({ entry: QueueEntryResponseSchema.optional(), reason: z.string().optional() });
 export const CallbackEntryResponseSchema = z.object({ appointmentId: z.string().optional(), doctorId: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), startTime: z.string().optional(), status: z.string().optional() });
 export const CancelRequestSchema = z.object({ note: z.string().optional(), reason: z.string().optional(), reasonCode: z.string().optional() });
+export const CareRecipientSchema = z.object({ channel: z.string().optional(), recipientRef: z.string().optional(), relation: z.string().optional() });
 export const CellSchema = z.object({ bookings: z.array(BookingSchema).optional(), doctorId: z.string().optional(), kind: z.string().optional(), slotStart: z.string().optional() });
 export const ChangeOfferAcceptSchema = z.object({ slotStart: z.string() });
 export const ChangeOfferRequestSchema = z.object({ slots: z.array(z.string()).optional() });
@@ -697,6 +698,7 @@ export const operationSchemas = {
   DrugMasterImportController_status: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   DrugMasterImportController_activate: { body: DrugMasterActivateRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   NotificationClaimController_claim: { response: NotificationClaimSchema },
+  InternalRecipientsController_recipients: { response: z.array(CareRecipientSchema) },
   SafetyDictionaryController_listSafetyDictionaryVersions: { response: z.array(z.record(z.string(), z.record(z.string(), z.unknown()))) },
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { body: SafetyDictionaryBundleSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   SafetyDictionaryController_activateSafetyDictionaryVersion: { body: ActivateRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },

@@ -83,6 +83,7 @@ export type CallNextResponse = { entry?: QueueEntryResponse; reason?: string; };
 export type CallbackEntryResponse = { appointmentId?: string; doctorId?: string; patientId?: string; patientName?: string; startTime?: string; status?: string; };
 export type CancelReasonRow = { code?: string; count?: number; label?: string; };
 export type CancelRequest = { note?: string; reason?: string; reasonCode?: string; };
+export type CareRecipient = { channel?: string; recipientRef?: string; relation?: string; };
 export type Cell = { bookings?: Array<Booking>; doctorId?: string; kind?: string; slotStart?: string; };
 export type ChangeOfferAccept = { slotStart: string; };
 export type ChangeOfferRequest = { slots?: Array<string>; };
@@ -695,6 +696,7 @@ export type Operations = {
   DrugMasterImportController_status: { method: "get"; path: "/internal/v1/drug-master/imports/{importId}"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
   DrugMasterImportController_activate: { method: "post"; path: "/internal/v1/drug-master/imports/{importId}/activate"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: DrugMasterActivateRequest; response: Record<string, Record<string, unknown>> };
   NotificationClaimController_claim: { method: "get"; path: "/internal/v1/notification-requests/{id}"; permission: "public"; pathParams: { id: string; }; query: never; body: never; response: NotificationClaim };
+  InternalRecipientsController_recipients: { method: "get"; path: "/internal/v1/patients/{ref}/recipients"; permission: "public"; pathParams: { ref: string; }; query: { tenantId: string; class: string; }; body: never; response: Array<CareRecipient> };
   SafetyDictionaryController_listSafetyDictionaryVersions: { method: "get"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: never; response: Array<Record<string, Record<string, unknown>>> };
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: SafetyDictionaryBundle; response: Record<string, Record<string, unknown>> };
   SafetyDictionaryController_activateSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate"; permission: "safety_content:edit"; pathParams: { region: string; versionId: string; }; query: never; body: ActivateRequest; response: Record<string, Record<string, unknown>> };

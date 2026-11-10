@@ -43,6 +43,7 @@ public class OpenApiConfig {
             "/.well-known/jwks.json", "/.well-known/jwks/*.json", "/v1/webhooks/whatsapp", "/v1/billing/gateway-webhooks/*/*",
             "/internal/v1/notification-requests/*", // COM-004: service token, not a bearer
             "/internal/v1/consents:export", // COM-008: same service token
+            "/internal/v1/patients/*/recipients", // IDC-014: same service token
             "/v1/plans/catalogue", // ADM-034: public plan comparison
             "/v1/public/notices/*/*", "/v1/proxy-invites/*", "/v1/proxy-invites/*/otp", "/v1/proxy-invites/*/accept", "/v1/me/profile-claims/*", "/v1/me/profile-claims/*/otp", "/v1/public/links/*/otp", "/v1/public/links/*/open", "/v1/public/trials", "/v1/public/trials/*/verify", "/v1/public/trials/*/status", "/abdm/v3/callbacks/**", "/abdm/v3/hip/patient/share", "/v1/display/pair", "/v1/display/stream", "/files-blob/object"); // PLT-029 signed object URLs (FilesBlobSecurityConfig); ACC-023 lobby TV (own device token), ADM-003 trials, IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
 

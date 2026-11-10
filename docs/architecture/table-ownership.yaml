@@ -49,7 +49,7 @@ modules:
     reads: []
   patient:
     owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_proxies, patient_registry_summary, patients, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
-    reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
+    reads: [appointments, clinical_documents, queue_entries, tenants]  # IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
     owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
     reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes

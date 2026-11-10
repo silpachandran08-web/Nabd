@@ -417,6 +417,49 @@ paths:
       tags:
       - messaging
       x-required-permission: public
+  /internal/v1/patients/{ref}/recipients:
+    get:
+      operationId: InternalRecipientsController_recipients
+      parameters:
+      - in: path
+        name: ref
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: class
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: X-Internal-Token
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CareRecipient"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
   /internal/v1/safety-dictionaries/{region}/versions:
     get:
       operationId: SafetyDictionaryController_listSafetyDictionaryVersions
@@ -22091,6 +22134,15 @@ components:
           type: string
           deprecated: true
         reasonCode:
+          type: string
+    CareRecipient:
+      type: object
+      properties:
+        channel:
+          type: string
+        recipientRef:
+          type: string
+        relation:
           type: string
     Cell:
       type: object
