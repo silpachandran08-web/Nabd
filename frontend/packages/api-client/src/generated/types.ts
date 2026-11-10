@@ -86,6 +86,8 @@ export type CancelRequest = { note?: string; reason?: string; reasonCode?: strin
 export type Cell = { bookings?: Array<Booking>; doctorId?: string; kind?: string; slotStart?: string; };
 export type ChangeOfferAccept = { slotStart: string; };
 export type ChangeOfferRequest = { slots?: Array<string>; };
+export type ChangeRequest = { confirmClinicName?: string; effective: string; targetPlanCode: string; };
+export type ChangeResult = { changeId?: string; currency?: string; direction?: string; effectiveAt?: string; modulesTurningReadOnly?: Array<string>; prorationMinor?: number; status?: string; };
 export type ChargeHeadResponse = { active?: boolean; baseAmount?: number; category?: string; code?: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom?: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; id?: string; name?: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeHeadWriteRequest = { active?: boolean; baseAmount: number; category: string; code: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; name: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeResponse = { baseAmount?: number; category?: string; code?: string; followUpAmount?: number; id?: string; isRx?: boolean; name?: string; stockQty?: number; taxRatePercent?: number; };
@@ -310,8 +312,10 @@ export type InternalVisitStatus = { appointmentId?: string; leaveHomeAlert?: boo
 export type InternalVisitStatusList = { items?: Array<InternalVisitStatus>; };
 export type InviteResendResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; };
 export type InviteView = { caregiverFirstName?: string; clinicName?: string; expiresAt?: string; relation?: string; };
+export type InvoiceItem = { amountMinor?: number; currency?: string; id?: string; issuedAt?: string; kind?: string; number?: string; pdfUrl?: string; period?: string; periodEnd?: string; periodStart?: string; status?: string; };
 export type InvoiceListItem = { balanceDue?: number; createdAt?: string; doctorId?: string; id?: string; invoiceNumber?: string; paid?: number; patientId?: string; patientName?: string; status?: string; total?: number; writtenOff?: number; };
 export type InvoiceListResponse = { items?: Array<InvoiceListItem>; nextCursor?: string; };
+export type InvoicePage = { items?: Array<InvoiceItem>; nextCursor?: string; };
 export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
@@ -355,6 +359,7 @@ export type MfaVerifyRequest = { challengeId: string; code: string; target?: str
 export type ModuleGrant = { approve?: boolean; breakGlass?: boolean; create?: boolean; delete?: boolean; edit?: boolean; export?: boolean; module?: string; refundDiscount?: boolean; view?: boolean; };
 export type ModuleState = { code?: string; enabled?: boolean; };
 export type MoneyResponse = { billsRaised?: number; bookings?: number; collected?: number; currency?: string; from?: string; includesToday?: boolean; noShows?: number; taxCollected?: number; taxLabel?: string; tender?: Array<Tender>; to?: string; topServices?: Array<Service>; waitingNow?: number; };
+export type NextInvoice = { amountMinor?: number; currency?: string; };
 export type NoShowRequest = { reasonCode?: string; };
 export type NoShowRiskResponse = { entries?: Array<Entry>; rule?: string; };
 export type NoShowWeekRow = { bookings?: number; doctorId?: string; doctorName?: string; noShowPct?: number; noShows?: number; weekStart?: string; };
@@ -410,6 +415,7 @@ export type PaymentRequest = { actedByPatientId?: string; actedByRelation?: stri
 export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: string; method?: string; recordedAt?: string; };
 export type PaymentSplit = { amount?: number; method?: string; };
 export type PayrollExportRowResponse = { days?: number; hours?: number; notes?: string; role?: string; salary?: number; staffId?: string; staffName?: string; };
+export type PendingChange = { direction?: string; effectiveAt?: string; id?: string; toPlanCode?: string; };
 export type PharmacyCapabilitiesResponse = { features?: Array<string>; mode?: string; };
 export type PharmacyItemResponse = { active?: boolean; code?: string; coldChain?: boolean; drugId?: string; genericName?: string; hsnCode?: string; id?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name?: string; packSize?: number; price?: number; priceInclusiveOfTax?: boolean; register?: string; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
 export type PharmacyItemStatusRequest = { active: boolean; reason?: string; };
@@ -432,6 +438,7 @@ export type PinResetConfirmRequest = { mobilePhone: string; newPin: string; tena
 export type PinResetRequestRequest = { mobilePhone: string; tenantSlug: string; };
 export type PlanCatalogueEntry = { code?: string; currency?: string; limits?: Limits; modules?: Array<string>; name?: string; priceMinor?: number; pricingBasis?: string; };
 export type PlanMixResponse = { planCode?: string; tenantCount?: number; };
+export type PlanOption = { branchLimit?: number; code?: string; modules?: Array<string>; monthlyMinor?: number; name?: string; pricingBasis?: string; seatLimit?: number; version?: number; };
 export type PlanResponse = { active?: boolean; branchLimit?: number; code?: string; createdAt?: string; currency?: string; id?: string; market?: string; modules?: Array<string>; monthlyPriceCents?: number; name?: string; onTrialExpiry?: string; pricingBasis?: string; seatLimit?: number; version?: number; visitsPerMonth?: number; };
 export type PlanVersionResponse = { branchLimit?: number; modules?: Array<string>; monthlyPriceCents?: number; publishedAt?: string; seatLimit?: number; subscriptions?: number; version?: number; visitsPerMonth?: number; };
 export type PlanWriteRequest = { active?: boolean; code: string; currency: string; limits?: Limits; market?: string; modules?: Array<string>; monthlyPriceCents: number; name: string; onTrialExpiry?: string; pricingBasis?: string; seatLimit?: number; };
@@ -603,7 +610,7 @@ export type StockTakeStarted = { lineCount?: number; stockTakeId?: string; };
 export type StockTakeSummary = { approvedByName?: string; countedCount?: number; createdByName?: string; lineCount?: number; postedAt?: string; postedByName?: string; scope?: string; scopeValue?: string; snapshotAt?: string; status?: string; stockTakeId?: string; };
 export type SubscriptionPage = { data?: Array<SubscriptionResponse>; page?: PageMeta; };
 export type SubscriptionResponse = { createdAt?: string; currency?: string; id?: string; mrrCents?: number; planCode?: string; planId?: string; planName?: string; region?: string; renewalDate?: string; seatLimit?: number; seatsUsed?: number; tenantId?: string; tenantName?: string; tenantSlug?: string; tenantStatus?: string; };
-export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; branchesLimit?: number; branchesUsed?: number; killedFeatures?: Array<string>; modules?: Array<ModuleState>; plan?: string; seatsLimit?: number; seatsUsed?: number; status?: string; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
+export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; availablePlans?: Array<PlanOption>; branchesLimit?: number; branchesUsed?: number; currency?: string; killedFeatures?: Array<string>; modules?: Array<ModuleState>; nextInvoice?: NextInvoice; paymentMethod?: string; pendingChange?: PendingChange; plan?: string; planCode?: string; renewalDate?: string; seatsLimit?: number; seatsUsed?: number; status?: string; usage?: Usage; version?: number; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
 export type SubscriptionTransitionRequest = { reason: string; toStatus: string; };
 export type SubscriptionUpsertRequest = { mrrCents?: number; planId: string; renewalDate: string; startTrial?: boolean; };
 export type SuggestedLine = { chargeCode?: string; emergencyAmount?: number; followUpAmount?: number; name?: string; normalAmount?: number; reason?: string; tier?: string; unitPrice?: number; };
@@ -647,6 +654,7 @@ export type UiPreferencesWrite = { digitStyle?: string; uiLocale?: string; uiThe
 export type Unbilled = { doctorName?: string; endedAt?: string; patientName?: string; queueEntryId?: string; token?: number; };
 export type UnlockRequest = { pin: string; };
 export type UpdateRequest = { assessment?: string; favourite?: boolean; name?: string; objective?: string; plan?: string; subjective?: string; tags?: Array<string>; };
+export type Usage = { aiChecks?: number; branchesLimit?: number; branchesUsed?: number; seatsLimit?: number; seatsUsed?: number; whatsappPassThroughMinor?: number; whatsappUtilityMessages?: number; };
 export type VaccineRecordRequest = { dose: string; expiryDate?: string; lotNumber?: string; notes?: string; patientId: string; queueEntryId?: string; route: string; site?: string; vaccineName: string; };
 export type VaccineRecordResponse = { administeredAt?: string; dose?: string; expiryDate?: string; id?: string; lotNumber?: string; notes?: string; patientId?: string; patientName?: string; queueEntryId?: string; recordedByName?: string; route?: string; site?: string; vaccineName?: string; };
 export type VerifyRequest = { otp?: string; };
@@ -1176,6 +1184,10 @@ export type Operations = {
   SetupController_addShift: { method: "post"; path: "/v1/setup/shifts"; permission: "setup:edit"; pathParams: never; query: never; body: StaffShiftWriteRequest; response: StaffShiftResponse };
   SetupController_staff: { method: "get"; path: "/v1/setup/staff"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<StaffSummaryResponse> };
   SetupController_subscription: { method: "get"; path: "/v1/setup/subscription"; permission: "setup:view"; pathParams: never; query: never; body: never; response: SubscriptionSummaryResponse };
+  OwnerPlanController_change: { method: "post"; path: "/v1/setup/subscription/change"; permission: "setup:edit"; pathParams: never; query: never; body: ChangeRequest; response: ChangeResult };
+  OwnerPlanController_preview: { method: "get"; path: "/v1/setup/subscription/change-preview"; permission: "setup:view"; pathParams: never; query: { targetPlanCode: string; effective?: string; }; body: never; response: Preview };
+  OwnerPlanController_invoices: { method: "get"; path: "/v1/setup/subscription/invoices"; permission: "setup:view"; pathParams: never; query: { cursor?: string; limit?: number; }; body: never; response: InvoicePage };
+  OwnerPlanController_invoice: { method: "get"; path: "/v1/setup/subscription/invoices/{id}"; permission: "setup:view"; pathParams: { id: string; }; query: never; body: never; response: InvoiceItem };
   ClinicTrialController_status: { method: "get"; path: "/v1/setup/trial"; permission: "setup:view"; pathParams: never; query: never; body: never; response: TrialStatusResponse };
   ClinicTrialController_convert: { method: "post"; path: "/v1/setup/trial/convert"; permission: "setup:edit"; pathParams: never; query: never; body: TrialConvertRequest; response: TrialConvertResponse };
   ClinicTrialController_requestOtp: { method: "post"; path: "/v1/setup/trial/convert/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };

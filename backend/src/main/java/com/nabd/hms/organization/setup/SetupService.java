@@ -67,12 +67,15 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final CalendarService calendar;
     private final com.nabd.hms.organization.licence.LicenceLifecycleService licences;
     private final PriceChangeLog pricingLog;
+    private final com.nabd.hms.organization.api.PlanAccount planAccount;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
                  com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
                  CalendarService calendar,
-                 com.nabd.hms.organization.licence.LicenceLifecycleService licences, PriceChangeLog pricingLog) {
+                 com.nabd.hms.organization.licence.LicenceLifecycleService licences, PriceChangeLog pricingLog,
+                 com.nabd.hms.organization.api.PlanAccount planAccount) {
+        this.planAccount = planAccount;
         this.calendar = calendar;
         this.licences = licences;
         this.pricingLog = pricingLog;
@@ -305,11 +308,21 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         int branchLimit = entitlements.branchLimit();
         int seatLimit = entitlements.seatLimit();
         var modules = entitlements.modules();
+        long branchesLimit = branchLimit == Integer.MAX_VALUE ? s.branchesLimit() : branchLimit;
+        long seatsUsed = actors.seatsInUse(tenantId);
+        Long seatsLimit = seatLimit == Integer.MAX_VALUE ? null : (long) seatLimit;
+        var account = planAccount.account(tenantId).orElse(null); // ADM-037
+        var usage = new SubscriptionSummaryResponse.Usage(seatsUsed, seatsLimit, s.branchesUsed(), branchesLimit,
+                repo.whatsappUtilityMessagesThisMonth(tenantId), null, null);
         return new SubscriptionSummaryResponse(s.plan(), s.status(), s.patientsUsed(), s.patientsLimit(),
-                s.messagesUsed(), s.messagesLimit(), s.branchesUsed(), branchLimit == Integer.MAX_VALUE ? s.branchesLimit() : branchLimit,
+                s.messagesUsed(), s.messagesLimit(), s.branchesUsed(), branchesLimit,
                 modules.entrySet().stream().map(e -> new SubscriptionSummaryResponse.ModuleState(e.getKey(), e.getValue())).toList(),
                 modules.keySet().stream().filter(entitlements::killed).toList(),
-                actors.seatsInUse(tenantId), seatLimit == Integer.MAX_VALUE ? null : (long) seatLimit);
+                seatsUsed, seatsLimit,
+                account == null ? null : account.planCode(), account == null ? null : account.version(),
+                account == null ? null : account.renewalDate(), account == null ? null : account.currency(),
+                account == null ? null : new SubscriptionSummaryResponse.NextInvoice(account.nextInvoiceMinor(), account.currency()),
+                null, usage, account == null ? java.util.List.of() : account.plans(), account == null ? null : account.pendingChange());
     }
 
     @Transactional

@@ -2068,6 +2068,58 @@ paths:
       responses:
         "200": { description: "Subscription summary", content: { application/json: { schema: { $ref: "#/components/schemas/SubscriptionSummary" } } } }
 
+  /setup/subscription/change-preview:
+    get:
+      tags: [Setup]
+      summary: What a plan change would cost and switch off (ADM-037)
+      description: Pro rata charge (negative = credit) for the rest of the billing month, the modules that become read-only (no data is deleted), whether the clinic has more branches than the target allows, and whether the clinic name must be typed (downgrades).
+      x-required-permission: setup:view
+      parameters:
+        - { name: targetPlanCode, in: query, required: true, schema: { type: string } }
+        - { name: effective, in: query, required: false, schema: { type: string, enum: [now, renewal], default: now } }
+      responses:
+        "200": { description: "Preview", content: { application/json: { schema: { type: object } } } }
+        "404": { description: "PLAN_NOT_OFFERED" }
+        "409": { description: "NO_SUBSCRIPTION or SAME_PLAN" }
+
+  /setup/subscription/change:
+    post:
+      tags: [Setup]
+      summary: Owner upgrades or downgrades the plan (ADM-037)
+      description: Built-in Owner only, X-Step-Up-Token from /v1/auth/mfa/verify with target "plan-change:{targetPlanCode}:{effective}" (single use). An upgrade applies at once with a pro rata 'due' Nabd invoice; a downgrade applies at the next renewal unless effective=now and needs confirmClinicName. Applying publishes platform.entitlements.changed.v1.
+      x-required-permission: setup:edit
+      x-step-up: true
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [targetPlanCode, effective], properties: { targetPlanCode: { type: string }, effective: { type: string, enum: [now, renewal] }, confirmClinicName: { type: string } } } } }
+      responses:
+        "202": { description: "{ changeId, status applied|scheduled, direction, prorationMinor, currency, effectiveAt, modulesTurningReadOnly[] }", content: { application/json: { schema: { type: object } } } }
+        "403": { description: "NOT_OWNER, step-up-required, STEP_UP_REUSED" }
+        "409": { description: "BRANCHES_EXCEED_TARGET, SAME_PLAN, NO_SUBSCRIPTION" }
+        "422": { description: "CONFIRM_NAME_MISMATCH" }
+
+  /setup/subscription/invoices:
+    get:
+      tags: [Setup]
+      summary: Nabd invoices to this clinic, newest first (ADM-037)
+      x-required-permission: setup:view
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20 } }
+      responses:
+        "200": { description: "{ items: [{ id, number, kind, period, periodStart, periodEnd, amountMinor, currency, status, issuedAt, pdfUrl }], nextCursor }. pdfUrl is null until the subscription billing gateway issues the tax invoice PDF.", content: { application/json: { schema: { type: object } } } }
+
+  /setup/subscription/invoices/{id}:
+    get:
+      tags: [Setup]
+      summary: One Nabd invoice of this clinic (ADM-037)
+      x-required-permission: setup:view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Invoice", content: { application/json: { schema: { type: object } } } }
+        "404": { description: "Not this clinic's invoice" }
+
   /setup/import-jobs:
     get:
       tags: [Setup]
