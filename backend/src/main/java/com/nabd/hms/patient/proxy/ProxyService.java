@@ -164,6 +164,9 @@ class ProxyService implements ProxyAccess {
         for (Map<String, Object> r : jdbc.queryForList("SELECT id, split_part(name, ' ', 1) AS first_name FROM patients WHERE guardian_id = ? AND status = 'active' ORDER BY created_at", caregiver)) {
             out.add(new Member(refs.refFor((UUID) r.get("id")), (String) r.get("first_name"), "guardian", "guardian"));
         }
+        for (UUID id : endedAt18(caregiver, null)) { // IDC-012: shown for 90 days as "access ended at 18"
+            out.add(new Member(refs.refFor(id), jdbc.queryForObject("SELECT split_part(name, ' ', 1) FROM patients WHERE id = ?", String.class, id), "guardian", "ended_at_18"));
+        }
         return out;
     }
 
@@ -171,11 +174,23 @@ class ProxyService implements ProxyAccess {
     public Access access(String caregiverRef, String memberRef, boolean records) {
         UUID caregiver = refs.patientIdFor(caregiverRef).orElseThrow(ProxyService::notAProxy);
         UUID subject = refs.patientIdFor(memberRef).orElseThrow(ProxyService::notAProxy);
-        Acting a = relationFor(caregiver, subject).orElseThrow(ProxyService::notAProxy);
+        Acting a = relationFor(caregiver, subject).orElseThrow(() -> endedAt18(caregiver, subject).isEmpty() ? notAProxy()
+                : new ApiException(HttpStatus.FORBIDDEN, "access-ended-at-18", "Access ended at 18", "Access ended when they turned 18. They can give you access again from their own phone.",
+                        Map.of("code", "access-ended-at-18")));
         if (records) {
             requireRecords(caregiver, subject);
         }
         return new Access(a.relation(), a.scope(), a.status());
+    }
+
+    /** IDC-012: members whose age-18 handover ended this caregiver's access (claimed keeping nothing, or 30 days with no claim) and who
+     * have not given a proxy since; subject null = all of them. */
+    private List<UUID> endedAt18(UUID caregiver, UUID subject) {
+        return jdbc.queryForList("SELECT DISTINCT c.patient_id FROM profile_claims c WHERE c.guardian_patient_id = ? AND (?::uuid IS NULL OR c.patient_id = ?) "
+                        + "AND (c.outcome = 'expired' OR c.kept_scope = 'NONE') AND coalesce(c.claimed_at, c.expires_at) > now() - interval '90 days' "
+                        + "AND NOT EXISTS (SELECT 1 FROM patients p WHERE p.id = c.patient_id AND p.guardian_id = c.guardian_patient_id) "
+                        + "AND NOT EXISTS (SELECT 1 FROM patient_proxies x WHERE x.proxy_patient_id = c.guardian_patient_id AND x.subject_patient_id = c.patient_id AND x.status <> 'revoked')",
+                UUID.class, caregiver, subject, subject);
     }
 
     // ---- the subject side (IDC-013): the patient downgrades or removes a caregiver ----

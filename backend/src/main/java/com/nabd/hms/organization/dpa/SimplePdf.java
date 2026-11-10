@@ -9,7 +9,7 @@ import java.util.List;
  * Text-only PDF (Helvetica, A4, no dependency). shortcut: Latin-1 only (anything else prints as '?') and no real layout;
  * swap for the document renderer once one exists, and for an Arabic-capable font before the GCC DPA is translated.
  */
-final class SimplePdf {
+public final class SimplePdf { // ADM-015: also the per-patient PDF of the data export
 
     private static final int LINES_PER_PAGE = 52;
     private static final int WRAP = 92;
@@ -17,7 +17,7 @@ final class SimplePdf {
     private SimplePdf() {
     }
 
-    static byte[] render(List<String> lines) {
+    public static byte[] render(List<String> lines) {
         List<String> wrapped = new ArrayList<>();
         for (String l : lines) {
             String t = l.startsWith("## ") ? l.substring(3).toUpperCase() : l.startsWith("# ") ? l.substring(2).toUpperCase() : l;

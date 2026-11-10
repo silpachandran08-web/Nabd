@@ -6,5 +6,6 @@ import java.util.UUID;
 /** NB-082: one row of the "guardian access review due" worklist — a patient who has turned 18 but
  * still has a guardian on file. */
 public record GuardianReviewResponse(UUID patientId, String mrn, String patientName, LocalDate dob,
-                                      UUID guardianId, String guardianName) {
+                                      UUID guardianId, String guardianName,
+                                      /* IDC-012 */ LocalDate handoverDate, String status, java.time.Instant claimSentAt, java.time.Instant claimExpiresAt) {
 }

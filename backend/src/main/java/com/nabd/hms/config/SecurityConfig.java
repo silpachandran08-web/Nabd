@@ -163,6 +163,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/internal/v1/notification-requests/*").permitAll() // COM-004: its own service token, checked in NotificationClaimController
                         .requestMatchers("/internal/v1/consents:export").permitAll() // COM-008: same service token, checked in ConsentExportController
+                        .requestMatchers("/internal/v1/patients/*/recipients").permitAll() // IDC-014: same service token, checked in InternalRecipientsController
                         .anyRequest().access((authn, ctx) -> authenticated(authn)));
         harden(http);
         resourceServer(http, decoder, jwtAuthenticationConverter);
@@ -254,7 +255,8 @@ public class SecurityConfig {
                                 "/v1/plans/catalogue", // ADM-034: public plan comparison
                                 "/v1/billing/gateway-webhooks/*/*", // FIN-020: HMAC-signed by the payment gateway, verified in PaymentGatewayWebhookController
                                 "/v1/webhooks/whatsapp", // HMAC-signed by Meta, verified in WhatsAppWebhookController
-                                "/internal/v1/notification-requests/*" // COM-004: internal service token, checked in NotificationClaimController
+                                "/internal/v1/notification-requests/*", // COM-004: internal service token, checked in NotificationClaimController
+                                "/internal/v1/patients/*/recipients" // IDC-014: same token, checked in InternalRecipientsController
                         ).permitAll()
                         .anyRequest().access((authn, ctx) -> authenticated(authn))
                 );

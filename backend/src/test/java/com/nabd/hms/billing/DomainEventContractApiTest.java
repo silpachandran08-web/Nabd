@@ -294,6 +294,9 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.PHARMACY_WORKLIST_STATUS_CHANGED.type()); // PHL-012: Phl012WorklistApiTest
         expected.remove(DomainEventType.PHARMACY_RETURN_ACCEPTED.type()); // PHL-011: Phl011PharmacyReturnApiTest
         expected.remove(DomainEventType.PATIENT_PROXY_CHANGED.type()); // IDC-013: Idc013ProxyChangeApiTest
+        expected.remove(DomainEventType.PATIENT_GUARDIAN_HANDOVER_DUE.type()); // IDC-012: Idc012ProfileClaimApiTest
+        expected.remove(DomainEventType.PATIENT_GUARDIAN_HANDOVER_COMPLETED.type()); // IDC-012: Idc012ProfileClaimApiTest
+        expected.remove(DomainEventType.ORGANIZATION_EXPORT_READY.type()); // ADM-015: Adm015DataExportApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

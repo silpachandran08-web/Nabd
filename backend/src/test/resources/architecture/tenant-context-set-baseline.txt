@@ -119,7 +119,6 @@ com.nabd.hms.organization.department.DepartmentService.resolveStatusSequence
 com.nabd.hms.organization.department.DepartmentService.transferTargets
 com.nabd.hms.organization.department.DepartmentService.update
 com.nabd.hms.organization.setup.SetupService.addCharge
-com.nabd.hms.organization.setup.SetupService.addExportJob
 com.nabd.hms.organization.setup.SetupService.addHoliday
 com.nabd.hms.organization.setup.SetupService.addImportJob
 com.nabd.hms.organization.setup.SetupService.addLicence

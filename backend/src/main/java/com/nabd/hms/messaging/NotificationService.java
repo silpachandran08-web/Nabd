@@ -52,12 +52,14 @@ public class NotificationService implements NotificationPort {
     private final TransactionTemplate tx;
     private final CommsCutover cutover;
     private final com.nabd.hms.organization.api.QuietHours quietHours;
+    private final com.nabd.hms.patient.api.CareRecipients care;
 
     NotificationService(NotificationRequestRepository repo, WhatsAppTemplateRepository templates, WhatsAppMessageService whatsApp,
                         EventPublisher publisher, TenantContext tenantContext, FieldCipher cipher, ObjectMapper json, ClinicClock clock,
                         TenantScope tenantScope, PlatformTransactionManager txManager, CommsCutover cutover,
-                        com.nabd.hms.organization.api.QuietHours quietHours) {
+                        com.nabd.hms.organization.api.QuietHours quietHours, com.nabd.hms.patient.api.CareRecipients care) {
         this.quietHours = quietHours;
+        this.care = care;
         this.cutover = cutover;
         this.tenantScope = tenantScope;
         this.tx = new TransactionTemplate(txManager);
@@ -112,6 +114,13 @@ public class NotificationService implements NotificationPort {
 
     @Override
     @Transactional
+    public boolean sendable(NotificationPurpose purpose, String language) {
+        return templates.findByName(tenantContext.current(), purpose.templateKey(), language == null ? "en" : language)
+                .filter(WhatsAppTemplateRepository.Template::sendable).isPresent();
+    }
+
+    @Override
+    @Transactional
     public int cancelBySubject(String subjectType, UUID subjectId, CancelReason reason) {
         UUID tenantId = tenantContext.current();
         List<UUID> ids = repo.cancelBySubject(tenantId, subjectType, subjectId);
@@ -122,10 +131,20 @@ public class NotificationService implements NotificationPort {
     /** Claim check for the Comms side: render params and recipient of a pending request. 410 SUBJECT_GONE once cancelled. */
     public NotificationClaim claim(UUID id) {
         UUID tenantId = tx.execute(s -> repo.tenantOf(id)).orElseThrow(NotificationService::notFound); // the caller knows only the id
-        return tenantScope.run(tenantId, () -> {
+        NotificationClaim c = tenantScope.run(tenantId, () -> {
             var row = repo.find(tenantId, id).orElseThrow(NotificationService::notFound);
+            if (!careAllowed(row)) { // IDC-014: the caregiver lost the scope (or the patient the consent) since the request
+                if (repo.move(tenantId, id, "cancelled")) {
+                    cancelled(tenantId, id, CancelReason.CONSENT_WITHDRAWN);
+                }
+                return null;
+            }
             return render(row, () -> repo.patientPhone(tenantId, row.recipientPatientId()));
         });
+        if (c == null) {
+            throw gone();
+        }
+        return c;
     }
 
     /** The in-process consumer: hands one pending request to the WhatsApp sender. Idempotent on the row's status. */
@@ -155,6 +174,11 @@ public class NotificationService implements NotificationPort {
             cancelled(tenantId, id, CancelReason.CONSENT_WITHDRAWN);
             return;
         }
+        if (!careAllowed(row)) { // IDC-014: recipients are resolved again at send time
+            repo.move(tenantId, id, "cancelled");
+            cancelled(tenantId, id, CancelReason.CONSENT_WITHDRAWN);
+            return;
+        }
         NotificationClaim c = render(row, () -> repo.patientPhone(tenantId, row.recipientPatientId()));
         whatsApp.queueTemplate(c.recipient().patientId(), c.recipient().phoneE164(), c.templateKey(), c.language(), c.params());
         repo.move(tenantId, id, "dispatched");
@@ -162,8 +186,7 @@ public class NotificationService implements NotificationPort {
 
     private NotificationClaim render(NotificationRequestRepository.Row row, java.util.function.Supplier<java.util.Optional<String>> patientPhone) {
         if ("cancelled".equals(row.status()) || "blocked".equals(row.status()) || row.paramsEnc() == null) {
-            throw new ApiException(HttpStatus.GONE, "subject-gone", "Notification no longer applies",
-                    "The request was cancelled, blocked or its render data has been purged.", Map.of("code", "SUBJECT_GONE"));
+            throw gone();
         }
         JsonNode body = json.readTree(cipher.decrypt(row.paramsEnc(), aad(row.tenantId(), row.id())));
         List<String> params = new java.util.ArrayList<>();
@@ -189,6 +212,21 @@ public class NotificationService implements NotificationPort {
 
     private static FieldCipher.Aad aad(UUID tenantId, UUID id) {
         return FieldCipher.Aad.of(tenantId, "notification_requests", COLUMN, id);
+    }
+
+    private static ApiException gone() {
+        return new ApiException(HttpStatus.GONE, "subject-gone", "Notification no longer applies",
+                "The request was cancelled, blocked or its render data has been purged.", Map.of("code", "SUBJECT_GONE"));
+    }
+
+    /** IDC-014: subject_type care_&lt;class&gt; marks a delivery about patient subject_id (CareFanoutService); its recipient must still
+     * be on that patient's list for the class. Every other request passes. */
+    private boolean careAllowed(NotificationRequestRepository.Row row) {
+        if (row.subjectType() == null || !row.subjectType().startsWith("care_") || row.subjectId() == null || row.recipientPatientId() == null) {
+            return true;
+        }
+        return care.allows(row.subjectId(), row.recipientPatientId(),
+                com.nabd.hms.patient.api.CareRecipients.MessageClass.ofWire(row.subjectType().substring("care_".length())));
     }
 
     private static ApiException notFound() {

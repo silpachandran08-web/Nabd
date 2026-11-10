@@ -326,13 +326,6 @@ class SetupRepository {
                 exportJobMapper(), tenantId);
     }
 
-    UUID insertExportJob(UUID tenantId, UUID staffId, String exportType) {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO data_export_jobs (id, tenant_id, export_type, requested_by) VALUES (?, ?, ?, ?)",
-                id, tenantId, exportType, staffId);
-        return id;
-    }
-
     // ── Licence registry ──
 
     List<LicenceRow> listLicences(UUID tenantId) {

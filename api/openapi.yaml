@@ -2171,13 +2171,10 @@ paths:
         "200": { description: "Export jobs", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ExportJob" } } } } }
     post:
       tags: [Setup]
-      summary: Create a self-serve export job
-      x-required-permission: setup:view
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/ExportJobRequest" } } }
+      summary: Start the owner's full export (ADM-015); needs X-Step-Up-Token asked for with target data-export, used once. 403 STEP_UP_REQUIRED, 409 EXPORT_RUNNING. Generated contract in api/openapi/core.yaml.
+      x-required-permission: setup:export
       responses:
-        "201": { description: "Created export job", content: { application/json: { schema: { $ref: "#/components/schemas/ExportJob" } } } }
+        "202": { description: "Export started { id, status: running, estimateMinutes }" }
 
   /setup/licences:
     get:
