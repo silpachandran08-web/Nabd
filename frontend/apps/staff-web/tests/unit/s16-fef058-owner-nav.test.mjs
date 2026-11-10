@@ -91,7 +91,8 @@ test("the sidebar draws section headings from the catalogue and the facility swi
   const nav = readFileSync(`${app}ClinicNav.tsx`, "utf8");
   assert.match(nav, /ownerSection\.\$\{e\.section\}/);
   const fs = readFileSync(`${app}shell/FacilitySwitcher.tsx`, "utf8");
-  assert.match(fs, /All facilities/);
+  assert.match(fs, /tf\("allFacilities"\)/); // FEF-040: text in the shell catalogue
+  assert.equal(msgs.facility.allFacilities, "All facilities");
   assert.match(fs, /all\.length > 1/); // only a chain (2+ facilities) is offered the aggregate
   assert.match(readFileSync(`${app}(clinic)/overview/page.tsx`, "utf8"), /useFacilityScope\(\) === "all" \? <AllFacilities \/>/);
 });

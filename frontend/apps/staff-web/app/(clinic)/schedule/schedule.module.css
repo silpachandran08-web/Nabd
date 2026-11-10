@@ -403,7 +403,7 @@ button.slot {
 .overlay {
   position: fixed;
   inset: 0;
-  background: var(--nb-scrim, rgba(0, 0, 0, 0.55));
+  background: var(--nb-scrim);
   display: flex;
   align-items: center;
   justify-content: center;

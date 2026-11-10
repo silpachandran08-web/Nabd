@@ -22,7 +22,7 @@
       ["text-primary", "bg-root"], ["text-primary", "bg-canvas"], ["text-primary", "surface-1"], ["text-primary", "surface-2"], ["text-primary", "surface-3"],
       ["text-secondary", "bg-root"], ["text-secondary", "bg-canvas"], ["text-secondary", "surface-1"], ["text-secondary", "surface-2"], ["text-secondary", "surface-3"],
       ["text-tertiary", "bg-root"], ["text-tertiary", "bg-canvas"], ["text-tertiary", "surface-1"], ["text-tertiary", "surface-2"], ["text-tertiary", "surface-3"],
-      ["accent-500", "surface-1"], ["accent-500", "accent-tint"], ["on-accent", "accent-500"],
+      ["accent-500", "surface-1"], ["accent-500", "accent-tint"], ["on-accent", "accent-fill"], ["danger-500", "surface-1"], ["warn-500", "surface-1"], ["ok-500", "surface-1"], ["info-500", "surface-1"], ["urgent-500", "surface-1"],
       ["danger-500", "danger-tint"], ["ok-500", "ok-tint"], ["success-500", "success-tint"], ["warn-500", "warn-tint"], ["info-500", "info-tint"], ["sync-500", "sync-tint"], ["urgent-500", "urgent-tint"]
     ],
     "ui": [

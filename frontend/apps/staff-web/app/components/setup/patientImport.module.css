@@ -5,7 +5,7 @@
 .note { margin: 0; font-size: 13px; color: var(--nb-text-secondary); }
 .row { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; }
 .btn { min-block-size: 44px; padding-inline: var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; cursor: pointer; }
-.btnPrimary { composes: btn; border-color: var(--nb-accent-500); background: var(--nb-accent-500); color: var(--nb-on-accent, #fff); }
+.btnPrimary { composes: btn; border-color: var(--nb-accent-fill); background: var(--nb-accent-fill); color: var(--nb-on-accent); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--nb-space-8); }
 .tile { border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); background: var(--nb-surface-2); }

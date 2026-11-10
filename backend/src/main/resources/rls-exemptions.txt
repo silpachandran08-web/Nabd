@@ -6,3 +6,5 @@ master.support_access_grants    # operator plane: grants clinics give to support
 master.subscriptions            # operator plane: billing
 master.discount_requests        # operator plane: commercial approvals
 master.tenant_feature_overrides # operator plane: per-clinic feature switches, read by tenant_id only (PLT-059)
+master.subscription_changes    # operator plane: owner plan changes (ADM-037), read and written by tenant_id only
+master.platform_invoices       # operator plane: Nabd invoices to the clinic (ADM-037), read by tenant_id only

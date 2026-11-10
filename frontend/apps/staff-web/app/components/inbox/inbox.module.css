@@ -4,7 +4,7 @@
 .listPane, .threadPane { display: flex; flex-direction: column; gap: var(--nb-space-8); min-inline-size: 0; background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-12); }
 .filters { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
 .filter, .chip, .secondary, .primary { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-12); border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer; border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); }
-.filterOn, .primary { background: var(--nb-accent-500); border-color: var(--nb-accent-500); color: var(--nb-on-accent); font-weight: 600; }
+.filterOn, .primary { background: var(--nb-accent-fill); border-color: var(--nb-accent-fill); color: var(--nb-on-accent); font-weight: 600; }
 .primary:disabled { opacity: 0.6; cursor: default; }
 .filter:focus-visible, .chip:focus-visible, .secondary:focus-visible, .primary:focus-visible, .thread:focus-visible, .tplItem:focus-visible, .textarea:focus-visible, .select:focus-visible, .back:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
 .threads { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-8); overflow-y: auto; }
@@ -12,7 +12,7 @@
 .selected { border-color: var(--nb-accent-500); box-shadow: 0 0 0 1px var(--nb-accent-500); }
 .threadTop { display: flex; justify-content: space-between; align-items: center; gap: var(--nb-space-8); }
 .name { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
-.unread { min-inline-size: 22px; text-align: center; border-radius: 999px; background: var(--nb-accent-500); color: var(--nb-on-accent); font-size: 12px; font-weight: 700; padding-inline: 6px; }
+.unread { min-inline-size: 22px; text-align: center; border-radius: 999px; background: var(--nb-accent-fill); color: var(--nb-on-accent); font-size: 12px; font-weight: 700; padding-inline: 6px; }
 .preview { font-size: 13px; color: var(--nb-text-secondary); overflow-wrap: anywhere; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8); }
 .wait { font-size: 12px; color: var(--nb-text-secondary); }

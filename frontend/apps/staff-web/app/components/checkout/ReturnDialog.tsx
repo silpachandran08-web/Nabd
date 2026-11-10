@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatMoney, paymentMethodLabel } from "@nabd/domain";
+import { formatMoney } from "@nabd/domain";
+import { useTranslations } from "next-intl";
+import { usePaymentMethodLabel } from "../../lib/paymentMethodText";
 import type { PharmacyReturnResponse, RefundRequestPage } from "@nabd/api-client/generated";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
@@ -17,6 +19,8 @@ import { decisionErrorMessage, lineBlock, pendingReturns, returnBody, returnErro
 // (billing:approve) approves it below, which issues the credit note, refunds the original payment and puts the units back in their batch.
 // The caller renders this only for billing:edit (the grant of POST /pharmacy/returns and GET /pharmacy/returns/bill).
 export default function ReturnDialog({ initialNumber, onClose }: { initialNumber?: string; onClose: () => void }) {
+  const t = useTranslations("checkout.returns");
+  const paymentMethodLabel = usePaymentMethodLabel();
   const region = getIdentity()?.tenantRegion;
   const canDecide = can("billing:approve") && can("billing:view"); // GET /billing/refund-requests + approve / reject
   const [number, setNumber] = useState(initialNumber ?? "");
@@ -42,11 +46,11 @@ export default function ReturnDialog({ initialNumber, onClose }: { initialNumber
       setMethod("");
     } catch (e) {
       setBill(null);
-      setLoadError(e instanceof ApiError && e.status === 404 ? "No bill with that number in this clinic." : errorText(e, "Couldn't load the bill. Try again."));
+      setLoadError(e instanceof ApiError && e.status === 404 ? t("noBill") : errorText(e, t("loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (initialNumber) void Promise.resolve().then(() => find(initialNumber));
@@ -74,37 +78,35 @@ export default function ReturnDialog({ initialNumber, onClose }: { initialNumber
       setSent(await api.post<PharmacyReturnResponse>("/pharmacy/returns", r.body, { idempotencyKey: keys.current.get("return", r.body) }));
       keys.current.done("return");
     } catch (e) {
-      setSendError(e instanceof ApiError ? returnErrorMessage(e.problem, "Couldn't send the return.") : errorText(e, ""));
+      setSendError(e instanceof ApiError ? returnErrorMessage(e.problem, t("sendFailed")) : errorText(e, ""));
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <Dialog title="Customer return" onClose={onClose} size="lg">
+    <Dialog title={t("title")} onClose={onClose} size="lg">
       <form className={styles.find} onSubmit={(e) => { e.preventDefault(); void find(number); }}>
-        <input className={styles.input} aria-label="Bill number" placeholder="Scan or type the bill number" value={number}
+        <input className={styles.input} aria-label={t("billNumber")} placeholder={t("billPlaceholder")} value={number}
           onChange={(e) => setNumber(e.target.value)} />
-        <button type="submit" className={styles.btn} disabled={loading || !number.trim()}>Find bill</button>
+        <button type="submit" className={styles.btn} disabled={loading || !number.trim()}>{t("findBill")}</button>
       </form>
 
-      {loading && <Skeleton rows={3} label="Loading bill" />}
+      {loading && <Skeleton rows={3} label={t("loadingBill")} />}
       {!loading && loadError && <ErrorState message={loadError} onRetry={() => void find(number)} />}
-      {!loading && !loadError && !bill && <EmptyState title="Find the bill" hint="Returns are taken against the original bill only." icon="receipt" />}
+      {!loading && !loadError && !bill && <EmptyState title={t("findTitle")} hint={t("findHint")} icon="receipt" />}
 
       {!loading && bill && (sent ? (
         <div className={styles.notice} role="status">
-          Return sent for approval: {formatMoney(sent.amount, sent.currency)} goes back to{" "}
-          {Array.from(new Set(bill.refundMethods)).map((m) => paymentMethodLabel(m, region)).join(" / ")} once a second person approves it.
-          The credit note is issued and the stock goes back on approval.
+          {t("sentNotice", { amount: formatMoney(sent.amount, sent.currency), methods: Array.from(new Set(bill.refundMethods)).map((m) => paymentMethodLabel(m, region)).join(" / ") })}
         </div>
       ) : (
         <>
-          <p className={tableStyles.muted}>{bill.invoiceNumber} · {bill.status}</p>
-          {bill.pendingRefundId && <div className={tableStyles.errorState} role="status">A return or refund of this bill is already waiting for approval.</div>}
-          {bill.lines.length === 0 ? <EmptyState title="This bill has no lines." /> : (
+          <p className={tableStyles.muted}>{t("billStatus", { number: bill.invoiceNumber, status: bill.status })}</p>
+          {bill.pendingRefundId && <div className={tableStyles.errorState} role="status">{t("pending")}</div>}
+          {bill.lines.length === 0 ? <EmptyState title={t("noLines")} /> : (
             <table className={tableStyles.table}>
-              <thead><tr><th scope="col">Return</th><th scope="col">Item</th><th scope="col">Sold</th><th scope="col">Qty</th><th scope="col">Pack opened</th></tr></thead>
+              <thead><tr><th scope="col">{t("colReturn")}</th><th scope="col">{t("colItem")}</th><th scope="col">{t("colSold")}</th><th scope="col">{t("colQty")}</th><th scope="col">{t("colOpened")}</th></tr></thead>
               <tbody>
                 {bill.lines.map((l) => {
                   const p = picks[l.invoiceLineId];
@@ -113,23 +115,23 @@ export default function ReturnDialog({ initialNumber, onClose }: { initialNumber
                     <tr key={l.invoiceLineId}>
                       <td>
                         <label className={styles.check}>
-                          <input type="checkbox" aria-label={`Return ${l.name}`} checked={!!p} disabled={!l.allowed || !!bill.pendingRefundId}
+                          <input type="checkbox" aria-label={t("returnItem", { name: l.name })} checked={!!p} disabled={!l.allowed || !!bill.pendingRefundId}
                             onChange={(e) => toggle(l.invoiceLineId, e.target.checked)} />
                         </label>
                       </td>
                       <td>
-                        {l.name}<div className={tableStyles.muted}>{formatMoney(l.unitPrice, bill.currency)} · tax {l.taxRatePercent}%</div>
+                        {l.name}<div className={tableStyles.muted}>{t("priceTax", { price: formatMoney(l.unitPrice, bill.currency), rate: l.taxRatePercent })}</div>
                         {block && <div className={styles.reason}>{block}</div>}
                       </td>
-                      <td>{l.soldQty}{l.returnedQty > 0 && <div className={tableStyles.muted}>{l.returnedQty} returned</div>}</td>
+                      <td>{l.soldQty}{l.returnedQty > 0 && <div className={tableStyles.muted}>{t("returned", { count: l.returnedQty })}</div>}</td>
                       <td>
-                        {p && <input className={styles.qty} type="number" min={1} max={l.returnableQty} aria-label={`Quantity of ${l.name}`} value={p.qty}
+                        {p && <input className={styles.qty} type="number" min={1} max={l.returnableQty} aria-label={t("qtyOf", { name: l.name })} value={p.qty}
                           onChange={(e) => setPicks((x) => ({ ...x, [l.invoiceLineId]: { ...p, qty: e.target.value } }))} />}
                       </td>
                       <td>
                         {p && (
                           <label className={styles.check}>
-                            <input type="checkbox" aria-label={`${l.name} pack opened`} checked={p.opened}
+                            <input type="checkbox" aria-label={t("packOpened", { name: l.name })} checked={p.opened}
                               onChange={(e) => setPicks((x) => ({ ...x, [l.invoiceLineId]: { ...p, opened: e.target.checked } }))} />
                           </label>
                         )}
@@ -144,14 +146,14 @@ export default function ReturnDialog({ initialNumber, onClose }: { initialNumber
           {!bill.pendingRefundId && bill.lines.some((l) => l.allowed) && (
             <div className={styles.actions}>
               {bill.refundMethods.length > 1 && (
-                <select className={styles.input} aria-label="Refund to" value={method} onChange={(e) => setMethod(e.target.value)}>
-                  <option value="">Refund as paid</option>
+                <select className={styles.input} aria-label={t("refundTo")} value={method} onChange={(e) => setMethod(e.target.value)}>
+                  <option value="">{t("refundAsPaid")}</option>
                   {bill.refundMethods.map((m) => <option key={m} value={m}>{paymentMethodLabel(m, region)}</option>)}
                 </select>
               )}
-              {bill.refundMethods.length === 1 && <span className={tableStyles.muted}>Refund to {paymentMethodLabel(bill.refundMethods[0], region)}</span>}
+              {bill.refundMethods.length === 1 && <span className={tableStyles.muted}>{t("refundToMethod", { method: paymentMethodLabel(bill.refundMethods[0], region) })}</span>}
               <button type="button" className={styles.primary} onClick={() => void send()} disabled={sending || Object.keys(picks).length === 0}>
-                {sending ? "Sending…" : "Send return for approval"}
+                {sending ? t("sending") : t("send")}
               </button>
             </div>
           )}
@@ -165,6 +167,7 @@ export default function ReturnDialog({ initialNumber, onClose }: { initialNumber
 
 /** Counter returns waiting for a second person (billing:approve). Absent for everyone else. */
 function PendingReturns({ reloadKey }: { reloadKey: string }) {
+  const t = useTranslations("checkout.returns");
   const [items, setItems] = useState<RefundRequestResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -176,9 +179,9 @@ function PendingReturns({ reloadKey }: { reloadKey: string }) {
     try {
       setItems(pendingReturns((await api.get<RefundRequestPage>("/billing/refund-requests?status=pending")).items ?? []));
     } catch (e) {
-      setError(errorText(e, "Couldn't load returns waiting for approval."));
+      setError(errorText(e, t("pendingFailed")));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -191,33 +194,33 @@ function PendingReturns({ reloadKey }: { reloadKey: string }) {
     try {
       if (approve) {
         const ok = await api.post<{ creditNoteNumber: string }>(`/billing/refund-requests/${r.id}/approve`, { expectedAmount: r.amount });
-        setNotice(`Credit note ${ok.creditNoteNumber} issued. The refund is recorded and the stock is back in its batch.`);
+        setNotice(t("creditIssued", { number: ok.creditNoteNumber }));
       } else {
         await api.post(`/billing/refund-requests/${r.id}/reject`, { reason: "Return refused at the counter" });
-        setNotice(`Return on ${r.invoiceNumber} rejected. Nothing was refunded.`);
+        setNotice(t("rejected", { number: r.invoiceNumber ?? "" }));
       }
       await load();
     } catch (e) {
-      setActError(e instanceof ApiError ? decisionErrorMessage(e.problem, "Couldn't record the decision.") : errorText(e, ""));
+      setActError(e instanceof ApiError ? decisionErrorMessage(e.problem, t("decideFailed")) : errorText(e, ""));
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <section className={styles.section} aria-label="Returns waiting for approval">
-      <h3 className={tableStyles.cardTitle}>Returns waiting for approval</h3>
+    <section className={styles.section} aria-label={t("waiting")}>
+      <h3 className={tableStyles.cardTitle}>{t("waiting")}</h3>
       {notice && <div className={styles.notice} role="status">{notice}</div>}
       {actError && <div className={tableStyles.errorState} role="alert">{actError}</div>}
       {error ? <ErrorState message={error} onRetry={() => void load()} />
-        : items === null ? <Skeleton rows={2} label="Loading returns" />
-        : items.length === 0 ? <EmptyState title="No returns waiting for approval." icon="check" />
+        : items === null ? <Skeleton rows={2} label={t("loadingReturns")} />
+        : items.length === 0 ? <EmptyState title={t("noneWaiting")} icon="check" />
         : items.map((r) => (
           <div key={r.id} className={styles.pending}>
-            <span>{r.invoiceNumber} · {formatMoney(r.amount ?? 0, r.currency ?? "")}<span className={tableStyles.muted}> · by {r.requestedByName ?? "unknown"}</span></span>
+            <span>{r.invoiceNumber} · {formatMoney(r.amount ?? 0, r.currency ?? "")}<span className={tableStyles.muted}>{t("by", { name: r.requestedByName ?? t("unknown") })}</span></span>
             <span className={styles.rowActions}>
-              <button type="button" className={styles.primary} disabled={busy !== null} onClick={() => void decide(r, true)}>Approve</button>
-              <button type="button" className={styles.btn} disabled={busy !== null} onClick={() => void decide(r, false)}>Reject</button>
+              <button type="button" className={styles.primary} disabled={busy !== null} onClick={() => void decide(r, true)}>{t("approve")}</button>
+              <button type="button" className={styles.btn} disabled={busy !== null} onClick={() => void decide(r, false)}>{t("reject")}</button>
             </span>
           </div>
         ))}

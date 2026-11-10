@@ -206,6 +206,9 @@ super_admin,GET /v1/setup/profile,setup:view,deny-401
 super_admin,GET /v1/setup/shifts,setup:view,deny-401
 super_admin,GET /v1/setup/staff,setup:view,deny-401
 super_admin,GET /v1/setup/subscription,setup:view,deny-401
+super_admin,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+super_admin,GET /v1/setup/subscription/invoices,setup:view,deny-401
+super_admin,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 super_admin,GET /v1/setup/trial,setup:view,deny-401
 super_admin,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 super_admin,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -400,6 +403,7 @@ super_admin,POST /v1/setup/import-uploads,setup:edit,deny-401
 super_admin,POST /v1/setup/licences,setup:edit,deny-401
 super_admin,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 super_admin,POST /v1/setup/shifts,setup:edit,deny-401
+super_admin,POST /v1/setup/subscription/change,setup:edit,deny-401
 super_admin,POST /v1/setup/trial/convert,setup:edit,deny-401
 super_admin,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 super_admin,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
@@ -642,6 +646,9 @@ implementation,GET /v1/setup/profile,setup:view,deny-401
 implementation,GET /v1/setup/shifts,setup:view,deny-401
 implementation,GET /v1/setup/staff,setup:view,deny-401
 implementation,GET /v1/setup/subscription,setup:view,deny-401
+implementation,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+implementation,GET /v1/setup/subscription/invoices,setup:view,deny-401
+implementation,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 implementation,GET /v1/setup/trial,setup:view,deny-401
 implementation,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 implementation,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -836,6 +843,7 @@ implementation,POST /v1/setup/import-uploads,setup:edit,deny-401
 implementation,POST /v1/setup/licences,setup:edit,deny-401
 implementation,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 implementation,POST /v1/setup/shifts,setup:edit,deny-401
+implementation,POST /v1/setup/subscription/change,setup:edit,deny-401
 implementation,POST /v1/setup/trial/convert,setup:edit,deny-401
 implementation,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 implementation,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
@@ -1078,6 +1086,9 @@ support_engineer,GET /v1/setup/profile,setup:view,deny-401
 support_engineer,GET /v1/setup/shifts,setup:view,deny-401
 support_engineer,GET /v1/setup/staff,setup:view,deny-401
 support_engineer,GET /v1/setup/subscription,setup:view,deny-401
+support_engineer,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+support_engineer,GET /v1/setup/subscription/invoices,setup:view,deny-401
+support_engineer,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 support_engineer,GET /v1/setup/trial,setup:view,deny-401
 support_engineer,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 support_engineer,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -1272,6 +1283,7 @@ support_engineer,POST /v1/setup/import-uploads,setup:edit,deny-401
 support_engineer,POST /v1/setup/licences,setup:edit,deny-401
 support_engineer,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 support_engineer,POST /v1/setup/shifts,setup:edit,deny-401
+support_engineer,POST /v1/setup/subscription/change,setup:edit,deny-401
 support_engineer,POST /v1/setup/trial/convert,setup:edit,deny-401
 support_engineer,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 support_engineer,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
@@ -1514,6 +1526,9 @@ billing,GET /v1/setup/profile,setup:view,deny-401
 billing,GET /v1/setup/shifts,setup:view,deny-401
 billing,GET /v1/setup/staff,setup:view,deny-401
 billing,GET /v1/setup/subscription,setup:view,deny-401
+billing,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+billing,GET /v1/setup/subscription/invoices,setup:view,deny-401
+billing,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 billing,GET /v1/setup/trial,setup:view,deny-401
 billing,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 billing,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -1708,6 +1723,7 @@ billing,POST /v1/setup/import-uploads,setup:edit,deny-401
 billing,POST /v1/setup/licences,setup:edit,deny-401
 billing,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 billing,POST /v1/setup/shifts,setup:edit,deny-401
+billing,POST /v1/setup/subscription/change,setup:edit,deny-401
 billing,POST /v1/setup/trial/convert,setup:edit,deny-401
 billing,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 billing,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
@@ -1950,6 +1966,9 @@ sre,GET /v1/setup/profile,setup:view,deny-401
 sre,GET /v1/setup/shifts,setup:view,deny-401
 sre,GET /v1/setup/staff,setup:view,deny-401
 sre,GET /v1/setup/subscription,setup:view,deny-401
+sre,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+sre,GET /v1/setup/subscription/invoices,setup:view,deny-401
+sre,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 sre,GET /v1/setup/trial,setup:view,deny-401
 sre,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 sre,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -2144,6 +2163,7 @@ sre,POST /v1/setup/import-uploads,setup:edit,deny-401
 sre,POST /v1/setup/licences,setup:edit,deny-401
 sre,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 sre,POST /v1/setup/shifts,setup:edit,deny-401
+sre,POST /v1/setup/subscription/change,setup:edit,deny-401
 sre,POST /v1/setup/trial/convert,setup:edit,deny-401
 sre,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 sre,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
@@ -2386,6 +2406,9 @@ commercial,GET /v1/setup/profile,setup:view,deny-401
 commercial,GET /v1/setup/shifts,setup:view,deny-401
 commercial,GET /v1/setup/staff,setup:view,deny-401
 commercial,GET /v1/setup/subscription,setup:view,deny-401
+commercial,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+commercial,GET /v1/setup/subscription/invoices,setup:view,deny-401
+commercial,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 commercial,GET /v1/setup/trial,setup:view,deny-401
 commercial,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 commercial,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -2580,6 +2603,7 @@ commercial,POST /v1/setup/import-uploads,setup:edit,deny-401
 commercial,POST /v1/setup/licences,setup:edit,deny-401
 commercial,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 commercial,POST /v1/setup/shifts,setup:edit,deny-401
+commercial,POST /v1/setup/subscription/change,setup:edit,deny-401
 commercial,POST /v1/setup/trial/convert,setup:edit,deny-401
 commercial,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 commercial,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
@@ -2822,6 +2846,9 @@ compliance_dpo,GET /v1/setup/profile,setup:view,deny-401
 compliance_dpo,GET /v1/setup/shifts,setup:view,deny-401
 compliance_dpo,GET /v1/setup/staff,setup:view,deny-401
 compliance_dpo,GET /v1/setup/subscription,setup:view,deny-401
+compliance_dpo,GET /v1/setup/subscription/change-preview,setup:view,deny-401
+compliance_dpo,GET /v1/setup/subscription/invoices,setup:view,deny-401
+compliance_dpo,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 compliance_dpo,GET /v1/setup/trial,setup:view,deny-401
 compliance_dpo,GET /v1/setup/whatsapp-templates,setup:view,deny-401
 compliance_dpo,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
@@ -3016,6 +3043,7 @@ compliance_dpo,POST /v1/setup/import-uploads,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/licences,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/licences/{id}/override,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/shifts,setup:edit,deny-401
+compliance_dpo,POST /v1/setup/subscription/change,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/trial/convert,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/whatsapp-templates,setup:edit,deny-401

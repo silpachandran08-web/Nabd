@@ -8,7 +8,7 @@ import styles from "./clinicNav.module.css";
 import Icon from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
 import { getIdentity, getSessionExpiresAt, ownerPendingTokenValid, regionLabel, signOut, type Identity } from "./lib/session";
-import { bottomNavSplit, COUNTER_ROLES, isActive, ROLE_LABEL } from "./shell/navRegistry";
+import { bottomNavSplit, isActive } from "./shell/navRegistry";
 import { useShellNav } from "./shell/useShellNav";
 import { usePharmacyCapabilities } from "./lib/pharmacyCapabilities";
 import { pharmacyNavAllowed } from "./lib/pharmacyRules";
@@ -17,18 +17,19 @@ import FacilitySwitcher from "./shell/FacilitySwitcher";
 import { BottomSheet } from "@nabd/ui";
 import UrgentBadge from "./shell/UrgentBadge";
 import BarcodeWedge from "./shell/BarcodeWedge";
+import { navText } from "./shell/navText";
 
 // FEF-052: the sidebar renders whatever shell/navRegistry resolves for the role context (one registry, one badge resolver).
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-function formatExpiry(expiresAt: Date | null): string {
+function formatExpiry(expiresAt: Date | null, t: (key: string, values?: Record<string, number>) => string): string {
   if (!expiresAt) return "—";
   const ms = expiresAt.getTime() - Date.now();
-  if (ms <= 0) return "expired";
+  if (ms <= 0) return t("nav.expired");
   const totalMinutes = Math.floor(ms / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return hours > 0 ? `expires in ${hours}h ${minutes}m` : `expires in ${minutes}m`;
+  return hours > 0 ? t("nav.expiresInHm", { h: hours, m: minutes }) : t("nav.expiresInM", { m: minutes });
 }
 
 export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
@@ -73,14 +74,14 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pharmacyCaps = usePharmacyCapabilities(input.perms.includes("pharmacy:view")); // PHL-004: hide Pharmacy while the clinic is External
   if (input.perms.length === 0 || items.length === 0) return null;
   const currentTab = searchParams.get("tab");
-  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i0) => (i0.section && role === "owner" ? { ...i0, label: t(`ownerNav.${i0.id}.label`), short: t(`ownerNav.${i0.id}.short`) } : COUNTER_ROLES.includes(role) ? { ...i0, label: t(`counterNav.${i0.id}.label`), short: t(`counterNav.${i0.id}.short`) } : i0)).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined, urgent: !!i.urgent }));
+  const entries = items.filter((i) => pharmacyNavAllowed(i.href, pharmacyCaps)).map((i0) => ({ ...i0, label: navText(t, i0, role), short: navText(t, i0, role, "short") })).map((i) => ({ ...i, key: i.id, active: isActive(i, pathname, currentTab), badgeCount: i.badge ? badges[i.badge] : undefined, urgent: !!i.urgent }));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4): 4 items + "More" when there are more.
   const { primary: primaryEntries, more: overflowEntries } = bottomNavSplit(entries);
-  const activeRoleLabel = roles.length > 1 ? ROLE_LABEL[role] : identity?.roleName ?? ROLE_LABEL[role];
+  const activeRoleLabel = roles.length > 1 ? t(`role.${role}`) : identity?.roleName ?? t(`role.${role}`);
   const branchLocked = !!plan && plan.branchesLimit > 0 && plan.branchesUsed >= plan.branchesLimit;
 
   function openMenu() {
-    setSessionLabel(formatExpiry(getSessionExpiresAt()));
+    setSessionLabel(formatExpiry(getSessionExpiresAt(), t));
     setShowMenu(true);
   }
 
@@ -93,8 +94,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   return (
     <>
     {role === "pharmacist" && <BarcodeWedge />}
-    <nav className={`${styles.nav} ${collapsed ? styles.navRail : ""}`} aria-label="Main">
-      <div className={styles.brand}>nabd</div>
+    <nav className={`${styles.nav} ${collapsed ? styles.navRail : ""}`} aria-label={t("nav.mainNav")}>
+      <div className={styles.brand}>{t("nav.brand")}</div>
 
       {identity && (owner ? (
         <FacilitySwitcher name={identity.tenantName} region={identity.tenantRegion} tenantId={tenantId} branchLocked={branchLocked}
@@ -129,8 +130,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
 
       {owner && plan && (
         <Link href="/setup?tab=subscription" className={styles.planChip}>
-          <span className={styles.planName}>{plan.plan ? `Plan: ${plan.plan}` : "No plan assigned"}</span>
-          <span className={styles.planSub}>{plan.status.replace(/_/g, " ")} · view catalog</span>
+          <span className={styles.planName}>{plan.plan ? t("nav.planName", { plan: plan.plan }) : t("nav.noPlan")}</span>
+          <span className={styles.planSub}>{t("nav.planSub", { status: plan.status.replace(/_/g, " ") })}</span>
         </Link>
       )}
 
@@ -140,7 +141,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             <>
               <div className={styles.menuBackdrop} onClick={() => setShowMenu(false)} />
               <div className={styles.identityMenu}>
-                <div className={styles.menuHeader}>Signed in</div>
+                <div className={styles.menuHeader}>{t("nav.signedIn")}</div>
                 <div className={styles.menuIdentityRow}>
                   <div className={styles.identityAvatar}>{initials(identity.staffName)}</div>
                   <div>
@@ -149,26 +150,26 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                   </div>
                 </div>
                 <div className={styles.menuRow}>
-                  <span>Active role</span>
+                  <span>{t("nav.activeRole")}</span>
                   <span className={styles.menuRowValue}>{activeRoleLabel}</span>
                 </div>
                 {owner && identity.tenantRegion && (
                   <div className={styles.menuRow}>
-                    <span>Region</span>
-                    <span className={styles.menuRowValue} title="Fixed at provisioning">{regionLabel(identity.tenantRegion)}</span>
+                    <span>{t("nav.region")}</span>
+                    <span className={styles.menuRowValue} title={t("nav.fixedAtProvisioning")}>{regionLabel(identity.tenantRegion)}</span>
                   </div>
                 )}
                 <div className={styles.menuRow}>
-                  <span>Session</span>
+                  <span>{t("nav.session")}</span>
                   <span className={styles.menuRowValue}>{sessionLabel}</span>
                 </div>
                 {owner && (
                   <Link href="/account" className={styles.menuLink} onClick={() => setShowMenu(false)}>
-                    Account &amp; Security
+                    {t("nav.accountSecurity")}
                   </Link>
                 )}
                 <button type="button" className={styles.menuSignOut} onClick={handleSignOut} disabled={signingOut}>
-                  {signingOut ? "Signing out…" : "Sign out"}
+                  {signingOut ? t("nav.signingOut") : t("nav.signOut")}
                 </button>
               </div>
             </>
@@ -183,7 +184,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         </div>
       )}
     </nav>
-    <nav className={styles.bottomNav} data-bottom-nav aria-label="Main">
+    <nav className={styles.bottomNav} data-bottom-nav aria-label={t("nav.mainNav")}>
       {primaryEntries.map((e) => (
         <Link key={e.key} href={e.href} aria-current={e.active ? "page" : undefined}
           className={`${styles.bottomLink} ${e.active ? styles.bottomLinkActive : ""}`}>
@@ -197,7 +198,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       {overflowEntries.length > 0 && (
         <div className={styles.moreWrap}>
           {showMore && (
-            <BottomSheet title="More" onClose={() => setShowMore(false)}>
+            <BottomSheet title={t("nav.more")} onClose={() => setShowMore(false)}>
               <div className={styles.moreMenu} role="menu">
                 {overflowEntries.map((e) => (
                   <Link key={e.key} href={e.href} role="menuitem" onClick={() => setShowMore(false)}
@@ -209,19 +210,19 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 {owner && (
                   <Link href="/account" role="menuitem" className={`${styles.moreItem} ${pathname === "/account" ? styles.linkActive : ""}`} onClick={() => setShowMore(false)}>
                     <Icon name="user" />
-                    Account &amp; Security
+                    {t("nav.accountSecurity")}
                   </Link>
                 )}
                 {owner && (canReturnToWorkspaces ? (
                   <Link href="/owner/workspaces" role="menuitem" className={styles.moreItem} onClick={() => setShowMore(false)}>
                     <Icon name="building" />
-                    Switch clinic
+                    {t("nav.switchClinic")}
                   </Link>
                 ) : (
                   <button type="button" role="menuitem" className={`${styles.moreItem} ${styles.moreButton}`} disabled={signingOut}
                     onClick={() => { setShowMore(false); void handleSignOut(); }}>
                     <Icon name="building" />
-                    {signingOut ? "Signing out…" : "Switch clinic (sign in again)"}
+                    {signingOut ? t("nav.signingOut") : t("nav.switchClinicAgain")}
                   </button>
                 ))}
               </div>
@@ -230,7 +231,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <button type="button" ref={moreBtnRef} className={styles.bottomLink} aria-expanded={showMore} aria-haspopup="menu"
             onClick={() => { setCanReturnToWorkspaces(ownerPendingTokenValid()); setShowMore((v) => !v); }}>
             <span className={styles.bottomIcon}><Icon name="more" size={20} /></span>
-            More
+            {t("nav.more")}
           </button>
         </div>
       )}

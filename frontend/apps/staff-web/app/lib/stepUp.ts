@@ -2,7 +2,7 @@ import { ApiError, api } from "./api";
 
 // A fresh MFA confirmation (X-Step-Up-Token) from the 6-digit authenticator code. keepSession: a wrong code also answers 401,
 // which must not be read as an expired session (same reason as the staff page).
-// target (IDC-013/ADM-015): the one object or action this confirmation is for; the token is then single use and bound to it.
+// target (IDC-013/ADM-015/ADM-037): the one object or action this confirmation is for; the token is then single use and bound to it.
 export async function requestStepUpToken(code: string, target?: string): Promise<{ token: string } | { error: string }> {
   if (!localStorage.getItem("nabd_access_token")) return { error: "Your session ended. Sign in again." };
   try {

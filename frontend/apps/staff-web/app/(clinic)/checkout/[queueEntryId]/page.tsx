@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
-import { formatMoney, paymentMethodLabel } from "@nabd/domain";
+import { formatMoney, taxRegime } from "@nabd/domain";
+import { useTranslations } from "next-intl";
+import { usePaymentMethodLabel } from "../../../lib/paymentMethodText";
 import BillingStatePill from "../../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../../components/ui/StockPill";
 import StatusPill from "../../../components/ui/StatusPill";
@@ -54,6 +56,8 @@ function round2(n: number): number {
 
 
 export default function CheckoutPage() {
+  const tr = useTranslations("checkout.visit");
+  const methodLabel = usePaymentMethodLabel();
   const router = useRouter();
   const region = getIdentity()?.tenantRegion;
   // UI gating only (absent, not disabled) — the API enforces the same grants.
@@ -161,11 +165,11 @@ export default function CheckoutPage() {
       if (canBill) await loadApproval(ctx);
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setForbidden(true);
-      else setError(e instanceof ApiError ? "Couldn't load checkout details. Try again." : "Couldn't reach the server. Check your connection and try again.");
+      else setError(e instanceof ApiError ? tr("loadFailed") : tr("unreachable"));
     } finally {
       setLoading(false);
     }
-  }, [queueEntryId, loadPrefill, loadApproval, canBill]);
+  }, [queueEntryId, loadPrefill, loadApproval, canBill, tr]);
 
 
   useUnsavedGuard(!invoice && (items.length > 0 || Number(discount) !== 0 || tenders.some((t) => t.amount !== ""))); // FEF-033
@@ -255,7 +259,7 @@ export default function CheckoutPage() {
     // closing out with nothing further to charge) — only the very first billing checkpoint for a
     // visit requires at least one item.
     if (!invoice && items.length === 0) {
-      setCreateError("Add at least one charge.");
+      setCreateError(tr("addOneCharge"));
       return null;
     }
     // FEF-033: a typed discount (even a negative one) is checked against the API's discount schema; errors sit on the fields.
@@ -287,7 +291,7 @@ export default function CheckoutPage() {
         return null;
       }
       // A server answer is a refusal; no answer (or a timeout) leaves the outcome unknown.
-      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : "Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || tr("invoiceFailed")) : tr("invoiceUnknown"));
       return null;
     } finally {
       setCreating(false);
@@ -300,7 +304,7 @@ export default function CheckoutPage() {
       setApproval(await api.post<DiscountApproval>("/billing/discount-approvals", req, { idempotencyKey: keys.current.get("approval", req) }));
       keys.current.done("approval");
     } catch (e) {
-      setCreateError(errorText(e, "Couldn't send the discount to the owner for approval."));
+      setCreateError(errorText(e, tr("approvalSendFailed")));
     }
   }
 
@@ -321,7 +325,7 @@ export default function CheckoutPage() {
       for (const row of filled(tenders)) {
         const amt = toMinor(row.amount)!;
         if (amt > Math.round(inv.balanceDue * 100)) {
-          setPaymentError("That amount is more than the balance due. Adjust it and collect again.");
+          setPaymentError(tr("overBalance"));
           return;
         }
         const before = inv.payments.length;
@@ -332,7 +336,7 @@ export default function CheckoutPage() {
           keys.current.done(`pay:${inv.id}`);
         } catch (e) {
           if (e instanceof ApiError) {
-            setPaymentError(e.detail || "Couldn't record payment.");
+            setPaymentError(e.detail || tr("paymentFailed"));
             if (e.status === 422) { // FIN-001: overpayment names the balance; refresh the one shown
               const r = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
               if (r) setInvoice(r);
@@ -342,13 +346,13 @@ export default function CheckoutPage() {
           // Outcome unknown: read the invoice back instead of guessing, so a payment that landed is never re-sent.
           const r = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
           if (!r) {
-            setPaymentError("Couldn't confirm whether that payment was recorded. Reload this page and check the Payments list before collecting again.");
+            setPaymentError(tr("paymentUnknown"));
             return;
           }
           next = r;
           if (next.payments.length <= before) {
             setInvoice(next);
-            setPaymentError("That payment did not go through and nothing was recorded. Try again.");
+            setPaymentError(tr("paymentNotThrough"));
             return;
           }
           keys.current.done(`pay:${inv.id}`);
@@ -391,22 +395,23 @@ export default function CheckoutPage() {
       const sequence = resolveSequence(flowSteps);
       const next = sequence[sequence.indexOf(context.queueStatus) + 1];
       if (!next) {
-        setContinueError("This visit has no next step to continue to.");
+        setContinueError(tr("noNextStep"));
         return;
       }
       await api.patch(`/queue/${queueEntryId}/status`, { status: next, expectedStatus: context.queueStatus }, { idempotencyKey: keys.current.get("advance", next) });
       router.push("/arrivals");
     } catch (e) {
-      setContinueError(errorText(e, "Couldn't continue the visit."));
+      setContinueError(errorText(e, tr("continueFailed")));
     } finally {
       setContinuing(false);
     }
   }
 
-  if (loading) return <main className={styles.page}><div className={styles.state}>Loading…</div></main>;
-  if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to checkout & billing.</div></main>;
-  if (error || !context) return <main className={styles.page}><div className={styles.errorState}>{error ?? "Something went wrong."}</div></main>;
+  if (loading) return <main className={styles.page}><div className={styles.state}>{tr("loading")}</div></main>;
+  if (forbidden) return <main className={styles.page}><div className={styles.state}>{tr("noAccess")}</div></main>;
+  if (error || !context) return <main className={styles.page}><div className={styles.errorState}>{error ?? tr("somethingWrong")}</div></main>;
 
+  const taxName = taxRegime(getIdentity()?.tenantRegion).label; // FEF-040: GST or VAT from the market, never a literal
   const categories = ["All", ...Array.from(new Set(context.charges.map((c) => c.category)))];
   const visibleCharges = category === "All" ? context.charges : context.charges.filter((c) => c.category === category);
 
@@ -415,10 +420,10 @@ export default function CheckoutPage() {
     <RxPrefillBlock lines={prefill} ticked={ticked} reasons={rxReasons} onToggle={(l, on) => toggleRx(l, on)} onReason={setRxReason} />
     <div className={styles.layout}>
       <div className={styles.card}>
-        <h2 className={styles.cardTitle}>Charges</h2>
+        <h2 className={styles.cardTitle}>{tr("charges")}</h2>
         <div className={styles.categoryTabs}>
           {categories.map((c) => (
-            <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c}</button>
+            <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c === "All" ? tr("all") : c}</button>
           ))}
         </div>
         {visibleCharges.map((c) => {
@@ -428,7 +433,7 @@ export default function CheckoutPage() {
           // PHA-011: a 0-stock item is flagged and not offered (no button at all).
           return (
             <ChargeButton key={c.id} dimmed={out} onClick={out ? undefined : () => addCharge(c)}
-              label={<>{c.name} {c.isRx && <StatusPill tone="danger" label="Rx" />} <StockPill qty={c.stockQty} /></>}
+              label={<>{c.name} {c.isRx && <StatusPill tone="danger" label={tr("rx")} />} <StockPill qty={c.stockQty} /></>}
               price={<>
                 {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{formatMoney(c.baseAmount, context.currency)}</span>}
                 {formatMoney(price, context.currency)}
@@ -438,12 +443,12 @@ export default function CheckoutPage() {
       </div>
 
       <div className={styles.card}>
-        <h2 className={styles.cardTitle}>{invoice ? "New charges to add" : "Selected line items"}</h2>
+        <h2 className={styles.cardTitle}>{invoice ? tr("newCharges") : tr("selectedItems")}</h2>
         {items.length === 0 ? (
-          <div className={styles.muted}>Pick a charge from the list to add it.</div>
+          <div className={styles.muted}>{tr("pickHint")}</div>
         ) : (
           <table className={styles.table}>
-            <thead><tr><th scope="col">Charge</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">Line total</th><th scope="col"></th></tr></thead>
+            <thead><tr><th scope="col">{tr("colCharge")}</th><th scope="col">{tr("colQty")}</th><th scope="col">{tr("colUnitPrice")}</th><th scope="col">{tr("colTax", { tax: taxName })}</th><th scope="col">{tr("colLineTotal")}</th><th scope="col"></th></tr></thead>
             <tbody>
               {items.map((i) => (
                 <tr key={i.chargeCode}>
@@ -451,11 +456,11 @@ export default function CheckoutPage() {
                     {i.chargeName}<div className={styles.muted}>{i.category}</div>
                     {/* PHL-001: an Rx line is linked to one signed line of this visit's prescription; no "unlink" choice once linked */}
                     {(i.prescriptionItemId || waitingForRx.includes(i.chargeCode)) && (
-                      <select aria-label={`Prescription line for ${i.chargeName}`} className={styles.rxPickerInput} value={i.prescriptionItemId ?? ""}
+                      <select aria-label={tr("rxLineFor", { name: i.chargeName })} className={styles.rxPickerInput} value={i.prescriptionItemId ?? ""}
                         onChange={(e) => e.target.value && linkRx(i.chargeCode, e.target.value)}>
-                        {!i.prescriptionItemId && <option value="">{rxChoices.length ? "Choose prescription line…" : "No signed prescription line left"}</option>}
+                        {!i.prescriptionItemId && <option value="">{rxChoices.length ? tr("chooseRxLine") : tr("noRxLine")}</option>}
                         {(context.prescribedItems ?? []).filter((p) => p.remainingQty > 0 || p.prescriptionItemId === i.prescriptionItemId).map((p) => (
-                          <option key={p.prescriptionItemId} value={p.prescriptionItemId}>Rx: {p.drugName}{p.dosage ? ` ${p.dosage}` : ""} · {p.remainingQty} left</option>
+                          <option key={p.prescriptionItemId} value={p.prescriptionItemId}>{tr("rxOption", { drug: p.drugName, dosage: p.dosage ? ` ${p.dosage}` : "", left: p.remainingQty })}</option>
                         ))}
                       </select>
                     )}
@@ -473,25 +478,25 @@ export default function CheckoutPage() {
                       <TierControl line={tierLineOf(i.chargeCode)!} picked={tierPicks[i.chargeCode] ?? tierLineOf(i.chargeCode)!.tier} currency={context.currency}
                         onPick={(t) => pickTier(i.chargeCode, t)} />
                     )}
-                    {i.override && <div className={styles.muted}>Override: {reasonLabel(i.override.reasonCode)}</div>}
+                    {i.override && <div className={styles.muted}>{tr("override", { reason: reasonLabel(i.override.reasonCode) })}</div>}
                     {canDiscount && editing !== i.chargeCode && (
-                      <button type="button" className={styles.removeBtn} onClick={() => { setEditing(i.chargeCode); setOvPrice(String(i.unitPrice)); setOvReason(i.override?.reasonCode ?? ""); }}>Override price</button>
+                      <button type="button" className={styles.removeBtn} onClick={() => { setEditing(i.chargeCode); setOvPrice(String(i.unitPrice)); setOvReason(i.override?.reasonCode ?? ""); }}>{tr("overridePrice")}</button>
                     )}
                     {canDiscount && editing === i.chargeCode && (
                       <div>
-                        <input aria-label="Override unit price" className={styles.discountInput} type="number" step="0.01" min="0" value={ovPrice} onChange={(e) => setOvPrice(e.target.value)} />
-                        <select aria-label="Override reason" className={styles.discountInput} value={ovReason} onChange={(e) => setOvReason(e.target.value)}>
-                          <option value="">Reason…</option>
+                        <input aria-label={tr("overrideUnitPrice")} className={styles.discountInput} type="number" step="0.01" min="0" value={ovPrice} onChange={(e) => setOvPrice(e.target.value)} />
+                        <select aria-label={tr("overrideReason")} className={styles.discountInput} value={ovReason} onChange={(e) => setOvReason(e.target.value)}>
+                          <option value="">{tr("reasonPlaceholder")}</option>
                           {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
                         </select>
-                        <button type="button" className={styles.removeBtn} disabled={!ovReason || ovPrice === ""} onClick={() => applyOverride(i.chargeCode)}>Apply</button>
-                        <button type="button" className={styles.removeBtn} onClick={() => setEditing(null)}>Cancel</button>
+                        <button type="button" className={styles.removeBtn} disabled={!ovReason || ovPrice === ""} onClick={() => applyOverride(i.chargeCode)}>{tr("apply")}</button>
+                        <button type="button" className={styles.removeBtn} onClick={() => setEditing(null)}>{tr("cancel")}</button>
                       </div>
                     )}
                   </td>
                   <td>{i.taxRatePercent}%</td>
                   <td>{formatMoney(i.unitPrice * i.quantity, context.currency)}</td>
-                  <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
+                  <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>{tr("remove")}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -501,31 +506,31 @@ export default function CheckoutPage() {
 
       <div className={styles.card}>
         <div className={styles.totals}>
-          <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(subtotal, context.currency)}</span></div>
+          <div className={styles.totalsRow}><span>{tr("subtotal")}</span><span>{formatMoney(subtotal, context.currency)}</span></div>
           {canDiscount && (
             <div className={styles.totalsRow}>
-              <span>Discount</span>
-              <input aria-label="Discount amount" className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => { fe.clearField("value"); setDiscount(e.target.value); }} onBlur={() => Number(discount) !== 0 && fv.blur(discountSchema(subtotal), "value", { value: Number(discount), reasonCode: "x" })} {...fe.attrs("value")} />
+              <span>{tr("discount")}</span>
+              <input aria-label={tr("discountAmount")} className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => { fe.clearField("value"); setDiscount(e.target.value); }} onBlur={() => Number(discount) !== 0 && fv.blur(discountSchema(subtotal), "value", { value: Number(discount), reasonCode: "x" })} {...fe.attrs("value")} />
             </div>
           )}
           {canDiscount && <FieldError fe={fe} name="value" className={styles.errorState} />}
           {canDiscount && Number(discount) > 0 && (
             <div className={styles.totalsRow}>
-              <span>Discount reason</span>
-              <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => { fe.clearField("reasonCode"); setDiscountReason(e.target.value); }} onBlur={() => fv.blur(discountSchema(subtotal), "reasonCode", { value: 1, reasonCode: discountReason })} {...fe.attrs("reasonCode")}>
-                <option value="">Reason…</option>
+              <span>{tr("discountReason")}</span>
+              <select aria-label={tr("discountReason")} className={styles.discountInput} value={discountReason} onChange={(e) => { fe.clearField("reasonCode"); setDiscountReason(e.target.value); }} onBlur={() => fv.blur(discountSchema(subtotal), "reasonCode", { value: 1, reasonCode: discountReason })} {...fe.attrs("reasonCode")}>
+                <option value="">{tr("reasonPlaceholder")}</option>
                 {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
               </select>
             </div>
           )}
           {canDiscount && <FieldError fe={fe} name="reasonCode" className={styles.errorState} />}
-          <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
-          <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
-          <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
+          <div className={styles.totalsRow}><span>{tr("taxRow", { tax: taxName })}</span><span>{formatMoney(tax, context.currency)}</span></div>
+          <div className={styles.totalsRow}><span>{tr("roundOff")}</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
+          <div className={styles.totalsRowMain}><span>{tr("total")}</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
         </div>
-        <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
+        <p className={styles.muted}>{tr("totalNote")}</p>
         {waitingForRx.length > 0 && (
-          <div className={styles.errorState} data-testid="rx-wait">Link every Rx item to a line of the signed prescription before checkout.</div>
+          <div className={styles.errorState} data-testid="rx-wait">{tr("rxWait")}</div>
         )}
         {createError && <div className={styles.errorState} role="alert">{createError}</div>}
         {canPay && !invoice && (
@@ -543,11 +548,11 @@ export default function CheckoutPage() {
   const collectBar = (
     <div className={styles.collectBar}>
       <div className={styles.collectNums}>
-        <span>Total <b>{formatMoney(previewTotal, context.currency)}</b></span>
-        {canPay && !invoice && <span>Balance due <b data-testid="balance-due">{formatMoney(Math.max(0, previewTotal * 100 - tenderedMinor) / 100, context.currency)}</b></span>}
+        <span>{tr("total")} <b>{formatMoney(previewTotal, context.currency)}</b></span>
+        {canPay && !invoice && <span>{tr("balanceDue")} <b data-testid="balance-due">{formatMoney(Math.max(0, previewTotal * 100 - tenderedMinor) / 100, context.currency)}</b></span>}
       </div>
       <button className={styles.collectBtn} onClick={invoice ? submitCheckout : collect} disabled={creating || recording || (!invoice && items.length === 0) || waitingForRx.length > 0}>
-        {creating || recording ? "Working…" : invoice ? "Add to invoice" : canPay && tenderedMinor > 0 ? `Collect ${formatMoney(tenderedMinor / 100, context.currency)}` : "Checkout"}
+        {creating || recording ? tr("working") : invoice ? tr("addToInvoice") : canPay && tenderedMinor > 0 ? tr("collectAmount", { amount: formatMoney(tenderedMinor / 100, context.currency) }) : tr("checkout")}
       </button>
     </div>
   );
@@ -556,7 +561,7 @@ export default function CheckoutPage() {
     <main className={styles.page}>
       <div className={styles.strip}>
         <div className={styles.stripIdentity}>
-          <button className={styles.backBtn} onClick={() => router.push("/arrivals")}>← Arrivals</button>
+          <button className={styles.backBtn} onClick={() => router.push("/arrivals")}>{tr("backArrivals")}</button>
           <span className={styles.stripName}>{context.patientName}</span>
           <span className={styles.stripMeta}>{context.doctorName} · {context.visitType}</span>
         </div>
@@ -565,15 +570,15 @@ export default function CheckoutPage() {
 
       {context.followUpEligible && !invoice && (
         <div className={styles.banner}>
-          Follow-up pricing available
-          <span className={styles.bannerSub}>Same doctor, a full-price visit within the clinic&apos;s follow-up window.</span>
+          {tr("followUp")}
+          <span className={styles.bannerSub}>{tr("followUpSub")}</span>
         </div>
       )}
 
       {context.prescribedItems.length > 0 && (
         <div className={styles.banner}>
-          Prescription ready: {context.prescribedItems.length} {context.prescribedItems.length === 1 ? "item" : "items"}
-          <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock. Rx items link to these lines.</span>
+          {tr("rxReady", { count: context.prescribedItems.length })}
+          <span className={styles.bannerSub}>{tr("rxReadySub")}</span>
         </div>
       )}
 
@@ -582,7 +587,7 @@ export default function CheckoutPage() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>{invoice.invoiceNumber}</h2>
             <table className={styles.table}>
-              <thead><tr><th scope="col">Charge</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax %</th><th scope="col">Line total</th></tr></thead>
+              <thead><tr><th scope="col">{tr("colCharge")}</th><th scope="col">{tr("colQty")}</th><th scope="col">{tr("colUnitPrice")}</th><th scope="col">{tr("colTaxPct", { tax: taxName })}</th><th scope="col">{tr("colLineTotal")}</th></tr></thead>
               <tbody>
                 {invoice.lineItems.map((li) => (
                   <tr key={li.chargeCode}>
@@ -591,7 +596,7 @@ export default function CheckoutPage() {
                     <td>
                       {formatMoney(li.unitPrice, invoice.currency)}
                       {li.overrideReason && li.listUnitPrice != null && (
-                        <div className={styles.muted}>List {formatMoney(li.listUnitPrice, invoice.currency)} · {reasonLabel(li.overrideReason)}</div>
+                        <div className={styles.muted}>{tr("listPrice", { price: formatMoney(li.listUnitPrice, invoice.currency), reason: reasonLabel(li.overrideReason) })}</div>
                       )}
                     </td>
                     <td>{li.taxRatePercent}</td>
@@ -602,10 +607,10 @@ export default function CheckoutPage() {
             </table>
             {invoice.payments.length > 0 && (
               <>
-                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Payments</h2>
+                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>{tr("payments")}</h2>
                 {invoice.payments.map((p) => (
                   <div key={p.id} className={styles.paymentRow}>
-                    <span>{paymentMethodLabel(p.method, region)}</span>
+                    <span>{methodLabel(p.method, region)}</span>
                     <span>{formatMoney(p.amount, invoice.currency)}</span>
                   </div>
                 ))}
@@ -613,20 +618,20 @@ export default function CheckoutPage() {
             )}
             {!showAddMore && canBill && invoice.status !== "void" && (
               <button type="button" className={styles.backBtn} style={{ marginTop: "16px" }} onClick={() => setShowAddMore(true)}>
-                + Add more charges
+                {tr("addMore")}
               </button>
             )}
           </div>
 
           <div className={styles.card}>
             <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(invoice.subtotal, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Discount</span><span>−{formatMoney(invoice.discount, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(invoice.tax, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{invoice.roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(invoice.roundOff), invoice.currency)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(invoice.total, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Paid</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Balance due</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tr("subtotal")}</span><span>{formatMoney(invoice.subtotal, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tr("discount")}</span><span>−{formatMoney(invoice.discount, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tr("taxRow", { tax: taxName })}</span><span>{formatMoney(invoice.tax, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tr("roundOff")}</span><span>{invoice.roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(invoice.roundOff), invoice.currency)}</span></div>
+              <div className={styles.totalsRowMain}><span>{tr("total")}</span><span>{formatMoney(invoice.total, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tr("paid")}</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tr("balanceDue")}</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
             </div>
 
             {invoice.id && invoice.status !== "void" && can("billing:view") && invoice.payments.length > 0 && <InvoiceActions invoiceId={invoice.id} />}
@@ -634,11 +639,11 @@ export default function CheckoutPage() {
             {context.queueStatus === "billing_pending" && canAdvance && (
               <>
                 <p className={styles.muted} style={{ marginTop: "12px" }}>
-                  This is an interim billing stop — the visit continues after this.
+                  {tr("interim")}
                 </p>
                 {continueError && <div className={styles.errorState}>{continueError}</div>}
                 <button className={styles.checkoutBtn} onClick={continueVisit} disabled={continuing}>
-                  {continuing ? "Continuing…" : "Continue visit →"}
+                  {continuing ? tr("continuing") : tr("continueVisit")}
                 </button>
               </>
             )}
@@ -646,11 +651,11 @@ export default function CheckoutPage() {
             {context.queueStatus === "checkout_pending" && canBill && invoice.status !== "void" && (
               <>
                 <p className={styles.muted} style={{ marginTop: "12px" }}>
-                  {invoice.balanceDue > 0 ? "Record the remaining payment, then complete checkout." : "Nothing further to charge for this visit."}
+                  {invoice.balanceDue > 0 ? tr("remaining") : tr("nothingFurther")}
                 </p>
                 {createError && <div className={styles.errorState}>{createError}</div>}
                 <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating}>
-                  {creating ? "Completing…" : "Complete checkout"}
+                  {creating ? tr("completing") : tr("complete")}
                 </button>
               </>
             )}
@@ -660,7 +665,7 @@ export default function CheckoutPage() {
                 <TenderRows rows={tenders} onChange={setTenders} region={region} balanceMinor={Math.round(invoice.balanceDue * 100)} disabled={creating || recording} />
                 {paymentError && <div className={styles.errorState}>{paymentError}</div>}
                 <button className={styles.recordBtn} onClick={collectOnInvoice} disabled={creating || recording || tenderTotalMinor(tenders) === 0}>
-                  {recording ? "Recording…" : `Collect ${formatMoney(tenderTotalMinor(tenders) / 100, invoice.currency)}`}
+                  {recording ? tr("recording") : tr("collectAmount", { amount: formatMoney(tenderTotalMinor(tenders) / 100, invoice.currency) })}
                 </button>
               </>
             )}
@@ -672,8 +677,8 @@ export default function CheckoutPage() {
         <ApprovalBanner approval={approval} currency={context.currency} canPin={canApprove} canPayLater={canBill} reasonLabel={reasonLabel}
           onChange={setApproval} onPayLater={() => router.push("/arrivals")} reload={() => loadApproval()} />
       )}
-      {canDiscount && reasons.error && <div className={styles.errorState} role="alert">Couldn&apos;t load the price-change reasons, so discounts and overrides can&apos;t be applied. Reload to try again.</div>}
-      {!canBill && !invoice && <div className={styles.state}>No invoice has been generated for this visit yet.</div>}
+      {canDiscount && reasons.error && <div className={styles.errorState} role="alert">{tr("reasonsFailed")}</div>}
+      {!canBill && !invoice && <div className={styles.state}>{tr("noInvoice")}</div>}
       {canBill && (!invoice || showAddMore) && <>{picker}{collectBar}</>}
     </main>
   );

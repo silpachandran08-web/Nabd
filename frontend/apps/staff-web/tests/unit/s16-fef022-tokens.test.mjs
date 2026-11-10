@@ -20,7 +20,7 @@ test("AC1: build emits tokens.css, custom-media.css, theme.ts and contrast-repor
 test("AC1: snapshot of the generated shape", () => {
   const css = dist("tokens.css");
   assert.match(css, /:root \{[\s\S]*--nb-bg-root: #06090c;/);
-  assert.match(css, /:root\[data-theme="light"\] \{[\s\S]*--nb-bg-root: #f4f6f8;/);
+  assert.match(css, /:root\[data-theme="light"\] \{[\s\S]*--nb-bg-root: #eef2f4;/); // FEF-025: prototype light values
   for (const v of ["--nb-fs-xs: 12px", "--nb-fs-sm: 13px", "--nb-fs-md: 14px", "--nb-fs-base: 16px", "--nb-fs-lg: 18px", "--nb-fs-xl: 22px", "--nb-fs-2xl: 28px"]) assert.ok(css.includes(v), v);
   const z = { base: 0, sticky: 10, nav: 20, dropdown: 30, overlay: 40, modal: 50, toast: 60, lock: 100 };
   for (const [k, n] of Object.entries(z)) assert.ok(css.includes(`--z-${k}: ${n};`), k);

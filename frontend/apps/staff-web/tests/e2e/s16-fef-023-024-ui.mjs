@@ -20,7 +20,7 @@ const noHScroll = (p) => p.evaluate(() => document.documentElement.scrollWidth <
   check('022 dark tokens.css applied (--nb-bg-root)', (await v('--nb-bg-root')) === '#06090c');
   check('022 type scale + z scale + missing tokens defined', (await v('--nb-fs-sm')) === '13px' && (await v('--z-lock')) === '100' && (await v('--z-modal')) === '50' && (await v('--nb-space-10')) === '10px' && (await v('--nb-topbar-h')) === '64px' && (await v('--nb-radius-sm')) === '8px');
   await s.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
-  check('022 light theme overrides on [data-theme=light]', (await v('--nb-bg-root')) === '#f4f6f8' && (await v('--nb-text-primary')) === '#0b1217');
+  check('022 light theme overrides on [data-theme=light]', (await v('--nb-bg-root')) === '#eef2f4' && (await v('--nb-text-primary')) === '#0a0e12');
   check('022 prototype aliases (--acc)', (await v('--acc')) === (await v('--nb-accent-500')) && (await v('--tx4')) === (await v('--nb-text-disabled')) && (await v('--acc')) !== '');
   await s.browser.close();
 }

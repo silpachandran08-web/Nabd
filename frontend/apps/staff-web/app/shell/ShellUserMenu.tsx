@@ -6,16 +6,18 @@ import { useTranslations } from "next-intl";
 import styles from "./shell.module.css";
 import Icon from "../components/ui/Icon";
 import { getIdentity, signOut } from "../lib/session";
-import { homeFor, ROLE_LABEL, type RoleContext } from "./navRegistry";
+import { homeFor, type RoleContext } from "./navRegistry";
 import { setRoleContext } from "./roleContext";
 import { useShellNav } from "./useShellNav";
 import { HELP_EVENT } from "./HelpPanel";
 import { TOUR_EVENT } from "./TourCard";
 import { isTourRole } from "./help";
+import ThemeSwitch from "./ThemeSwitch";
 
 export default function ShellUserMenu() {
   const router = useRouter();
   const th = useTranslations("help");
+  const t = useTranslations("shell");
   const { input, role, roles, owner } = useShellNav();
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -37,23 +39,24 @@ export default function ShellUserMenu() {
 
   return (
     <div className={styles.wrap}>
-      <button type="button" className={styles.chip} aria-haspopup="menu" aria-expanded={open} aria-label={`Account menu, active role ${ROLE_LABEL[role]}`} onClick={() => setOpen((v) => !v)}>
-        <span className={styles.chipIcon}><Icon name="user" size={16} /></span><span data-testid="active-role">{ROLE_LABEL[role]}</span>
+      <button type="button" className={styles.chip} aria-haspopup="menu" aria-expanded={open} aria-label={t("userMenu.chip", { role: t(`role.${role}`) })} onClick={() => setOpen((v) => !v)}>
+        <span className={styles.chipIcon}><Icon name="user" size={16} /></span><span data-testid="active-role">{t(`role.${role}`)}</span>
       </button>
       {open && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} />
-          <div className={styles.menu} role="menu" aria-label="Account">
+          <div className={styles.menu} role="menu" aria-label={t("userMenu.menu")}>
             {who && <div className={styles.menuHead}><bdi>{who.staffName}</bdi></div>}
             {roles.length > 1 && roles.map((r) => (
               <button key={r} type="button" role="menuitemradio" aria-checked={r === role} className={styles.menuItem} onClick={() => pick(r)}>
-                {ROLE_LABEL[r]} context{r === role && <Icon name="check" size={14} />}
+                {t("userMenu.context", { role: t(`role.${r}`) })}{r === role && <Icon name="check" size={14} />}
               </button>
             ))}
+            <ThemeSwitch variant="menu" />
             {/* FEF-062: help for this screen (also F1) and, for roles with a first-run tour, its replay */}
             <button type="button" role="menuitem" className={styles.menuItem} onClick={() => { setOpen(false); document.dispatchEvent(new Event(HELP_EVENT)); }}>{th("menu.help")}<kbd>F1</kbd></button>
             {isTourRole(role) && <button type="button" role="menuitem" className={styles.menuItem} onClick={() => { setOpen(false); document.dispatchEvent(new Event(TOUR_EVENT)); }}>{th("menu.replayTour")}</button>}
-            <button type="button" role="menuitem" className={styles.menuItem} onClick={() => void out()}>Sign out</button>
+            <button type="button" role="menuitem" className={styles.menuItem} onClick={() => void out()}>{t("userMenu.signOut")}</button>
           </div>
         </>
       )}

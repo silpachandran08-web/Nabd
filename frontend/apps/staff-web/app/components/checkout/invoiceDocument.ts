@@ -2,6 +2,7 @@
 // ONE pure function that turns it into the text both print layouts show. Amounts are integer minor units.
 import { amountInWords } from "@nabd/i18n/format";
 import { formatMoney } from "@nabd/i18n/format";
+import { taxRegime, type TaxRegime } from "@nabd/domain";
 
 export type DocLine = {
   description: string; sac: string | null; quantity: number; unitMinor: number;
@@ -35,16 +36,18 @@ export type InvoiceView = {
   payments: { label: string; value: string }[];
 };
 
-/** `when` formats an ISO instant in the clinic zone (caller passes the clinic formatter, so this stays pure and testable). */
-export function buildInvoiceView(d: InvoiceDocument, when: (iso: string) => string): InvoiceView {
+/** `when` formats an ISO instant in the clinic zone (caller passes the clinic formatter, so this stays pure and testable).
+ * FEF-040: tax labels follow the market (`regime`): India splits GST into CGST/SGST/IGST, a VAT market shows one VAT line. */
+export function buildInvoiceView(d: InvoiceDocument, when: (iso: string) => string, regime: TaxRegime = taxRegime("IN")): InvoiceView {
   const m = (n: number) => formatMoney(n, d.currency, { minor: true });
-  const rate = (l: DocLine) => (l.exempt ? "—" : l.igstRate ? `IGST ${l.igstRate}%` : `CGST ${l.cgstRate}% + SGST ${l.sgstRate}%`);
+  const rate = (l: DocLine) => (l.exempt ? "—" : !regime.split ? `${regime.label} ${l.cgstRate + l.sgstRate + l.igstRate}%` : l.igstRate ? `IGST ${l.igstRate}%` : `CGST ${l.cgstRate}% + SGST ${l.sgstRate}%`);
   const t = d.totals;
-  const taxRows = [
+  const taxSum = t.cgstMinor + t.sgstMinor + t.igstMinor;
+  const taxRows = (regime.split ? [
     t.cgstMinor ? { label: "CGST", value: m(t.cgstMinor) } : null,
     t.sgstMinor ? { label: "SGST", value: m(t.sgstMinor) } : null,
     t.igstMinor ? { label: "IGST", value: m(t.igstMinor) } : null,
-  ].filter((r): r is { label: string; value: string } => r !== null);
+  ] : [taxSum ? { label: regime.label, value: m(taxSum) } : null]).filter((r): r is { label: string; value: string } => r !== null);
   return {
     title: "Tax invoice",
     copyNote: d.copy === "duplicate" ? `Duplicate copy${d.reprintedAt ? ` · reprinted ${when(d.reprintedAt)}` : ""}` : null,

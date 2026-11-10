@@ -3,7 +3,7 @@
 import { CATALOGUED, type Locale } from "./locales.ts";
 import { pseudoCatalogue } from "./pseudo.ts";
 
-export const NAMESPACES = ["shell", "queue", "login", "arrivals", "common", "consult", "glossary", "help"] as const;
+export const NAMESPACES = ["shell", "queue", "login", "arrivals", "common", "consult", "glossary", "help", "checkout", "billing"] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 export type Messages = Record<string, Record<string, unknown>>;
 export type PseudoMode = "pseudo" | "pseudo-rtl";

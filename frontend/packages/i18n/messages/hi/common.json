@@ -11,5 +11,12 @@
     "amountPositive": "0 से अधिक राशि दर्ज करें।",
     "discountReason": "छूट का कारण चुनें।",
     "discountTooBig": "छूट उप-योग से अधिक नहीं हो सकती।"
+  },
+  "paymentMethod": {
+    "cash": "नकद",
+    "card": "कार्ड",
+    "upi": "UPI",
+    "mada": "मदा और डिजिटल",
+    "other": "अन्य"
   }
 }
