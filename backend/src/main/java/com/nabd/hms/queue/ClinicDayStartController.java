@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,7 +28,7 @@ class ClinicDayStartController {
 
     @PutMapping("/v1/clinic/settings/day-start")
     @PreAuthorize("hasAuthority('setup:edit')")
-    ClinicDayStartService.Result put(@AuthenticationPrincipal Jwt jwt, @RequestBody Request req,
+    ClinicDayStartService.Result put(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody Request req,
                                      @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
         return service.set(UUID.fromString(jwt.getSubject()), req.dayStart(), stepUpToken);
     }

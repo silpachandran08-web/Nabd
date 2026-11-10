@@ -186,7 +186,7 @@ public class ProfileClaimService {
         if (c == null) {
             UUID tenant = tenantContext.current();
             Map<String, Object> p = jdbc.queryForList("SELECT guardian_id, (dob + interval '18 years')::date AS handover FROM patients WHERE id = ? AND status = 'active'", patientId)
-                    .stream().findFirst().orElseThrow(ProfileClaimService::notFound);
+                    .stream().findFirst().orElseThrow(ApiException::notFound);
             if (p.get("guardian_id") == null) {
                 throw new ApiException(HttpStatus.CONFLICT, "no-handover", "No handover due", "This patient has no guardian on file to hand over from.", Map.of("code", "no-handover"));
             }
@@ -206,7 +206,7 @@ public class ProfileClaimService {
     public Outcome claimAtDesk(UUID patientId, UUID staffId, String otp, String keep, String ip) {
         Map<String, Object> c = lockedClaim("c.patient_id = ? AND c.outcome IS NULL", patientId);
         if (c == null) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         return apply(c, otp, keep, ip, null, staffId);
     }
@@ -252,7 +252,7 @@ public class ProfileClaimService {
         if (staffId == null) {
             audit.record(tenant, "system", null, "patient", "patient", ip, "patient.profile_claimed", "patient", patient, null, after);
         } else {
-            ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(ProfileClaimService::notFound);
+            ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(ApiException::notFound);
             audit.record(tenant, "staff", staffId, actor.name(), actor.role(), ip, "patient.profile_claimed", "patient", patient, null, after);
         }
         completed(tenant, patient, result, keep);
@@ -353,7 +353,4 @@ public class ProfileClaimService {
         return new ApiException(HttpStatus.CONFLICT, "claim-not-open", "Not yet", "You can claim your profile from your 18th birthday.", Map.of("code", "claim-not-open"));
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

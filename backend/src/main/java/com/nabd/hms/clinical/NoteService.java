@@ -58,13 +58,13 @@ public class NoteService {
     @Transactional
     public NoteResponse get(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public NoteResponse upsert(UUID tenantId, UUID queueEntryId, NoteUpsertRequest req) {
         tenantContext.set(tenantId);
-        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
 
         int updated = repo.upsert(tenantId, queueEntryId, owner.patientId(), owner.doctorId(),
                 req.subjective(), req.objective(), req.assessment(), req.plan(), req.diagnosis());
@@ -72,7 +72,7 @@ public class NoteService {
         if (updated == 0) {
             throw noteSigned();
         }
-        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     /** CLN-006: only the visit's doctor, or a holder of clinical:approve, signs; the signer is stored and audited.
@@ -80,13 +80,13 @@ public class NoteService {
     @Transactional
     public NoteResponse sign(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove) {
         tenantContext.set(tenantId);
-        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         ClinicalAuthority.Licence licence = requireVisitDoctor(tenantId, queueEntryId, callerStaffId, callerCanApprove, "sign");
         if (repo.sign(tenantId, queueEntryId, callerStaffId) == 0) {
             throw new ApiException(HttpStatus.CONFLICT, "already-signed", "Note already signed",
                     "This clinical note is already signed. Add an amendment to change it.");
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", "signed");
         after.put("signedBy", callerStaffId.toString());
@@ -97,12 +97,12 @@ public class NoteService {
         events.publish(tenantId, NOTE_SIGNED_EVENT, Map.of("tenantId", tenantId.toString(), "noteId", note.id().toString(),
                 "queueEntryId", queueEntryId.toString(), "signedBy", callerStaffId.toString()));
         log.info("clinical note signed for queue entry {} (tenant {})", queueEntryId, tenantId);
-        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     private ClinicalAuthority.Licence requireVisitDoctor(UUID tenantId, UUID queueEntryId, UUID callerStaffId,
                                                          boolean callerCanApprove, String what) {
-        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         return clinicalAuthority.require(tenantId, owner.doctorId(), callerStaffId, callerCanApprove, what + " this note");
     }
 
@@ -114,7 +114,7 @@ public class NoteService {
     public NoteAmendmentResponse amend(UUID tenantId, UUID callerStaffId, boolean callerCanApprove, UUID queueEntryId,
                                        NoteAmendmentRequest req) {
         tenantContext.set(tenantId);
-        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         ClinicalAuthority.Licence licence = requireVisitDoctor(tenantId, queueEntryId, callerStaffId, callerCanApprove, "amend");
         if (!"signed".equals(note.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "note-not-signed", "Note not signed",
@@ -122,7 +122,7 @@ public class NoteService {
         }
         UUID id = repo.insertAmendment(tenantId, note.id(), callerStaffId, req.reason(), req.subjective(),
                 req.objective(), req.assessment(), req.plan(), req.diagnosis());
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         Map<String, Object> amended = new LinkedHashMap<>();
         amended.put("amendment", req);
         amended.put("licenceNo", licence.registrationNo());
@@ -136,7 +136,7 @@ public class NoteService {
     @Transactional
     public List<NoteAmendmentResponse> listAmendments(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         return repo.listAmendments(tenantId, note.id()).stream().map(this::toAmendmentResponse).toList();
     }
 
@@ -148,10 +148,6 @@ public class NoteService {
     private NoteResponse toResponse(NoteRow n) {
         return new NoteResponse(n.id(), n.queueEntryId(), n.patientId(), n.doctorId(), n.subjective(),
                 n.objective(), n.assessment(), n.plan(), n.diagnosis(), n.status(), n.signedAt(), n.updatedAt(), n.signedBy());
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private ApiException noteSigned() {

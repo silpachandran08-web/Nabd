@@ -47,7 +47,7 @@ public class PlatformAuthController {
 
     /** PLT-005: forced enrolment for an operator without MFA; the platform mfa_setup token travels in the body. */
     @PostMapping("/mfa/enroll")
-    public com.nabd.hms.auth.dto.MfaEnrollResponse enrollMfa(@RequestBody(required = false) com.nabd.hms.auth.dto.MfaEnrollRequest req,
+    public com.nabd.hms.auth.dto.MfaEnrollResponse enrollMfa(@Valid @RequestBody(required = false) com.nabd.hms.auth.dto.MfaEnrollRequest req,
                                                            HttpServletRequest http) {
         return service.enrollMfa(req == null ? null : req.setupToken(), RequestMeta.clientIp(http));
     }

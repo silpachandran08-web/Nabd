@@ -51,7 +51,7 @@ public class DrugMasterService implements DrugMasterLookup {
 
     @Transactional
     DetailView detail(String drugId) {
-        DrugMasterRepository.Drug d = repo.find(region(), drugId).orElseThrow(DrugMasterService::notFound);
+        DrugMasterRepository.Drug d = repo.find(region(), drugId).orElseThrow(DrugMasterService::drugNotFound);
         List<DrugMasterRepository.Ingredient> ing = repo.ingredients(d.id());
         return new DetailView(d.id(), d.brand(), ing.stream().map(DrugMasterRepository.Ingredient::name).toList(), d.strength(), d.form(),
                 d.route(), d.schedule(), d.pregnancyCategory(), d.lactationNote(), d.status(),
@@ -81,7 +81,7 @@ public class DrugMasterService implements DrugMasterLookup {
         return prescriptions.findTenantRegion(tenantContext.current()).map(String::trim).orElse("IN");
     }
 
-    static ApiException notFound() {
+    static ApiException drugNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "DRUG_NOT_FOUND", "Drug not found", "No such drug in the drug master.");
     }
 }

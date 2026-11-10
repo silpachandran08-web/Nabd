@@ -1,5 +1,6 @@
 package com.nabd.hms.messaging;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,7 +29,7 @@ class TemplateCatalogueController {
     @PostMapping("/internal/v1/tenants/{tenantId}/templates:instantiate")
     @ResponseStatus(HttpStatus.ACCEPTED)
     @PreAuthorize("hasAuthority('onboarding_provisioning:view')")
-    Map<String, Integer> instantiate(@PathVariable UUID tenantId, @RequestBody InstantiateRequest req) {
+    Map<String, Integer> instantiate(@PathVariable UUID tenantId, @Valid @RequestBody InstantiateRequest req) {
         return Map.of("submitted", service.instantiate(tenantId, req.languages()));
     }
 }

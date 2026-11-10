@@ -272,7 +272,7 @@ public class PatientService {
     public PatientDetailResponse get(UUID tenantId, UUID callerStaffId, UUID id) {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
-        PatientRow row = repo.findVisibleById(tenantId, id, scopedToDoctorId).orElseThrow(this::notFound);
+        PatientRow row = repo.findVisibleById(tenantId, id, scopedToDoctorId).orElseThrow(ApiException::notFound);
         List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
         return toDetailResponse(tenantId, row, repo.findLastVisitAt(tenantId, id).orElse(null), repo.findActiveAllergySubstances(tenantId, id),
                 repo.findActiveConditionNames(tenantId, id), fieldGrants);
@@ -316,7 +316,7 @@ public class PatientService {
         tenantContext.set(tenantId);
         // scoped out or genuinely absent look identical — both 404, never 403 (NB-051)
         PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
-                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+                .filter(r -> "active".equals(r.status())).orElseThrow(ApiException::notFound);
         for (String required : List.of("name", "phone", "dob", "gender")) {
             if (req.has(required) && valueOf(req, required) == null) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
@@ -408,7 +408,7 @@ public class PatientService {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
-                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+                .filter(r -> "active".equals(r.status())).orElseThrow(ApiException::notFound);
         if (before.guardianId() == null) {
             return;
         }
@@ -426,7 +426,7 @@ public class PatientService {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
-                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+                .filter(r -> "active".equals(r.status())).orElseThrow(ApiException::notFound);
         if (before.guardianId() == null || isMinor(before.dob(), clock.today(tenantId))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-review-not-due", "No guardian review due",
                     "Only an adult patient who still has a guardian on file has a guardian review.");
@@ -497,7 +497,7 @@ public class PatientService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "patient", entityId, before, after);
     }
@@ -514,14 +514,14 @@ public class PatientService {
                     "duplicatePatientId must be different from the target patient.");
         }
         if (!repo.existsActive(tenantId, survivorId) || !repo.existsActive(tenantId, req.duplicatePatientId())) {
-            throw notFound();
+            throw ApiException.notFound();
         }
 
         UUID mergeId = repo.markMerged(tenantId, req.duplicatePatientId(), survivorId, callerStaffId);
         audit(tenantId, callerStaffId, "patient.merge", survivorId, Map.of("duplicatePatientId", req.duplicatePatientId().toString()),
                 Map.of("survivorId", survivorId.toString(), "mergeId", mergeId.toString()));
         log.info("patient {} merged into {} by {} (tenant {})", req.duplicatePatientId(), survivorId, callerStaffId, tenantId);
-        PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(this::notFound);
+        PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(ApiException::notFound);
         List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
         return toDetailResponse(tenantId, row, repo.findLastVisitAt(tenantId, survivorId).orElse(null),
                 repo.findActiveAllergySubstances(tenantId, survivorId), repo.findActiveConditionNames(tenantId, survivorId), fieldGrants);
@@ -551,7 +551,7 @@ public class PatientService {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         if (!repo.existsActive(tenantId, patientId)) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         repo.withdrawConsent(tenantId, patientId, consentType, channel);
         consentChanged(tenantId, patientId, consentType, "withdrawn");
@@ -624,10 +624,5 @@ public class PatientService {
                 row.guardianId(), guardianName, guardianConsentGrantedAt,
                 row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null),
                 repo.findLastVisit(tenantId, row.id()).orElse(null));
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                "The requested resource was not found.");
     }
 }

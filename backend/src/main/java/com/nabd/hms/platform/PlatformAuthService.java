@@ -276,7 +276,7 @@ public class PlatformAuthService {
     }
 
     public OperatorProfileResponse getProfile(UUID operatorId) {
-        Operator operator = repo.findById(operatorId).orElseThrow(this::notFound);
+        Operator operator = repo.findById(operatorId).orElseThrow(ApiException::notFound);
         return new OperatorProfileResponse(operator.id(), operator.name(), operator.email(), operator.role(),
                 PlatformPermissions.forRole(operator.role()));
     }
@@ -292,7 +292,7 @@ public class PlatformAuthService {
     @Transactional
     public void revokeSession(UUID operatorId, UUID sessionId, String ip) {
         if (!repo.revokeSessionOwnedBy(operatorId, sessionId, "admin_revoke")) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         audit.record(null, operatorId, ip, "platform_auth.session_revoked", "operator_session", sessionId, null);
         log.info("operator {} revoked their own session {}", operatorId, sessionId);
@@ -392,10 +392,5 @@ public class PlatformAuthService {
     private ApiException invalidRefresh() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "invalid-refresh-token", "Invalid refresh token",
                 "Session is no longer valid; sign in again.");
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                "The requested resource was not found.");
     }
 }

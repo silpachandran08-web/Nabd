@@ -63,20 +63,20 @@ public class ClinicalDocumentService {
     @Transactional
     public List<DocumentResponse> listForVisit(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        repo.findVisit(tenantId, queueEntryId).orElseThrow(this::notFound);
+        repo.findVisit(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         return repo.listForVisit(tenantId, queueEntryId).stream().map(this::toResponse).toList();
     }
 
     @Transactional
     public DocumentResponse get(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public SummaryPrefillResponse summaryPrefill(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        repo.findVisit(tenantId, queueEntryId).orElseThrow(this::notFound);
+        repo.findVisit(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         SummarySources src = repo.findSummarySources(tenantId, queueEntryId);
         Map<String, String> body = new LinkedHashMap<>();
         putIfFilled(body, "diagnosis", src.diagnosis());
@@ -91,16 +91,16 @@ public class ClinicalDocumentService {
     @Transactional
     public DocumentResponse create(UUID tenantId, UUID staffId, UUID queueEntryId, CreateRequest req) {
         tenantContext.set(tenantId);
-        VisitInfo visit = repo.findVisit(tenantId, queueEntryId).orElseThrow(this::notFound);
+        VisitInfo visit = repo.findVisit(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         Map<String, String> body = ClinicalDocumentRules.sanitise(req.type(), req.body());
         UUID id = repo.insert(tenantId, visit, queueEntryId, req.type(), toJson(body), staffId);
-        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public DocumentResponse updateDraft(UUID tenantId, UUID id, UpdateRequest req) {
         tenantContext.set(tenantId);
-        DocumentRow row = repo.lock(tenantId, id).orElseThrow(this::notFound);
+        DocumentRow row = repo.lock(tenantId, id).orElseThrow(ApiException::notFound);
         if ("issued".equals(row.status())) {
             throw issued();
         }
@@ -111,13 +111,13 @@ public class ClinicalDocumentService {
         if (repo.updateDraftBody(tenantId, id, toJson(body)) == 0) {
             throw issued();
         }
-        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public DocumentResponse issue(UUID tenantId, UUID staffId, boolean callerCanApprove, String ip, UUID id) {
         tenantContext.set(tenantId);
-        DocumentRow row = repo.lock(tenantId, id).orElseThrow(this::notFound);
+        DocumentRow row = repo.lock(tenantId, id).orElseThrow(ApiException::notFound);
         // Same gate as signing a prescription (V1-007 + CLN-005 licence rule): it prints under the visit doctor's name.
         String refusal = clinicalAuthority.refusal(tenantId, row.doctorId(), staffId, callerCanApprove);
         if (ClinicalAuthority.NOT_PRESCRIBER.equals(refusal)) {
@@ -133,7 +133,7 @@ public class ClinicalDocumentService {
         Map<String, String> body = fromJson(row.bodyJson(), BODY_TYPE);
         ClinicalDocumentRules.requireIssuable(row.type(), body);
 
-        PartyInfo issuer = actors.findActor(tenantId, staffId).map(a -> new PartyInfo(a.name(), a.role())).orElseThrow(this::notFound);
+        PartyInfo issuer = actors.findActor(tenantId, staffId).map(a -> new PartyInfo(a.name(), a.role())).orElseThrow(ApiException::notFound);
         String headerJson = toJson(buildHeader(tenantId, row, staffId, issuer));
         if (repo.issue(tenantId, id, staffId, headerJson) == 0) {
             throw issued();
@@ -143,15 +143,15 @@ public class ClinicalDocumentService {
                 "clinical_document.issued", "clinical_document", id, null,
                 Map.of("type", row.type(), "queueEntryId", row.queueEntryId().toString()));
         log.info("clinical document {} ({}) issued by {} (tenant {})", id, row.type(), staffId, tenantId);
-        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.find(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     // ── header snapshot ──────────────────────────────────────────────────
 
     private Map<String, Object> buildHeader(UUID tenantId, DocumentRow row, UUID staffId, PartyInfo issuer) {
-        VisitInfo visit = repo.findVisit(tenantId, row.queueEntryId()).orElseThrow(this::notFound);
-        PatientHeader patient = repo.findPatientHeader(tenantId, row.patientId()).orElseThrow(this::notFound);
-        PartyInfo doctor = actors.findActor(tenantId, row.doctorId()).map(a -> new PartyInfo(a.name(), a.role())).orElseThrow(this::notFound);
+        VisitInfo visit = repo.findVisit(tenantId, row.queueEntryId()).orElseThrow(ApiException::notFound);
+        PatientHeader patient = repo.findPatientHeader(tenantId, row.patientId()).orElseThrow(ApiException::notFound);
+        PartyInfo doctor = actors.findActor(tenantId, row.doctorId()).map(a -> new PartyInfo(a.name(), a.role())).orElseThrow(ApiException::notFound);
 
         Map<String, Object> clinic = new LinkedHashMap<>();
         clinic.put("name", repo.findClinicName(tenantId).orElse(null));
@@ -211,10 +211,6 @@ public class ClinicalDocumentService {
         } catch (JacksonException e) {
             throw new IllegalStateException("stored document json is unreadable", e);
         }
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private ApiException issued() {

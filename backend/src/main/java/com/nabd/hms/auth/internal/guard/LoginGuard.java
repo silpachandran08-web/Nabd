@@ -1,5 +1,8 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.guard;
 
+import com.nabd.hms.auth.TotpService;
+
+import com.nabd.hms.auth.internal.store.CredentialRepository;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.config.AuthProperties;
@@ -28,28 +31,28 @@ public class LoginGuard {
 
     private static final Logger log = LoggerFactory.getLogger(LoginGuard.class);
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
     private final JdbcTemplate jdbc;
     private final TotpService totp;
     private final AuthProperties props;
 
     private final Clock clock;
 
-    LoginGuard(AuthRepository repo, JdbcTemplate jdbc, TotpService totp, AuthProperties props, Clock clock) {
+    LoginGuard(CredentialRepository credentials, JdbcTemplate jdbc, TotpService totp, AuthProperties props, Clock clock) {
         this.clock = clock;
-        this.repo = repo;
+        this.credentials = credentials;
         this.jdbc = jdbc;
         this.totp = totp;
         this.props = props;
     }
 
     /** Throws 423 while the backoff window runs. Does not record anything, so a locked hit cannot renew the lock. */
-    void enforceLockout(UUID staffId) {
-        enforceLockout(repo.countFailedAttemptsSinceLastSuccess(staffId), repo.lastFailedAttemptAt(staffId), staffId);
+    public void enforceLockout(UUID staffId) {
+        enforceLockout(credentials.countFailedAttemptsSinceLastSuccess(staffId), credentials.lastFailedAttemptAt(staffId), staffId);
     }
 
     /** The same rule over another attempt log (FIN-018: owner PIN tries at a desk, counted per desk caller). */
-    void enforceLockout(int failures, java.util.Optional<Instant> lastFailed, UUID staffId) {
+    public void enforceLockout(int failures, java.util.Optional<Instant> lastFailed, UUID staffId) {
         if (failures < props.lockoutThreshold()) {
             return;
         }
@@ -69,20 +72,20 @@ public class LoginGuard {
         return Duration.ofMinutes(Math.min(30, 1L << Math.min(overBy - 1, 10))); // 1, 2, 4, ... capped 30 min
     }
 
-    void recordAttempt(UUID tenantId, UUID staffId, String email, String factor, boolean succeeded) {
+    public void recordAttempt(UUID tenantId, UUID staffId, String email, String factor, boolean succeeded) {
         jdbc.update("INSERT INTO login_attempts (tenant_id, staff_id, email, ip_address, succeeded, factor) VALUES (?,?,?,?::inet,?,?)",
                 tenantId, staffId, email, currentIp(), succeeded, factor);
     }
 
     /** Valid code AND its time-step is newer than the last one accepted for this account (atomic claim). */
-    boolean verifyTotp(UUID staffId, byte[] secret, String code) {
+    public boolean verifyTotp(UUID staffId, byte[] secret, String code) {
         if (secret == null) return false; // PLT-044: secret did not decrypt for this row (FieldCipher logged it)
         long step = totp.matchStep(secret, code, Instant.now(clock));
         return step >= 0 && jdbc.update("UPDATE staff SET mfa_last_used_step = ? WHERE id = ? "
                 + "AND (mfa_last_used_step IS NULL OR mfa_last_used_step < ?)", step, staffId, step) == 1;
     }
 
-    boolean pinChangeRequired(UUID staffId) {
+    public boolean pinChangeRequired(UUID staffId) {
         Integer v = jdbc.query("SELECT pin_policy_version FROM staff WHERE id = ?",
                 rs -> rs.next() ? rs.getInt(1) : 2, staffId);
         return v != null && v < 2;

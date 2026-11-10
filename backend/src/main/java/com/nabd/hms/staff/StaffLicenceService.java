@@ -70,8 +70,8 @@ class StaffLicenceService {
     @Transactional
     public LicenceResponse grantOverride(UUID tenantId, UUID callerId, UUID id, Instant until, String ip) {
         tenantContext.set(tenantId);
-        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(this::notFound);
-        if (!GrantAuthority.isOwner(roleRepo.findById(tenantId, caller.roleId()).orElseThrow(this::notFound))) {
+        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(ApiException::notFound);
+        if (!GrantAuthority.isOwner(roleRepo.findById(tenantId, caller.roleId()).orElseThrow(ApiException::notFound))) {
             throw new ApiException(HttpStatus.FORBIDDEN, "owner-only", "Owner only",
                     "Only the clinic owner can let an expired licence keep signing.");
         }
@@ -95,7 +95,7 @@ class StaffLicenceService {
                         rs.getString("professional_registration_no") != null && !rs.getString("professional_registration_no").isBlank(),
                         rs.getDate("licence_expires_on") == null ? null : rs.getDate("licence_expires_on").toLocalDate(),
                         rs.getTimestamp("licence_override_until") == null ? null : rs.getTimestamp("licence_override_until").toInstant()),
-                tenantId, id).stream().findFirst().orElseThrow(this::notFound);
+                tenantId, id).stream().findFirst().orElseThrow(ApiException::notFound);
     }
 
     private static Map<String, Object> snapshot(LicenceResponse l) {
@@ -107,12 +107,8 @@ class StaffLicenceService {
     }
 
     private void audit(UUID tenantId, UUID callerId, String ip, String action, UUID id, Object before, Object after) {
-        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(this::notFound);
+        StaffRow caller = staffRepo.findById(tenantId, callerId).orElseThrow(ApiException::notFound);
         String role = roleRepo.findById(tenantId, caller.roleId()).map(StaffRoleModels.RoleRow::name).orElse("Staff");
         auditService.record(tenantId, "staff", callerId, caller.name(), role, ip, action, "staff", id, before, after);
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

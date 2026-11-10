@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.dto.PregnancyEventResponse;
 import com.nabd.hms.clinical.dto.PregnancyStatusResponse;
 import com.nabd.hms.clinical.dto.PregnancyStatusWriteRequest;
@@ -44,9 +46,9 @@ public class PregnancyStatusController {
 
     @PutMapping("/patients/{patientId}/pregnancy-status")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public PregnancyStatusResponse put(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public PregnancyStatusResponse put(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                         @Valid @RequestBody PregnancyStatusWriteRequest req, HttpServletRequest http) {
-        return service.record(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http), req);
+        return service.record(tenantId, patientId, staffId, RequestMeta.clientIp(http), req);
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -57,13 +59,5 @@ public class PregnancyStatusController {
         ReadScope scope = scopes.resolve(jwt);
         scopes.requirePatient(scope, patientId);
         return service.history(scope.tenantId(), patientId);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

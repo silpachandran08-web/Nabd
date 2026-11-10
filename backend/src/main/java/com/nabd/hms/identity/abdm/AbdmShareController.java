@@ -1,5 +1,6 @@
 package com.nabd.hms.identity.abdm;
 
+import jakarta.validation.Valid;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.nabd.hms.common.ApiException;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -39,7 +40,7 @@ class AbdmShareController {
 
     @PostMapping("/abdm/v3/hip/patient/share")
     ResponseEntity<Void> share(@RequestHeader(value = "Authorization", required = false) String authorization,
-                               @RequestHeader(value = "X-HIP-ID", required = false) String hipHeader, @RequestBody ShareRequest req) {
+                               @RequestHeader(value = "X-HIP-ID", required = false) String hipHeader, @Valid @RequestBody ShareRequest req) {
         auth.require(authorization);
         String hip = hipHeader != null && !hipHeader.isBlank() ? hipHeader.strip() : req.hipId();
         if (hip == null || hip.isBlank() || req.requestId() == null || req.requestId().isBlank() || req.requestId().length() > 100 || req.profile() == null) {

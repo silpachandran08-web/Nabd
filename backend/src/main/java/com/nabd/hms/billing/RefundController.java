@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.common.CurrentStaff;
 import com.nabd.hms.billing.dto.RefundDecisionRequests;
 import com.nabd.hms.billing.dto.RefundRequestRequest;
 import com.nabd.hms.billing.dto.RefundRequestResponse;
@@ -9,8 +10,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,25 +36,25 @@ public class RefundController {
     @PostMapping("/invoices/{id}/refund-requests")
     @PreAuthorize("hasAuthority('billing:edit')")
     @ResponseStatus(HttpStatus.CREATED)
-    public RefundRequestResponse request(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody RefundRequestRequest req,
+    public RefundRequestResponse request(@CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody RefundRequestRequest req,
                                          HttpServletRequest http) {
-        return service.request(id, staffId(jwt), RequestMeta.clientIp(http), req);
+        return service.request(id, staffId, RequestMeta.clientIp(http), req);
     }
 
     @Idempotent
     @PostMapping("/refund-requests/{id}/approve")
     @PreAuthorize("hasAuthority('billing:approve')")
-    public RefundDecisionRequests.Approved approve(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public RefundDecisionRequests.Approved approve(@CurrentStaff UUID staffId, @PathVariable UUID id,
                                                    @Valid @RequestBody RefundDecisionRequests.Approve req, HttpServletRequest http) {
-        return service.approve(id, staffId(jwt), RequestMeta.clientIp(http), req.expectedAmount());
+        return service.approve(id, staffId, RequestMeta.clientIp(http), req.expectedAmount());
     }
 
     @Idempotent
     @PostMapping("/refund-requests/{id}/reject")
     @PreAuthorize("hasAuthority('billing:approve')")
-    public RefundRequestResponse reject(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public RefundRequestResponse reject(@CurrentStaff UUID staffId, @PathVariable UUID id,
                                         @Valid @RequestBody RefundDecisionRequests.Reject req, HttpServletRequest http) {
-        return service.reject(id, staffId(jwt), RequestMeta.clientIp(http), req.reason());
+        return service.reject(id, staffId, RequestMeta.clientIp(http), req.reason());
     }
 
     @GetMapping("/refund-requests")
@@ -63,9 +62,5 @@ public class RefundController {
     public RefundRequestResponse.Page list(@RequestParam(required = false) String status, @RequestParam(required = false) String cursor,
                                            @RequestParam(defaultValue = "50") int limit) {
         return service.list(status, cursor, limit);
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

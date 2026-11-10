@@ -1,4 +1,4 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.guard;
 
 import com.nabd.hms.common.EventPublisher;
 import org.slf4j.Logger;
@@ -31,14 +31,14 @@ import java.util.UUID;
 public class OtpSendLimiter {
 
     private static final Logger log = LoggerFactory.getLogger(OtpSendLimiter.class);
-    static final String ABUSE_EVENT = "iam.otp_abuse.detected.v1";
-    static final int PER_WINDOW = 3;
-    static final int PER_DAY = 10;
-    static final Duration RESEND_GAP = Duration.ofSeconds(60);
+    public static final String ABUSE_EVENT = "iam.otp_abuse.detected.v1";
+    public static final int PER_WINDOW = 3;
+    public static final int PER_DAY = 10;
+    public static final Duration RESEND_GAP = Duration.ofSeconds(60);
     private static final long BUCKET_SECONDS = 60; // counter rows are per minute; the limits sum the buckets they cover
     private static final byte[] TENANT_ALERT_KEY = "tenant-cap-alert".getBytes(StandardCharsets.US_ASCII);
 
-    enum Decision { SEND, LIMITED }
+    public enum Decision { SEND, LIMITED }
 
     private final OtpCounterRepository repo;
     private final EventPublisher events;
@@ -70,7 +70,7 @@ public class OtpSendLimiter {
     }
 
     /** Runs inside the caller's tenant transaction. Records the send when it returns SEND. */
-    Decision tryConsume(UUID tenantId, String e164Digits) {
+    public Decision tryConsume(UUID tenantId, String e164Digits) {
         byte[] h = phoneHmac(e164Digits);
         Instant now = Instant.now(clock);
         Instant bucket = Instant.ofEpochSecond(now.getEpochSecond() / BUCKET_SECONDS * BUCKET_SECONDS);

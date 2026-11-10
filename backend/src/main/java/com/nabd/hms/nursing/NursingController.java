@@ -1,5 +1,7 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.ClinicalReadScope;
 import com.nabd.hms.nursing.dto.ActivityEntryResponse;
 import com.nabd.hms.nursing.dto.AdministerRequest;
@@ -56,70 +58,70 @@ public class NursingController {
     @PostMapping("/administration-orders")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('nursing:create')")
-    public AdministrationOrderResponse orderAdministration(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AdministrationOrderRequest req) {
-        return administrationService.order(tenantId(jwt), staffId(jwt), req);
+    public AdministrationOrderResponse orderAdministration(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody AdministrationOrderRequest req) {
+        return administrationService.order(tenantId, staffId, req);
     }
 
     @GetMapping("/administration-orders/today")
     @PreAuthorize("hasAuthority('nursing:view')")
-    public List<AdministrationOrderResponse> administrationOrdersToday(@AuthenticationPrincipal Jwt jwt) {
-        return administrationService.listToday(tenantId(jwt));
+    public List<AdministrationOrderResponse> administrationOrdersToday(@CurrentTenant UUID tenantId) {
+        return administrationService.listToday(tenantId);
     }
 
     @PostMapping("/administration-orders/{id}/administer")
     @PreAuthorize("hasAuthority('nursing:edit')")
-    public AdministrationOrderResponse administer(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody AdministerRequest req) {
-        return administrationService.administer(tenantId(jwt), staffId(jwt), id, req);
+    public AdministrationOrderResponse administer(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody AdministerRequest req) {
+        return administrationService.administer(tenantId, staffId, id, req);
     }
 
     @PostMapping("/administration-orders/{id}/refuse")
     @PreAuthorize("hasAuthority('nursing:edit')")
-    public AdministrationOrderResponse refuse(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody RefuseRequest req) {
-        return administrationService.refuse(tenantId(jwt), staffId(jwt), id, req);
+    public AdministrationOrderResponse refuse(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody RefuseRequest req) {
+        return administrationService.refuse(tenantId, staffId, id, req);
     }
 
     @PostMapping("/procedure-orders")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('nursing:create')")
-    public ProcedureOrderResponse orderProcedure(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ProcedureOrderRequest req) {
-        return procedureService.order(tenantId(jwt), staffId(jwt), req);
+    public ProcedureOrderResponse orderProcedure(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody ProcedureOrderRequest req) {
+        return procedureService.order(tenantId, staffId, req);
     }
 
     @GetMapping("/procedure-orders/today")
     @PreAuthorize("hasAuthority('nursing:view')")
-    public List<ProcedureOrderResponse> procedureOrdersToday(@AuthenticationPrincipal Jwt jwt) {
-        return procedureService.listToday(tenantId(jwt));
+    public List<ProcedureOrderResponse> procedureOrdersToday(@CurrentTenant UUID tenantId) {
+        return procedureService.listToday(tenantId);
     }
 
     @PatchMapping("/procedure-orders/{id}/status")
     @PreAuthorize("hasAuthority('nursing:edit')")
-    public ProcedureOrderResponse updateProcedureStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody ProcedureStatusRequest req) {
-        return procedureService.updateStatus(tenantId(jwt), staffId(jwt), id, req);
+    public ProcedureOrderResponse updateProcedureStatus(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody ProcedureStatusRequest req) {
+        return procedureService.updateStatus(tenantId, staffId, id, req);
     }
 
     @PostMapping("/procedure-orders/{id}/consent")
     @PreAuthorize("hasAuthority('nursing:edit')")
-    public ProcedureOrderResponse recordProcedureConsent(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody ProcedureConsentRequest req) {
-        return procedureService.recordConsent(tenantId(jwt), staffId(jwt), id, req);
+    public ProcedureOrderResponse recordProcedureConsent(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody ProcedureConsentRequest req) {
+        return procedureService.recordConsent(tenantId, staffId, id, req);
     }
 
     @PatchMapping("/procedure-orders/{id}/notes")
     @PreAuthorize("hasAuthority('nursing:edit')")
-    public ProcedureOrderResponse updateProcedureNotes(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody ProcedureNotesRequest req) {
-        return procedureService.updateNotes(tenantId(jwt), id, req);
+    public ProcedureOrderResponse updateProcedureNotes(@CurrentTenant UUID tenantId, @PathVariable UUID id, @Valid @RequestBody ProcedureNotesRequest req) {
+        return procedureService.updateNotes(tenantId, id, req);
     }
 
     @GetMapping("/activity/today")
     @PreAuthorize("hasAuthority('nursing:view')")
-    public List<ActivityEntryResponse> activityToday(@AuthenticationPrincipal Jwt jwt) {
-        return activityService.today(tenantId(jwt), staffId(jwt));
+    public List<ActivityEntryResponse> activityToday(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId) {
+        return activityService.today(tenantId, staffId);
     }
 
     @PostMapping("/vaccine-records")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('nursing:create')")
-    public VaccineRecordResponse recordVaccine(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody VaccineRecordRequest req) {
-        return vaccineRecordService.record(tenantId(jwt), staffId(jwt), req);
+    public VaccineRecordResponse recordVaccine(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody VaccineRecordRequest req) {
+        return vaccineRecordService.record(tenantId, staffId, req);
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -132,18 +134,10 @@ public class NursingController {
     /** NUR-019: same permission as GET /queue; patient/vitals sub-objects follow patients:view / clinical:view. */
     @GetMapping("/worklist")
     @PreAuthorize("hasAuthority('queue:view')")
-    public WorklistResponse worklist(@AuthenticationPrincipal Jwt jwt) {
+    public WorklistResponse worklist(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
-        return worklistService.worklist(tenantId(jwt), staffId(jwt),
+        return worklistService.worklist(tenantId, staffId,
                 permissions != null && permissions.contains("patients:view"),
                 permissions != null && permissions.contains("clinical:view"));
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

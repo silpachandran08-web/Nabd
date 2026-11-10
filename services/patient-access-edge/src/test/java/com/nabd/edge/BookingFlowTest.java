@@ -19,6 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** ACC-040 and ACC-042 against the fake Core and Comms (the real WhatsApp sandbox is Needs external action). */
@@ -496,5 +497,41 @@ class BookingFlowTest extends BookingTestBase {
         say(c, "Old"); say(c, "01-01-1990"); UP.dependantStatus = 400; tap(c, "Girl");
         assertTrue(text().contains("under 18"), text());
         assertEquals("CHILD_DOB", state(c));
+    }
+    // ---- ACC-045: Core outage mid-flow, and the funnel ------------------------------------------------------------------
+
+    @Test
+    void coreOutageMidFlowSaysUnavailableOnceKeepsTheStepAndTheRetryResumesWhenCoreIsBack() {
+        Clinic c = clinic("Outage", "Asia/Kolkata");
+        say(c, "Hi"); tap(c, "Book");
+        String before = state(c);
+        String id = FakeUpstreams.id();
+        UP.inbound(id, c.hash(), "", options().get(titles().indexOf("Me")).path("id").asString());
+        int sentBefore = UP.sent.size();
+        UP.coreFirst = ex -> { FakeUpstreams.reply(ex, 503, "{}"); return true; };
+        try {
+            assertThrows(RuntimeException.class, () -> engine.process(c.tenant(), id, "whatsapp", c.hash()), "not claimed: the stream retries it");
+            assertThrows(RuntimeException.class, () -> engine.process(c.tenant(), id, "whatsapp", c.hash()), "still down on the retry");
+        } finally {
+            UP.coreFirst = null;
+        }
+        assertEquals(sentBefore + 1, UP.sent.size(), "told once per message, not on every retry");
+        assertTrue(text().contains("temporarily unavailable"), text());
+        assertEquals(before, state(c), "the conversation stays on the step it was on");
+        engine.process(c.tenant(), id, "whatsapp", c.hash()); // the stream's next retry, Core is back
+        assertNotEquals(before, state(c), "resumed from the same step with the same message");
+        assertTrue(UP.bookCalls.isEmpty(), "nothing was booked during the outage");
+    }
+
+    @Test
+    void theFunnelRecordsStateChangesOnlyWithNoContactData() {
+        Clinic c = clinic("Funnel", "Asia/Kolkata");
+        say(c, "Hi"); tap(c, "Book"); tap(c, "Me"); tapAt(c, 0); tapAt(c, 0); tap(c, "Confirm");
+        assertEquals("DONE", state(c));
+        List<String> steps = superuser().queryForList("select to_state from funnel_steps where tenant_id = ?::uuid order by at, to_state", String.class,
+                c.tenant().toString());
+        assertTrue(steps.contains("MENU") && steps.contains("DONE"), steps.toString());
+        List<String> cols = superuser().queryForList("select column_name from information_schema.columns where table_name = 'funnel_steps' order by 1", String.class);
+        assertEquals(List.of("at", "conversation_id", "from_state", "tenant_id", "to_state"), cols, "ids, states and time only");
     }
 }

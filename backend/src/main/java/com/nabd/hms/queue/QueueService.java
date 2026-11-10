@@ -226,7 +226,7 @@ public class QueueService {
     /** orderReason (ACC-012): why the policy called this entry; carried on the changed event. */
     QueueEntryResponse move(UUID tenantId, UUID callerStaffId, UUID id, String expectedStatus, String nextStatus, String orderReason) {
         tenantContext.set(tenantId);
-        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (expectedStatus != null && !expectedStatus.equals(current.status())) {
             throw stale(current.status());
         }
@@ -246,7 +246,7 @@ public class QueueService {
     /** The one status write: WHERE status = the row we validated against, so a concurrent move makes this 0 rows -> 409. */
     private void casStatus(UUID tenantId, UUID callerStaffId, QueueEntryRow current, String nextStatus, String orderReason) {
         if (repo.updateStatus(tenantId, current.id(), current.status(), nextStatus) == 0) {
-            throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(this::notFound));
+            throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(ApiException::notFound));
         }
         log.info("queue entry {} moved {} -> {} by {}", current.id(), current.status(), nextStatus, callerStaffId);
         recordEvent(tenantId, current.id(), current.status(), nextStatus, "transition", null, callerStaffId, current.doctorId());
@@ -310,7 +310,7 @@ public class QueueService {
     @Transactional
     public TransferResponse transfer(UUID tenantId, UUID callerStaffId, UUID id, TransferRequest req) {
         tenantContext.set(tenantId);
-        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         requireLegalTransition(tenantId, current, "transferred_out", callerStaffId, id);
 
         if (!repo.transferAllowed(tenantId, current.departmentId(), req.toDepartmentId())) {
@@ -350,7 +350,7 @@ public class QueueService {
     @Transactional
     public QueueEntryResponse reorder(UUID tenantId, UUID callerStaffId, UUID id, QueueReorderRequest req) {
         tenantContext.set(tenantId);
-        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (req.priority() && (req.reason() == null || req.reason().isBlank())) { // ACC-022: a priority flag needs its reason
             throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
                     "State why this patient is moved up.", java.util.Map.of("code", "REASON_REQUIRED"));
@@ -370,7 +370,7 @@ public class QueueService {
     @Transactional
     public com.nabd.hms.queue.dto.ConsultExtendResponse extend(UUID tenantId, UUID callerStaffId, UUID id, int minutes) {
         // tenant already bound by TenantTransactionBinder (PLT-019)
-        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (!"in_consult".equals(current.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "not-in-consult", "Not in consult",
                     "Only a visit that is in consult can be extended.", java.util.Map.of("code", "NOT_IN_CONSULT", "currentStatus", current.status()));
@@ -396,7 +396,7 @@ public class QueueService {
     @Transactional
     public QueueEntryResponse acknowledgePriority(UUID tenantId, UUID callerStaffId, UUID id) {
         tenantContext.set(tenantId);
-        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (!current.priority()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-flagged", "Not flagged",
                     "This visit isn't flagged as priority.");
@@ -436,7 +436,7 @@ public class QueueService {
     /** ACC-022: the entry as the API shows it (used by the reassign service in this package). */
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     QueueEntryResponse view(UUID tenantId, UUID id) {
-        return toResponse(repo.findById(tenantId, id).orElseThrow(this::notFound));
+        return toResponse(repo.findById(tenantId, id).orElseThrow(ApiException::notFound));
     }
 
     private QueueEntryResponse toResponse(QueueEntryRow row) {
@@ -460,10 +460,6 @@ public class QueueService {
         extras.put("code", "ALREADY_CHECKED_IN");
         return new ApiException(HttpStatus.CONFLICT, "already-checked-in", "Already checked in",
                 "This appointment has already been checked in.", extras);
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private ApiException sessionFull() {

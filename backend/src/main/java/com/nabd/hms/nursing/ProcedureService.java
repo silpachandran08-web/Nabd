@@ -42,7 +42,7 @@ public class ProcedureService {
     @Transactional
     public ProcedureOrderResponse order(UUID tenantId, UUID staffId, ProcedureOrderRequest req) {
         tenantContext.set(tenantId);
-        UUID patientId = repo.findPatientIdForQueueEntry(tenantId, req.queueEntryId()).orElseThrow(this::notFound);
+        UUID patientId = repo.findPatientIdForQueueEntry(tenantId, req.queueEntryId()).orElseThrow(ApiException::notFound);
         ChargeSnapshot charge = repo.findActiveCharge(tenantId, req.chargeCode())
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "charge-not-found", "Charge not found",
                         "chargeCode does not reference an active charge in this clinic's catalogue."));
@@ -59,7 +59,7 @@ public class ProcedureService {
     @Transactional
     public ProcedureOrderResponse updateStatus(UUID tenantId, UUID staffId, UUID id, ProcedureStatusRequest req) {
         tenantContext.set(tenantId);
-        ProcedureOrderRow row = repo.findProcedureOrder(tenantId, id).orElseThrow(this::notFound);
+        ProcedureOrderRow row = repo.findProcedureOrder(tenantId, id).orElseThrow(ApiException::notFound);
         if ("completed".equals(row.status()) || "cancelled".equals(row.status())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "already-final", "Already final",
                     "This procedure is already " + row.status() + ".");
@@ -76,7 +76,7 @@ public class ProcedureService {
     @Transactional
     public ProcedureOrderResponse recordConsent(UUID tenantId, UUID staffId, UUID id, ProcedureConsentRequest req) {
         tenantContext.set(tenantId);
-        repo.findProcedureOrder(tenantId, id).orElseThrow(this::notFound);
+        repo.findProcedureOrder(tenantId, id).orElseThrow(ApiException::notFound);
         repo.recordConsent(tenantId, id, req.signedName(), staffId);
         return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
     }
@@ -84,7 +84,7 @@ public class ProcedureService {
     @Transactional
     public ProcedureOrderResponse updateNotes(UUID tenantId, UUID id, ProcedureNotesRequest req) {
         tenantContext.set(tenantId);
-        repo.findProcedureOrder(tenantId, id).orElseThrow(this::notFound);
+        repo.findProcedureOrder(tenantId, id).orElseThrow(ApiException::notFound);
         repo.updateProcedureNotes(tenantId, id, req.prepNotes(), req.consentNote());
         return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
     }
@@ -99,9 +99,5 @@ public class ProcedureService {
                 row.chargeCode(), row.chargeName(), row.baseAmount(), row.taxRatePercent(), row.prepNotes(),
                 row.consentNote(), row.status(), row.billed(), completedByName, row.completedAt(), row.createdAt(),
                 row.consentSignedName(), consentRecordedByName, row.consentSignedAt());
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

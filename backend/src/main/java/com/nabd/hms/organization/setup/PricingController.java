@@ -1,5 +1,6 @@
 package com.nabd.hms.organization.setup;
 
+import jakarta.validation.Valid;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.organization.setup.dto.PolicyResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,14 +45,14 @@ public class PricingController {
 
     @PutMapping("/charges/{id}/doctor-fees")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public PricingService.FeesResponse setFees(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody PricingService.FeesRequest req,
+    public PricingService.FeesResponse setFees(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody PricingService.FeesRequest req,
                                                HttpServletRequest http) {
         return service.setFees(id, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http), req);
     }
 
     @PutMapping("/policies/follow_up_window_days")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public PolicyResponse followUpWindow(@AuthenticationPrincipal Jwt jwt, @RequestBody WindowRequest req, HttpServletRequest http) {
+    public PolicyResponse followUpWindow(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody WindowRequest req, HttpServletRequest http) {
         return service.setFollowUpWindow(req.value(), UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 
@@ -64,7 +65,7 @@ public class PricingController {
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/charges/bulk")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<PricingService.BulkResponse> bulk(@AuthenticationPrincipal Jwt jwt, @RequestBody PricingService.BulkRequest req, HttpServletRequest http) {
+    public ResponseEntity<PricingService.BulkResponse> bulk(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PricingService.BulkRequest req, HttpServletRequest http) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.applyTemplate(UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http), req));
     }
 

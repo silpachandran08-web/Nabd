@@ -31,7 +31,7 @@ class PlatformAuthRepository {
     private static final String OPERATOR_COLUMNS =
             "id, name, email, pin_hash, role, status, mfa_enabled, mfa_secret_enc ";
 
-    // ::citext cast is load-bearing — see AuthRepository's class comment for why a bare "= ?"
+    // ::citext cast is load-bearing — see StaffDirectoryRepository's class comment for why a bare "= ?"
     // against a citext column silently falls back to case-sensitive text equality via JDBC.
     Optional<Operator> findByEmail(String email) {
         return jdbc.query("SELECT " + OPERATOR_COLUMNS + "FROM master.operators WHERE email = ?::citext",
@@ -72,7 +72,7 @@ class PlatformAuthRepository {
                 + "AND (mfa_last_used_step IS NULL OR mfa_last_used_step < ?)", step, operatorId, step) == 1;
     }
 
-    /** Same "failures since last success" window as AuthRepository's staff equivalent. */
+    /** Same "failures since last success" window as CredentialRepository's staff equivalent. */
     int countFailedAttemptsSinceLastSuccess(UUID operatorId) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM master.login_attempts " +
@@ -143,7 +143,7 @@ class PlatformAuthRepository {
                 reason, sessionId);
     }
 
-    /** Same ownership-checked revoke as AuthRepository.revokeSessionOwnedBy — the fix for the session-ownership gap found earlier this session applies here too, from day one. */
+    /** Same ownership-checked revoke as AuthSessionRepository.revokeSessionOwnedBy — the fix for the session-ownership gap found earlier this session applies here too, from day one. */
     boolean revokeSessionOwnedBy(UUID operatorId, UUID sessionId, String reason) {
         int rows = jdbc.update(
                 "UPDATE master.sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND operator_id = ? AND revoked_at IS NULL",

@@ -57,7 +57,7 @@ public class PregnancyStatusService {
     public PregnancyStatusResponse get(UUID tenantId, UUID patientId) {
         tenantContext.set(tenantId);
         if (!allergyRepo.patientExists(tenantId, patientId)) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         return current(tenantId, patientId);
     }
@@ -66,7 +66,7 @@ public class PregnancyStatusService {
     public PregnancyStatusResponse record(UUID tenantId, UUID patientId, UUID callerStaffId, String ipAddress, PregnancyStatusWriteRequest req) {
         tenantContext.set(tenantId);
         if (!allergyRepo.patientExists(tenantId, patientId)) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         if (req.expectedDeliveryDate() != null && !"pregnant".equals(req.status())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
@@ -85,7 +85,7 @@ public class PregnancyStatusService {
         Map<String, Object> beforeSnap = before == null ? null
                 : snapshot(before.status(), before.expectedDeliveryDate() == null ? null : before.expectedDeliveryDate().toString());
         repo.insertEvent(tenantId, patientId, beforeSnap == null ? null : json(beforeSnap), json(after), callerStaffId);
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "patient.pregnancy_status.recorded", "patient_pregnancy_status", patientId, beforeSnap, after);
         return current(tenantId, patientId);
@@ -135,9 +135,5 @@ public class PregnancyStatusService {
         } catch (JacksonException e) {
             return null;
         }
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

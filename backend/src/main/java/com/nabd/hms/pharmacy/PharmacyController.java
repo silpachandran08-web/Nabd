@@ -1,5 +1,7 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.pharmacy.dto.BatchDtos;
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.common.RequestMeta;
@@ -17,8 +19,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,43 +45,43 @@ public class PharmacyController {
     @GetMapping("/settings")
     @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
     @PreAuthorize("hasAuthority('pharmacy:view')")
-    public PharmacySettingsResponse settings(@AuthenticationPrincipal Jwt jwt) {
-        return service.getSettings(tenantId(jwt));
+    public PharmacySettingsResponse settings(@CurrentTenant UUID tenantId) {
+        return service.getSettings(tenantId);
     }
 
     @PatchMapping("/settings")
     @RequiresPharmacyMode(PharmacyMode.EXTERNAL)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public PharmacySettingsResponse updateSettings(@AuthenticationPrincipal Jwt jwt,
+    public PharmacySettingsResponse updateSettings(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                      @Valid @RequestBody PharmacySettingsWriteRequest req, HttpServletRequest http) {
-        return service.updateSettings(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), req);
+        return service.updateSettings(tenantId, staffId, RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/items")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:view')")
-    public List<PharmacyItemResponse> items(@AuthenticationPrincipal Jwt jwt,
+    public List<PharmacyItemResponse> items(@CurrentTenant UUID tenantId,
                                             @org.springframework.web.bind.annotation.RequestParam(name = "class", required = false) String scheduleClass) {
-        return service.listItems(tenantId(jwt), scheduleClass);
+        return service.listItems(tenantId, scheduleClass);
     }
 
     @PostMapping("/items")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public ResponseEntity<PharmacyItemResponse> addItem(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<PharmacyItemResponse> addItem(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                          @Valid @RequestBody PharmacyItemWriteRequest req, HttpServletRequest http) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.addItem(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), req));
+                .body(service.addItem(tenantId, staffId, RequestMeta.clientIp(http), req));
     }
 
     @PatchMapping("/items/{id}")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public PharmacyItemResponse updateItem(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public PharmacyItemResponse updateItem(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                             @Valid @RequestBody PharmacyItemWriteRequest req, HttpServletRequest http) {
-        return service.updateItem(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req);
+        return service.updateItem(tenantId, staffId, RequestMeta.clientIp(http), id, req);
     }
 
     public record DrugLinkRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 80) String drugId) {
@@ -91,9 +91,9 @@ public class PharmacyController {
     @org.springframework.web.bind.annotation.PutMapping("/items/{id}/drug-link")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public java.util.Map<String, Object> linkDrug(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public java.util.Map<String, Object> linkDrug(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                                   @Valid @RequestBody DrugLinkRequest req, HttpServletRequest http) {
-        return service.linkDrug(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req.drugId());
+        return service.linkDrug(tenantId, staffId, RequestMeta.clientIp(http), id, req.drugId());
     }
 
     /** V2-004: the only way to change stock by hand. Relative (`delta`) or stock-take (`setTo`), reason required. */
@@ -101,9 +101,9 @@ public class PharmacyController {
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public PharmacyItemResponse adjustStock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public PharmacyItemResponse adjustStock(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                              @Valid @RequestBody PharmacyStockAdjustmentRequest req, HttpServletRequest http) {
-        return service.adjustStock(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req);
+        return service.adjustStock(tenantId, staffId, RequestMeta.clientIp(http), id, req);
     }
 
     /** V2-007: activate / deactivate an item. */
@@ -111,23 +111,23 @@ public class PharmacyController {
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public PharmacyItemResponse setStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public PharmacyItemResponse setStatus(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                            @Valid @RequestBody PharmacyItemStatusRequest req, HttpServletRequest http) {
-        return service.setActive(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req);
+        return service.setActive(tenantId, staffId, RequestMeta.clientIp(http), id, req);
     }
 
     @GetMapping("/items/{id}/stock-movements")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:view')")
-    public List<PharmacyStockMovementResponse> stockMovements(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.movements(tenantId(jwt), id);
+    public List<PharmacyStockMovementResponse> stockMovements(@CurrentTenant UUID tenantId, @PathVariable UUID id) {
+        return service.movements(tenantId, id);
     }
 
     @GetMapping("/dispensing-queue")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:view')")
-    public List<DispensingQueueEntryResponse> dispensingQueue(@AuthenticationPrincipal Jwt jwt) {
-        return service.dispensingQueue(tenantId(jwt));
+    public List<DispensingQueueEntryResponse> dispensingQueue(@CurrentTenant UUID tenantId) {
+        return service.dispensingQueue(tenantId);
     }
 
     /** PHL-004: the pharmacy features this clinic's mode switches on; any signed-in staff member (the nav is built from it). */
@@ -186,9 +186,9 @@ public class PharmacyController {
     @PatchMapping("/batches/{id}")
     @RequiresPharmacyMode(PharmacyMode.HYBRID) // BatchService refuses it in Hybrid once the batch is known (an unknown id stays 404)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public BatchDtos.BatchResponse patchBatch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public BatchDtos.BatchResponse patchBatch(@CurrentStaff UUID staffId, @PathVariable UUID id,
                                               @Valid @RequestBody BatchDtos.BatchPatchRequest req, HttpServletRequest http) {
-        return batchService.patch(staffId(jwt), RequestMeta.clientIp(http), id, req);
+        return batchService.patch(staffId, RequestMeta.clientIp(http), id, req);
     }
 
     /** PHL-006: FEFO pick preview, no stock change. Authority is pharmacy:view: the permission catalogue has no dispense action. */
@@ -197,13 +197,5 @@ public class PharmacyController {
     @PreAuthorize("hasAuthority('pharmacy:view')")
     public BatchDtos.PickResponse picks(@Valid @RequestBody BatchDtos.PickRequest req) {
         return batchService.pick(req);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

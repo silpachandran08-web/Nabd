@@ -33,9 +33,9 @@ class PublicNoticeController {
     ResponseEntity<String> page(@PathVariable String tenantSlug, @PathVariable String version,
                                 @RequestParam(name = "lang", defaultValue = "en") String lang, WebRequest request) {
         if (!lang.matches("^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$") || version.length() > 40 || tenantSlug.length() > 80) {
-            throw notFound();
+            throw noticeNotFound();
         }
-        NoticeRepository.Notice n = service.find(tenantSlug, version, lang).orElseThrow(PublicNoticeController::notFound);
+        NoticeRepository.Notice n = service.find(tenantSlug, version, lang).orElseThrow(PublicNoticeController::noticeNotFound);
         String etag = "\"" + NoticeService.hash(java.util.List.of(n.id().toString())) .substring(0, 32) + "\"";
         if (request.checkNotModified(etag)) {
             return null;
@@ -44,7 +44,7 @@ class PublicNoticeController {
                 .contentType(new MediaType("text", "html", StandardCharsets.UTF_8)).body(html(n));
     }
 
-    private static ApiException notFound() {
+    private static ApiException noticeNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "notice-not-found", "Notice not found", "No such notice.");
     }
 

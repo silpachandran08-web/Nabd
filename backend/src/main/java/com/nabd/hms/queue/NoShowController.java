@@ -39,7 +39,7 @@ class NoShowController {
     @Idempotent
     @PostMapping("/v1/appointments/{id}/no-show")
     @PreAuthorize("hasAuthority('queue:edit')")
-    AppointmentResponse mark(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody(required = false) MarkRequest req) {
+    AppointmentResponse mark(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody(required = false) MarkRequest req) {
         return service.mark(UUID.fromString(jwt.getSubject()), id, req == null ? null : req.reasonCode());
     }
 

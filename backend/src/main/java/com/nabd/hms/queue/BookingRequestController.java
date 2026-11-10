@@ -1,5 +1,7 @@
 package com.nabd.hms.queue;
 
+import jakarta.validation.Valid;
+import com.nabd.hms.common.CurrentStaff;
 import com.nabd.hms.common.PageRequest;
 import com.nabd.hms.shared.Idempotent;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -7,8 +9,6 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,25 +58,21 @@ class BookingRequestController {
     @Idempotent
     @PostMapping("/{id}/accept")
     @PreAuthorize("hasAuthority('queue:create')")
-    Map<String, Object> accept(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody(required = false) AcceptBody body) {
-        return service.accept(staffId(jwt), id, body == null ? null : body.slotStart());
+    Map<String, Object> accept(@CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody(required = false) AcceptBody body) {
+        return service.accept(staffId, id, body == null ? null : body.slotStart());
     }
 
     @Idempotent
     @PostMapping("/{id}/suggest")
     @PreAuthorize("hasAuthority('queue:create')")
-    ResponseEntity<Map<String, Object>> suggest(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody SuggestBody body) {
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(service.suggest(staffId(jwt), id, body.slots()));
+    ResponseEntity<Map<String, Object>> suggest(@CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody SuggestBody body) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(service.suggest(staffId, id, body.slots()));
     }
 
     @Idempotent
     @PostMapping("/{id}/decline")
     @PreAuthorize("hasAuthority('queue:create')")
-    Map<String, Object> decline(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody(required = false) DeclineBody body) {
-        return service.decline(staffId(jwt), id, body == null ? null : body.reasonCode());
-    }
-
-    private static UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    Map<String, Object> decline(@CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody(required = false) DeclineBody body) {
+        return service.decline(staffId, id, body == null ? null : body.reasonCode());
     }
 }

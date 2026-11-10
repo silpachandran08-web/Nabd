@@ -30,6 +30,8 @@ import java.util.UUID;
 @Transactional(propagation = Propagation.MANDATORY)
 class StockCommandsImpl implements StockCommands {
 
+    private static final String NOT_FOUND = "The requested pharmacy item was not found.";
+
     private record Leg(UUID batchId, int delta) {
     }
 
@@ -107,7 +109,7 @@ class StockCommandsImpl implements StockCommands {
         }
         String why = overrideReason.trim();
         StockResult r = apply(itemId, have, List.of(new Leg(batchId, -qty)), "dispense", "FEFO override: " + why, actorId, invoiceId, why, null);
-        ActorDirectory.Actor actor = actors.findActor(tenant.current(), actorId).orElseThrow(StockCommandsImpl::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenant.current(), actorId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         audit.record(tenant.current(), "staff", actorId, actor.name(), actor.role(), null, "pharmacy.fefo_overridden", "pharmacy_item", itemId,
                 null, Map.of("batchId", batchId, "qty", qty, "reason", why));
         return r;
@@ -175,15 +177,15 @@ class StockCommandsImpl implements StockCommands {
     public StockResult adjustBatch(UUID itemId, UUID batchId, int delta, UUID actorId, String reasonCode, String reason) {
         requireNonZero(delta);
         int have = lock(itemId);
-        batches.itemOf(tenant.current(), batchId).filter(itemId::equals).orElseThrow(StockCommandsImpl::notFound);
+        batches.itemOf(tenant.current(), batchId).filter(itemId::equals).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         return apply(itemId, have, List.of(new Leg(batchId, delta)), "adjustment", reason, reasonCode, actorId, null, null, null);
     }
 
     @Override
     public LockedBatch lockBatch(UUID batchId) {
-        UUID itemId = batches.itemOf(tenant.current(), batchId).orElseThrow(StockCommandsImpl::notFound);
+        UUID itemId = batches.itemOf(tenant.current(), batchId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         lock(itemId);
-        return new LockedBatch(itemId, batches.lock(tenant.current(), batchId).orElseThrow(StockCommandsImpl::notFound).qtyOnHand());
+        return new LockedBatch(itemId, batches.lock(tenant.current(), batchId).orElseThrow(() -> ApiException.notFound(NOT_FOUND)).qtyOnHand());
     }
 
     @Override
@@ -205,12 +207,12 @@ class StockCommandsImpl implements StockCommands {
         }
         Map<UUID, UUID> itemOf = batches.itemsOf(t, batchIds);
         if (itemOf.size() != n) {
-            throw notFound();
+            throw ApiException.notFound(NOT_FOUND);
         }
         UUID[] itemIds = itemOf.values().stream().distinct().sorted().toArray(UUID[]::new);
         Map<UUID, Integer> have = repo.lockItems(t, itemIds);
         if (have.size() != itemIds.length) {
-            throw notFound();
+            throw ApiException.notFound(NOT_FOUND);
         }
         Map<UUID, Integer> sums = batches.sumQtys(t, itemIds);
         have.forEach((item, qty) -> topUpOpening(item, qty - sums.getOrDefault(item, 0))); // rare: stock that reached stock_qty without a batch
@@ -302,7 +304,7 @@ class StockCommandsImpl implements StockCommands {
      * stock_qty without a batch (an item stocked before PHL-005, or by a test fixture) becomes the OPENING batch. */
     private int lock(UUID itemId) {
         UUID t = tenant.current();
-        int have = repo.lockItem(t, itemId).orElseThrow(StockCommandsImpl::notFound).stockQty();
+        int have = repo.lockItem(t, itemId).orElseThrow(() -> ApiException.notFound(NOT_FOUND)).stockQty();
         topUpOpening(itemId, have - batches.sumQty(t, itemId));
         return have;
     }
@@ -402,9 +404,5 @@ class StockCommandsImpl implements StockCommands {
     private static ApiException batchFieldsRequired() {
         return new ApiException(HttpStatus.BAD_REQUEST, "batch-details-required", "Batch details required",
                 "Batch number, expiry date, MRP, purchase rate and quantity are required for an In-house pharmacy.");
-    }
-
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested pharmacy item was not found.");
     }
 }

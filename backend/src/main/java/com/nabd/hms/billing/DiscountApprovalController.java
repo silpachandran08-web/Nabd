@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.common.CurrentStaff;
 import com.nabd.hms.billing.dto.DiscountApprovals;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.shared.Idempotent;
@@ -42,11 +43,11 @@ class DiscountApprovalController {
     @Idempotent
     @PostMapping("/discount-approvals")
     @PreAuthorize("hasAuthority('billing:create')")
-    ResponseEntity<DiscountApprovals.Item> request(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DiscountApprovals.CreateRequest req,
+    ResponseEntity<DiscountApprovals.Item> request(@CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DiscountApprovals.CreateRequest req,
                                                    HttpServletRequest http) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
         boolean canDiscount = permissions != null && permissions.contains("billing.discount");
-        return ResponseEntity.status(HttpStatus.CREATED).body(checkout.requestDiscountApproval(staffId(jwt), canDiscount, RequestMeta.clientIp(http), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(checkout.requestDiscountApproval(staffId, canDiscount, RequestMeta.clientIp(http), req));
     }
 
     /** Newest first (100 at most). invoiceDraftId: the desk's bill; status: the owner's inbox (pending). */
@@ -60,30 +61,26 @@ class DiscountApprovalController {
     @Idempotent
     @PostMapping("/discount-approvals/{id}/decide")
     @PreAuthorize("hasAuthority('billing:approve')")
-    DiscountApprovals.Item decide(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody DiscountApprovals.DecideRequest req,
+    DiscountApprovals.Item decide(@CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody DiscountApprovals.DecideRequest req,
                                   HttpServletRequest http) {
-        return approvals.decide(id, staffId(jwt), RequestMeta.clientIp(http), req);
+        return approvals.decide(id, staffId, RequestMeta.clientIp(http), req);
     }
 
     /** The patient leaves; the desk issues the bill later, once approved. 409 NOT_OPEN when decided against, used or expired. */
     @Idempotent
     @PostMapping("/discount-approvals/{id}/pay-later")
     @PreAuthorize("hasAuthority('billing:create')")
-    DiscountApprovals.Item payLater(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http) {
-        return approvals.payLater(id, staffId(jwt), RequestMeta.clientIp(http));
+    DiscountApprovals.Item payLater(@CurrentStaff UUID staffId, @PathVariable UUID id, HttpServletRequest http) {
+        return approvals.payLater(id, staffId, RequestMeta.clientIp(http));
     }
 
     /** Clinic days [from, to] (default today); type = discount | override | write_off | refund. Owner only. */
     @GetMapping("/leakage")
     @PreAuthorize("hasAuthority('reports:view')")
-    DiscountApprovals.LeakageResponse leakage(@AuthenticationPrincipal Jwt jwt,
+    DiscountApprovals.LeakageResponse leakage(@CurrentStaff UUID staffId,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                               @RequestParam(required = false) String type) {
-        return leakage.forOwner(staffId(jwt), from, to, type);
-    }
-
-    private static UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+        return leakage.forOwner(staffId, from, to, type);
     }
 }

@@ -132,3 +132,61 @@ spec:
   timeWindow: [{ duration: 28d, isRolling: true }]
   budgetingMethod: Occurrences
   objectives: [{ displayName: under-30s, target: 0.99 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: edge-bot-step-500ms
+  displayName: WhatsApp bot step under 500 ms (Patient Access Edge)
+  # ACC-045: edge_bot_step_seconds (ConversationEngine.process) publishes the 0.5 s bucket.
+  annotations: { nabd.io/service: patient-edge, nabd.io/status: live }
+spec:
+  service: patient-edge
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(edge_bot_step_seconds_bucket{le="0.5"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(edge_bot_step_seconds_count[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: p95-under-500ms, target: 0.95 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: edge-availability-read-50ms
+  displayName: Edge availability read under 50 ms
+  # ACC-045: edge_availability_read_seconds publishes the 0.05 s bucket.
+  annotations: { nabd.io/service: patient-edge, nabd.io/status: live }
+spec:
+  service: patient-edge
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(edge_availability_read_seconds_bucket{le="0.05"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(edge_availability_read_seconds_count[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: p95-under-50ms, target: 0.95 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: edge-inbound-success
+  displayName: Edge inbound messages handled
+  # ACC-045: a message counts as bad when its step failed (edge_event_failures_total, retried or dead-lettered) or the
+  # version conflict could not be resolved. Rate-limited and not-yet-enabled clinics are handled, not failures.
+  annotations: { nabd.io/service: patient-edge, nabd.io/status: live }
+spec:
+  service: patient-edge
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(edge_inbound_total{result!="conflict_exhausted"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: '(sum(rate(edge_inbound_total[{{w}}])) + sum(rate(edge_event_failures_total[{{w}}])))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: handled, target: 0.995 }]

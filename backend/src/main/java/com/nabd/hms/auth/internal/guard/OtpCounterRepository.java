@@ -1,4 +1,4 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.guard;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

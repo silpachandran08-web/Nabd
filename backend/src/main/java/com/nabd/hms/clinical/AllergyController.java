@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.dto.AllergyCorrectionRequest;
 import com.nabd.hms.clinical.dto.AllergyEventResponse;
 import com.nabd.hms.clinical.dto.AllergyRemovalRequest;
@@ -53,25 +55,25 @@ public class AllergyController {
     @PostMapping("/patients/{patientId}/allergies")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public AllergyResponse add(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public AllergyResponse add(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                 @Valid @RequestBody AllergyWriteRequest req, HttpServletRequest http) {
-        return service.add(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http), req);
+        return service.add(tenantId, patientId, staffId, RequestMeta.clientIp(http), req);
     }
 
     /** Correction (partial update) with a mandatory reason; the original stays in the history. */
     @PatchMapping("/allergies/{id}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public AllergyResponse correct(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public AllergyResponse correct(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                     @Valid @RequestBody AllergyCorrectionRequest req, HttpServletRequest http) {
-        return service.correct(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
+        return service.correct(tenantId, id, staffId, RequestMeta.clientIp(http), req);
     }
 
     /** Removal needs a reason; a body-less call is rejected (400 reason-required). */
     @PatchMapping("/allergies/{id}/deactivate")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public void deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public void deactivate(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                             @Valid @RequestBody(required = false) AllergyRemovalRequest req, HttpServletRequest http) {
-        service.deactivate(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
+        service.deactivate(tenantId, id, staffId, RequestMeta.clientIp(http), req);
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -96,15 +98,7 @@ public class AllergyController {
 
     @PutMapping("/patients/{patientId}/allergies/status")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public AllergyStatusResponse documentNone(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId, HttpServletRequest http) {
-        return service.documentNoKnownAllergies(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http));
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    public AllergyStatusResponse documentNone(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId, HttpServletRequest http) {
+        return service.documentNoKnownAllergies(tenantId, patientId, staffId, RequestMeta.clientIp(http));
     }
 }

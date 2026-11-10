@@ -1,5 +1,7 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.patient.dto.DuplicateCandidatesResponse;
 import com.nabd.hms.patient.dto.GuardianReviewDecisionRequest;
@@ -15,8 +17,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -49,24 +49,24 @@ public class PatientController {
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_duplicate_list", key = "a.patientId,b.patientId")
     @GetMapping("/duplicate-suggestions")
     @PreAuthorize("hasAuthority('patients:delete')")
-    public com.nabd.hms.patient.dto.DuplicateSuggestionPage duplicateSuggestions(@AuthenticationPrincipal Jwt jwt,
+    public com.nabd.hms.patient.dto.DuplicateSuggestionPage duplicateSuggestions(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                                                    @RequestParam(required = false) String cursor) {
-        return suggestions.list(tenantId(jwt), staffId(jwt), cursor);
+        return suggestions.list(tenantId, staffId, cursor);
     }
 
     /** ACC-030: merges still inside the 30-day undo window. */
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_merge_list", key = "duplicate.patientId,survivor.patientId")
     @GetMapping("/merges")
     @PreAuthorize("hasAuthority('patients:delete')")
-    public com.nabd.hms.patient.dto.RecentMerges recentMerges(@AuthenticationPrincipal Jwt jwt) {
-        return suggestions.recentMerges(tenantId(jwt), staffId(jwt));
+    public com.nabd.hms.patient.dto.RecentMerges recentMerges(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId) {
+        return suggestions.recentMerges(tenantId, staffId);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/duplicate-suggestions/{id}/dismiss")
     @PreAuthorize("hasAuthority('patients:delete')")
-    public ResponseEntity<Void> dismissSuggestion(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
-        suggestions.dismiss(tenantId(jwt), staffId(jwt), id);
+    public ResponseEntity<Void> dismissSuggestion(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable String id) {
+        suggestions.dismiss(tenantId, staffId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -74,8 +74,8 @@ public class PatientController {
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_household_list")
     @GetMapping("/by-phone")
     @PreAuthorize("hasAuthority('patients:view')")
-    public com.nabd.hms.patient.dto.HouseholdResponse byPhone(@AuthenticationPrincipal Jwt jwt, @RequestParam String phone) {
-        return households.byPhone(tenantId(jwt), staffId(jwt), phone);
+    public com.nabd.hms.patient.dto.HouseholdResponse byPhone(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @RequestParam String phone) {
+        return households.byPhone(tenantId, staffId, phone);
     }
 
     /**
@@ -85,51 +85,51 @@ public class PatientController {
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_registry_list", key = "id")
     @GetMapping("/registry")
     @PreAuthorize("hasAuthority('patients:view')")
-    public PatientRegistryResponse registry(@AuthenticationPrincipal Jwt jwt,
+    public PatientRegistryResponse registry(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                             @RequestParam(required = false) String q,
                                             @RequestParam(required = false) String filter,
                                             @RequestParam(required = false) Integer limit,
                                             @RequestParam(required = false) String cursor) {
-        return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit == null ? null : com.nabd.hms.common.PageRequest.limit(limit, 200), cursor);
+        return service.registry(tenantId, staffId, q, filter, limit == null ? null : com.nabd.hms.common.PageRequest.limit(limit, 200), cursor);
     }
 
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_list", key = "id")
     @GetMapping
     @PreAuthorize("hasAuthority('patients:view')")
-    public PatientPage list(@AuthenticationPrincipal Jwt jwt,
+    public PatientPage list(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                              @RequestParam(required = false) String q,
                              @RequestParam(required = false) Integer limit,
                              @RequestParam(required = false) String cursor) {
-        return service.list(tenantId(jwt), staffId(jwt), q, com.nabd.hms.common.PageRequest.limit(limit), cursor);
+        return service.list(tenantId, staffId, q, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     /** ACC-028: records needing correction (issue=phone: stored numbers that failed validation). */
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_data_quality_list", purpose = "directory")
     @GetMapping("/data-quality")
     @PreAuthorize("hasAuthority('patients:edit')")
-    public com.nabd.hms.patient.dto.DataQualityPage dataQuality(@AuthenticationPrincipal Jwt jwt,
+    public com.nabd.hms.patient.dto.DataQualityPage dataQuality(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                                  @RequestParam String issue,
                                                                  @RequestParam(required = false) Integer limit,
                                                                  @RequestParam(required = false) String cursor) {
-        return service.dataQuality(tenantId(jwt), staffId(jwt), issue, com.nabd.hms.common.PageRequest.limit(limit), cursor);
+        return service.dataQuality(tenantId, staffId, issue, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("guardian_reviews_list")
     @GetMapping("/guardian-reviews-due")
     @PreAuthorize("hasAuthority('patients:view')")
-    public List<GuardianReviewResponse> guardianReviewsDue(@AuthenticationPrincipal Jwt jwt,
+    public List<GuardianReviewResponse> guardianReviewsDue(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                            @RequestParam(required = false) String status) {
         if (status != null && !status.matches("due|overdue")) {
             throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "status must be due or overdue.");
         }
-        return service.guardianReviewsDue(tenantId(jwt), staffId(jwt), status);
+        return service.guardianReviewsDue(tenantId, staffId, status);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping
     @PreAuthorize("hasAuthority('patients:create')")
-    public ResponseEntity<Object> register(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PatientWriteRequest req) {
-        Object result = service.register(tenantId(jwt), staffId(jwt), req);
+    public ResponseEntity<Object> register(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody PatientWriteRequest req) {
+        Object result = service.register(tenantId, staffId, req);
         HttpStatus status = result instanceof DuplicateCandidatesResponse ? HttpStatus.CONFLICT : HttpStatus.CREATED;
         return ResponseEntity.status(status).body(result);
     }
@@ -137,60 +137,52 @@ public class PatientController {
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient", key = "id")
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('patients:view')")
-    public PatientDetailResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.get(tenantId(jwt), staffId(jwt), id);
+    public PatientDetailResponse get(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        return service.get(tenantId, staffId, id);
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('patients:edit')")
-    public PatientResponse patch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public PatientResponse patch(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                   @Valid @RequestBody PatientPatchRequest req) {
-        return service.patch(tenantId(jwt), staffId(jwt), id, req);
+        return service.patch(tenantId, staffId, id, req);
     }
 
     @DeleteMapping("/{id}/guardian")
     @PreAuthorize("hasAuthority('patients:edit')")
-    public ResponseEntity<Void> revokeGuardian(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        service.revokeGuardian(tenantId(jwt), staffId(jwt), id);
+    public ResponseEntity<Void> revokeGuardian(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        service.revokeGuardian(tenantId, staffId, id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/guardian/review")
     @PreAuthorize("hasAuthority('patients:edit')")
-    public PatientDetailResponse keepGuardian(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public PatientDetailResponse keepGuardian(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                               @Valid @RequestBody GuardianReviewDecisionRequest req) {
-        return service.keepGuardian(tenantId(jwt), staffId(jwt), id);
+        return service.keepGuardian(tenantId, staffId, id);
     }
 
     @PostMapping("/{id}/merge")
     @PreAuthorize("hasAuthority('patients:delete')")
-    public PatientDetailResponse merge(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public PatientDetailResponse merge(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                         @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken,
                                         @Valid @RequestBody MergeRequest req) {
-        return service.merge(tenantId(jwt), id, staffId(jwt), stepUpToken, req);
+        return service.merge(tenantId, id, staffId, stepUpToken, req);
     }
 
     @PostMapping("/merges/{mergeId}/undo")
     @PreAuthorize("hasAuthority('patients:delete')")
-    public ResponseEntity<Void> undoMerge(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID mergeId,
+    public ResponseEntity<Void> undoMerge(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID mergeId,
                                            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
-        service.unmerge(tenantId(jwt), mergeId, staffId(jwt), stepUpToken);
+        service.unmerge(tenantId, mergeId, staffId, stepUpToken);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/consent/withdraw")
     @PreAuthorize("hasAuthority('patients:edit')")
-    public ResponseEntity<Void> withdrawConsent(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public ResponseEntity<Void> withdrawConsent(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                                  @Valid @RequestBody WithdrawConsentRequest req) {
-        service.withdrawConsent(tenantId(jwt), staffId(jwt), id, req.consentTypeOrDefault(), req.channel());
+        service.withdrawConsent(tenantId, staffId, id, req.consentTypeOrDefault(), req.channel());
         return ResponseEntity.noContent().build();
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

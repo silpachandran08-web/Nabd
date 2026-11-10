@@ -1,5 +1,7 @@
 package com.nabd.hms.staff;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.staff.dto.DelegationRequest;
 import com.nabd.hms.staff.dto.DelegationResponse;
 import com.nabd.hms.staff.dto.RoleResponse;
@@ -8,8 +10,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -37,66 +37,58 @@ public class RoleController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('staff:view')")
-    public List<RoleResponse> list(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) Integer limit) {
+    public List<RoleResponse> list(@CurrentTenant UUID tenantId, @RequestParam(required = false) Integer limit) {
         // shortcut: PLT-027 cap applied after the read (a tenant has tens of roles); the bare list shape the shell relies on stays, default is the max
         int cap = limit == null ? com.nabd.hms.common.PageRequest.MAX : com.nabd.hms.common.PageRequest.limit(limit);
-        return service.list(tenantId(jwt)).stream().limit(cap).toList();
+        return service.list(tenantId).stream().limit(cap).toList();
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('staff:create')")
-    public ResponseEntity<RoleResponse> create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RoleWriteRequest req) {
-        RoleResponse created = service.create(tenantId(jwt), staffId(jwt), req);
+    public ResponseEntity<RoleResponse> create(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody RoleWriteRequest req) {
+        RoleResponse created = service.create(tenantId, staffId, req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('staff:view')")
-    public RoleResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.get(tenantId(jwt), id);
+    public RoleResponse get(@CurrentTenant UUID tenantId, @PathVariable UUID id) {
+        return service.get(tenantId, id);
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('staff:edit')")
-    public RoleResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public RoleResponse update(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                 @Valid @RequestBody RoleWriteRequest req) {
-        return service.update(tenantId(jwt), staffId(jwt), id, req);
+        return service.update(tenantId, staffId, id, req);
     }
 
     /** PLT-016: Owner only (checked in RoleService); 409 NOT_A_PRESET for a custom role. */
     @PostMapping("/{id}/reset-to-preset")
     @PreAuthorize("hasAuthority('staff:edit')")
     @com.nabd.hms.shared.Idempotent
-    public RoleResponse resetToPreset(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.resetToPreset(tenantId(jwt), staffId(jwt), id);
+    public RoleResponse resetToPreset(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        return service.resetToPreset(tenantId, staffId, id);
     }
 
     @PostMapping("/delegations")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('staff:edit')")
-    public DelegationResponse createDelegation(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DelegationRequest req,
+    public DelegationResponse createDelegation(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody DelegationRequest req,
                                                @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
-        return service.createDelegation(tenantId(jwt), staffId(jwt), req, stepUpToken);
+        return service.createDelegation(tenantId, staffId, req, stepUpToken);
     }
 
     @GetMapping("/delegations")
     @PreAuthorize("hasAuthority('staff:view')")
-    public List<DelegationResponse> listDelegations(@AuthenticationPrincipal Jwt jwt) {
-        return service.listDelegations(tenantId(jwt));
+    public List<DelegationResponse> listDelegations(@CurrentTenant UUID tenantId) {
+        return service.listDelegations(tenantId);
     }
 
     @DeleteMapping("/delegations/{id}")
     @PreAuthorize("hasAuthority('staff:edit')")
-    public ResponseEntity<Void> revokeDelegation(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        service.revokeDelegation(tenantId(jwt), staffId(jwt), id);
+    public ResponseEntity<Void> revokeDelegation(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        service.revokeDelegation(tenantId, staffId, id);
         return ResponseEntity.noContent().build();
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

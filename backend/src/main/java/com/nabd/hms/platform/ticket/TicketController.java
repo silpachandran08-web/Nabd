@@ -1,12 +1,12 @@
 package com.nabd.hms.platform.ticket;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.platform.ticket.dto.RaiseTicketRequest;
 import com.nabd.hms.platform.ticket.dto.TicketResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,8 +26,8 @@ public class TicketController {
     }
 
     @PostMapping
-    public ResponseEntity<TicketResponse> raise(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RaiseTicketRequest req) {
-        TicketResponse ticket = service.raiseFromStaff(tenantId(jwt), staffId(jwt), req);
+    public ResponseEntity<TicketResponse> raise(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody RaiseTicketRequest req) {
+        TicketResponse ticket = service.raiseFromStaff(tenantId, staffId, req);
         return ResponseEntity.status(HttpStatus.CREATED).body(ticket);
     }
 
@@ -35,13 +35,5 @@ public class TicketController {
     @PostMapping("/redaction-preview")
     public TicketService.RedactionPreview preview(@Valid @RequestBody RaiseTicketRequest req) {
         return service.preview(req);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

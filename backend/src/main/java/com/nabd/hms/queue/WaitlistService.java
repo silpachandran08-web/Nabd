@@ -155,9 +155,9 @@ public class WaitlistService {
     @Transactional
     public WaitlistEntryResponse accept(UUID tenantId, UUID callerStaffId, UUID id, Instant chosenSlotStart) {
         tenantContext.set(tenantId);
-        WaitlistEntryRow entry = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        WaitlistEntryRow entry = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         expireAndCascade(tenantId, entry.doctorId());
-        entry = repo.findById(tenantId, id).orElseThrow(this::notFound); // re-read: may have just expired/cascaded above
+        entry = repo.findById(tenantId, id).orElseThrow(ApiException::notFound); // re-read: may have just expired/cascaded above
 
         if (chosenSlotStart != null
                 && !("offered".equals(entry.status()) && chosenSlotStart.equals(entry.offeredSlotStart()))) {
@@ -268,7 +268,7 @@ public class WaitlistService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "waitlist_entry", entityId, before, after);
     }
@@ -276,7 +276,7 @@ public class WaitlistService {
     @Transactional
     public void cancelMembership(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, id).orElseThrow(this::notFound);
+        repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         repo.cancelMembership(tenantId, id);
     }
 
@@ -289,9 +289,5 @@ public class WaitlistService {
     private WaitlistEntryResponse toResponse(WaitlistEntryRow row) {
         return new WaitlistEntryResponse(row.id(), row.doctorId(), row.patientId(), row.patientName(), row.joinedAt(),
                 row.status(), row.offeredSlotStart(), row.offerExpiresAt(), row.bookedAppointmentId());
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

@@ -28,6 +28,8 @@ import static com.nabd.hms.platform.plans.PlanModels.Plan;
 @Service
 public class PlanService {
 
+    private static final String NOT_FOUND = "The requested plan was not found.";
+
     private final PlanRepository repo;
     private final PlatformAudit audit;
 
@@ -65,7 +67,7 @@ public class PlanService {
 
     @Transactional
     public PlanResponse update(UUID id, PlanWriteRequest req, UUID operatorId, String ip) {
-        Plan cur = repo.findById(id).orElseThrow(this::notFound);
+        Plan cur = repo.findById(id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         PlanResponse before = toResponse(cur);
         List<String> curModules = repo.modules(id, cur.version());
         List<String> modules = req.modules() == null ? curModules : validModules(req.modules());
@@ -94,7 +96,7 @@ public class PlanService {
 
     @Transactional(readOnly = true)
     public List<PlanVersionResponse> versions(UUID id) {
-        repo.findById(id).orElseThrow(this::notFound);
+        repo.findById(id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         return repo.versions(id).stream().map(v -> new PlanVersionResponse((int) v[0], (int) v[1], (int) v[2], (Integer) v[3],
                 (Integer) v[4], repo.modules(id, (int) v[0]), (Instant) v[5], (long) v[6])).toList();
     }
@@ -124,9 +126,5 @@ public class PlanService {
         return new PlanResponse(p.id(), p.code(), p.name(), p.monthlyPriceCents(), p.currency(),
                 p.seatLimit(), p.active(), p.createdAt(), p.version(), p.market(), p.pricingBasis(), p.branchLimit(),
                 p.visitsPerMonth(), p.onTrialExpiry(), repo.modules(p.id(), p.version()));
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested plan was not found.");
     }
 }

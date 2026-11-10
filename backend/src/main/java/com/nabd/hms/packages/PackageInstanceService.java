@@ -47,10 +47,9 @@ import static com.nabd.hms.packages.PackageModels.RefundRow;
  * invoices in one place).
  *
  * Deliberately NOT built here (all "Phase 2" in the wireframe's own Package settings panel, agreeing
- * with the xlsx's Delivery Phase column): scheduled instalments (NB-156, needs a payment gateway
- * that doesn't exist anywhere in this codebase) and transfer/gifting (NB-159). Expiry alerts and
- * next-session nudges are real here as a computed list + a manual "mark sent" action — the automatic
- * WhatsApp push itself needs NB-197's messaging infra, which doesn't exist yet either.
+ * with the xlsx's Delivery Phase column): scheduled instalments (NB-156) and transfer/gifting (NB-159).
+ * Expiry alerts and next-session nudges are a computed list + a manual "mark as reminded" action; this
+ * service sends no message (automatic dispatch is COM-044, see sendReminder).
  */
 @Service
 public class PackageInstanceService {
@@ -89,7 +88,7 @@ public class PackageInstanceService {
     @Transactional
     public InstanceResponse sell(UUID tenantId, UUID staffId, SellPackageRequest req) {
         tenantContext.set(tenantId);
-        PackageRow pkg = repo.findPackage(tenantId, req.packageId()).orElseThrow(this::notFound);
+        PackageRow pkg = repo.findPackage(tenantId, req.packageId()).orElseThrow(ApiException::notFound);
         if (!"on_sale".equals(pkg.status())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "package-not-on-sale", "Package not on sale",
                     "This package isn't on sale right now.");
@@ -160,17 +159,17 @@ public class PackageInstanceService {
     @Transactional
     public InstanceResponse detail(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        InstanceRow row = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        InstanceRow row = repo.findInstance(tenantId, id).orElseThrow(ApiException::notFound);
         return toResponse(tenantId, row, true);
     }
 
     @Transactional
     public InstanceResponse book(UUID tenantId, UUID staffId, UUID instanceItemId) {
         tenantContext.set(tenantId);
-        InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(this::notFound);
-        UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(this::notFound);
+        InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(ApiException::notFound);
+        UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(ApiException::notFound);
         repo.lockInstance(tenantId, instanceId); // FIN-004: serialise with refund request/approve
-        InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(this::notFound);
+        InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(ApiException::notFound);
         requireActionable(tenantId, instance, item, clock.today(tenantId));
 
         repo.insertRedemption(tenantId, instanceItemId, staffId);
@@ -181,10 +180,10 @@ public class PackageInstanceService {
     @Transactional
     public InstanceResponse redeem(UUID tenantId, UUID staffId, UUID instanceItemId) {
         tenantContext.set(tenantId);
-        InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(this::notFound);
-        UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(this::notFound);
+        InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(ApiException::notFound);
+        UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(ApiException::notFound);
         repo.lockInstance(tenantId, instanceId); // FIN-004: serialise with refund request/approve
-        InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(this::notFound);
+        InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(ApiException::notFound);
         requireActionable(tenantId, instance, item, clock.today(tenantId));
 
         if ("first_session".equals(instance.validityStarts()) && instance.validityStart() == null) {
@@ -231,7 +230,7 @@ public class PackageInstanceService {
     @Transactional
     public InstanceResponse extend(UUID tenantId, UUID staffId, UUID id, ExtendRequest req) {
         tenantContext.set(tenantId);
-        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(ApiException::notFound);
         LocalDate currentEnd = instance.validityEnd();
         if ("refunded".equals(instance.status()) || "cancelled".equals(instance.status())) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "instance-not-extendable", "Package cannot be extended",
@@ -277,7 +276,7 @@ public class PackageInstanceService {
     @Transactional
     public InstanceResponse sendReminder(UUID tenantId, UUID staffId, UUID id) {
         tenantContext.set(tenantId);
-        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(ApiException::notFound);
         int tier = currentAlertTier(instance, clock.today(tenantId));
         if (tier == 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-expiring-soon", "Not due for a reminder",
@@ -300,7 +299,7 @@ public class PackageInstanceService {
     @Transactional
     public RefundPreviewResponse refundPreview(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(ApiException::notFound);
         List<InstanceItemRow> items = repo.listInstanceItems(tenantId, id);
         BigDecimal usedListValue = items.stream()
                 .map(i -> i.unitListPrice().multiply(BigDecimal.valueOf(i.quantityConsumed())))
@@ -320,9 +319,9 @@ public class PackageInstanceService {
     public RefundResponse requestRefund(UUID tenantId, UUID staffId, UUID id, RefundRequestRequest req) {
         tenantContext.set(tenantId);
         if (!repo.lockInstance(tenantId, id)) {
-            throw notFound();
+            throw ApiException.notFound();
         }
-        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(ApiException::notFound);
         if ("refunded".equals(instance.status()) || "cancelled".equals(instance.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "instance-not-refundable", "Package not refundable",
                     "This package is " + instance.status() + " and cannot be refunded.");
@@ -352,7 +351,7 @@ public class PackageInstanceService {
     @Transactional
     public RefundResponse approveRefund(UUID tenantId, UUID staffId, UUID refundId, BigDecimal expectedAmount) {
         tenantContext.set(tenantId);
-        RefundRow refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound);
+        RefundRow refund = repo.findRefund(tenantId, refundId).orElseThrow(ApiException::notFound);
         // NB-056 maker-checker: whoever requested the refund cannot also be the one who approves it.
         if (refund.requestedBy().equals(staffId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "same-user", "Self-approval blocked",
@@ -360,7 +359,7 @@ public class PackageInstanceService {
         }
         dayClose.requireTodayOpen(tenantId); // FIN-005: the credit note lands on today; day lock before the instance lock
         repo.lockInstance(tenantId, refund.instanceId());
-        refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound); // re-read under the lock
+        refund = repo.findRefund(tenantId, refundId).orElseThrow(ApiException::notFound); // re-read under the lock
         requirePending(refund);
         RefundPreviewResponse current = refundPreview(tenantId, refund.instanceId());
         BigDecimal confirmed = expectedAmount != null ? expectedAmount : refund.refundAmount();
@@ -389,7 +388,7 @@ public class PackageInstanceService {
     @Transactional
     public RefundResponse rejectRefund(UUID tenantId, UUID staffId, UUID refundId, String reason) {
         tenantContext.set(tenantId);
-        RefundRow refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound);
+        RefundRow refund = repo.findRefund(tenantId, refundId).orElseThrow(ApiException::notFound);
         repo.lockInstance(tenantId, refund.instanceId());
         if (repo.rejectRefund(tenantId, refundId, staffId, reason) != 1) {
             throw alreadyDecided();
@@ -415,7 +414,7 @@ public class PackageInstanceService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "package_refund", entityId, before, after);
     }
@@ -465,9 +464,5 @@ public class PackageInstanceService {
         return new RefundResponse(r.id().toString(), r.instanceId().toString(), r.patientName(), r.packageName(),
                 r.reason(), r.usedListValue(), r.refundAmount(), r.amountOwed(), r.status(), r.creditNoteNumber(),
                 r.createdAt(), r.recomputedAmount());
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

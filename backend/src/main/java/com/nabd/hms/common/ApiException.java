@@ -27,6 +27,15 @@ public class ApiException extends RuntimeException {
         this.extras = extras;
     }
 
+    /** PLT-034: the one 404 problem (type not-found) the services share, instead of a local notFound() per class. */
+    public static ApiException notFound() {
+        return notFound("The requested resource was not found.");
+    }
+
+    public static ApiException notFound(String detail) {
+        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", detail);
+    }
+
     public java.util.Map<String, Object> extras() {
         return extras;
     }

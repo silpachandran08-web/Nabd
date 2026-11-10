@@ -166,7 +166,7 @@ public class DataExportService {
             }
             throw running();
         }
-        ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(DataExportService::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(ApiException::notFound);
         audit.record(tenant, "staff", staffId, actor.name(), actor.role(), ip, "data_export.started", "data_export_job", id, null,
                 Map.of("format", r.format(), "datasets", String.join(",", datasets), "stepUpId", stepUpId.toString()));
         Integer patients = jdbc.queryForObject("SELECT count(*) FROM patients WHERE tenant_id = ?", Integer.class, tenant);
@@ -177,7 +177,7 @@ public class DataExportService {
     public Job get(UUID id) {
         Map<String, Object> r = jdbc.queryForList("SELECT status, format, array_to_string(datasets, ',') AS datasets, progress::text AS progress, manifest::text AS manifest, "
                         + "link_id, bytes, created_at, completed_at FROM data_export_jobs WHERE tenant_id = ? AND id = ? AND format IS NOT NULL", tenantContext.current(), id)
-                .stream().findFirst().orElseThrow(DataExportService::notFound);
+                .stream().findFirst().orElseThrow(ApiException::notFound);
         List<DatasetProgress> ds = new ArrayList<>();
         @SuppressWarnings("unchecked")
         Map<String, Object> progress = r.get("progress") == null ? Map.of() : json.readValue((String) r.get("progress"), Map.class);
@@ -346,7 +346,7 @@ public class DataExportService {
         }
         jdbc.update("UPDATE data_export_links SET downloads = downloads + 1, otp_hash = NULL, otp_challenge_id = NULL WHERE token_hash = ?", hash);
         UUID job = (UUID) l.get("job_id");
-        byte[] enc = storage.get(ObjectStorage.Bucket.CLEAN, (String) l.get("object_key")).orElseThrow(DataExportService::notFound);
+        byte[] enc = storage.get(ObjectStorage.Bucket.CLEAN, (String) l.get("object_key")).orElseThrow(ApiException::notFound);
         UUID staff = (UUID) l.get("recipient_staff_id");
         ActorDirectory.Actor a = actors.findActor(tenant, staff).orElse(null);
         audit.record(tenant, "staff", staff, a == null ? "owner" : a.name(), a == null ? null : a.role(), ip, "data_export.downloaded", "data_export_job", job, null,
@@ -541,7 +541,4 @@ public class DataExportService {
                 Map.of("code", "export-link-expired"));
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
-    }
 }

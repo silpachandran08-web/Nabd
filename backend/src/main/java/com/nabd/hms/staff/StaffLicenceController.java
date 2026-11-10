@@ -1,5 +1,6 @@
 package com.nabd.hms.staff;
 
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.common.RequestMeta;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -42,26 +43,22 @@ public class StaffLicenceController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('staff:view')")
-    public LicenceResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.get(tenantId(jwt), id);
+    public LicenceResponse get(@CurrentTenant UUID tenantId, @PathVariable UUID id) {
+        return service.get(tenantId, id);
     }
 
     @PutMapping
     @PreAuthorize("hasAuthority('staff:edit')")
-    public LicenceResponse put(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody LicenceRequest req,
+    public LicenceResponse put(@CurrentTenant UUID tenantId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody LicenceRequest req,
                                HttpServletRequest http) {
-        return service.update(tenantId(jwt), UUID.fromString(jwt.getSubject()), id, req, RequestMeta.clientIp(http));
+        return service.update(tenantId, UUID.fromString(jwt.getSubject()), id, req, RequestMeta.clientIp(http));
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/override")
     @PreAuthorize("hasAuthority('staff:edit')")
-    public LicenceResponse override(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody OverrideRequest req,
+    public LicenceResponse override(@CurrentTenant UUID tenantId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody OverrideRequest req,
                                     HttpServletRequest http) {
-        return service.grantOverride(tenantId(jwt), UUID.fromString(jwt.getSubject()), id, req.until(), RequestMeta.clientIp(http));
-    }
-
-    private static UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
+        return service.grantOverride(tenantId, UUID.fromString(jwt.getSubject()), id, req.until(), RequestMeta.clientIp(http));
     }
 }

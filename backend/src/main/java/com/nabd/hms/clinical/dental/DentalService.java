@@ -87,10 +87,10 @@ public class DentalService {
     public ToothResponse updateSupernumerary(UUID tenantId, UUID patientId, UUID id, UUID callerStaffId,
                                               String ipAddress, String status, String note) {
         tenantContext.set(tenantId);
-        ToothRow before = repo.findById(tenantId, patientId, id).filter(ToothRow::isSupernumerary).orElseThrow(this::notFound);
+        ToothRow before = repo.findById(tenantId, patientId, id).filter(ToothRow::isSupernumerary).orElseThrow(ApiException::notFound);
         if (repo.updateSupernumerary(tenantId, patientId, id, status == null ? before.status() : status,
                 note == null ? before.note() : note, callerStaffId) == 0) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         ToothRow after = repo.findById(tenantId, patientId, id).orElseThrow();
         audit(tenantId, callerStaffId, ipAddress, "dental_chart.update", id, before, after);
@@ -101,9 +101,9 @@ public class DentalService {
     @Transactional
     public void removeSupernumerary(UUID tenantId, UUID patientId, UUID id, UUID callerStaffId, String ipAddress) {
         tenantContext.set(tenantId);
-        ToothRow before = repo.findById(tenantId, patientId, id).filter(ToothRow::isSupernumerary).orElseThrow(this::notFound);
+        ToothRow before = repo.findById(tenantId, patientId, id).filter(ToothRow::isSupernumerary).orElseThrow(ApiException::notFound);
         if (repo.deleteSupernumerary(tenantId, patientId, id) == 0) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         audit(tenantId, callerStaffId, ipAddress, "dental_chart.delete", id, before, null);
         event(tenantId, patientId, "supernumerary_removed", id, before, null, callerStaffId);
@@ -112,7 +112,7 @@ public class DentalService {
     @Transactional
     public List<ToothHistoryEntryResponse> history(UUID tenantId, UUID patientId, UUID toothId) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, patientId, toothId).orElseThrow(this::notFound);
+        repo.findById(tenantId, patientId, toothId).orElseThrow(ApiException::notFound);
         return repo.findHistory(tenantId, toothId).stream()
                 .map(h -> new ToothHistoryEntryResponse(h.actorName(), h.actorRole(), h.action(), h.before(),
                         h.after(), h.occurredAt()))
@@ -121,7 +121,7 @@ public class DentalService {
 
     private void audit(UUID tenantId, UUID callerStaffId, String ipAddress, String action, UUID entityId,
                         ToothRow before, ToothRow after) {
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 action, "dental_chart_entries", entityId, snapshot(before), snapshot(after));
     }
@@ -154,9 +154,5 @@ public class DentalService {
     private ToothResponse toResponse(ToothRow t) {
         return new ToothResponse(t.id(), t.patientId(), t.toothNumber(), t.status(), t.note(),
                 t.isSupernumerary(), t.updatedBy(), t.updatedAt());
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

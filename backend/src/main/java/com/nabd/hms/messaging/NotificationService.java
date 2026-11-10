@@ -37,6 +37,8 @@ import java.util.UUID;
 @Service
 public class NotificationService implements NotificationPort {
 
+    private static final String NOT_FOUND = "No such notification request.";
+
     static final String COLUMN = "params";
     private static final long MAX_DEFER_SECONDS = 3600;
 
@@ -130,9 +132,9 @@ public class NotificationService implements NotificationPort {
 
     /** Claim check for the Comms side: render params and recipient of a pending request. 410 SUBJECT_GONE once cancelled. */
     public NotificationClaim claim(UUID id) {
-        UUID tenantId = tx.execute(s -> repo.tenantOf(id)).orElseThrow(NotificationService::notFound); // the caller knows only the id
+        UUID tenantId = tx.execute(s -> repo.tenantOf(id)).orElseThrow(() -> ApiException.notFound(NOT_FOUND)); // the caller knows only the id
         NotificationClaim c = tenantScope.run(tenantId, () -> {
-            var row = repo.find(tenantId, id).orElseThrow(NotificationService::notFound);
+            var row = repo.find(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
             if (!careAllowed(row)) { // IDC-014: the caregiver lost the scope (or the patient the consent) since the request
                 if (repo.move(tenantId, id, "cancelled")) {
                     cancelled(tenantId, id, CancelReason.CONSENT_WITHDRAWN);
@@ -192,7 +194,7 @@ public class NotificationService implements NotificationPort {
         List<String> params = new java.util.ArrayList<>();
         body.path("p").forEach(n -> params.add(n.asString()));
         String phone = body.hasNonNull("to") ? body.path("to").asString()
-                : patientPhone.get().orElseThrow(NotificationService::notFound);
+                : patientPhone.get().orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         var purpose = NotificationPurpose.ofCode(row.purpose());
         return new NotificationClaim(row.id(), row.tenantId(), purpose.code(), purpose.templateKey(), row.language(), params,
                 new NotificationClaim.Recipient(phone, row.recipientPatientId()), purpose.consentClass().name().toLowerCase(),
@@ -229,7 +231,4 @@ public class NotificationService implements NotificationPort {
                 com.nabd.hms.patient.api.CareRecipients.MessageClass.ofWire(row.subjectType().substring("care_".length())));
     }
 
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such notification request.");
-    }
 }

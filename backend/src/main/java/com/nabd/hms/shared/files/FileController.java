@@ -1,5 +1,7 @@
 package com.nabd.hms.shared.files;
 
+import com.nabd.hms.common.ApiException;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -72,7 +74,7 @@ class FileController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('clinical:view')")
     StatusResponse get(@PathVariable UUID id) {
-        com.nabd.hms.shared.FileStore.FileInfo f = service.info(id).orElseThrow(FileService::notFound);
+        com.nabd.hms.shared.FileStore.FileInfo f = service.info(id).orElseThrow(ApiException::notFound);
         return new StatusResponse(f.fileId(), f.status(), f.contentType(), f.sizeBytes(), f.createdAt());
     }
 }

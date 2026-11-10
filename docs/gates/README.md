@@ -32,3 +32,8 @@ A missing entry makes its criterion FAIL ("no evidence supplied").
 
 ## Real-data block
 `app.provisioning.real-data-onboarding` (`blocked` | `open`, env `REAL_DATA_ONBOARDING`). Unset means blocked under the `prod` profile. While blocked, `POST /v1/platform/provisioning-jobs` and `/advance` return 409 `real-data-onboarding-blocked`. Open it on prod-in only after `phase0.md` records `passed`.
+
+## Phase 1 exit gate (OPS-050)
+Cohort B entry needs Security Controls >= 90% verified with every gap owned and dated; Phase 1 exit needs the measured pilot
+metrics. Queries, runner and formats: `docs/gates/phase1/README.md`. Tool: `python3 scripts/ci/phase1_gate.py controls | uat | sus | dayclose | report`.
+Decision record: `docs/gates/phase1.md`.
