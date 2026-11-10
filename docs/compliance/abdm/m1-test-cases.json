@@ -1,0 +1,60 @@
+{
+  "_about": "IDC-019: ABDM M1 (ABHA creation, verification, facility and professional registry) cases mapped to what Nabd implements (IDC-016/017/018). nha_ref is the row of the official NHA M1 test case sheet; it is null until the compliance lead maps each case from the sheet NHA issues with sandbox access (this repository does not hold that sheet, and no case text here is NHA wording). Run with scripts/abdm/m1_runner.py; see README.md.",
+  "version": 1,
+  "cases": [
+    {
+      "id": "M1-01", "nha_ref": null, "mandatory": true, "kind": "auto",
+      "title": "Integration on for the clinic: gateway configured and the switch reads enabled",
+      "request": { "method": "GET", "path": "/v1/abha/status" },
+      "expect": { "status": 200, "json": { "enabled": true } }
+    },
+    {
+      "id": "M1-02", "nha_ref": null, "mandatory": true, "kind": "auto",
+      "title": "Facility verified against the Health Facility Registry (HFR)",
+      "request": { "method": "GET", "path": "/v1/settings/integrations/abdm" },
+      "expect": { "status": 200, "json": { "enabled": true, "hfrVerified": true } }
+    },
+    {
+      "id": "M1-03", "nha_ref": null, "mandatory": true, "kind": "manual",
+      "title": "Doctor's HPR id verified against the Health Professional Registry (PUT /v1/staff/{id}/hpr)",
+      "steps": "Owner opens Setup > Staff, enters the sandbox HPR id of a test doctor, saves; expect the id stored and shown as verified."
+    },
+    {
+      "id": "M1-04", "nha_ref": null, "mandatory": true, "kind": "manual",
+      "title": "ABHA creation with Aadhaar OTP (POST /v1/abha/enrol mode=aadhaar, init then confirm)",
+      "steps": "Reception enrols a sandbox test identity with the sandbox Aadhaar OTP; expect abhaLast4 and abhaAddress returned and linked to the test patient."
+    },
+    {
+      "id": "M1-05", "nha_ref": null, "mandatory": true, "kind": "manual",
+      "title": "ABHA creation with mobile OTP (POST /v1/abha/enrol mode=mobile)",
+      "steps": "As M1-04 with mode=mobile and the sandbox test mobile."
+    },
+    {
+      "id": "M1-06", "nha_ref": null, "mandatory": true, "kind": "auto",
+      "title": "ABHA verification starts for a sandbox ABHA address (POST /v1/patients/{id}/abha/verify step=init)",
+      "request": { "method": "POST", "path": "/v1/patients/${M1_PATIENT_ID}/abha/verify", "body": { "step": "init", "abhaNumberOrAddress": "${M1_ABHA_ADDRESS}" } },
+      "expect": { "status": 200, "json_keys": ["txnId"] }
+    },
+    {
+      "id": "M1-07", "nha_ref": null, "mandatory": true, "kind": "manual",
+      "title": "ABHA verification completes with the OTP (step=confirm) and the patient shows ABHA verified",
+      "steps": "Confirm with the OTP the sandbox sends for M1-06's txnId; expect verified=true and the ABHA panel showing the last four digits only."
+    },
+    {
+      "id": "M1-08", "nha_ref": null, "mandatory": true, "kind": "manual",
+      "title": "A wrong OTP is refused and nothing is linked",
+      "steps": "Repeat M1-07 with a wrong code; expect a refusal and no ABHA on the patient."
+    },
+    {
+      "id": "M1-09", "nha_ref": null, "mandatory": true, "kind": "auto", "auth": false,
+      "title": "A gateway callback without the gateway's signature is refused",
+      "request": { "method": "POST", "path": "/abdm/v3/callbacks/m1-probe", "body": {} },
+      "expect": { "status": 401 }
+    },
+    {
+      "id": "M1-10", "nha_ref": null, "mandatory": false, "kind": "manual",
+      "title": "Integration switched off: no ABDM call is made and ABHA actions answer abdm-disabled",
+      "steps": "Owner turns ABDM off in Setup > Integrations; repeat M1-06; expect 409 abdm-disabled."
+    }
+  ]
+}

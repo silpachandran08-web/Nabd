@@ -1,0 +1,17 @@
+{
+  "_about": "IDC-019: the M1 submission record. Filled by the owners named below once the external steps happen; scripts/abdm/m1_runner.py gate reads it. Nothing here may be filled with a placeholder.",
+  "phase2_starts_on": null,
+  "submission": {
+    "owner": "Product owner (with the compliance lead)",
+    "submitted_on": null,
+    "evidence_pack": null,
+    "nha_acknowledgement_ref": null
+  },
+  "security_audit": {
+    "owner": "Security lead (procurement)",
+    "auditor": null,
+    "cert_in_empanelled": null,
+    "audit_date": null,
+    "booking_ref": null
+  }
+}
