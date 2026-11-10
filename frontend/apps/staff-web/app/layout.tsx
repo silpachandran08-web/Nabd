@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import BffBoot from "./BffBoot";
@@ -11,6 +12,8 @@ import { dirOf, isLocale } from "@nabd/i18n";
 import { currentTag } from "../i18n/request";
 import { scriptFontClasses } from "./fonts";
 import I18nBoot from "./I18nBoot";
+import { ThemeBoot } from "./shell/ThemeSwitch";
+import { THEME_BOOT_SCRIPT } from "./shell/theme";
 
 // DESIGN.md §2.1 — weights 400/500/600/700 only, Poppins is the only Latin family.
 const poppins = Poppins({
@@ -30,11 +33,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const lang = isLocale(tag) ? tag : "en";
   const dir = tag === "pseudo-rtl" ? "rtl" : isLocale(tag) ? dirOf(tag) : "ltr";
   const messages = await getMessages();
+  // FEF-025: the nonce'd inline script in <head> sets data-theme from the nabd_theme cookie (System: prefers-color-scheme)
+  // while the HTML is parsed, so the first frame is already in the user's theme. data-theme is never a React prop, so a
+  // router.refresh cannot reset it; suppressHydrationWarning because the script sets it before React hydrates.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html lang={lang} dir={dir} className={`${poppins.variable} ${scriptFontClasses(lang)}`}>
+    <html lang={lang} dir={dir} suppressHydrationWarning className={`${poppins.variable} ${scriptFontClasses(lang)}`}>
+      <head>
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body>
         <NextIntlClientProvider locale={lang} messages={messages}>
           <I18nBoot locale={lang} />
+          <ThemeBoot />
           <TelemetryReporter />
           <BffBoot />
           {/* FEF-029: each route group's layout adds its own shell: (clinic) nav + top bar + idle lock, the others a plain frame. */}

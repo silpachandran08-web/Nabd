@@ -19,6 +19,11 @@
   "online": "ऑनलाइन",
   "language": "भाषा",
   "languageSaveFailed": "आपकी भाषा सहेजी नहीं जा सकी। रीलोड करने पर यह बदल जाएगी।",
+  "theme": "थीम",
+  "themeSystem": "सिस्टम",
+  "themeDark": "गहरा",
+  "themeLight": "हल्का",
+  "themeSaveFailed": "आपकी थीम सहेजी नहीं जा सकी। यह केवल इस कंप्यूटर पर लागू है।",
   "ownerSection": {
     "run": "क्लिनिक चलाएँ",
     "people": "लोग और एक्सेस",

@@ -11,7 +11,6 @@ import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
 import ShellUserMenu from "./shell/ShellUserMenu";
 import TrialChip from "./components/setup/TrialChip";
-import ThemeToggle from "./shell/ThemeToggle";
 import { keyHint } from "./shell/shortcuts";
 import { formatClinicTime } from "./lib/clinicTime";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
@@ -155,7 +154,6 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
       <div className={styles.spacer} />
       <TrialChip />
       <LanguagePicker />
-      <ThemeToggle />
       {/* FEF-034: Register walk-in from any screen (also Ctrl+K and W); the schedule board already carries it as its primary action. */}
       {canWalkIn && !primaryAction?.href.includes("action=walkin") && (
         <button type="button" className={`${styles.primaryAction} ${styles.walkInBtn}`} {...keyHint("walkin")} onClick={() => router.push("/arrivals?action=walkin")}>

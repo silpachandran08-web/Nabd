@@ -12,6 +12,7 @@ import { useShellNav } from "./useShellNav";
 import { HELP_EVENT } from "./HelpPanel";
 import { TOUR_EVENT } from "./TourCard";
 import { isTourRole } from "./help";
+import ThemeSwitch from "./ThemeSwitch";
 
 export default function ShellUserMenu() {
   const router = useRouter();
@@ -50,6 +51,7 @@ export default function ShellUserMenu() {
                 {ROLE_LABEL[r]} context{r === role && <Icon name="check" size={14} />}
               </button>
             ))}
+            <ThemeSwitch variant="menu" />
             {/* FEF-062: help for this screen (also F1) and, for roles with a first-run tour, its replay */}
             <button type="button" role="menuitem" className={styles.menuItem} onClick={() => { setOpen(false); document.dispatchEvent(new Event(HELP_EVENT)); }}>{th("menu.help")}<kbd>F1</kbd></button>
             {isTourRole(role) && <button type="button" role="menuitem" className={styles.menuItem} onClick={() => { setOpen(false); document.dispatchEvent(new Event(TOUR_EVENT)); }}>{th("menu.replayTour")}</button>}

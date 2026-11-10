@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "./account.module.css";
 import { storeTokens } from "../../lib/apiClient";
 import { api, reasonText } from "../../lib/api";
+import ThemeSwitch from "../../shell/ThemeSwitch";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
@@ -106,6 +107,9 @@ export default function AccountPage() {
     <main className={styles.page}>
       <h1 className={styles.title}>Account & Security</h1>
       <p className={styles.subtitle}>Manage two-factor authentication, active sessions, and emergency access.</p>
+
+      {/* FEF-025: same choice as the user menu */}
+      <div className={styles.card}><ThemeSwitch variant="page" /></div>
 
       <h2 className={styles.sectionTitle}>Two-factor authentication</h2>
       <div className={styles.card}>

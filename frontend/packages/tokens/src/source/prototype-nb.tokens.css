@@ -1,0 +1,53 @@
+/* FEF-025: verbatim copy of the token blocks (lines 1-52) of the prototype stylesheet prototype/css/nb.css, the design source the light theme is diff-tested against. Not imported anywhere. */
+/* Nabd prototype stylesheet.
+   Layout: prototype bar on top, then the product frame (sidebar + top bar + content, optional context rail).
+   Tokens follow DESIGN.md (dark-first, Poppins, cyan-mint accent). Single deliberate dark theme. */
+:root {
+  color-scheme: dark;
+  --bg-root: #06090C; --bg-canvas: #0A0E12; --bg-nav: #080B0E;
+  --s1: #11161B; --s2: #171D23; --s3: #1E262D; --sunk: #05080A; --overlay: #12181E;
+  --scrim: rgba(3,6,9,.72);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,0));
+  --b-sub: rgba(255,255,255,.07); --b-def: rgba(255,255,255,.11); --b-str: rgba(255,255,255,.18); --div: rgba(255,255,255,.06);
+  --acc: #2ED3E0; --acc-300: #7BE9F0; --acc-600: #1FB8C7; --mint: #3EE0C4;
+  --acc-grad: linear-gradient(90deg, #3EE0C4 0%, #35C9E8 100%);
+  --acc-tint: rgba(46,211,224,.12); --acc-tint2: rgba(46,211,224,.20); --acc-line: rgba(46,211,224,.42);
+  --acc-glow: 0 8px 24px rgba(46,211,224,.26); --on-acc: #04231F;
+  --tx: #FFFFFF; --tx2: #A6B0B8; --tx3: #78848C; --tx4: #4E585F;
+  --crit: #FF4D4F; --crit-t: rgba(255,77,79,.15); --urg: #FF8A3D; --urg-t: rgba(255,138,61,.15);
+  --warn: #E8B33C; --warn-t: rgba(232,179,60,.14); --ok: #34D399; --ok-t: rgba(52,211,153,.14);
+  --info: #58B2F5; --info-t: rgba(88,178,245,.14); --sync: #8B93F5; --sync-t: rgba(139,147,245,.15);
+  --perm: #78848C; --perm-t: rgba(255,255,255,.06); --sub: #B48CF0; --sub-t: rgba(180,140,240,.15);
+  --danger: #F0455C; --danger-t: rgba(240,69,92,.13);
+  --acc-fill: #2ED3E0;
+  --hover: rgba(255,255,255,.04); --hover2: rgba(255,255,255,.05); --chip: rgba(255,255,255,.08); --scroll: rgba(255,255,255,.13);
+  --inset-hl: inset 0 1px 0 rgba(255,255,255,.05); --bezel: #1A2026; --shadow-lg: 0 24px 64px rgba(0,0,0,.5); --shadow-xl: 0 24px 64px rgba(0,0,0,.65); --shadow-md: 0 12px 32px rgba(0,0,0,.55);
+  --wa: #25D366; --wa-bg: #0B141A; --wa-in: #1F2C34; --wa-out: #005C4B; --wa-bar: #1F2C34; --wa-field: #2A3942; --wa-mute: #8696A0; --wa-link: #53BDEB; --wa-tx: #E9EDEF; --wa-ts: rgba(255,255,255,.55); --wa-line: rgba(255,255,255,.08);
+  --font: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-ar: 'IBM Plex Sans Arabic', 'Poppins', system-ui, sans-serif;
+  --font-hi: 'Noto Sans Devanagari', 'Poppins', system-ui, sans-serif;
+  --r-xs: 6px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px; --r-2xl: 24px;
+  --dur: 180ms; --ease: cubic-bezier(.2,0,.2,1); --ease-out: cubic-bezier(.16,1,.3,1);
+}
+/* Light theme ("lite mode"): DESIGN.md §1.7 mapping. Accent text darkens for AA on white;
+   accent fills stay bright cyan with dark ink. Clinical state colours darken for AA on white. */
+:root[data-nb-theme="light"] {
+  color-scheme: light;
+  --bg-root: #EEF2F4; --bg-canvas: #FFFFFF; --bg-nav: #F7F9FA;
+  --s1: #FFFFFF; --s2: #F1F4F6; --s3: #E9EDF0; --sunk: #F3F6F8; --overlay: #FFFFFF;
+  --scrim: rgba(10,14,18,.38);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0));
+  --b-sub: rgba(6,9,12,.09); --b-def: rgba(6,9,12,.14); --b-str: rgba(6,9,12,.24); --div: rgba(6,9,12,.07);
+  --acc: #0B7F8B; --acc-300: #0A6C76; --acc-600: #096570; --acc-fill: #2ED3E0;
+  --acc-tint: rgba(11,127,139,.09); --acc-tint2: rgba(11,127,139,.15); --acc-line: rgba(11,127,139,.42);
+  --acc-glow: 0 6px 18px rgba(21,143,156,.22);
+  --tx: #0A0E12; --tx2: #4B565E; --tx3: #66727A; --tx4: #98A2A9;
+  --crit: #D42A2D; --crit-t: rgba(212,42,45,.10); --urg: #B8530F; --urg-t: rgba(184,83,15,.10);
+  --warn: #946200; --warn-t: rgba(148,98,0,.10); --ok: #0B7A52; --ok-t: rgba(11,122,82,.10);
+  --info: #1C68AA; --info-t: rgba(28,104,170,.10); --sync: #4B55C8; --sync-t: rgba(75,85,200,.10);
+  --perm: #5C6770; --perm-t: rgba(6,9,12,.05); --sub: #7340C4; --sub-t: rgba(115,64,196,.10);
+  --danger: #C8283E; --danger-t: rgba(200,40,62,.09);
+  --hover: rgba(6,9,12,.04); --hover2: rgba(6,9,12,.05); --chip: rgba(6,9,12,.07); --scroll: rgba(6,9,12,.18);
+  --inset-hl: inset 0 1px 0 rgba(255,255,255,.6); --bezel: #CDD5DB; --shadow-lg: 0 18px 48px rgba(10,14,18,.12); --shadow-xl: 0 24px 64px rgba(10,14,18,.18); --shadow-md: 0 10px 28px rgba(10,14,18,.14);
+  --wa-bg: #EFEAE2; --wa-in: #FFFFFF; --wa-out: #D9FDD3; --wa-bar: #F0F2F5; --wa-field: #FFFFFF; --wa-mute: #667781; --wa-link: #027EB5; --wa-tx: #111B21; --wa-ts: rgba(17,27,33,.5); --wa-line: rgba(17,27,33,.1);
+}

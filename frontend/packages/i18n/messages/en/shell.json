@@ -19,6 +19,11 @@
   "online": "Online",
   "language": "Language",
   "languageSaveFailed": "Could not save your language. It will reset when you reload.",
+  "theme": "Theme",
+  "themeSystem": "System",
+  "themeDark": "Dark",
+  "themeLight": "Light",
+  "themeSaveFailed": "Couldn't save your theme. It applies on this computer only.",
   "ownerSection": {
     "run": "Run the clinic",
     "people": "People & access",

@@ -32,7 +32,7 @@ export function consultActive(pathname: string | null, search: { get(k: string):
   return !!pathname && (pathname === "/consult" || pathname.startsWith("/consult/")) && !!search?.get("entry");
 }
 
-// Completion lives in the browser like the shell's other per-viewer preferences (nabd_sidebar_collapsed, nabd_theme): ACC-035's
+// Completion lives in the browser like the shell's other per-viewer preferences (nabd_sidebar_collapsed): ACC-035's
 // staff_onboarding_progress does not exist yet. shortcut: completion is per browser, not per account; move it to ACC-035 when it lands.
 const KEY = "nabd_tour_done";
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void };
