@@ -343,3 +343,147 @@ groups:
     annotations:
       summary: 'outbox-oldest-pending-30s: burning the 28 d error budget at more than 6x (6h and 30m windows)'
       runbook: docs/runbooks/NabdSloSlowBurn.md
+- name: nabd-slo-edge-bot-step-500ms
+  rules:
+  - record: slo:sli_error:ratio_rate5m
+    expr: (1 - ((sum(rate(edge_bot_step_seconds_bucket{le="0.5"}[5m]))) / (sum(rate(edge_bot_step_seconds_count[5m]))))) >= 0
+    labels: &id008
+      slo: edge-bot-step-500ms
+      service: patient-edge
+  - record: slo:sli_error:ratio_rate30m
+    expr: (1 - ((sum(rate(edge_bot_step_seconds_bucket{le="0.5"}[30m]))) / (sum(rate(edge_bot_step_seconds_count[30m]))))) >= 0
+    labels: *id008
+  - record: slo:sli_error:ratio_rate1h
+    expr: (1 - ((sum(rate(edge_bot_step_seconds_bucket{le="0.5"}[1h]))) / (sum(rate(edge_bot_step_seconds_count[1h]))))) >= 0
+    labels: *id008
+  - record: slo:sli_error:ratio_rate6h
+    expr: (1 - ((sum(rate(edge_bot_step_seconds_bucket{le="0.5"}[6h]))) / (sum(rate(edge_bot_step_seconds_count[6h]))))) >= 0
+    labels: *id008
+  - record: slo:sli_error:ratio_rate28d
+    expr: avg_over_time(slo:sli_error:ratio_rate5m{slo="edge-bot-step-500ms"}[28d])
+    labels: *id008
+  - record: slo:objective:ratio
+    expr: '0.95'
+    labels: *id008
+  - record: slo:error_budget_remaining:ratio
+    expr: clamp_max(1 - slo:sli_error:ratio_rate28d{slo="edge-bot-step-500ms"} / 0.05, 1)
+    labels: *id008
+  - record: slo:release_frozen
+    expr: slo:error_budget_remaining:ratio{slo="edge-bot-step-500ms"} < bool 0.5
+    labels: *id008
+  - alert: NabdSloFastBurn
+    expr: slo:sli_error:ratio_rate1h{slo="edge-bot-step-500ms"} > 0.72 and slo:sli_error:ratio_rate5m{slo="edge-bot-step-500ms"} > 0.72
+    for: 0m
+    labels:
+      slo: edge-bot-step-500ms
+      service: patient-edge
+      severity: page
+    annotations:
+      summary: 'edge-bot-step-500ms: burning the 28 d error budget at more than 14.4x (1h and 5m windows)'
+      runbook: docs/runbooks/NabdSloFastBurn.md
+  - alert: NabdSloSlowBurn
+    expr: slo:sli_error:ratio_rate6h{slo="edge-bot-step-500ms"} > 0.3 and slo:sli_error:ratio_rate30m{slo="edge-bot-step-500ms"} > 0.3
+    for: 0m
+    labels:
+      slo: edge-bot-step-500ms
+      service: patient-edge
+      severity: page
+    annotations:
+      summary: 'edge-bot-step-500ms: burning the 28 d error budget at more than 6x (6h and 30m windows)'
+      runbook: docs/runbooks/NabdSloSlowBurn.md
+- name: nabd-slo-edge-availability-read-50ms
+  rules:
+  - record: slo:sli_error:ratio_rate5m
+    expr: (1 - ((sum(rate(edge_availability_read_seconds_bucket{le="0.05"}[5m]))) / (sum(rate(edge_availability_read_seconds_count[5m]))))) >= 0
+    labels: &id009
+      slo: edge-availability-read-50ms
+      service: patient-edge
+  - record: slo:sli_error:ratio_rate30m
+    expr: (1 - ((sum(rate(edge_availability_read_seconds_bucket{le="0.05"}[30m]))) / (sum(rate(edge_availability_read_seconds_count[30m]))))) >= 0
+    labels: *id009
+  - record: slo:sli_error:ratio_rate1h
+    expr: (1 - ((sum(rate(edge_availability_read_seconds_bucket{le="0.05"}[1h]))) / (sum(rate(edge_availability_read_seconds_count[1h]))))) >= 0
+    labels: *id009
+  - record: slo:sli_error:ratio_rate6h
+    expr: (1 - ((sum(rate(edge_availability_read_seconds_bucket{le="0.05"}[6h]))) / (sum(rate(edge_availability_read_seconds_count[6h]))))) >= 0
+    labels: *id009
+  - record: slo:sli_error:ratio_rate28d
+    expr: avg_over_time(slo:sli_error:ratio_rate5m{slo="edge-availability-read-50ms"}[28d])
+    labels: *id009
+  - record: slo:objective:ratio
+    expr: '0.95'
+    labels: *id009
+  - record: slo:error_budget_remaining:ratio
+    expr: clamp_max(1 - slo:sli_error:ratio_rate28d{slo="edge-availability-read-50ms"} / 0.05, 1)
+    labels: *id009
+  - record: slo:release_frozen
+    expr: slo:error_budget_remaining:ratio{slo="edge-availability-read-50ms"} < bool 0.5
+    labels: *id009
+  - alert: NabdSloFastBurn
+    expr: slo:sli_error:ratio_rate1h{slo="edge-availability-read-50ms"} > 0.72 and slo:sli_error:ratio_rate5m{slo="edge-availability-read-50ms"} > 0.72
+    for: 0m
+    labels:
+      slo: edge-availability-read-50ms
+      service: patient-edge
+      severity: page
+    annotations:
+      summary: 'edge-availability-read-50ms: burning the 28 d error budget at more than 14.4x (1h and 5m windows)'
+      runbook: docs/runbooks/NabdSloFastBurn.md
+  - alert: NabdSloSlowBurn
+    expr: slo:sli_error:ratio_rate6h{slo="edge-availability-read-50ms"} > 0.3 and slo:sli_error:ratio_rate30m{slo="edge-availability-read-50ms"} > 0.3
+    for: 0m
+    labels:
+      slo: edge-availability-read-50ms
+      service: patient-edge
+      severity: page
+    annotations:
+      summary: 'edge-availability-read-50ms: burning the 28 d error budget at more than 6x (6h and 30m windows)'
+      runbook: docs/runbooks/NabdSloSlowBurn.md
+- name: nabd-slo-edge-inbound-success
+  rules:
+  - record: slo:sli_error:ratio_rate5m
+    expr: (1 - ((sum(rate(edge_inbound_total{result!="conflict_exhausted"}[5m]))) / ((sum(rate(edge_inbound_total[5m])) + sum(rate(edge_event_failures_total[5m])))))) >= 0
+    labels: &id010
+      slo: edge-inbound-success
+      service: patient-edge
+  - record: slo:sli_error:ratio_rate30m
+    expr: (1 - ((sum(rate(edge_inbound_total{result!="conflict_exhausted"}[30m]))) / ((sum(rate(edge_inbound_total[30m])) + sum(rate(edge_event_failures_total[30m])))))) >= 0
+    labels: *id010
+  - record: slo:sli_error:ratio_rate1h
+    expr: (1 - ((sum(rate(edge_inbound_total{result!="conflict_exhausted"}[1h]))) / ((sum(rate(edge_inbound_total[1h])) + sum(rate(edge_event_failures_total[1h])))))) >= 0
+    labels: *id010
+  - record: slo:sli_error:ratio_rate6h
+    expr: (1 - ((sum(rate(edge_inbound_total{result!="conflict_exhausted"}[6h]))) / ((sum(rate(edge_inbound_total[6h])) + sum(rate(edge_event_failures_total[6h])))))) >= 0
+    labels: *id010
+  - record: slo:sli_error:ratio_rate28d
+    expr: avg_over_time(slo:sli_error:ratio_rate5m{slo="edge-inbound-success"}[28d])
+    labels: *id010
+  - record: slo:objective:ratio
+    expr: '0.995'
+    labels: *id010
+  - record: slo:error_budget_remaining:ratio
+    expr: clamp_max(1 - slo:sli_error:ratio_rate28d{slo="edge-inbound-success"} / 0.005, 1)
+    labels: *id010
+  - record: slo:release_frozen
+    expr: slo:error_budget_remaining:ratio{slo="edge-inbound-success"} < bool 0.5
+    labels: *id010
+  - alert: NabdSloFastBurn
+    expr: slo:sli_error:ratio_rate1h{slo="edge-inbound-success"} > 0.072 and slo:sli_error:ratio_rate5m{slo="edge-inbound-success"} > 0.072
+    for: 0m
+    labels:
+      slo: edge-inbound-success
+      service: patient-edge
+      severity: page
+    annotations:
+      summary: 'edge-inbound-success: burning the 28 d error budget at more than 14.4x (1h and 5m windows)'
+      runbook: docs/runbooks/NabdSloFastBurn.md
+  - alert: NabdSloSlowBurn
+    expr: slo:sli_error:ratio_rate6h{slo="edge-inbound-success"} > 0.03 and slo:sli_error:ratio_rate30m{slo="edge-inbound-success"} > 0.03
+    for: 0m
+    labels:
+      slo: edge-inbound-success
+      service: patient-edge
+      severity: page
+    annotations:
+      summary: 'edge-inbound-success: burning the 28 d error budget at more than 6x (6h and 30m windows)'
+      runbook: docs/runbooks/NabdSloSlowBurn.md

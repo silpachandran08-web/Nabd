@@ -31,3 +31,32 @@ groups:
         annotations:
           summary: "More than half of Edge availability reads miss the projection (Core is carrying the load)"
           runbook: docs/runbooks/patient-access-edge.md
+      # ---- ACC-045: cohort B hardening (burn-rate alerts for the Edge SLOs are generated from slo/slos.yaml) ----
+      - alert: EdgeCoreUnavailable
+        expr: sum(increase(edge_core_unavailable_total[5m])) > 0
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Edge steps are failing because Core is unreachable or 5xx; patients are told booking is temporarily unavailable"
+          runbook: docs/runbooks/edge-cohort-b.md
+      - alert: EdgeRepliesFailing
+        expr: sum(rate(edge_reply_failed_total[5m])) / clamp_min(sum(rate(edge_inbound_total{result="processed"}[5m])), 0.001) > 0.2
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 20% of bot answers fail to send (Comms Gateway or Meta outage)"
+          runbook: docs/runbooks/edge-cohort-b.md
+      - alert: EdgeBookingConflictRateHigh
+        expr: sum(rate(edge_book_conflict_total[30m])) / clamp_min(sum(rate(edge_funnel_step_total{to="DONE"}[30m])) + sum(rate(edge_book_conflict_total[30m])), 0.001) > 0.15
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: "More than 15% of WhatsApp confirms hit a slot already taken (409): projection staleness or a rush"
+          runbook: docs/runbooks/edge-cohort-b.md
+      - alert: EdgeConversationsStuck
+        expr: sum(increase(edge_inbound_total{result="conflict_exhausted"}[15m])) > 0
+        for: 0m
+        labels: { severity: ticket }
+        annotations:
+          summary: "A conversation could not be moved after 25 version conflicts"
+          runbook: docs/runbooks/edge-cohort-b.md

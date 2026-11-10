@@ -36,9 +36,22 @@ public class ConversationEngine {
     private final MeterRegistry meters;
     private final Map<State, FlowHandler> handlers = new EnumMap<>(State.class);
     private final java.util.List<Intent> intents;
+    private final ClinicRollout rollout;
+    /** The booking journey (ACC-040/042). Consent, registration and check-in keep their own outage handling (silent retry). */
+    static final java.util.Set<State> BOOKING_STATES = java.util.EnumSet.of(State.START, State.LANGUAGE, State.MENU, State.WHO, State.CHILD_NAME,
+            State.CHILD_DOB, State.CHILD_SEX, State.CHOOSING_DOCTOR, State.CHOOSING_DAY, State.CHOOSING_SLOT, State.CONFIRMING, State.DONE);
+    /** Messages already told "temporarily unavailable" (per replica; a retry on another replica may say it once more). */
+    private final java.util.Set<String> notifiedOutage = java.util.Collections.newSetFromMap(java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(256, 0.75f, false) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                    return size() > 10_000;
+                }
+            }));
 
     ConversationEngine(ConversationStore store, RateLimiter limiter, CommsClient comms, ButtonTokens buttons, MeterRegistry meters,
-                       ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents) {
+                       ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents, ClinicRollout rollout) {
+        this.rollout = rollout;
         this.store = store;
         this.limiter = limiter;
         this.comms = comms;
@@ -50,6 +63,20 @@ public class ConversationEngine {
 
     /** contactHash may be null when the event does not carry it; it then comes from the fetched message. */
     public void process(UUID tenantId, String messageId, String channel, String contactHash) {
+        io.micrometer.core.instrument.Timer.Sample t = io.micrometer.core.instrument.Timer.start(meters);
+        try {
+            step(tenantId, messageId, channel, contactHash);
+        } finally { // ACC-045 SLO: bot step p95 < 500 ms (the 0.5 s bucket is published for the burn-rate rules)
+            t.stop(io.micrometer.core.instrument.Timer.builder("edge_bot_step_seconds").publishPercentileHistogram()
+                    .serviceLevelObjectives(java.time.Duration.ofMillis(500)).register(meters));
+        }
+    }
+
+    private void step(UUID tenantId, String messageId, String channel, String contactHash) {
+        if (!rollout.enabled(tenantId)) { // ACC-045: a cohort B clinic stays silent until its checklist is done and it is switched on
+            result("clinic_not_enabled");
+            return;
+        }
         if (store.processed(tenantId, messageId)) {
             result("duplicate");
             return;
@@ -84,8 +111,22 @@ public class ConversationEngine {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             Conversation c = store.load(tenantId, channel, contact);
             FlowHandler h = handlers.get(CheckInFlow.claims(msg) ? State.CHECKIN : c.state()); // ACC-033: CHECKIN <code> and "I'm here" win in any state
-            Outcome o = intents.stream().map(i -> i.handle(c, msg)).flatMap(Optional::stream).findFirst()
-                    .orElseGet(() -> h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg));
+            Outcome o;
+            try {
+                o = intents.stream().map(i -> i.handle(c, msg)).flatMap(Optional::stream).findFirst()
+                        .orElseGet(() -> h == null ? new Outcome(c.state(), c.context(), null) : h.handle(c, msg));
+            } catch (RuntimeException e) {
+                if (upstreamDown(e)) {
+                    // ACC-045: Core (or the availability read) is down. Nothing is claimed and the step still fails, so the stream
+                    // retries the same message and it resumes on its own when Core is back (lose-nothing, ACC-043/IDC-005). The
+                    // patient is told once per message instead of hearing nothing.
+                    meters.counter("edge_core_unavailable_total").increment();
+                    if (BOOKING_STATES.contains(c.state()) && notifiedOutage.add(tenantId + "/" + messageId)) {
+                        reply(tenantId, channel, contact, BookingCopy.t(c.context().get("lang"), "unavailable"), messageId, java.util.List.of());
+                    }
+                }
+                throw e;
+            }
             checkContext(o);
             switch (store.commit(c, o, messageId)) {
                 case DUPLICATE -> {
@@ -94,6 +135,9 @@ public class ConversationEngine {
                 }
                 case OK -> {
                     result("processed");
+                    if (o.next() != c.state()) {
+                        meters.counter("edge_funnel_step_total", "from", c.state().name(), "to", o.next().name()).increment();
+                    }
                     if (o.reply() != null) {
                         reply(tenantId, channel, contact, o.reply(), messageId, o.buttons());
                     }
@@ -126,6 +170,16 @@ public class ConversationEngine {
             }
         }
         throw new IllegalStateException("conversation version conflict not resolved for " + key);
+    }
+
+    /** An outage, not a refusal: no answer at all, or a 5xx. A 4xx is the flow's business (it handles or hands off). */
+    static boolean upstreamDown(Throwable e) {
+        for (Throwable x = e; x != null; x = x.getCause()) {
+            if (x instanceof Http.UpstreamDown || (x instanceof Http.UpstreamStatusException u && u.status >= 500)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void checkContext(Outcome o) {

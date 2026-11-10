@@ -67,7 +67,7 @@ public class AvailabilityProjection {
             try {
                 return f.get(2500, TimeUnit.MILLISECONDS);
             } catch (ExecutionException | TimeoutException e) {
-                throw new IllegalStateException("availability unavailable", e);
+                throw new Http.UpstreamDown("availability unavailable", e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("interrupted", e);
@@ -75,7 +75,8 @@ public class AvailabilityProjection {
                 inflight.remove(key, f);
             }
         } finally {
-            t.stop(Timer.builder("edge_availability_read_seconds").publishPercentileHistogram().register(meters));
+            t.stop(Timer.builder("edge_availability_read_seconds").publishPercentileHistogram()
+                    .serviceLevelObjectives(java.time.Duration.ofMillis(50)).register(meters)); // ACC-045: the 50 ms SLO bucket
         }
     }
 

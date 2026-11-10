@@ -54,10 +54,17 @@ final class Http {
             }
             return r.body();
         } catch (IOException e) {
-            throw new IllegalStateException("upstream unreachable", e);
+            throw new UpstreamDown("upstream unreachable", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("interrupted", e);
+        }
+    }
+
+    /** ACC-045: the upstream did not answer at all (connection refused, timeout). An outage, never a rule refusal. */
+    static final class UpstreamDown extends IllegalStateException {
+        UpstreamDown(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
