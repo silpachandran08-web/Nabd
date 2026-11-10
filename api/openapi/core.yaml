@@ -9013,6 +9013,88 @@ paths:
       tags:
       - staff
       x-required-permission: authenticated
+  /v1/me/profile-claims/{token}:
+    get:
+      operationId: ProfileClaimController_view
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/View"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
+    post:
+      operationId: ProfileClaimController_claim
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileClaimRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProfileClaimed"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
+  /v1/me/profile-claims/{token}/otp:
+    post:
+      operationId: ProfileClaimController_otp
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+          description: Accepted
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
   /v1/messaging/quality:
     get:
       operationId: OwnerMessagingController_quality
@@ -10983,6 +11065,12 @@ paths:
   /v1/patients/guardian-reviews-due:
     get:
       operationId: PatientController_guardianReviewsDue
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -11549,6 +11637,90 @@ paths:
       tags:
       - patient
       x-required-permission: patients:delete
+  /v1/patients/{id}/profile-claim:
+    post:
+      operationId: ProfileClaimController_deskClaim
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileClaimRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProfileClaimed"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
+  /v1/patients/{id}/profile-claim/otp:
+    post:
+      operationId: ProfileClaimController_deskOtp
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/patients/{id}/proxies/{proxyId}/revoke:
     post:
       operationId: ProxyRevokeController_revoke
@@ -25025,6 +25197,12 @@ components:
     GuardianReviewResponse:
       type: object
       properties:
+        claimExpiresAt:
+          type: string
+          format: date-time
+        claimSentAt:
+          type: string
+          format: date-time
         dob:
           type: string
           format: date
@@ -25033,12 +25211,17 @@ components:
           format: uuid
         guardianName:
           type: string
+        handoverDate:
+          type: string
+          format: date
         mrn:
           type: string
         patientId:
           type: string
           format: uuid
         patientName:
+          type: string
+        status:
           type: string
     HolidayEffectRequest:
       type: object
@@ -28458,6 +28641,25 @@ components:
         status:
           type: string
           pattern: prepped|completed|cancelled
+    ProfileClaimRequest:
+      type: object
+      properties:
+        keepGuardianScope:
+          type: string
+          pattern: NONE|BOOK_ONLY|BOOK_AND_RECORDS
+        otp:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{6}$"
+      required:
+      - otp
+    ProfileClaimed:
+      type: object
+      properties:
+        claimed:
+          type: boolean
+        keptScope:
+          type: string
     ProvisioningJobResponse:
       type: object
       properties:
@@ -31435,6 +31637,23 @@ components:
       properties:
         otp:
           type: string
+    View:
+      type: object
+      properties:
+        clinicName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        firstName:
+          type: string
+        guardianFirstName:
+          type: string
+        opensOn:
+          type: string
+          format: date
+        ownPhone:
+          type: boolean
     VisitAttachmentItem:
       type: object
       properties:

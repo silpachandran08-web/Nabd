@@ -48,7 +48,9 @@ public enum DomainEventType {
     PHARMACY_WORKLIST_ENTRY_CREATED("pharmacy.worklist.entry_created.v1", "core/pharmacy"),
     PHARMACY_WORKLIST_STATUS_CHANGED("pharmacy.worklist.status_changed.v1", "core/pharmacy"),
     PHARMACY_RETURN_ACCEPTED("pharmacy.return.accepted.v1", "core/pharmacy"),
-    PATIENT_PROXY_CHANGED("patient.proxy.changed.v1", "core/patient");
+    PATIENT_PROXY_CHANGED("patient.proxy.changed.v1", "core/patient"),
+    PATIENT_GUARDIAN_HANDOVER_DUE("patient.guardian.handover_due.v1", "core/patient"),
+    PATIENT_GUARDIAN_HANDOVER_COMPLETED("patient.guardian.handover_completed.v1", "core/patient");
 
     private final String type;
     private final String source;

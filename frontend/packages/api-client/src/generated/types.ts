@@ -275,7 +275,7 @@ export type GrantResponse = { active?: boolean; declineNote?: string; expiresAt?
 export type Granted = { caregiverFirstName?: string; id?: string; relation?: string; scope?: string; status?: string; };
 export type GuardianConsent = { channel?: string; confirmed?: boolean; };
 export type GuardianReviewDecisionRequest = { decision: string; };
-export type GuardianReviewResponse = { dob?: string; guardianId?: string; guardianName?: string; mrn?: string; patientId?: string; patientName?: string; };
+export type GuardianReviewResponse = { claimExpiresAt?: string; claimSentAt?: string; dob?: string; guardianId?: string; guardianName?: string; handoverDate?: string; mrn?: string; patientId?: string; patientName?: string; status?: string; };
 export type HolidayEffectRequest = { effect: string; hours?: Array<HolidayWindow>; };
 export type HolidayTemplateResponse = { code?: string; name?: string; source?: string; year?: number; };
 export type HolidayWindow = { from?: string; to?: string; };
@@ -464,6 +464,8 @@ export type ProcedureNotesRequest = { consentNote?: string; prepNotes?: string; 
 export type ProcedureOrderRequest = { chargeCode: string; consentNote?: string; prepNotes?: string; queueEntryId: string; };
 export type ProcedureOrderResponse = { baseAmount?: number; billed?: boolean; chargeCode?: string; chargeName?: string; completedAt?: string; completedByName?: string; consentNote?: string; consentRecordedByName?: string; consentSignedAt?: string; consentSignedName?: string; createdAt?: string; id?: string; orderedByName?: string; patientId?: string; patientName?: string; prepNotes?: string; queueEntryId?: string; status?: string; taxRatePercent?: number; };
 export type ProcedureStatusRequest = { status?: string; };
+export type ProfileClaimRequest = { keepGuardianScope?: string; otp: string; };
+export type ProfileClaimed = { claimed?: boolean; keptScope?: string; };
 export type ProvisioningJobResponse = { approvedAt?: string; createdTenantId?: string; id?: string; ownerAccountInviteToken?: string; ownerInviteToken?: string; path?: string; region?: string; status?: string; steps?: Array<ProvisioningStepResponse>; tenantName?: string; tenantSlug?: string; };
 export type ProvisioningStepResponse = { completedAt?: string; errorDetail?: string; startedAt?: string; status?: string; stepName?: string; stepOrder?: number; };
 export type ProxyInviteAcceptRequest = { otp: string; scope: string; };
@@ -650,6 +652,7 @@ export type UpdateRequest = { assessment?: string; favourite?: boolean; name?: s
 export type VaccineRecordRequest = { dose: string; expiryDate?: string; lotNumber?: string; notes?: string; patientId: string; queueEntryId?: string; route: string; site?: string; vaccineName: string; };
 export type VaccineRecordResponse = { administeredAt?: string; dose?: string; expiryDate?: string; id?: string; lotNumber?: string; notes?: string; patientId?: string; patientName?: string; queueEntryId?: string; recordedByName?: string; route?: string; site?: string; vaccineName?: string; };
 export type VerifyRequest = { otp?: string; };
+export type View = { clinicName?: string; expiresAt?: string; firstName?: string; guardianFirstName?: string; opensOn?: string; ownPhone?: boolean; };
 export type VisitAttachmentItem = { attachmentId?: string; contentType?: string; createdAt?: string; fileId?: string; kind?: string; note?: string; patientId?: string; };
 export type VisitAttachmentList = { items?: Array<VisitAttachmentItem>; };
 export type VisitSummaryAllergy = { reaction?: string; severity?: string; substance?: string; };
@@ -909,6 +912,9 @@ export type Operations = {
   MeEntitlementsController_get: { method: "get"; path: "/v1/me/entitlements"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MeEntitlements };
   MePreferencesController_get: { method: "get"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: never; response: UiPreferencesRead };
   MePreferencesController_put: { method: "put"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: UiPreferencesWrite; response: UiPreferences };
+  ProfileClaimController_view: { method: "get"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: View };
+  ProfileClaimController_claim: { method: "post"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: ProfileClaimRequest; response: ProfileClaimed };
+  ProfileClaimController_otp: { method: "post"; path: "/v1/me/profile-claims/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
   OwnerMessagingController_quality: { method: "get"; path: "/v1/messaging/quality"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: Record<string, string> };
   NursingController_activityToday: { method: "get"; path: "/v1/nursing/activity/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<ActivityEntryResponse> };
   NursingController_orderAdministration: { method: "post"; path: "/v1/nursing/administration-orders"; permission: "nursing:create"; pathParams: never; query: never; body: AdministrationOrderRequest; response: AdministrationOrderResponse };
@@ -963,7 +969,7 @@ export type Operations = {
   PatientController_dataQuality: { method: "get"; path: "/v1/patients/data-quality"; permission: "patients:edit"; pathParams: never; query: { issue: string; limit?: number; cursor?: string; }; body: never; response: DataQualityPage };
   PatientController_duplicateSuggestions: { method: "get"; path: "/v1/patients/duplicate-suggestions"; permission: "patients:delete"; pathParams: never; query: { cursor?: string; }; body: never; response: DuplicateSuggestionPage };
   PatientController_dismissSuggestion: { method: "post"; path: "/v1/patients/duplicate-suggestions/{id}/dismiss"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: never; response: void };
-  PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: never; body: never; response: Array<GuardianReviewResponse> };
+  PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: { status?: string; }; body: never; response: Array<GuardianReviewResponse> };
   PatientController_recentMerges: { method: "get"; path: "/v1/patients/merges"; permission: "patients:delete"; pathParams: never; query: never; body: never; response: RecentMerges };
   PatientController_undoMerge: { method: "post"; path: "/v1/patients/merges/{mergeId}/undo"; permission: "patients:delete"; pathParams: { mergeId: string; }; query: never; body: never; response: void };
   PatientController_registry: { method: "get"; path: "/v1/patients/registry"; permission: "patients:view"; pathParams: never; query: { q?: string; filter?: string; limit?: number; cursor?: string; }; body: never; response: PatientRegistryResponse };
@@ -977,6 +983,8 @@ export type Operations = {
   PatientController_revokeGuardian: { method: "delete"; path: "/v1/patients/{id}/guardian"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   PatientController_keepGuardian: { method: "post"; path: "/v1/patients/{id}/guardian/review"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: GuardianReviewDecisionRequest; response: PatientDetailResponse };
   PatientController_merge: { method: "post"; path: "/v1/patients/{id}/merge"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: MergeRequest; response: PatientDetailResponse };
+  ProfileClaimController_deskClaim: { method: "post"; path: "/v1/patients/{id}/profile-claim"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: ProfileClaimRequest; response: ProfileClaimed };
+  ProfileClaimController_deskOtp: { method: "post"; path: "/v1/patients/{id}/profile-claim/otp"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: never; response: Record<string, boolean> };
   ProxyRevokeController_revoke: { method: "post"; path: "/v1/patients/{id}/proxies/{proxyId}/revoke"; permission: "patients:edit"; pathParams: { id: string; proxyId: string; }; query: never; body: ProxyRevokeRequest; response: void };
   PatientMessagesController_messages: { method: "get"; path: "/v1/patients/{patientId}/messages"; permission: "patients:view"; pathParams: { patientId: string; }; query: { cursor?: string; limit?: number; }; body: never; response: Page };
   NoticeController_status: { method: "get"; path: "/v1/patients/{patientId}/privacy-notice"; permission: "patients:view"; pathParams: { patientId: string; }; query: never; body: never; response: PrivacyNoticeStatus };

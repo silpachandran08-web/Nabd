@@ -340,6 +340,8 @@ owner,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner,POST /v1/patients/{id}/consents,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner,POST /v1/patients/{id}/merge,patients:delete,allow
+owner,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+owner,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 owner,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 owner,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 owner,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,allow
@@ -773,6 +775,8 @@ owner_doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/merge,patients:delete,allow
+owner_doctor,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+owner_doctor,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 owner_doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 owner_doctor,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,allow
@@ -1206,6 +1210,8 @@ doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 doctor,POST /v1/patients/{id}/merge,patients:delete,deny-403
+doctor,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+doctor,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 doctor,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 doctor,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -1639,6 +1645,8 @@ nurse,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 nurse,POST /v1/patients/{id}/consents,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 nurse,POST /v1/patients/{id}/merge,patients:delete,deny-403
+nurse,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+nurse,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 nurse,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 nurse,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 nurse,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -2072,6 +2080,8 @@ receptionist,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 receptionist,POST /v1/patients/{id}/consents,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 receptionist,POST /v1/patients/{id}/merge,patients:delete,deny-403
+receptionist,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+receptionist,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 receptionist,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 receptionist,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 receptionist,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -2505,6 +2515,8 @@ frontdesk_vitals,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/consents,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/merge,patients:delete,deny-403
+frontdesk_vitals,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+frontdesk_vitals,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 frontdesk_vitals,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403

@@ -117,8 +117,12 @@ public class PatientController {
     @com.nabd.hms.shared.phiread.PhiRead("guardian_reviews_list")
     @GetMapping("/guardian-reviews-due")
     @PreAuthorize("hasAuthority('patients:view')")
-    public List<GuardianReviewResponse> guardianReviewsDue(@AuthenticationPrincipal Jwt jwt) {
-        return service.guardianReviewsDue(tenantId(jwt), staffId(jwt));
+    public List<GuardianReviewResponse> guardianReviewsDue(@AuthenticationPrincipal Jwt jwt,
+                                                           @RequestParam(required = false) String status) {
+        if (status != null && !status.matches("due|overdue")) {
+            throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "status must be due or overdue.");
+        }
+        return service.guardianReviewsDue(tenantId(jwt), staffId(jwt), status);
     }
 
     @com.nabd.hms.shared.Idempotent

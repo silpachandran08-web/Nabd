@@ -21,6 +21,9 @@ export type ConsentSummary = {
 /** IDC-009: GET {base}/proxy-invites/{token} (public; the token is the credential, the OTP proves the phone). */
 export type ProxyInvite = { clinicName: string; relation: string; caregiverFirstName: string; expiresAt: string };
 export type ProxyScope = "BOOK_ONLY" | "BOOK_AND_RECORDS" | "FULL";
+/** IDC-012: GET {base}/me/profile-claims/{token} (public; the OTP goes to the young adult's own number). */
+export type ProfileClaim = { clinicName: string; firstName: string; guardianFirstName: string; opensOn: string; expiresAt: string; ownPhone: boolean };
+export type KeepScope = "NONE" | "BOOK_ONLY" | "BOOK_AND_RECORDS";
 export type Booking = { doctorName: string; clinicName: string; address?: string | null; startsAt: string; timeZone: string; status: "confirmed" | "held" | "cancelled" };
 export type Resolved =
   | { kind: "document"; contentType: string; fileName?: string | null }
@@ -28,7 +31,7 @@ export type Resolved =
   | { kind: "booking"; booking: Booking };
 
 /** Why a call failed, in the only terms the UI cares about. */
-export type Failure = "expired" | "wrong_code" | "too_many" | "changed" | "network";
+export type Failure = "expired" | "wrong_code" | "too_many" | "changed" | "not_open" | "own_phone" | "network";
 export class PatientApiError extends Error {
   failure: Failure;
   status: number;
@@ -41,6 +44,8 @@ type Fetch = typeof fetch;
 export function failureOf(status: number, code: string | null): Failure {
   if (status === 410 || status === 404) return "expired";
   if (status === 409 && code === "ARTEFACT_CHANGED") return "changed";
+  if (status === 409 && code === "claim-not-open") return "not_open";
+  if (status === 422 && code === "own-phone-required") return "own_phone";
   if (status === 429) return "too_many";
   if (status === 401 || status === 403) return code === "EXPIRED" ? "expired" : "wrong_code";
   return "network";
@@ -80,6 +85,10 @@ export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
   proxyOtp: async (token: string): Promise<void> => { await call(f, `/proxy-invites/${enc(token)}/otp`, { method: "POST" }); },
   proxyAccept: async (token: string, otp: string, scope: ProxyScope): Promise<{ status: string; scope: ProxyScope }> =>
     (await call(f, `/proxy-invites/${enc(token)}/accept`, { method: "POST", body: JSON.stringify({ otp, scope }) })).json(),
+  profileClaim: async (token: string): Promise<ProfileClaim> => (await call(f, `/me/profile-claims/${enc(token)}`)).json(),
+  profileClaimOtp: async (token: string): Promise<void> => { await call(f, `/me/profile-claims/${enc(token)}/otp`, { method: "POST" }); },
+  claimProfile: async (token: string, otp: string, keepGuardianScope: KeepScope): Promise<{ claimed: boolean; keptScope: KeepScope }> =>
+    (await call(f, `/me/profile-claims/${enc(token)}`, { method: "POST", body: JSON.stringify({ otp, keepGuardianScope }) })).json(),
   decide: async (consentId: string, token: string, decision: "approve" | "decline", artefactHash: string, key: string): Promise<{ status: string }> =>
     (await call(f, `/exchange/consents/${enc(consentId)}/patient-decision`, { method: "POST", token, idempotencyKey: key, body: JSON.stringify({ decision, artefactHash }) })).json(),
 });

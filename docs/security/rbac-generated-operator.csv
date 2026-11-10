@@ -340,6 +340,8 @@ super_admin,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/consents,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/merge,patients:delete,deny-401
+super_admin,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+super_admin,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 super_admin,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 super_admin,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401
@@ -773,6 +775,8 @@ implementation,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/consents,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/merge,patients:delete,deny-401
+implementation,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+implementation,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 implementation,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 implementation,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401
@@ -1206,6 +1210,8 @@ support_engineer,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/consents,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/merge,patients:delete,deny-401
+support_engineer,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+support_engineer,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 support_engineer,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 support_engineer,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401
@@ -1639,6 +1645,8 @@ billing,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 billing,POST /v1/patients/{id}/consents,patients:edit,deny-401
 billing,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 billing,POST /v1/patients/{id}/merge,patients:delete,deny-401
+billing,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+billing,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 billing,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 billing,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 billing,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401
@@ -2072,6 +2080,8 @@ sre,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 sre,POST /v1/patients/{id}/consents,patients:edit,deny-401
 sre,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 sre,POST /v1/patients/{id}/merge,patients:delete,deny-401
+sre,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+sre,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 sre,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 sre,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 sre,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401
@@ -2505,6 +2515,8 @@ commercial,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/consents,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/merge,patients:delete,deny-401
+commercial,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+commercial,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 commercial,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 commercial,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401
@@ -2938,6 +2950,8 @@ compliance_dpo,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/consents,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/merge,patients:delete,deny-401
+compliance_dpo,POST /v1/patients/{id}/profile-claim,patients:edit,deny-401
+compliance_dpo,POST /v1/patients/{id}/profile-claim/otp,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-401

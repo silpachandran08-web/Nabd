@@ -443,12 +443,17 @@ public class PatientService {
      * of the age-18 handover is this always-current computed worklist; staff perform the actual
      * handover with a normal patch() clearing guardianId, which changeGuardian() already audits. */
     @Transactional
-    public List<GuardianReviewResponse> guardianReviewsDue(UUID tenantId, UUID callerStaffId) {
+    public List<GuardianReviewResponse> guardianReviewsDue(UUID tenantId, UUID callerStaffId, String status) {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
-        return repo.findGuardianReviewsDue(tenantId).stream()
-                .map(r -> new GuardianReviewResponse(r.id(), r.mrn(), r.name(), r.dob(), r.guardianId(),
-                        repo.findById(tenantId, r.guardianId()).map(PatientRow::name).orElse(null)))
+        boolean due = "due".equals(status); // IDC-012: no status = overdue, the NB-082 list as before
+        return repo.findGuardianReviews(tenantId, due).stream()
+                .map(r -> {
+                    java.time.Instant[] claim = repo.findOpenProfileClaim(tenantId, r.id()).orElse(null);
+                    return new GuardianReviewResponse(r.id(), r.mrn(), r.name(), r.dob(), r.guardianId(),
+                            repo.findById(tenantId, r.guardianId()).map(PatientRow::name).orElse(null), r.dob().plusYears(18),
+                            due ? "due" : "overdue", claim == null ? null : claim[0], claim == null ? null : claim[1]);
+                })
                 .toList();
     }
 

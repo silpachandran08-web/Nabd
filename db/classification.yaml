@@ -1602,6 +1602,21 @@ schemas:
       otp_expires_at: operational
       otp_attempts: operational
       otp_challenge_id: operational
+    profile_claims:
+      token_hash: pii
+      tenant_id: operational
+      patient_id: pii
+      guardian_patient_id: pii
+      handover_date: pii
+      sent_at: operational
+      expires_at: operational
+      claimed_at: operational
+      outcome: operational
+      kept_scope: operational
+      otp_hash: pii
+      otp_expires_at: operational
+      otp_attempts: operational
+      otp_challenge_id: operational
     secure_links:
       id: operational
       tenant_id: operational

@@ -25,6 +25,8 @@ public enum NotificationPurpose {
     PROFILE_COMPLETION("profile_completion", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** IDC-009: consent link to an adult family member's own number (no names in the body; the link is the only parameter). */
     PROXY_INVITE("proxy_invite", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** IDC-012: age-18 claim invitation to the guardian and the young adult's own number; 2 params: the dependant's first name, the link. */
+    PROFILE_CLAIM_INVITE("profile_claim_invite", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** FIN-020: UPI payment link; slots are clinic name, amount and link only (no line items, no diagnosis). */
     PAYMENT_LINK("payment_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),

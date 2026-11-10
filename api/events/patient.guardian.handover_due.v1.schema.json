@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:patient.guardian.handover_due.v1",
+  "title": "patient.guardian.handover_due.v1",
+  "description": "A minor with a guardian on file turns 18 within 14 days and the claim invitation was requested (IDC-012, ProfileClaimJob); subject = the patient. Opaque patient references and the handover date only (the date the guardian access review starts, never the date of birth as a field). Consumers comms-gateway (the invitation itself travels as comms.notification.requested.v1): log-only handler until it exists.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "patientRef", "guardianRef", "handoverDate", "version"],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "patientRef": {
+      "type": "string",
+      "description": "The young adult's opaque patient reference.",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "guardianRef": {
+      "type": "string",
+      "description": "The guardian's opaque patient reference.",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "handoverDate": {
+      "type": "string",
+      "format": "date",
+      "description": "The clinic date from which the profile can be claimed."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "patientRef": "pr_Zm9vYmFy",
+      "guardianRef": "pr_YmF6cXV4",
+      "handoverDate": "2026-11-23",
+      "version": 1
+    }
+  ]
+}

@@ -67,5 +67,13 @@
  "proxyScopeFull": "Full help",
  "proxyScopeFullHint": "Everything above, plus payments and forms.",
  "proxyAccept": "Confirm",
- "proxyDone": "Thank you. {name} can now help with your visits."
+ "proxyDone": "Thank you. {name} can now help with your visits.",
+ "claimTitle": "Your profile is yours now, {name}",
+ "claimIntro": "At {clinic}, {guardian} has managed your profile as your guardian. From your 18th birthday you can take it over with a code sent to your own phone.",
+ "claimNotOpen": "You can claim your profile from {date}.",
+ "claimOwnPhone": "The clinic does not have a phone number of your own. Visit the clinic desk to claim your profile.",
+ "claimKeepLabel": "What may {guardian} still do for you?",
+ "claimKeepNone": "Nothing: my guardian's access ends",
+ "claimSubmit": "Claim my profile",
+ "claimDone": "Done. Your profile is now yours."
 }

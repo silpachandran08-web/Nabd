@@ -48,7 +48,7 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_proxies, patient_registry_summary, patients, privacy_notices, proxy_invites, registry_dirty, secure_link_opens, secure_links]
+    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_proxies, patient_registry_summary, patients, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
     reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
     owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
