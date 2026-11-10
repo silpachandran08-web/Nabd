@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { THEME_BOOT_SCRIPT, resolveTheme, themePrefFromCookies, themeCookie, themePrefOf } from "../../app/shell/theme.ts";
-import { proxy } from "../../app/lib/bff.ts";
+import { proxy, signInCookiesFrom } from "../../app/lib/bff.ts";
 import { printCss, PAPERS } from "../../../../packages/ui/src/print/paper.ts";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -150,6 +150,18 @@ test("AC3: preferences unavailable -> sign-in still succeeds and no preference c
     assert.ok(!setCookies(res).some((c) => /^nabd_(theme|locale|digits|clinic_locale)=/.test(c)));
     assert.ok(setCookies(res).some((c) => c.startsWith("__Host-nabd_rt=")));
   }
+});
+
+test("T1-BUG-4: bearer-mode sign-in reads /me/preferences and sets the same theme and language cookies as the BFF", () => {
+  const c = signInCookiesFrom({ uiLocale: "hi", uiTheme: "light", digitStyle: null, clinicDefaultLocale: "en" });
+  assert.ok(c.includes("nabd_theme=light; Path=/; Max-Age=31536000; Secure; SameSite=Lax"));
+  assert.ok(c.some((x) => x.startsWith("nabd_locale=hi;")));
+  for (const none of [null, { ok: true }]) assert.deepEqual(signInCookiesFrom(none), [], "nothing saved or no answer: this machine's cookies stay");
+  const page = read("../../app/(auth)/login/page.tsx");
+  const body = page.slice(page.indexOf("async function handleTokens"), page.indexOf("async function signedIn"));
+  assert.match(body, /if \(!COOKIE_AUTH\)[\s\S]*api\.get<.+?>\("\/me\/preferences", \{ keepSession: true/);
+  assert.match(body, /signInCookiesFrom\(prefs\)\) document\.cookie = c/);
+  assert.match(body, /window\.location\.replace\(to\)/, "a changed language gets a server render");
 });
 
 test("AC6: Rx, invoice and token print are black on white whatever the theme (no theme token inside the print rules)", () => {

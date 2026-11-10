@@ -73,9 +73,11 @@ async function signInPreferenceCookies(accessToken: string, deps: Deps, reqId: s
   try {
     const r = await deps.fetch(`${deps.core}/me/preferences`, { headers: { authorization: `Bearer ${accessToken}`, "x-request-id": reqId } });
     const j = r.ok && (r.headers.get("content-type") ?? "").includes("json") ? ((await r.json()) as Record<string, unknown>) : null;
-    return j && typeof j.uiTheme === "string" ? preferenceCookies(j, true) : [];
+    return signInCookiesFrom(j);
   } catch { return []; }
 }
+/** The sign-in cookies for a /me/preferences answer; none until the user has saved a theme. Also used by bearer-mode sign-in. */
+export const signInCookiesFrom = (j: Record<string, unknown> | null) => (j && typeof j.uiTheme === "string" ? preferenceCookies(j, true) : []);
 
 // ---- claims --------------------------------------------------------------------------------------
 const payload = (token: string | undefined) => (token ? decodeJwtPayload<Record<string, unknown>>(token) : null);
