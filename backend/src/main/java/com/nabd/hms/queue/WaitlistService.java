@@ -290,5 +290,4 @@ public class WaitlistService {
         return new WaitlistEntryResponse(row.id(), row.doctorId(), row.patientId(), row.patientName(), row.joinedAt(),
                 row.status(), row.offeredSlotStart(), row.offerExpiresAt(), row.bookedAppointmentId());
     }
-
 }

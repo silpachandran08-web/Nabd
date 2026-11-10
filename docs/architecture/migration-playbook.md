@@ -42,3 +42,11 @@ Never backfill a large table inside the migration transaction. Run a job that up
 ## CI
 - Stage 4 (any PR touching `db/**`): lint added files, `flyway validate` + `migrate` on an empty DB and on the seeded snapshot (< 3 min), see `.github/workflows/migrations.yml`.
 - Main build: ERD (SVG) and per-table schema doc generated from the catalog with SchemaSpy, published as build artefacts. `docs/Nabd HMS - Database Architecture.pdf` is superseded (covers 12 of 86 tables).
+
+## Known stale header: V7 (PLT-034)
+`db/migrations/V7__master_schema_operators.sql` starts with `-- DRAFT — not yet in db/migrations/, not applied anywhere`.
+That line is wrong: V7 is applied in every environment. It is left in the file on purpose. Editing an applied migration
+changes its Flyway checksum, and `validate` then fails on boot in any database that is not repaired in the same release.
+To remove it, in one release: edit the header, then run `flyway repair` against every environment
+(local, CI images, Render staging, Neon pilot) before the new jar boots there. Until a release owner (devops-sre) does that
+for the Neon pilot database, treat V7's header as a known false comment, not as a draft.

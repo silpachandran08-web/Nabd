@@ -1,6 +1,9 @@
 package com.nabd.hms.auth;
 
-import com.nabd.hms.auth.AuthModels.Staff;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.breakglass.BreakGlassPolicy;
+import com.nabd.hms.auth.internal.breakglass.BreakGlassSession;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
 import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
 import com.nabd.hms.auth.dto.BreakGlassActivateResponse;
 import com.nabd.hms.auth.dto.BreakGlassAlertResponse;
@@ -34,7 +37,7 @@ public class BreakGlassService {
     private static final Logger log = LoggerFactory.getLogger(BreakGlassService.class);
 
     private final BreakGlassRepository repo;
-    private final AuthRepository authRepo;
+    private final StaffDirectoryRepository staffDir;
     private final AuthService authService;
     private final AuditService auditService;
     private final EventPublisher publisher;
@@ -43,11 +46,11 @@ public class BreakGlassService {
 
     private final Clock clock;
 
-    BreakGlassService(BreakGlassRepository repo, AuthRepository authRepo, AuthService authService, AuditService auditService,
+    BreakGlassService(BreakGlassRepository repo, StaffDirectoryRepository staffDir, AuthService authService, AuditService auditService,
                       EventPublisher publisher, TenantContext tenantContext, ChallengeTokenDecoder jwtDecoder, Clock clock) {
         this.clock = clock;
         this.repo = repo;
-        this.authRepo = authRepo;
+        this.staffDir = staffDir;
         this.authService = authService;
         this.auditService = auditService;
         this.publisher = publisher;
@@ -61,9 +64,9 @@ public class BreakGlassService {
         UUID tenantId = UUID.fromString(caller.getClaimAsString("tenantId"));
         requireStepUp(stepUpToken, staffId, caller.getClaimAsString("sid"));
         tenantContext.set(tenantId);
-        Staff staff = authRepo.findStaffById(staffId).orElseThrow(() -> forbidden("Not allowed."));
+        Staff staff = staffDir.findStaffById(staffId).orElseThrow(() -> forbidden("Not allowed."));
 
-        authRepo.expireStaleBreakGlass(staffId);
+        staffDir.expireStaleBreakGlass(staffId);
         if (repo.hasActive(staffId)) {
             throw new ApiException(HttpStatus.CONFLICT, "already-active", "Emergency access already active",
                     "You already have an active emergency access grant.");

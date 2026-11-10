@@ -88,5 +88,4 @@ public class AdministrationService {
                 row.drugName(), row.dose(), row.route(), row.site(), status, recordedByName, witnessedByName,
                 refuseReason, recordedAt, row.createdAt());
     }
-
 }

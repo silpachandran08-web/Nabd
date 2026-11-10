@@ -260,5 +260,4 @@ public class SupportAccessService {
                 g.reason(), g.grantedAt(), g.expiresAt(), g.revokedAt(), g.isActive(now), g.effectiveStatus(now), g.minutes(),
                 g.windowStartedAt(), g.windowEndsAt(), g.declineNote());
     }
-
 }

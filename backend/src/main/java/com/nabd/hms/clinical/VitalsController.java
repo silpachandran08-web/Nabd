@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.dto.VitalsHistoryResponse;
 import com.nabd.hms.clinical.dto.VitalsResponse;
 import com.nabd.hms.clinical.dto.VitalsWriteRequest;
@@ -54,18 +56,10 @@ public class VitalsController {
     @PatchMapping("/{queueEntryId}")
     // REC-060: first-time recording needs clinical:create or clinical:edit; changing an already-recorded value needs clinical:edit.
     @PreAuthorize("hasAuthority('clinical:create') or hasAuthority('clinical:edit')")
-    public VitalsResponse record(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+    public VitalsResponse record(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                   @Valid @RequestBody VitalsWriteRequest req) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
-        return service.record(tenantId(jwt), staffId(jwt), queueEntryId, req,
+        return service.record(tenantId, staffId, queueEntryId, req,
                 permissions != null && permissions.contains("clinical:edit"));
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

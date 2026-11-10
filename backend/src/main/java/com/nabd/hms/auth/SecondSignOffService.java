@@ -1,5 +1,8 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
+import com.nabd.hms.auth.internal.store.AuthModels;
 import com.nabd.hms.auth.api.SecondSignOff;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.GrantsFlattener;
@@ -24,16 +27,16 @@ import java.util.UUID;
 @Component
 class SecondSignOffService implements SecondSignOff {
 
-    private final AuthRepository repo;
+    private final StaffDirectoryRepository staffDir;
     private final LoginGuard guard;
     private final PasswordEncoder pinEncoder;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
     private final TenantContext tenant;
 
-    SecondSignOffService(AuthRepository repo, LoginGuard guard, PasswordEncoder pinEncoder, ObjectMapper objectMapper, JdbcTemplate jdbc,
+    SecondSignOffService(StaffDirectoryRepository staffDir, LoginGuard guard, PasswordEncoder pinEncoder, ObjectMapper objectMapper, JdbcTemplate jdbc,
                          TenantContext tenant) {
-        this.repo = repo;
+        this.staffDir = staffDir;
         this.guard = guard;
         this.pinEncoder = pinEncoder;
         this.objectMapper = objectMapper;
@@ -63,9 +66,9 @@ class SecondSignOffService implements SecondSignOff {
     @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = ApiException.class) // the failed attempt must survive the caller's rollback
     public Confirmation confirm(UUID staffId, String pin, String permission) {
         UUID t = tenant.current();
-        AuthModels.Staff staff = repo.findStaffById(staffId).filter(s -> t.equals(s.tenantId()) && "active".equals(s.status())).orElse(null);
-        boolean holds = staff != null && (repo.findRole(staff.roleId()).map(r -> flatten(r.grantsJson()).contains(permission)).orElse(false)
-                || repo.findActiveDelegatedRoles(staff.id()).stream().anyMatch(r -> flatten(r.grantsJson()).contains(permission)));
+        AuthModels.Staff staff = staffDir.findStaffById(staffId).filter(s -> t.equals(s.tenantId()) && "active".equals(s.status())).orElse(null);
+        boolean holds = staff != null && (staffDir.findRole(staff.roleId()).map(r -> flatten(r.grantsJson()).contains(permission)).orElse(false)
+                || staffDir.findActiveDelegatedRoles(staff.id()).stream().anyMatch(r -> flatten(r.grantsJson()).contains(permission)));
         if (!holds) {
             return new Confirmation(Outcome.NOT_PERMITTED, null);
         }

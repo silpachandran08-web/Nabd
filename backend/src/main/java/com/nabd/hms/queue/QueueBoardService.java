@@ -178,5 +178,4 @@ class QueueBoardService {
         return new ApiException(HttpStatus.CONFLICT, "stale-status", "Visit already moved",
                 "This visit is no longer at the stage your screen shows.", Map.of("currentStatus", currentStatus, "code", "STALE_STATUS"));
     }
-
 }

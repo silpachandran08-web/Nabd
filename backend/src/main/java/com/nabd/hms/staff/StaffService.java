@@ -348,7 +348,6 @@ public class StaffService {
                 "A staff member with this email already exists.");
     }
 
-
     private ApiException inviteInvalid() {
         return new ApiException(HttpStatus.GONE, "invite-invalid", "Invite expired or already used",
                 "This invite link is no longer valid.");

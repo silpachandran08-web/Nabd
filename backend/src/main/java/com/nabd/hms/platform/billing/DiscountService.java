@@ -160,7 +160,6 @@ public class DiscountService {
                 d.percent(), d.reason(), d.status(), d.reviewedBy(), d.reviewedByName(), d.reviewedAt(), d.createdAt());
     }
 
-
     private ApiException noSubscription() {
         return new ApiException(HttpStatus.BAD_REQUEST, "no-subscription", "No subscription",
                 "This clinic has no active subscription to discount.");

@@ -336,7 +336,6 @@ public class RefundService {
                 Map.of("code", "RETURN_NOT_ALLOWED", "invoiceLineId", lineId, "reason", reason));
     }
 
-
     private static ApiException alreadyDecided() {
         return new ApiException(HttpStatus.CONFLICT, "already-decided", "Already decided", "This refund request has already been approved or rejected.",
                 Map.of("code", "ALREADY_DECIDED"));

@@ -361,5 +361,4 @@ public class ImportPipeline {
     private static ApiException unprocessable(String code, String detail) {
         return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, code, "Cannot process the import", detail);
     }
-
 }

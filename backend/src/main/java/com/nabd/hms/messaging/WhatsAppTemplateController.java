@@ -1,5 +1,6 @@
 package com.nabd.hms.messaging;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,14 +36,14 @@ class WhatsAppTemplateController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('setup:edit')")
-    ResponseEntity<WhatsAppTemplateService.TemplateResponse> create(@RequestBody WhatsAppTemplateService.TemplateRequest req) {
+    ResponseEntity<WhatsAppTemplateService.TemplateResponse> create(@Valid @RequestBody WhatsAppTemplateService.TemplateRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req));
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('setup:edit')")
     WhatsAppTemplateService.TemplateResponse resubmit(@PathVariable UUID id,
-                                                      @RequestBody WhatsAppTemplateService.TemplateRequest req) {
+                                                      @Valid @RequestBody WhatsAppTemplateService.TemplateRequest req) {
         return service.resubmit(id, req);
     }
 }

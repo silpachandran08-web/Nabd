@@ -253,7 +253,6 @@ public class RoleService {
         }
     }
 
-
     private ApiException builtInImmutable() {
         return new ApiException(HttpStatus.BAD_REQUEST, "built-in-role-immutable", "Built-in role cannot be edited",
                 "Built-in roles cannot be modified; create a custom role instead.");

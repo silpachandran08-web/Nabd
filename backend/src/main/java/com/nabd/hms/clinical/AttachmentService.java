@@ -55,5 +55,4 @@ class AttachmentService {
         return repo.list(tenantContext.current(), visitId).stream().map(r -> new AttachmentController.Item(r.id(), r.patientId(), r.fileId(), r.kind(), r.note(),
                 r.createdAt(), files.info(r.fileId()).map(FileStore.FileInfo::contentType).orElse(null))).toList();
     }
-
 }

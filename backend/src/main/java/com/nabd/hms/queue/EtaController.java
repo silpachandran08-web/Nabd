@@ -81,5 +81,4 @@ public class EtaController {
                     Map.of("mode", "range", "from", label.substring(0, 5), "to", label.substring(6)), d.v());
         });
     }
-
 }

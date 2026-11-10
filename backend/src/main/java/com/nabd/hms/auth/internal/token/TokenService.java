@@ -1,12 +1,14 @@
 package com.nabd.hms.auth.internal.token;
 
-import com.nabd.hms.auth.AuthModels.Role;
-import com.nabd.hms.auth.AuthModels.Staff;
-import com.nabd.hms.auth.AuthModels.Tenant;
-import com.nabd.hms.auth.AuthRepository;
-import com.nabd.hms.auth.BreakGlassPolicy;
-import com.nabd.hms.auth.BreakGlassSession;
-import com.nabd.hms.auth.LoginGuard;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.CredentialRepository;
+import com.nabd.hms.auth.internal.store.AuthSessionRepository;
+import com.nabd.hms.auth.internal.store.AuthModels.Role;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
+import com.nabd.hms.auth.internal.store.AuthModels.Tenant;
+import com.nabd.hms.auth.internal.breakglass.BreakGlassPolicy;
+import com.nabd.hms.auth.internal.breakglass.BreakGlassSession;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
 import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
 import com.nabd.hms.auth.dto.MfaSetupRequiredResponse;
@@ -50,7 +52,9 @@ public class TokenService {
 
     public static final String ISSUER = TokenPopulation.STAFF.issuer();
 
-    private final AuthRepository repo;
+    private final AuthSessionRepository sessionRepo;
+    private final CredentialRepository credentials;
+    private final StaffDirectoryRepository staffDir;
     private final JwtEncoder jwtEncoder;
     private final AuthProperties props;
     private final ObjectMapper objectMapper;
@@ -59,9 +63,9 @@ public class TokenService {
     private final MfaPolicy mfaPolicy;
     private final Clock clock;
 
-    TokenService(AuthRepository repo, JwtEncoder jwtEncoder, AuthProperties props, ObjectMapper objectMapper,
+    TokenService(AuthSessionRepository sessionRepo, CredentialRepository credentials, StaffDirectoryRepository staffDir, JwtEncoder jwtEncoder, AuthProperties props, ObjectMapper objectMapper,
                  AuditService auditService, LoginGuard guard, MfaPolicy mfaPolicy, Clock clock) {
-        this.repo = repo;
+        this.sessionRepo = sessionRepo; this.credentials = credentials; this.staffDir = staffDir;
         this.jwtEncoder = jwtEncoder;
         this.props = props;
         this.objectMapper = objectMapper;
@@ -83,7 +87,7 @@ public class TokenService {
     }
 
     public void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
+        int recent = credentials.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -98,7 +102,7 @@ public class TokenService {
         if (staff.mfaResetRequired()) { // PLT-004: an owner reset forces enrolment at next sign-in
             return true;
         }
-        Role role = repo.findRole(staff.roleId()).orElseThrow(() -> new IllegalStateException("role missing"));
+        Role role = staffDir.findRole(staff.roleId()).orElseThrow(() -> new IllegalStateException("role missing"));
         return role.mfaRequired() || privilegedByPolicy(staff, role);
     }
 
@@ -106,12 +110,12 @@ public class TokenService {
         if (mfaPolicy.requiredForRole(role.builtIn(), flattenGrants(role.grantsJson()))) {
             return true;
         }
-        return repo.findActiveDelegatedRoles(staff.id()).stream()
+        return staffDir.findActiveDelegatedRoles(staff.id()).stream()
                 .anyMatch(d -> mfaPolicy.requiredForRole(d.builtIn(), flattenGrants(d.grantsJson())));
     }
 
     public boolean tenantInactive(UUID tenantId) {
-        return repo.findTenantById(tenantId).map(t -> com.nabd.hms.common.SessionRevocation.INACTIVE_TENANT_STATUSES.contains(t.status()))
+        return staffDir.findTenantById(tenantId).map(t -> com.nabd.hms.common.SessionRevocation.INACTIVE_TENANT_STATUSES.contains(t.status()))
                 .orElse(true);
     }
 
@@ -152,21 +156,21 @@ public class TokenService {
 
     /** PLT-012: bg != null mints the read-only emergency token for that grant (see BreakGlassService). */
     public TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent, BreakGlassSession bg) {
-        Role role = repo.findRole(staff.roleId())
+        Role role = staffDir.findRole(staff.roleId())
                 .orElseThrow(() -> new IllegalStateException("role missing for staff " + staff.id()));
-        Tenant tenant = repo.findTenantById(staff.tenantId())
+        Tenant tenant = staffDir.findTenantById(staff.tenantId())
                 .orElseThrow(() -> new IllegalStateException("tenant missing for staff " + staff.id()));
         List<String> permissions = new ArrayList<>(flattenGrants(role.grantsJson()));
 
         // NB-057: fold in any role currently on loan (e.g. covering a doctor's leave). Auditing
         // an expiry here, not on a scheduler, is what "the expiry is audited" means without a
         // background-job platform — see AuthRepository.expireStaleDelegations.
-        for (UUID expiredId : repo.expireStaleDelegations(staff.id())) {
+        for (UUID expiredId : staffDir.expireStaleDelegations(staff.id())) {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "staff.delegation_expired", "role_delegation", expiredId, null, null);
         }
         // PLT-012: the emergency token is base + read scope only; loans are not folded in.
-        for (Role delegated : bg != null ? List.<Role>of() : repo.findActiveDelegatedRoles(staff.id())) {
+        for (Role delegated : bg != null ? List.<Role>of() : staffDir.findActiveDelegatedRoles(staff.id())) {
             for (String p : flattenGrants(delegated.grantsJson())) {
                 if (!permissions.contains(p)) {
                     permissions.add(p);
@@ -175,7 +179,7 @@ public class TokenService {
         }
 
         // NB-048: same lazy expire-and-audit shape as delegation above.
-        for (UUID expiredId : repo.expireStaleBreakGlass(staff.id())) {
+        for (UUID expiredId : staffDir.expireStaleBreakGlass(staff.id())) {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "auth.break_glass_expired", "break_glass_grant", expiredId, null, null);
         }
@@ -220,7 +224,7 @@ public class TokenService {
 
         String rawRefresh = OpaqueTokens.generate();
         Instant refreshExp = bg != null ? bg.expiresAt() : now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
-        repo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
+        sessionRepo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent, now);
 
         return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),

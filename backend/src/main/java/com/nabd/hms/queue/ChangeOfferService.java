@@ -201,7 +201,6 @@ class ChangeOfferService {
         return repo.latestFor(tid, appointmentId).map(o -> "sent".equals(o.status()) && !o.expiresAt().isAfter(clock.now()) ? "expired" : o.status()).orElse(null);
     }
 
-
     private static ApiException gone() {
         return new ApiException(HttpStatus.GONE, "offer-expired", "Offer expired", "This offer is no longer open.", Map.of("code", "OFFER_EXPIRED"));
     }

@@ -105,5 +105,4 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
                 .toList();
         return new TenantLifecycleResponse(tenantId, status, events);
     }
-
 }

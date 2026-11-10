@@ -90,5 +90,4 @@ class StaffAccessService {
     String roleName(UUID tenantId, StaffRow s) {
         return roleRepo.findById(tenantId, s.roleId()).map(r -> r.name()).orElse("Staff");
     }
-
 }

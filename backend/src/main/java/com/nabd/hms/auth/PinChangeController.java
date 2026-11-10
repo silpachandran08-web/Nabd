@@ -1,5 +1,8 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
+import com.nabd.hms.auth.internal.store.AuthModels;
 import com.nabd.hms.auth.dto.PinChangeRequest;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -24,16 +27,16 @@ import java.util.UUID;
 @RequestMapping("/v1/auth/pin")
 public class PinChangeController {
 
-    private final AuthRepository repo;
+    private final StaffDirectoryRepository staffDir;
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final LoginGuard guard;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
 
-    PinChangeController(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
+    PinChangeController(StaffDirectoryRepository staffDir, TenantContext tenantContext, PasswordEncoder pinEncoder,
                         LoginGuard guard, JdbcTemplate jdbc, AuditService audit) {
-        this.repo = repo;
+        this.staffDir = staffDir;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.guard = guard;
@@ -47,7 +50,7 @@ public class PinChangeController {
         UUID staffId = UUID.fromString(jwt.getSubject());
         UUID tenantId = UUID.fromString(jwt.getClaimAsString("tenantId"));
         tenantContext.set(tenantId);
-        AuthModels.Staff staff = repo.findStaffById(staffId)
+        AuthModels.Staff staff = staffDir.findStaffById(staffId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such account."));
         guard.enforceLockout(staffId);
         if (staff.pinHash() == null || !pinEncoder.matches(req.currentPin(), staff.pinHash())) {

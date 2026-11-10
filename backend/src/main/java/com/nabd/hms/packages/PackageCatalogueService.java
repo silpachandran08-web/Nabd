@@ -150,5 +150,4 @@ public class PackageCatalogueService {
                 row.validityStarts(), row.graceDays(), row.refundNote(), listValue, saveAmount, savePercent, floor,
                 row.price().compareTo(floor) < 0, eligibleDoctorIds, items, doctorLeaveWarning);
     }
-
 }

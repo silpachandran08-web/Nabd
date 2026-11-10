@@ -1,5 +1,7 @@
 package com.nabd.hms.organization.setup;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.organization.setup.dto.ChargeHeadResponse;
 import com.nabd.hms.organization.setup.dto.ChargeHeadWriteRequest;
 import com.nabd.hms.organization.setup.dto.ClinicHolidayResponse;
@@ -26,8 +28,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -58,8 +58,8 @@ public class SetupController {
 
     @GetMapping("/checklist")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<SetupChecklistItemResponse> checklist(@AuthenticationPrincipal Jwt jwt) {
-        return service.getChecklist(tenantId(jwt));
+    public List<SetupChecklistItemResponse> checklist(@CurrentTenant UUID tenantId) {
+        return service.getChecklist(tenantId);
     }
 
     // status is derived from the endpoint itself, never from a request body — a call to .../skip
@@ -67,15 +67,15 @@ public class SetupController {
 
     @PostMapping("/checklist/{step}/skip")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<Void> skipStep(@AuthenticationPrincipal Jwt jwt, @PathVariable String step) {
-        service.updateProgress(tenantId(jwt), step, "skipped");
+    public ResponseEntity<Void> skipStep(@CurrentTenant UUID tenantId, @PathVariable String step) {
+        service.updateProgress(tenantId, step, "skipped");
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/checklist/{step}/complete")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<Void> completeStep(@AuthenticationPrincipal Jwt jwt, @PathVariable String step) {
-        service.updateProgress(tenantId(jwt), step, "done");
+    public ResponseEntity<Void> completeStep(@CurrentTenant UUID tenantId, @PathVariable String step) {
+        service.updateProgress(tenantId, step, "done");
         return ResponseEntity.noContent().build();
     }
 
@@ -83,88 +83,88 @@ public class SetupController {
 
     @GetMapping("/profile")
     @PreAuthorize("hasAuthority('setup:view')")
-    public ClinicProfileResponse profile(@AuthenticationPrincipal Jwt jwt) {
-        return service.getProfile(tenantId(jwt));
+    public ClinicProfileResponse profile(@CurrentTenant UUID tenantId) {
+        return service.getProfile(tenantId);
     }
 
     @PatchMapping("/profile")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ClinicProfileResponse updateProfile(@AuthenticationPrincipal Jwt jwt,
+    public ClinicProfileResponse updateProfile(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                 @Valid @RequestBody ClinicProfileWriteRequest req) {
-        return service.updateProfile(tenantId(jwt), staffId(jwt), req);
+        return service.updateProfile(tenantId, staffId, req);
     }
 
     // ── Charge head / price master ──
 
     @GetMapping("/charges")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<ChargeHeadResponse> charges(@AuthenticationPrincipal Jwt jwt) {
-        return service.listCharges(tenantId(jwt));
+    public List<ChargeHeadResponse> charges(@CurrentTenant UUID tenantId) {
+        return service.listCharges(tenantId);
     }
 
     @PostMapping("/charges")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<ChargeHeadResponse> addCharge(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<ChargeHeadResponse> addCharge(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                          @Valid @RequestBody ChargeHeadWriteRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addCharge(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addCharge(tenantId, staffId, req));
     }
 
     @PatchMapping("/charges/{id}")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ChargeHeadResponse updateCharge(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public ChargeHeadResponse updateCharge(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                             @Valid @RequestBody ChargeHeadWriteRequest req) {
-        return service.updateCharge(tenantId(jwt), staffId(jwt), id, req);
+        return service.updateCharge(tenantId, staffId, id, req);
     }
 
     // ── Policies ──
 
     @GetMapping("/policies")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<PolicyResponse> policies(@AuthenticationPrincipal Jwt jwt) {
-        return service.listPolicies(tenantId(jwt));
+    public List<PolicyResponse> policies(@CurrentTenant UUID tenantId) {
+        return service.listPolicies(tenantId);
     }
 
     @PatchMapping("/policies/{key}")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public PolicyResponse updatePolicy(@AuthenticationPrincipal Jwt jwt, @PathVariable String key,
+    public PolicyResponse updatePolicy(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable String key,
                                         @Valid @RequestBody PolicyWriteRequest req) {
-        return service.updatePolicy(tenantId(jwt), staffId(jwt), key, req);
+        return service.updatePolicy(tenantId, staffId, key, req);
     }
 
     // ── Consent & privacy contact ──
 
     @GetMapping("/consent-contact")
     @PreAuthorize("hasAuthority('setup:view')")
-    public ConsentContactResponse consentContact(@AuthenticationPrincipal Jwt jwt) {
-        return service.getConsentContact(tenantId(jwt));
+    public ConsentContactResponse consentContact(@CurrentTenant UUID tenantId) {
+        return service.getConsentContact(tenantId);
     }
 
     @PatchMapping("/consent-contact")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ConsentContactResponse updateConsentContact(@AuthenticationPrincipal Jwt jwt,
+    public ConsentContactResponse updateConsentContact(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                         @Valid @RequestBody ConsentContactWriteRequest req) {
-        return service.updateConsentContact(tenantId(jwt), staffId(jwt), req);
+        return service.updateConsentContact(tenantId, staffId, req);
     }
 
     // ── Clinic holidays (schedule admin) ──
 
     @GetMapping("/holidays")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<ClinicHolidayResponse> holidays(@AuthenticationPrincipal Jwt jwt) {
-        return service.listHolidays(tenantId(jwt));
+    public List<ClinicHolidayResponse> holidays(@CurrentTenant UUID tenantId) {
+        return service.listHolidays(tenantId);
     }
 
     @PostMapping("/holidays")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<ClinicHolidayResponse> addHoliday(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<ClinicHolidayResponse> addHoliday(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                              @Valid @RequestBody ClinicHolidayWriteRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addHoliday(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addHoliday(tenantId, staffId, req));
     }
 
     @DeleteMapping("/holidays/{id}")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<Void> deleteHoliday(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        service.deleteHoliday(tenantId(jwt), staffId(jwt), id);
+    public ResponseEntity<Void> deleteHoliday(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        service.deleteHoliday(tenantId, staffId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -172,103 +172,95 @@ public class SetupController {
 
     @GetMapping("/shifts")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<StaffShiftResponse> shifts(@AuthenticationPrincipal Jwt jwt) {
-        return service.listShifts(tenantId(jwt));
+    public List<StaffShiftResponse> shifts(@CurrentTenant UUID tenantId) {
+        return service.listShifts(tenantId);
     }
 
     @PostMapping("/shifts")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<StaffShiftResponse> addShift(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<StaffShiftResponse> addShift(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                         @Valid @RequestBody StaffShiftWriteRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addShift(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addShift(tenantId, staffId, req));
     }
 
     // ── Payroll export ──
 
     @GetMapping("/payroll-export")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<PayrollExportRowResponse> payrollExport(@AuthenticationPrincipal Jwt jwt,
+    public List<PayrollExportRowResponse> payrollExport(@CurrentTenant UUID tenantId,
                                                          @RequestParam(required = false) String month) {
-        return service.payrollExport(tenantId(jwt), month);
+        return service.payrollExport(tenantId, month);
     }
 
     // ── Subscription ──
 
     @GetMapping("/subscription")
     @PreAuthorize("hasAuthority('setup:view')")
-    public SubscriptionSummaryResponse subscription(@AuthenticationPrincipal Jwt jwt) {
-        return service.getSubscription(tenantId(jwt));
+    public SubscriptionSummaryResponse subscription(@CurrentTenant UUID tenantId) {
+        return service.getSubscription(tenantId);
     }
 
     // ── Import / Export ──
 
     @GetMapping("/import-jobs")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<ImportJobResponse> importJobs(@AuthenticationPrincipal Jwt jwt) {
-        return service.listImportJobs(tenantId(jwt));
+    public List<ImportJobResponse> importJobs(@CurrentTenant UUID tenantId) {
+        return service.listImportJobs(tenantId);
     }
 
     @PostMapping("/import-jobs")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<ImportJobResponse> createImportJob(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<ImportJobResponse> createImportJob(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                               @Valid @RequestBody ImportJobRequest req) {
         if (req.uploadId() != null) { // ADM-012: staged pipeline
-            return ResponseEntity.status(HttpStatus.CREATED).body(importPipeline.create(staffId(jwt), req));
+            return ResponseEntity.status(HttpStatus.CREATED).body(importPipeline.create(staffId, req));
         }
         if (req.fileName() == null || req.fileName().isBlank()) {
             throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "validation", "Validation failed", "fileName or uploadId is required");
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addImportJob(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addImportJob(tenantId, staffId, req));
     }
 
     @GetMapping("/export-jobs")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<ExportJobResponse> exportJobs(@AuthenticationPrincipal Jwt jwt) {
-        return service.listExportJobs(tenantId(jwt));
+    public List<ExportJobResponse> exportJobs(@CurrentTenant UUID tenantId) {
+        return service.listExportJobs(tenantId);
     }
 
     @PostMapping("/export-jobs")
     @PreAuthorize("hasAuthority('setup:view')")
-    public ResponseEntity<ExportJobResponse> createExportJob(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<ExportJobResponse> createExportJob(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                               @Valid @RequestBody ExportJobRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addExportJob(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addExportJob(tenantId, staffId, req));
     }
 
     // ── Licence registry ──
 
     @GetMapping("/licences")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<LicenceResponse> licences(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) String kind, @RequestParam(required = false) String status) {
-        return service.listLicences(tenantId(jwt), kind, status);
+    public List<LicenceResponse> licences(@CurrentTenant UUID tenantId, @RequestParam(required = false) String kind, @RequestParam(required = false) String status) {
+        return service.listLicences(tenantId, kind, status);
     }
 
     @PostMapping("/licences")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<LicenceResponse> addLicence(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<LicenceResponse> addLicence(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                        @Valid @RequestBody LicenceWriteRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addLicence(tenantId(jwt), staffId(jwt), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addLicence(tenantId, staffId, req));
     }
 
     @PatchMapping("/licences/{id}")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public LicenceResponse updateLicence(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public LicenceResponse updateLicence(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                           @Valid @RequestBody LicenceWriteRequest req) {
-        return service.updateLicence(tenantId(jwt), staffId(jwt), id, req);
+        return service.updateLicence(tenantId, staffId, id, req);
     }
 
     // ── Staff lookup helper (for shift/licence forms) ──
 
     @GetMapping("/staff")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<StaffSummaryResponse> staff(@AuthenticationPrincipal Jwt jwt) {
-        return service.listStaff(tenantId(jwt));
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    public List<StaffSummaryResponse> staff(@CurrentTenant UUID tenantId) {
+        return service.listStaff(tenantId);
     }
 }

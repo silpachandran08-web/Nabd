@@ -50,7 +50,7 @@ class ChangeOfferController {
     @Idempotent
     @PostMapping("/v1/appointments/{id}/offer-alternatives")
     @PreAuthorize("hasAuthority('queue:edit')")
-    ResponseEntity<Map<String, Object>> offer(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody(required = false) OfferRequest body) {
+    ResponseEntity<Map<String, Object>> offer(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody(required = false) OfferRequest body) {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(service.offer(UUID.fromString(jwt.getSubject()), id, body == null ? null : body.slots()));
     }
 

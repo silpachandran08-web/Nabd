@@ -1,11 +1,12 @@
 package com.nabd.hms.auth.internal.otp;
 
-import com.nabd.hms.auth.AuthModels.Staff;
-import com.nabd.hms.auth.AuthModels.Tenant;
-import com.nabd.hms.auth.AuthRepository;
-import com.nabd.hms.auth.LoginGuard;
-import com.nabd.hms.auth.OtpOutbox;
-import com.nabd.hms.auth.OtpSendLimiter;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.CredentialRepository;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
+import com.nabd.hms.auth.internal.store.AuthModels.Tenant;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
+import com.nabd.hms.auth.internal.guard.OtpOutbox;
+import com.nabd.hms.auth.internal.guard.OtpSendLimiter;
 import com.nabd.hms.auth.dto.OtpRequestRequest;
 import com.nabd.hms.auth.dto.OtpVerifyRequest;
 import com.nabd.hms.auth.dto.PinResetConfirmRequest;
@@ -34,7 +35,8 @@ public class OtpService {
 
     private static final Logger log = LoggerFactory.getLogger(OtpService.class);
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
+    private final StaffDirectoryRepository staffDir;
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final OtpOutbox otpOutbox;
@@ -44,9 +46,9 @@ public class OtpService {
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
-    OtpService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder, OtpOutbox otpOutbox, LoginGuard guard,
+    OtpService(CredentialRepository credentials, StaffDirectoryRepository staffDir, TenantContext tenantContext, PasswordEncoder pinEncoder, OtpOutbox otpOutbox, LoginGuard guard,
                OtpSendLimiter otpLimiter, TokenService tokens, Clock clock) {
-        this.repo = repo;
+        this.credentials = credentials; this.staffDir = staffDir;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.otpOutbox = otpOutbox;
@@ -63,7 +65,7 @@ public class OtpService {
         // PLT-006: same 202 for every outcome (unknown clinic or number, limited, sent). The per-number and per-tenant
         // limits are counted whether or not the number exists, and the WhatsApp call happens in the outbox (OPS-012
         // OtpOutbox / OtpRequestedHandler), so neither the response nor its timing shows which numbers are registered.
-        Tenant tenant = repo.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElse(null);
+        Tenant tenant = staffDir.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElse(null);
         if (tenant == null) {
             return;
         }
@@ -71,13 +73,13 @@ public class OtpService {
         if (otpLimiter.tryConsume(tenant.id(), PhoneNumbers.digits(req.mobilePhone(), tenant.region())) != OtpSendLimiter.Decision.SEND) {
             return;
         }
-        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
+        Staff staff = staffDir.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
             return; // PLT-006: same 202 as a real send, so the response does not reveal which numbers exist
         }
         String code = String.format("%06d", random.nextInt(1_000_000));
         Instant expiresAt = Instant.now(clock).plus(5, ChronoUnit.MINUTES);
-        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), expiresAt);
+        credentials.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), expiresAt);
         otpOutbox.queue(tenant.id(), staff.id(), "login", code, expiresAt); // OPS-012: sent by the outbox, to the number on file
         log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
@@ -88,24 +90,24 @@ public class OtpService {
     public Object verifyOtp(OtpVerifyRequest req, String ip, String device, String userAgent) {
         tokens.enforceIpRateLimit(ip);
 
-        Tenant tenant = repo.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElseThrow(AuthErrors::invalidCredentials);
+        Tenant tenant = staffDir.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElseThrow(AuthErrors::invalidCredentials);
         tenantContext.set(tenant.id());
 
-        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
+        Staff staff = staffDir.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
             throw AuthErrors.invalidCredentials();
         }
 
         guard.enforceLockout(staff.id());
 
-        if (!repo.consumeWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(req.code()))) {
+        if (!credentials.consumeWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(req.code()))) {
             guard.recordAttempt(tenant.id(), staff.id(), staff.email(), "otp", false);
             throw AuthErrors.invalidCredentials();
         }
         if (!staff.mfaEnabled()) {
             guard.recordAttempt(tenant.id(), staff.id(), staff.email(), "otp", true);
         }
-        repo.markMobileVerified(staff.id());
+        credentials.markMobileVerified(staff.id());
         log.info("staff {} authenticated via WhatsApp OTP, mobile verified (tenant {})", staff.id(), tenant.id());
         return tokens.afterFirstFactor(staff, ip, device, userAgent);
     }
@@ -117,18 +119,18 @@ public class OtpService {
     @Transactional(noRollbackFor = ApiException.class)
     public void requestPinReset(PinResetRequestRequest req, String ip) {
         tokens.enforceIpRateLimit(ip);
-        Tenant tenant = repo.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElse(null);
+        Tenant tenant = staffDir.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElse(null);
         if (tenant == null) {
             return;
         }
         tenantContext.set(tenant.id());
-        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
+        Staff staff = staffDir.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
             return;
         }
         String token = OpaqueTokens.generate();
         Instant expiresAt = Instant.now(clock).plus(15, ChronoUnit.MINUTES);
-        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), expiresAt);
+        credentials.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), expiresAt);
         otpOutbox.queue(tenant.id(), staff.id(), "pin_reset", token, expiresAt); // OPS-012: sent by the outbox
         log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
@@ -136,13 +138,13 @@ public class OtpService {
     @Transactional(noRollbackFor = ApiException.class)
     public void confirmPinReset(PinResetConfirmRequest req, String ip) {
         tokens.enforceIpRateLimit(ip);
-        Tenant tenant = repo.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElseThrow(AuthErrors::invalidCredentials);
+        Tenant tenant = staffDir.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElseThrow(AuthErrors::invalidCredentials);
         tenantContext.set(tenant.id());
-        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
+        Staff staff = staffDir.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null) {
             throw AuthErrors.invalidCredentials();
         }
-        boolean reset = repo.consumePinResetToken(staff.id(), OpaqueTokens.sha256Hex(req.token()), pinEncoder.encode(req.newPin()));
+        boolean reset = credentials.consumePinResetToken(staff.id(), OpaqueTokens.sha256Hex(req.token()), pinEncoder.encode(req.newPin()));
         if (!reset) {
             throw AuthErrors.invalidCredentials();
         }

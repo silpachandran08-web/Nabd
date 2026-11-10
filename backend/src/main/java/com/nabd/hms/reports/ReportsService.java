@@ -310,5 +310,4 @@ public class ReportsService {
     private double round1(double v) {
         return Math.round(v * 10) / 10.0;
     }
-
 }

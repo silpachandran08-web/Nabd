@@ -321,5 +321,4 @@ public class StockTakeService {
     private static ApiException batchNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested batch was not found.");
     }
-
 }

@@ -192,5 +192,4 @@ public class NotificationService implements NotificationPort {
     private static FieldCipher.Aad aad(UUID tenantId, UUID id) {
         return FieldCipher.Aad.of(tenantId, "notification_requests", COLUMN, id);
     }
-
 }

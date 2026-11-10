@@ -200,7 +200,6 @@ class NoShowService {
         eta.afterCommit(tenant, a.doctorId(), a.startTime().atZone(clock.zone(tenant)).toLocalDate());
     }
 
-
     private static ApiException conflict(String slug, String title, String detail, String code) {
         return new ApiException(HttpStatus.CONFLICT, slug, title, detail, Map.of("code", code));
     }

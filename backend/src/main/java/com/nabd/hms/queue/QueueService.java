@@ -462,7 +462,6 @@ public class QueueService {
                 "This appointment has already been checked in.", extras);
     }
 
-
     private ApiException sessionFull() {
         return new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
                 "This session has reached its patient cap (walk-ins and bookings counted together).", java.util.Map.of("code", "SESSION_FULL", "scope", "total"));

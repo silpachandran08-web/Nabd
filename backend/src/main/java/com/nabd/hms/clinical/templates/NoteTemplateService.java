@@ -99,5 +99,4 @@ public class NoteTemplateService {
             throw new IllegalStateException("could not serialise note template json", e);
         }
     }
-
 }

@@ -288,5 +288,4 @@ public class AllergyService {
         return new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
                 "A reason is required to correct or remove an allergy. The original entry is kept in the allergy history.");
     }
-
 }

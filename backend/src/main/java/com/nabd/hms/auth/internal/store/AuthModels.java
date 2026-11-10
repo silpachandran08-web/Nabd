@@ -1,4 +1,4 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.store;
 
 import java.time.Instant;
 import java.util.UUID;

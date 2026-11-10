@@ -213,7 +213,6 @@ public class ClinicalDocumentService {
         }
     }
 
-
     private ApiException issued() {
         return new ApiException(HttpStatus.CONFLICT, "document-issued", "Document already issued",
                 "This document has been issued and can no longer be changed.");

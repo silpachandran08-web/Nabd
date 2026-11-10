@@ -162,7 +162,6 @@ public class FileService implements FileStore {
         return new SignedUrl(storage.presign(false, ObjectStorage.Bucket.CLEAN, f.storageKey(), t, 0), clock.instant().plus(t));
     }
 
-
     private static byte[] sha256(byte[] d) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(d);

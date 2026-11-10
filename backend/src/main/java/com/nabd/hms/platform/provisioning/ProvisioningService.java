@@ -221,5 +221,4 @@ public class ProvisioningService {
                 job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps,
                 ownerInviteToken, ownerAccountInviteToken);
     }
-
 }

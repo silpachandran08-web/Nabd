@@ -317,7 +317,6 @@ public class AppointmentService {
         return SessionModes.expectedRange(row.startTime(), row.endTime(), row.sessionToken(), avg, clock.zone(row.tenantId()));
     }
 
-
     private ApiException sessionFull(boolean online) {
         return new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
                 online ? "Online booking for this session is full; the desk may still add walk-ins."

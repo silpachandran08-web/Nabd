@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +43,7 @@ class QueueSettingsController {
 
     @PutMapping("/v1/doctors/{id}/queue-settings")
     @PreAuthorize(CAN_WRITE)
-    Response put(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody Request req) {
+    Response put(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody Request req) {
         var r = modes.put(UUID.fromString(jwt.getSubject()), id, req.workingHoursId(), req.etaDisplayMode());
         return new Response(r.mode(), r.source());
     }

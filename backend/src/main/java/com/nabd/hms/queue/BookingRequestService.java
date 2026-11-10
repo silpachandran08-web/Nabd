@@ -369,7 +369,6 @@ class BookingRequestService {
         return new ApiException(HttpStatus.CONFLICT, "already-decided", "Already decided", "This request was already decided.", Map.of("code", "ALREADY_DECIDED"));
     }
 
-
     private static ApiException notOwner() {
         return new ApiException(HttpStatus.FORBIDDEN, "not-owner", "Not the patient's appointment", "That appointment does not belong to this patient.", Map.of("code", "NOT_OWNER"));
     }

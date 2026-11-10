@@ -136,5 +136,4 @@ public class PregnancyStatusService {
             return null;
         }
     }
-
 }

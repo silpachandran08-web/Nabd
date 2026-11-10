@@ -155,5 +155,4 @@ public class DentalService {
         return new ToothResponse(t.id(), t.patientId(), t.toothNumber(), t.status(), t.note(),
                 t.isSupernumerary(), t.updatedBy(), t.updatedAt());
     }
-
 }

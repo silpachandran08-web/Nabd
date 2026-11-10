@@ -32,12 +32,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
@@ -88,11 +86,13 @@ public class PrescriptionService {
 
     private final ActorDirectory actors;
     private final DrugCoding coding;
+    private final RxSafetyService safety;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
                          SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors,
-                         DrugCoding coding) {
+                         DrugCoding coding, RxSafetyService safety) {
+        this.safety = safety;
         this.actors = actors;
         this.coding = coding;
         this.dictionaries = dictionaries;
@@ -189,7 +189,7 @@ public class PrescriptionService {
             // CLN-021: a drug master id must exist (404 DRUG_NOT_FOUND); its ingredients and classes join the text checks.
             String drugId = blankToNull(item.drugId());
             DrugCoding.Codes codes = drugId == null ? null : coding.resolve(drugId).codes();
-            for (Detected d : detectLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today)) {
+            for (RxSafetyService.Finding d : safety.checkLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today)) {
                 if (!d.requiresDecision()) {
                     continue;
                 }
@@ -534,9 +534,9 @@ public class PrescriptionService {
                     String pregnancyWarning = null;
                     String controlledWarning = null;
                     DrugCoding.Codes codes = coding.codes(i.drugId()).orElse(null);
-                    for (Detected d : detectLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today)) {
+                    for (RxSafetyService.Finding d : safety.checkLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today)) {
                         StoredDecision held = !d.requiresDecision() ? null : stored.stream()
-                                .filter(s -> s.kind().equals(d.kind()) && sameMatch(s.matched(), d.matched())
+                                .filter(s -> s.kind().equals(d.kind()) && RxSafetyService.sameMatch(s.matched(), d.matched())
                                         && RxSafetyChecks.reasonLabel(d.kind(), s.reasonCode()) != null)
                                 .findFirst().orElse(null);
                         boolean resolved = !d.requiresDecision() || held != null;
@@ -615,9 +615,6 @@ public class PrescriptionService {
 
     // ── warning detection and stored decisions ───────────────────────────
 
-    private record Detected(String kind, String severity, String message, String matched, boolean requiresDecision) {
-    }
-
     /** Decision as stored in prescription_items.overrides (by/at are stamped by the server, never by the client). */
     record StoredDecision(String kind, String reasonCode, String note, String matched, String severity, String by,
                            String byName, String at) {
@@ -625,53 +622,6 @@ public class PrescriptionService {
 
     private static final TypeReference<List<StoredDecision>> DECISIONS = new TypeReference<>() {
     };
-
-    private List<Detected> detect(String drugName, List<AllergyRow> allergies, PrescriptionRepository.PatientProfile profile,
-                                  SafetyDictionary dict, LocalDate today) {
-        List<Detected> found = new ArrayList<>();
-        findMatch(dict, allergies, drugName).ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
-                a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
-        String preg = profile == null ? null : RxSafetyChecks.pregnancyWarning(dict, drugName, profile.gender(), profile.dob(), today);
-        // DOC-021: a recorded pregnant/lactating status escalates (severity, wording and a fresh decision: `matched`
-        // differs from the generic one, so an earlier generic override does not carry over). Never weakens: any other
-        // status falls through to the unchanged rule above.
-        String recorded = profile == null ? null : RxSafetyChecks.recordedStatusWarning(dict, drugName, profile.pregnancyStatus());
-        if (recorded != null) {
-            found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "severe", recorded, profile.pregnancyStatus(), true));
-        } else if (preg != null) {
-            found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "caution", preg, "pregnancy/lactation", true));
-        }
-        String controlled = RxSafetyChecks.controlledSubstanceWarning(dict, drugName);
-        if (controlled != null) {
-            found.add(new Detected(RxSafetyChecks.KIND_CONTROLLED, "caution", controlled, "controlled substance", true));
-        }
-        return found;
-    }
-
-    /** DOC-033: the safety checks run on the generic text AND the brand text. A brand can never hide a conflict the
-     * generic would show, nor the other way round. A finding already raised by the generic is not duplicated. */
-    private List<Detected> detectLine(String drugName, String brandName, DrugCoding.Codes codes, List<AllergyRow> allergies,
-                                      PrescriptionRepository.PatientProfile profile, SafetyDictionary dict, LocalDate today) {
-        List<Detected> found = new ArrayList<>(detect(drugName, allergies, profile, dict, today));
-        // CLN-021: a coded allergy (ingredient or class id) matches a coded line by id, even when no dictionary text knows the brand.
-        if (codes != null) {
-            allergies.stream().filter(a -> (a.allergenIngredientId() != null && codes.ingredientIds().contains(a.allergenIngredientId()))
-                            || (a.allergenClassId() != null && codes.classIds().contains(a.allergenClassId())))
-                    .min(Comparator.comparingInt(a -> "severe".equals(a.severity()) ? 0 : "moderate".equals(a.severity()) ? 1 : 2))
-                    .filter(a -> found.stream().noneMatch(f -> RxSafetyChecks.KIND_ALLERGY.equals(f.kind()) && sameMatch(f.matched(), a.substance())))
-                    .ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
-                            a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
-        }
-        if (brandName != null && !brandName.isBlank() && !brandName.trim().equalsIgnoreCase(drugName.trim())) {
-            for (Detected d : detect(brandName, allergies, profile, dict, today)) {
-                boolean dup = found.stream().anyMatch(f -> f.kind().equals(d.kind()) && sameMatch(f.matched(), d.matched()));
-                if (!dup) {
-                    found.add(d);
-                }
-            }
-        }
-        return found;
-    }
 
     private static String blankToNull(String s) {
         return s == null || s.isBlank() ? null : s.trim();
@@ -681,24 +631,10 @@ public class PrescriptionService {
         items.stream().map(i -> blankToNull(i.drugId())).filter(Objects::nonNull).distinct().forEach(coding::resolve);
     }
 
-    /** The most severe matching allergy wins (severe, then moderate, then mild). */
-    private Optional<AllergyRow> findMatch(SafetyDictionary dict, List<AllergyRow> allergies, String drugName) {
-        return allergies.stream().filter(a -> RxSafetyChecks.allergyMatches(dict, drugName, a.substance()))
-                .min(Comparator.comparingInt(a -> switch (a.severity()) {
-                    case "severe" -> 0;
-                    case "moderate" -> 1;
-                    default -> 2;
-                }));
-    }
-
-    private static boolean sameMatch(String a, String b) {
-        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
-    }
-
     private StoredDecision findStored(List<PrescriptionItemRow> existing, String drugName, String kind, String matched) {
         return existing.stream().filter(r -> r.drugName().trim().equalsIgnoreCase(drugName.trim()))
                 .flatMap(r -> parseDecisions(r.overridesJson()).stream())
-                .filter(d -> d.kind().equals(kind) && sameMatch(d.matched(), matched)
+                .filter(d -> d.kind().equals(kind) && RxSafetyService.sameMatch(d.matched(), matched)
                         && RxSafetyChecks.reasonLabel(kind, d.reasonCode()) != null)
                 .findFirst().orElse(null);
     }
@@ -766,5 +702,4 @@ public class PrescriptionService {
                 "prescription", prescriptionId, Map.of("drugName", drugName, "warningKind", d.kind(), "reasonCode", d.reasonCode(),
                         "decidedBy", String.valueOf(d.by()), "decidedAt", String.valueOf(d.at())), null);
     }
-
 }

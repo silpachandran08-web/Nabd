@@ -393,5 +393,4 @@ public class PlatformAuthService {
         return new ApiException(HttpStatus.UNAUTHORIZED, "invalid-refresh-token", "Invalid refresh token",
                 "Session is no longer valid; sign in again.");
     }
-
 }

@@ -150,7 +150,6 @@ public class NoteService {
                 n.objective(), n.assessment(), n.plan(), n.diagnosis(), n.status(), n.signedAt(), n.updatedAt(), n.signedBy());
     }
 
-
     private ApiException noteSigned() {
         return new ApiException(HttpStatus.CONFLICT, "note-signed", "Note already signed",
                 "This clinical note is signed and can no longer be edited.");

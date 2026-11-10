@@ -620,5 +620,4 @@ public class PatientService {
                 row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null),
                 repo.findLastVisit(tenantId, row.id()).orElse(null));
     }
-
 }

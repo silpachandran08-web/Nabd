@@ -1,5 +1,7 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.billing.dto.CheckoutContextResponse;
 import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.InvoiceResponse;
@@ -44,89 +46,81 @@ public class CheckoutController {
 
     @GetMapping("/checkout/{queueEntryId}")
     @PreAuthorize("hasAuthority('billing:view')")
-    public CheckoutContextResponse checkoutContext(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.getCheckoutContext(tenantId(jwt), queueEntryId);
+    public CheckoutContextResponse checkoutContext(@CurrentTenant UUID tenantId, @PathVariable UUID queueEntryId) {
+        return service.getCheckoutContext(tenantId, queueEntryId);
     }
 
     @GetMapping("/checkout/{queueEntryId}/invoice")
     @PreAuthorize("hasAuthority('billing:view')")
-    public InvoiceResponse existingInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.getExistingInvoice(tenantId(jwt), queueEntryId);
+    public InvoiceResponse existingInvoice(@CurrentTenant UUID tenantId, @PathVariable UUID queueEntryId) {
+        return service.getExistingInvoice(tenantId, queueEntryId);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/checkout/{queueEntryId}")
     @PreAuthorize("hasAuthority('billing:create')")
-    public InvoiceResponse checkout(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+    public InvoiceResponse checkout(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                      @Valid @RequestBody CheckoutRequest req, jakarta.servlet.http.HttpServletRequest http) {
-        return service.checkout(tenantId(jwt), queueEntryId, staffId(jwt), canDiscount(jwt), RequestMeta.clientIp(http), req);
+        return service.checkout(tenantId, queueEntryId, staffId, canDiscount(jwt), RequestMeta.clientIp(http), req);
     }
 
     /** FIN-008: tax for a draft cart, nothing stored (read-only, so no Idempotency-Key). */
     @PostMapping("/quotes")
     @PreAuthorize("hasAuthority('billing:view')")
-    public com.nabd.hms.billing.dto.QuoteResponse quote(@AuthenticationPrincipal Jwt jwt,
+    public com.nabd.hms.billing.dto.QuoteResponse quote(@CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt,
                                                          @Valid @RequestBody com.nabd.hms.billing.dto.QuoteRequest req) {
-        return service.quote(staffId(jwt), canDiscount(jwt),
+        return service.quote(staffId, canDiscount(jwt),
                 new CheckoutRequest(req.lines(), null, req.discounts(), req.buyerGstin()));
     }
 
     @GetMapping("/otc-charges")
     @PreAuthorize("hasAuthority('billing:view')")
-    public OtcChargesResponse otcCharges(@AuthenticationPrincipal Jwt jwt) {
-        return service.getOtcCharges(tenantId(jwt));
+    public OtcChargesResponse otcCharges(@CurrentTenant UUID tenantId) {
+        return service.getOtcCharges(tenantId);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/otc-checkout")
     @PreAuthorize("hasAuthority('billing:create')")
-    public InvoiceResponse otcCheckout(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req,
+    public InvoiceResponse otcCheckout(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req,
                                         jakarta.servlet.http.HttpServletRequest http) {
-        return service.otcCheckout(tenantId(jwt), staffId(jwt), canDiscount(jwt), RequestMeta.clientIp(http), req);
+        return service.otcCheckout(tenantId, staffId, canDiscount(jwt), RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/invoices/{id}")
     @PreAuthorize("hasAuthority('billing:view')")
-    public org.springframework.http.ResponseEntity<InvoiceResponse> getInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public org.springframework.http.ResponseEntity<InvoiceResponse> getInvoice(@CurrentTenant UUID tenantId, @PathVariable UUID id,
                                                                                @org.springframework.web.bind.annotation.RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
         java.util.List<Long> seq = service.invoiceChangeSeq(id); // OPS-006: 304 without loading the invoice
-        return com.nabd.hms.shared.ETags.respond(!seq.isEmpty(), seq.isEmpty() ? null : seq.get(0), ifNoneMatch, () -> service.getInvoice(tenantId(jwt), id));
+        return com.nabd.hms.shared.ETags.respond(!seq.isEmpty(), seq.isEmpty() ? null : seq.get(0), ifNoneMatch, () -> service.getInvoice(tenantId, id));
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/invoices/{id}/payments")
     @PreAuthorize("hasAuthority('billing:edit')")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
-    public InvoiceResponse recordPayment(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public InvoiceResponse recordPayment(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                           @Valid @RequestBody PaymentRequest req,
                                           @org.springframework.web.bind.annotation.RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        return service.recordPayment(tenantId(jwt), id, staffId(jwt), req, idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim());
+        return service.recordPayment(tenantId, id, staffId, req, idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim());
     }
 
     /** PHA-011: void an unpaid invoice and restore its pharmacy stock. Same grant as discounts/refunds. */
     @PostMapping("/invoices/{id}/void")
     @PreAuthorize("hasAuthority('billing:edit')")
-    public InvoiceResponse voidInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public InvoiceResponse voidInvoice(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                         @Valid @RequestBody VoidInvoiceRequest req, jakarta.servlet.http.HttpServletRequest http) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
         if (permissions == null || !permissions.contains("billing.discount")) {
             throw new ApiException(HttpStatus.FORBIDDEN, "void-not-permitted", "Void not permitted",
                     "Your role cannot void an invoice.");
         }
-        return service.voidInvoice(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
+        return service.voidInvoice(tenantId, id, staffId, RequestMeta.clientIp(http), req);
     }
 
     /** REC-043 / FIN-003: the billing.discount grant gates every price-bearing change; CheckoutService enforces it per field. */
     private boolean canDiscount(Jwt jwt) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
         return permissions != null && permissions.contains("billing.discount");
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

@@ -47,10 +47,9 @@ import static com.nabd.hms.packages.PackageModels.RefundRow;
  * invoices in one place).
  *
  * Deliberately NOT built here (all "Phase 2" in the wireframe's own Package settings panel, agreeing
- * with the xlsx's Delivery Phase column): scheduled instalments (NB-156, needs a payment gateway
- * that doesn't exist anywhere in this codebase) and transfer/gifting (NB-159). Expiry alerts and
- * next-session nudges are real here as a computed list + a manual "mark sent" action — the automatic
- * WhatsApp push itself needs NB-197's messaging infra, which doesn't exist yet either.
+ * with the xlsx's Delivery Phase column): scheduled instalments (NB-156) and transfer/gifting (NB-159).
+ * Expiry alerts and next-session nudges are a computed list + a manual "mark as reminded" action; this
+ * service sends no message (automatic dispatch is COM-044, see sendReminder).
  */
 @Service
 public class PackageInstanceService {
@@ -466,5 +465,4 @@ public class PackageInstanceService {
                 r.reason(), r.usedListValue(), r.refundAmount(), r.amountOwed(), r.status(), r.creditNoteNumber(),
                 r.createdAt(), r.recomputedAmount());
     }
-
 }

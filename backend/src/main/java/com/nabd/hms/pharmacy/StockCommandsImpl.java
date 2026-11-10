@@ -405,5 +405,4 @@ class StockCommandsImpl implements StockCommands {
         return new ApiException(HttpStatus.BAD_REQUEST, "batch-details-required", "Batch details required",
                 "Batch number, expiry date, MRP, purchase rate and quantity are required for an In-house pharmacy.");
     }
-
 }

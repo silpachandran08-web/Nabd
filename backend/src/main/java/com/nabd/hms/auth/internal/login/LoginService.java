@@ -1,9 +1,10 @@
 package com.nabd.hms.auth.internal.login;
 
-import com.nabd.hms.auth.AuthModels.Staff;
-import com.nabd.hms.auth.AuthModels.Tenant;
-import com.nabd.hms.auth.AuthRepository;
-import com.nabd.hms.auth.LoginGuard;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.CredentialRepository;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
+import com.nabd.hms.auth.internal.store.AuthModels.Tenant;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.internal.token.AuthErrors;
 import com.nabd.hms.auth.internal.token.TokenService;
@@ -21,14 +22,15 @@ public class LoginService {
 
     private static final Logger log = LoggerFactory.getLogger(LoginService.class);
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
+    private final StaffDirectoryRepository staffDir;
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final LoginGuard guard;
     private final TokenService tokens;
 
-    LoginService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder, LoginGuard guard, TokenService tokens) {
-        this.repo = repo;
+    LoginService(CredentialRepository credentials, StaffDirectoryRepository staffDir, TenantContext tenantContext, PasswordEncoder pinEncoder, LoginGuard guard, TokenService tokens) {
+        this.credentials = credentials; this.staffDir = staffDir;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.guard = guard;
@@ -47,14 +49,14 @@ public class LoginService {
     public Object login(LoginRequest req, String ip, String device, String userAgent) {
         tokens.enforceIpRateLimit(ip);
 
-        Tenant tenant = repo.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElseThrow(AuthErrors::invalidCredentials);
+        Tenant tenant = staffDir.findTenantBySlug(req.tenantSlug()).filter(LoginService::active).orElseThrow(AuthErrors::invalidCredentials);
 
         tenantContext.set(tenant.id());
         String email = req.email().toLowerCase();
 
-        Staff staff = repo.findStaffByEmail(tenant.id(), email).orElse(null);
+        Staff staff = staffDir.findStaffByEmail(tenant.id(), email).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
-            repo.recordLoginAttempt(tenant.id(), staff == null ? null : staff.id(), email, ip, false);
+            credentials.recordLoginAttempt(tenant.id(), staff == null ? null : staff.id(), email, ip, false);
             throw AuthErrors.invalidCredentials();
         }
 
@@ -63,11 +65,11 @@ public class LoginService {
         guard.enforceLockout(staff.id());
 
         if (staff.pinHash() == null || !pinEncoder.matches(req.pin(), staff.pinHash())) {
-            repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, false);
+            credentials.recordLoginAttempt(tenant.id(), staff.id(), email, ip, false);
             throw AuthErrors.invalidCredentials();
         }
         if (!staff.mfaEnabled()) { // with MFA the success is recorded after the second factor, so PIN logins cannot reset TOTP failures
-            repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
+            credentials.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
         }
         log.info("staff {} authenticated via PIN (tenant {})", staff.id(), tenant.id());
         return tokens.afterFirstFactor(staff, ip, device, userAgent);

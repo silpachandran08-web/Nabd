@@ -127,5 +127,4 @@ public class PlanService {
                 p.seatLimit(), p.active(), p.createdAt(), p.version(), p.market(), p.pricingBasis(), p.branchLimit(),
                 p.visitsPerMonth(), p.onTrialExpiry(), repo.modules(p.id(), p.version()));
     }
-
 }

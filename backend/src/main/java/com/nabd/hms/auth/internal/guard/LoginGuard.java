@@ -1,5 +1,8 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.guard;
 
+import com.nabd.hms.auth.TotpService;
+
+import com.nabd.hms.auth.internal.store.CredentialRepository;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.config.AuthProperties;
@@ -28,16 +31,16 @@ public class LoginGuard {
 
     private static final Logger log = LoggerFactory.getLogger(LoginGuard.class);
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
     private final JdbcTemplate jdbc;
     private final TotpService totp;
     private final AuthProperties props;
 
     private final Clock clock;
 
-    LoginGuard(AuthRepository repo, JdbcTemplate jdbc, TotpService totp, AuthProperties props, Clock clock) {
+    LoginGuard(CredentialRepository credentials, JdbcTemplate jdbc, TotpService totp, AuthProperties props, Clock clock) {
         this.clock = clock;
-        this.repo = repo;
+        this.credentials = credentials;
         this.jdbc = jdbc;
         this.totp = totp;
         this.props = props;
@@ -45,7 +48,7 @@ public class LoginGuard {
 
     /** Throws 423 while the backoff window runs. Does not record anything, so a locked hit cannot renew the lock. */
     public void enforceLockout(UUID staffId) {
-        enforceLockout(repo.countFailedAttemptsSinceLastSuccess(staffId), repo.lastFailedAttemptAt(staffId), staffId);
+        enforceLockout(credentials.countFailedAttemptsSinceLastSuccess(staffId), credentials.lastFailedAttemptAt(staffId), staffId);
     }
 
     /** The same rule over another attempt log (FIN-018: owner PIN tries at a desk, counted per desk caller). */

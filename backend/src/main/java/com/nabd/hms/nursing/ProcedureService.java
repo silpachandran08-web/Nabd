@@ -100,5 +100,4 @@ public class ProcedureService {
                 row.consentNote(), row.status(), row.billed(), completedByName, row.completedAt(), row.createdAt(),
                 row.consentSignedName(), consentRecordedByName, row.consentSignedAt());
     }
-
 }

@@ -235,7 +235,6 @@ public class PharmacyWorklistService implements RxValidity {
                 "This prescription has passed its validity date and can no longer be dispensed.");
     }
 
-
     private static String norm(String s) {
         return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
     }

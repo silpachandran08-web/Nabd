@@ -1,5 +1,6 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.auth.internal.guard.OtpOutbox;
 import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.OutboxEvent;

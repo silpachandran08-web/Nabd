@@ -1,5 +1,6 @@
 package com.nabd.hms.billing.tax;
 
+import jakarta.validation.Valid;
 import com.nabd.hms.common.RequestMeta;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +27,7 @@ public class TaxHeadController {
     @PatchMapping("/v1/setup/charges/{id}/tax")
     @PreAuthorize("hasAuthority('setup:edit')")
     public TaxHeadService.Response setTax(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                           @RequestBody TaxHeadService.Request req, jakarta.servlet.http.HttpServletRequest http) {
+                                           @Valid @RequestBody TaxHeadService.Request req, jakarta.servlet.http.HttpServletRequest http) {
         return service.update(UUID.fromString(jwt.getSubject()), id, RequestMeta.clientIp(http), req);
     }
 

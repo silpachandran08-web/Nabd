@@ -142,5 +142,4 @@ public class PharmacyReturnService {
         repo.reversed(t, invoiceId).forEach(r -> out.merge(r.lineId(), r.quantity(), Integer::sum));
         return out;
     }
-
 }

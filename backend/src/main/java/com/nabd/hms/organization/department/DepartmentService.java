@@ -268,7 +268,6 @@ public class DepartmentService implements OrganizationConfig {
         return new DepartmentResponse(row.id(), row.name(), row.isDefault(), row.active());
     }
 
-
     private ApiException duplicateName() {
         return new ApiException(HttpStatus.CONFLICT, "duplicate-department-name", "Department name already in use",
                 "A department with this name already exists.");

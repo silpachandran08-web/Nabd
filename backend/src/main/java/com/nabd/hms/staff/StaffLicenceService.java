@@ -111,5 +111,4 @@ class StaffLicenceService {
         String role = roleRepo.findById(tenantId, caller.roleId()).map(StaffRoleModels.RoleRow::name).orElse("Staff");
         auditService.record(tenantId, "staff", callerId, caller.name(), role, ip, action, "staff", id, before, after);
     }
-
 }

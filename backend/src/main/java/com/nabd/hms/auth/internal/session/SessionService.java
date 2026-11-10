@@ -1,9 +1,10 @@
 package com.nabd.hms.auth.internal.session;
 
-import com.nabd.hms.auth.AuthModels.SessionRow;
-import com.nabd.hms.auth.AuthModels.Staff;
-import com.nabd.hms.auth.AuthRepository;
-import com.nabd.hms.auth.LoginGuard;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.AuthSessionRepository;
+import com.nabd.hms.auth.internal.store.AuthModels.SessionRow;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
@@ -34,7 +35,8 @@ public class SessionService {
 
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
-    private final AuthRepository repo;
+    private final AuthSessionRepository sessionRepo;
+    private final StaffDirectoryRepository staffDir;
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final LoginGuard guard;
@@ -44,9 +46,9 @@ public class SessionService {
     @Value("${app.auth.absolute-session-hours:12}")
     private int absoluteSessionHours; // PLT-007: refresh-family cap (one shift); per-tenant SSO policy later
 
-    SessionService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder, LoginGuard guard,
+    SessionService(AuthSessionRepository sessionRepo, StaffDirectoryRepository staffDir, TenantContext tenantContext, PasswordEncoder pinEncoder, LoginGuard guard,
                    TokenService tokens, Clock clock) {
-        this.repo = repo;
+        this.sessionRepo = sessionRepo; this.staffDir = staffDir;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.guard = guard;
@@ -62,7 +64,7 @@ public class SessionService {
     public void unlock(Jwt callerJwt, UnlockRequest req) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
-        Staff staff = repo.findStaffById(staffId).orElseThrow(ApiException::notFound);
+        Staff staff = staffDir.findStaffById(staffId).orElseThrow(ApiException::notFound);
         guard.enforceLockout(staffId); // 423 before the PIN is even looked at
         if (staff.pinHash() == null || !pinEncoder.matches(req.pin(), staff.pinHash())) {
             guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", false);
@@ -75,7 +77,7 @@ public class SessionService {
     @Transactional
     public Object sessionAfterInviteAccept(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
         tenantContext.set(tenantId);
-        Staff staff = repo.findStaffById(staffId)
+        Staff staff = staffDir.findStaffById(staffId)
                 .orElseThrow(() -> new IllegalStateException("staff " + staffId + " vanished right after invite accept"));
         if (!staff.mfaEnabled() && tokens.mfaRequiredByPolicy(staff)) {
             return tokens.issueMfaSetupRequired(staff);
@@ -90,7 +92,7 @@ public class SessionService {
         if (tokens.tenantInactive(tenantId)) { // PLT-007: workspace select into a suspended/offboarded clinic
             throw AuthErrors.tenantInactive(HttpStatus.FORBIDDEN);
         }
-        Staff staff = repo.findStaffById(staffId)
+        Staff staff = staffDir.findStaffById(staffId)
                 .orElseThrow(() -> new IllegalStateException("staff " + staffId + " vanished right after invite accept"));
         return tokens.mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
     }
@@ -101,7 +103,7 @@ public class SessionService {
     @Transactional(noRollbackFor = ApiException.class)
     public TokenPairResponse refresh(RefreshRequest req, String ip, String device, String userAgent) {
         String tokenHash = OpaqueTokens.sha256Hex(req.refreshToken());
-        SessionRow session = repo.findSessionByTokenHash(tokenHash).orElseThrow(AuthErrors::invalidRefresh);
+        SessionRow session = sessionRepo.findSessionByTokenHash(tokenHash).orElseThrow(AuthErrors::invalidRefresh);
 
         tenantContext.set(session.tenantId());
 
@@ -116,31 +118,31 @@ public class SessionService {
             // token already used once (or already revoked) and is being presented again — compromise signal
             log.warn("refresh-token reuse detected — revoking session family {} (staff {}, tenant {})",
                     session.familyId(), session.staffId(), session.tenantId());
-            repo.revokeFamily(session.familyId(), "reuse_detected");
+            sessionRepo.revokeFamily(session.familyId(), "reuse_detected");
             throw AuthErrors.invalidRefresh();
         }
         if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw AuthErrors.invalidRefresh();
         }
         // PLT-007: absolute lifetime of the family; unlock never mints, so an idle-lock unlock cannot extend it
-        if (!Instant.now(clock).isBefore(repo.familyStartedAt(session.tenantId(), session.id()).plus(absoluteSessionHours, ChronoUnit.HOURS))) {
-            repo.revokeFamily(session.familyId(), "max_age");
+        if (!Instant.now(clock).isBefore(sessionRepo.familyStartedAt(session.tenantId(), session.id()).plus(absoluteSessionHours, ChronoUnit.HOURS))) {
+            sessionRepo.revokeFamily(session.familyId(), "max_age");
             throw AuthErrors.sessionMaxAge();
         }
 
-        Staff staff = repo.findStaffById(session.staffId()).orElseThrow(AuthErrors::invalidRefresh);
+        Staff staff = staffDir.findStaffById(session.staffId()).orElseThrow(AuthErrors::invalidRefresh);
         if (!"active".equals(staff.status())) {
             throw AuthErrors.invalidRefresh();
         }
         // PLT-005: the invariant is checked at every mint; a privileged session without MFA ends here and the next sign-in enrols.
         // Owner shadow rows are exempt: the owner account passes its own MFA before entering a clinic.
-        if (!staff.mfaEnabled() && tokens.privilegedByPolicy(staff, repo.findRole(staff.roleId()).orElseThrow(AuthErrors::invalidRefresh))
-                && !repo.isOwnerLinked(staff.id())) {
-            repo.revokeFamily(session.familyId(), "admin_revoke");
+        if (!staff.mfaEnabled() && tokens.privilegedByPolicy(staff, staffDir.findRole(staff.roleId()).orElseThrow(AuthErrors::invalidRefresh))
+                && !staffDir.isOwnerLinked(staff.id())) {
+            sessionRepo.revokeFamily(session.familyId(), "admin_revoke");
             throw AuthErrors.invalidRefresh();
         }
 
-        repo.revokeSession(session.id(), "rotated");
+        sessionRepo.revokeSession(session.id(), "rotated");
         log.debug("session refreshed for staff {} (family {})", staff.id(), session.familyId());
         return tokens.mintTokenPair(staff, session.familyId(), ip, device, userAgent);
     }
@@ -148,14 +150,14 @@ public class SessionService {
     @Transactional
     public void logout(UUID tenantId, UUID sessionId) {
         tenantContext.set(tenantId);
-        repo.revokeFamilyOf(sessionId, "logout"); // FEF-009: the whole family, so no sibling of this login survives sign-out
+        sessionRepo.revokeFamilyOf(sessionId, "logout"); // FEF-009: the whole family, so no sibling of this login survives sign-out
         log.info("staff logged out, session {}", sessionId);
     }
 
     @Transactional
     public List<SessionResponse> listSessions(UUID tenantId, UUID staffId, UUID currentSessionId) {
         tenantContext.set(tenantId);
-        return repo.listActiveSessions(staffId).stream()
+        return sessionRepo.listActiveSessions(staffId).stream()
                 .map(s -> new SessionResponse(s.id(), s.deviceLabel(), s.ipAddress(), s.lastSeenAt(), s.id().equals(currentSessionId)))
                 .toList();
     }
@@ -164,7 +166,7 @@ public class SessionService {
     @Transactional
     public void revokeSession(UUID tenantId, UUID staffId, UUID sessionId) {
         tenantContext.set(tenantId);
-        if (!repo.revokeSessionOwnedBy(staffId, sessionId, "admin_revoke")) {
+        if (!sessionRepo.revokeSessionOwnedBy(staffId, sessionId, "admin_revoke")) {
             throw ApiException.notFound();
         }
         log.info("staff {} revoked their own session {}", staffId, sessionId);

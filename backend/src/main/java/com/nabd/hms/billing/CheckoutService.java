@@ -626,5 +626,4 @@ public class CheckoutService {
     private String currencyFor(UUID tenantId) {
         return regions.region(repo.findTenantRegion(tenantId).orElse("IN")).currency();
     }
-
 }

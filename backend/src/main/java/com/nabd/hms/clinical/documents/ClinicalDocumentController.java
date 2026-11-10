@@ -1,5 +1,8 @@
 package com.nabd.hms.clinical.documents;
 
+import jakarta.validation.Valid;
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.ClinicalReadScope;
 import com.nabd.hms.clinical.FieldGrantMasker;
 import com.nabd.hms.clinical.ReadScope;
@@ -64,9 +67,9 @@ public class ClinicalDocumentController {
     @PostMapping("/visits/{queueEntryId}/documents")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public DocumentResponse create(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
-                                   @RequestBody CreateRequest req) {
-        return service.create(tenantId(jwt), staffId(jwt), queueEntryId, req);
+    public DocumentResponse create(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID queueEntryId,
+                                   @Valid @RequestBody CreateRequest req) {
+        return service.create(tenantId, staffId, queueEntryId, req);
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -81,15 +84,15 @@ public class ClinicalDocumentController {
 
     @PatchMapping("/documents/{id}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public DocumentResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody UpdateRequest req) {
-        return service.updateDraft(tenantId(jwt), id, req);
+    public DocumentResponse update(@CurrentTenant UUID tenantId, @PathVariable UUID id, @Valid @RequestBody UpdateRequest req) {
+        return service.updateDraft(tenantId, id, req);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/documents/{id}/issue")
     @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve')") // CLN-005: see PrescriptionController.sign
-    public DocumentResponse issue(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http) {
-        return service.issue(tenantId(jwt), staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), id);
+    public DocumentResponse issue(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http) {
+        return service.issue(tenantId, staffId, canApprove(jwt), RequestMeta.clientIp(http), id);
     }
 
     private static boolean canApprove(Jwt jwt) {
@@ -100,13 +103,5 @@ public class ClinicalDocumentController {
     private static DocumentResponse masked(ReadScope scope, DocumentResponse d) {
         return new DocumentResponse(d.id(), d.patientId(), d.queueEntryId(), d.doctorId(), d.type(), d.status(),
                 FieldGrantMasker.body(scope, d.body()), d.header(), d.issuedBy(), d.issuedAt(), d.createdAt(), d.updatedAt());
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

@@ -1,9 +1,10 @@
 package com.nabd.hms.auth.internal.mfa;
 
-import com.nabd.hms.auth.AuthModels.Role;
-import com.nabd.hms.auth.AuthModels.Staff;
-import com.nabd.hms.auth.AuthRepository;
-import com.nabd.hms.auth.LoginGuard;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.CredentialRepository;
+import com.nabd.hms.auth.internal.store.AuthModels.Role;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
 import com.nabd.hms.auth.TotpService;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
 import com.nabd.hms.auth.dto.MfaConfirmResponse;
@@ -41,7 +42,8 @@ public class MfaService {
 
     private static final Logger log = LoggerFactory.getLogger(MfaService.class);
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
+    private final StaffDirectoryRepository staffDir;
     private final TenantContext tenantContext;
     private final TotpService totpService;
     private final FieldCipher cipher;
@@ -51,10 +53,10 @@ public class MfaService {
     private final StepUpVerifier stepUpVerifier;
     private final TokenService tokens;
 
-    MfaService(AuthRepository repo, TenantContext tenantContext, TotpService totpService, FieldCipher cipher,
+    MfaService(CredentialRepository credentials, StaffDirectoryRepository staffDir, TenantContext tenantContext, TotpService totpService, FieldCipher cipher,
                ChallengeTokenDecoder jwtDecoder, AuditService auditService, LoginGuard guard, StepUpVerifier stepUpVerifier,
                TokenService tokens) {
-        this.repo = repo;
+        this.credentials = credentials; this.staffDir = staffDir;
         this.tenantContext = tenantContext;
         this.totpService = totpService;
         this.cipher = cipher;
@@ -81,7 +83,7 @@ public class MfaService {
         // RLS context *before* touching the tenant-scoped staff table — findStaffById alone can't
         // resolve a tenant to scope by, since staff is behind the same RLS it would need to bypass.
         tenantContext.set(UUID.fromString(challenge.getClaimAsString("tenantId")));
-        Staff staff = repo.findStaffById(UUID.fromString(challenge.getSubject())).orElseThrow(AuthErrors::mfaFailed);
+        Staff staff = staffDir.findStaffById(UUID.fromString(challenge.getSubject())).orElseThrow(AuthErrors::mfaFailed);
 
         if (staff.mfaSecretEnc() == null) {
             throw AuthErrors.mfaFailed(); // enrolled=false but flagged enabled — never silently skip the check
@@ -108,7 +110,7 @@ public class MfaService {
     public MfaEnrollResponse enrollMfa(Jwt callerJwt, String currentCode, String stepUpToken) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
-        Staff staff = repo.findStaffById(staffId).orElseThrow(ApiException::notFound);
+        Staff staff = staffDir.findStaffById(staffId).orElseThrow(ApiException::notFound);
         if (staff.mfaEnabled()) {
             if (stepUpToken != null && !stepUpToken.isBlank()) {
                 stepUpVerifier.require(stepUpToken, staffId);
@@ -126,7 +128,7 @@ public class MfaService {
         }
 
         byte[] secret = totpService.generateSecret();
-        repo.setPendingMfaSecret(staffId, cipher.encrypt(secret, TokenService.mfaAad(staff)));
+        credentials.setPendingMfaSecret(staffId, cipher.encrypt(secret, TokenService.mfaAad(staff)));
         log.info("staff {} started MFA enrollment", staffId);
         return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd", staff.email()));
     }
@@ -136,19 +138,19 @@ public class MfaService {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
         tenantContext.set(tenantId);
-        Staff staff = repo.findStaffById(staffId).orElseThrow(ApiException::notFound);
+        Staff staff = staffDir.findStaffById(staffId).orElseThrow(ApiException::notFound);
 
         guard.enforceLockout(staffId);
         if (staff.mfaPendingSecretEnc() == null || !guard.verifyTotp(staffId, cipher.tryDecrypt(staff.mfaPendingSecretEnc(), TokenService.mfaAad(staff)).orElse(null), req.code())) {
             guard.recordAttempt(tenantId, staffId, staff.email(), "totp", false);
             throw AuthErrors.mfaFailed();
         }
-        repo.confirmPendingMfa(staffId);
-        repo.revokeUnusedRecoveryCodes(staffId);
+        credentials.confirmPendingMfa(staffId);
+        credentials.revokeUnusedRecoveryCodes(staffId);
         List<String> codes = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             String code = OpaqueTokens.generate().substring(0, 10).toUpperCase(Locale.ROOT);
-            repo.insertRecoveryCode(tenantId, staffId, OpaqueTokens.sha256Hex(code));
+            credentials.insertRecoveryCode(tenantId, staffId, OpaqueTokens.sha256Hex(code));
             codes.add(code);
         }
         log.info("staff {} completed MFA enrollment, {} recovery codes issued", staffId, codes.size());
@@ -168,19 +170,19 @@ public class MfaService {
             throw AuthErrors.challengeInvalid();
         }
         tenantContext.set(UUID.fromString(challenge.getClaimAsString("tenantId")));
-        Staff staff = repo.findStaffById(UUID.fromString(challenge.getSubject())).orElseThrow(AuthErrors::challengeInvalid);
+        Staff staff = staffDir.findStaffById(UUID.fromString(challenge.getSubject())).orElseThrow(AuthErrors::challengeInvalid);
         guard.enforceLockout(staff.id());
         String hash = OpaqueTokens.sha256Hex(req.recoveryCode().trim().toUpperCase(Locale.ROOT));
-        if (!repo.consumeRecoveryCode(staff.id(), hash)) {
+        if (!credentials.consumeRecoveryCode(staff.id(), hash)) {
             guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "recovery", false);
             throw new ApiException(HttpStatus.UNAUTHORIZED, "recovery-code-invalid", "Recovery code invalid",
                     "That recovery code is not valid.");
         }
         guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "recovery", true);
-        String roleName = repo.findRole(staff.roleId()).map(Role::name).orElse("Staff");
+        String roleName = staffDir.findRole(staff.roleId()).map(Role::name).orElse("Staff");
         auditService.record(staff.tenantId(), "staff", staff.id(), staff.name(), roleName, ip,
                 "auth.recovery_code_used", "staff", staff.id(), null, null);
         TokenPairResponse t = tokens.mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
-        return new RecoveryVerifyResponse(t.accessToken(), t.refreshToken(), t.expiresIn(), repo.countLiveRecoveryCodes(staff.id()));
+        return new RecoveryVerifyResponse(t.accessToken(), t.refreshToken(), t.expiresIn(), credentials.countLiveRecoveryCodes(staff.id()));
     }
 }

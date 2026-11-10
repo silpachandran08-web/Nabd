@@ -1,5 +1,7 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
@@ -11,8 +13,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,78 +43,70 @@ public class QueueController {
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/doctors/{doctorId}/call-next")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public com.nabd.hms.queue.dto.CallNextResponse callNext(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID doctorId,
-                                                            @RequestBody(required = false) com.nabd.hms.queue.dto.CallNextRequest req) {
-        return callOrder.callNext(staffId(jwt), doctorId, req == null ? null : req.expectedHeadId());
+    public com.nabd.hms.queue.dto.CallNextResponse callNext(@CurrentStaff UUID staffId, @PathVariable UUID doctorId,
+                                                            @Valid @RequestBody(required = false) com.nabd.hms.queue.dto.CallNextRequest req) {
+        return callOrder.callNext(staffId, doctorId, req == null ? null : req.expectedHeadId());
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/check-in")
     @PreAuthorize("hasAuthority('queue:create')")
-    public ResponseEntity<QueueEntryResponse> checkIn(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckInRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(callOrder.checkInAnnotated(tenantId(jwt), staffId(jwt), req));
+    public ResponseEntity<QueueEntryResponse> checkIn(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody CheckInRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(callOrder.checkInAnnotated(tenantId, staffId, req));
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('queue:view')")
-    public List<QueueEntryResponse> list(@AuthenticationPrincipal Jwt jwt,
+    public List<QueueEntryResponse> list(@CurrentTenant UUID tenantId,
                                           @RequestParam(required = false) UUID doctorId,
                                           @RequestParam(required = false) UUID departmentId,
                                           @RequestParam(required = false) LocalDate date,
                                           @RequestParam(defaultValue = "false") boolean priority) {
-        var rows = service.list(tenantId(jwt), doctorId, departmentId, date, priority);
+        var rows = service.list(tenantId, doctorId, departmentId, date, priority);
         return priority ? rows : callOrder.annotate(rows); // ACC-012: position and why-here per doctor and day
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public QueueEntryResponse updateStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public QueueEntryResponse updateStatus(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                             @Valid @RequestBody QueueStatusUpdateRequest req) {
-        return service.updateStatus(tenantId(jwt), staffId(jwt), id, req);
+        return service.updateStatus(tenantId, staffId, id, req);
     }
 
     @PostMapping("/{id}/transfer")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public TransferResponse transfer(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public TransferResponse transfer(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                       @Valid @RequestBody TransferRequest req) {
-        return service.transfer(tenantId(jwt), staffId(jwt), id, req);
+        return service.transfer(tenantId, staffId, id, req);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/{id}/extend")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public com.nabd.hms.queue.dto.ConsultExtendResponse extend(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public com.nabd.hms.queue.dto.ConsultExtendResponse extend(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                                          @Valid @RequestBody com.nabd.hms.queue.dto.ConsultExtendRequest req) {
         if (!java.util.Set.of(5, 10, 15).contains(req.minutes())) {
             throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "invalid-extension", "Invalid extension", "Minutes must be 5, 10 or 15.");
         }
-        return service.extend(tenantId(jwt), staffId(jwt), id, req.minutes());
+        return service.extend(tenantId, staffId, id, req.minutes());
     }
 
     @PostMapping("/{id}/reorder")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public QueueEntryResponse reorder(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public QueueEntryResponse reorder(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id,
                                        @Valid @RequestBody QueueReorderRequest req) {
-        return service.reorder(tenantId(jwt), staffId(jwt), id, req);
+        return service.reorder(tenantId, staffId, id, req);
     }
 
     @PostMapping("/{id}/priority/acknowledge")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public QueueEntryResponse acknowledgePriority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.acknowledgePriority(tenantId(jwt), staffId(jwt), id);
+    public QueueEntryResponse acknowledgePriority(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        return service.acknowledgePriority(tenantId, staffId, id);
     }
 
     @GetMapping("/wait-estimate")
     @PreAuthorize("hasAuthority('queue:view')")
-    public WaitEstimateResponse waitEstimate(@AuthenticationPrincipal Jwt jwt, @RequestParam UUID doctorId) {
-        return service.waitEstimate(tenantId(jwt), doctorId);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    public WaitEstimateResponse waitEstimate(@CurrentTenant UUID tenantId, @RequestParam UUID doctorId) {
+        return service.waitEstimate(tenantId, doctorId);
     }
 }

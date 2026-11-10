@@ -380,5 +380,4 @@ public class PharmacyService {
         out.put("scheduleClass", cls);
         return out;
     }
-
 }

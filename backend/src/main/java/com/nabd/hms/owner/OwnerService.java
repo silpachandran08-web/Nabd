@@ -369,7 +369,6 @@ public class OwnerService {
                 "Too many failed attempts. Try again later.");
     }
 
-
     private ApiException inviteInvalid() {
         return new ApiException(HttpStatus.BAD_REQUEST, "invite-invalid", "Invite invalid",
                 "This invite link is invalid or has expired.");

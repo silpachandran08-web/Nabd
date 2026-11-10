@@ -1,5 +1,7 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import com.nabd.hms.reports.dto.MoneyResponse;
@@ -18,8 +20,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,94 +41,86 @@ public class ReportsController {
 
     @GetMapping("/overview")
     @PreAuthorize("hasAuthority('reports:view')")
-    public OverviewResponse overview(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return service.overview(tenantId(jwt), from, to);
+    public OverviewResponse overview(@CurrentTenant UUID tenantId, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.overview(tenantId, from, to);
     }
 
     @GetMapping("/daily-money")
     @PreAuthorize("hasAuthority('reports:view')")
-    public DailyMoneyResponse dailyMoney(@AuthenticationPrincipal Jwt jwt) {
-        return service.dailyMoney(tenantId(jwt));
+    public DailyMoneyResponse dailyMoney(@CurrentTenant UUID tenantId) {
+        return service.dailyMoney(tenantId);
     }
 
     /** Reports → Today's money. from/to are clinic days, inclusive; both default to today. */
     @GetMapping("/money")
     @PreAuthorize("hasAuthority('reports:view')")
-    public MoneyResponse money(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        UUID tenantId = tenantId(jwt);
+    public MoneyResponse money(@CurrentTenant UUID callerTenantId, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        UUID tenantId = callerTenantId;
         return service.money(tenantId, service.range(tenantId, 0, from, to));
     }
 
     /** from/to (clinic days, inclusive) win over days; days alone keeps the old "last N days" window. */
     @GetMapping("/sources")
     @PreAuthorize("hasAuthority('reports:view')")
-    public List<SourceBreakdownResponse> sources(@AuthenticationPrincipal Jwt jwt,
+    public List<SourceBreakdownResponse> sources(@CurrentTenant UUID callerTenantId,
                                                    @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        UUID tenantId = tenantId(jwt);
+        UUID tenantId = callerTenantId;
         return service.sourceBreakdown(tenantId, service.range(tenantId, days, from, to));
     }
 
     /** OWN-026 Packages tab. Same period rules as /sources. */
     @GetMapping("/packages")
     @PreAuthorize("hasAuthority('reports:view')")
-    public PackagesReportResponse packages(@AuthenticationPrincipal Jwt jwt,
+    public PackagesReportResponse packages(@CurrentTenant UUID callerTenantId,
                                            @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        UUID tenantId = tenantId(jwt);
+        UUID tenantId = callerTenantId;
         return service.packages(tenantId, service.range(tenantId, days, from, to));
     }
 
     @GetMapping("/staff-performance")
     @PreAuthorize("hasAuthority('reports:view')")
-    public StaffPerformanceReport staffPerformance(@AuthenticationPrincipal Jwt jwt,
+    public StaffPerformanceReport staffPerformance(@CurrentTenant UUID callerTenantId, @CurrentStaff UUID staffId,
                                                     @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        UUID tenantId = tenantId(jwt);
-        return service.staffPerformanceReport(tenantId, staffId(jwt), service.range(tenantId, days, from, to));
+        UUID tenantId = callerTenantId;
+        return service.staffPerformanceReport(tenantId, staffId, service.range(tenantId, days, from, to));
     }
 
     @GetMapping("/billing-leakage")
     @PreAuthorize("hasAuthority('reports:view')")
-    public BillingLeakageResponse billingLeakage(@AuthenticationPrincipal Jwt jwt,
+    public BillingLeakageResponse billingLeakage(@CurrentTenant UUID tenantId,
                                                   @RequestParam(defaultValue = "0") BigDecimal thresholdAmount) {
-        return service.billingLeakage(tenantId(jwt), thresholdAmount);
+        return service.billingLeakage(tenantId, thresholdAmount);
     }
 
     @GetMapping("/doctor-punctuality")
     @PreAuthorize("hasAuthority('reports:view')")
-    public DoctorPunctualityResponse doctorPunctuality(@AuthenticationPrincipal Jwt jwt) {
-        return service.doctorPunctuality(tenantId(jwt));
+    public DoctorPunctualityResponse doctorPunctuality(@CurrentTenant UUID tenantId) {
+        return service.doctorPunctuality(tenantId);
     }
 
     @GetMapping("/retention")
     @PreAuthorize("hasAuthority('reports:view')")
-    public RetentionResponse retention(@AuthenticationPrincipal Jwt jwt) {
-        return service.retention(tenantId(jwt));
+    public RetentionResponse retention(@CurrentTenant UUID tenantId) {
+        return service.retention(tenantId);
     }
 
     @GetMapping("/no-show-risk")
     @PreAuthorize("hasAuthority('reports:view')")
-    public NoShowRiskResponse noShowRisk(@AuthenticationPrincipal Jwt jwt) {
-        return service.noShowRisk(tenantId(jwt));
+    public NoShowRiskResponse noShowRisk(@CurrentTenant UUID tenantId) {
+        return service.noShowRisk(tenantId);
     }
 
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('reports:export')")
-    public ResponseEntity<String> export(@AuthenticationPrincipal Jwt jwt, @RequestParam String reportType,
+    public ResponseEntity<String> export(@CurrentTenant UUID callerTenantId, @CurrentStaff UUID staffId, @RequestParam String reportType,
                                           @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                           HttpServletRequest http) {
-        UUID tenantId = tenantId(jwt);
-        String csv = service.exportCsv(tenantId, staffId(jwt), RequestMeta.clientIp(http), reportType,
+        UUID tenantId = callerTenantId;
+        String csv = service.exportCsv(tenantId, staffId, RequestMeta.clientIp(http), reportType,
                 service.range(tenantId, days, from, to));
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("text/csv"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + reportType + ".csv\"")
                 .body(csv);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

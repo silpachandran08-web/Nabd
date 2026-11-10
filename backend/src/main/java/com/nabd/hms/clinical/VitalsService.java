@@ -204,5 +204,4 @@ public class VitalsService {
     private static int ageInYears(LocalDate dob, LocalDate today) {
         return Period.between(dob, today).getYears();
     }
-
 }

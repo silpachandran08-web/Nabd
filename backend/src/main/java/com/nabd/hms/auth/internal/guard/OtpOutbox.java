@@ -1,4 +1,4 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.guard;
 
 import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.EventPublisher;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @Component
 public class OtpOutbox {
 
-    static final String EVENT_TYPE = "iam.otp.requested.v1";
+    public static final String EVENT_TYPE = "iam.otp.requested.v1";
 
     private final JdbcTemplate jdbc;
     private final FieldCipher cipher;
@@ -42,7 +42,7 @@ public class OtpOutbox {
         return id;
     }
 
-    static FieldCipher.Aad aad(UUID tenantId, UUID otpRequestId) {
+    public static FieldCipher.Aad aad(UUID tenantId, UUID otpRequestId) {
         return FieldCipher.Aad.of(tenantId, "otp_requests", "code_enc", otpRequestId);
     }
 }

@@ -1,4 +1,4 @@
-package com.nabd.hms.auth;
+package com.nabd.hms.auth.internal.breakglass;
 
 import java.util.List;
 
@@ -9,7 +9,7 @@ public final class BreakGlassPolicy {
 
     /** Added to the caller's own grants. No create/edit/delete/approve/staff: break-glass is never Owner rights. */
     public static final List<String> BREAK_GLASS_GRANTS = List.of("clinical:view", "patients:view");
-    static final int MINUTES = 30;
-    static final String ACTIVATED_EVENT = "iam.break_glass.activated.v1";
-    static final String OWNER_WHATSAPP_EVENT = "iam.break_glass.owner_whatsapp.v1";
+    public static final int MINUTES = 30;
+    public static final String ACTIVATED_EVENT = "iam.break_glass.activated.v1";
+    public static final String OWNER_WHATSAPP_EVENT = "iam.break_glass.owner_whatsapp.v1";
 }

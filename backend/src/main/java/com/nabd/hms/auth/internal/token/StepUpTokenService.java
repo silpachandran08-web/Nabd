@@ -1,8 +1,9 @@
 package com.nabd.hms.auth.internal.token;
 
-import com.nabd.hms.auth.AuthModels.Staff;
-import com.nabd.hms.auth.AuthRepository;
-import com.nabd.hms.auth.LoginGuard;
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.CredentialRepository;
+import com.nabd.hms.auth.internal.store.AuthModels.Staff;
+import com.nabd.hms.auth.internal.guard.LoginGuard;
 import com.nabd.hms.auth.dto.StepUpTokenResponse;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.FieldCipher;
@@ -30,7 +31,8 @@ public class StepUpTokenService {
 
     private static final Logger log = LoggerFactory.getLogger(StepUpTokenService.class);
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
+    private final StaffDirectoryRepository staffDir;
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final FieldCipher cipher;
@@ -38,9 +40,9 @@ public class StepUpTokenService {
     private final LoginGuard guard;
     private final Clock clock;
 
-    StepUpTokenService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder, FieldCipher cipher,
+    StepUpTokenService(CredentialRepository credentials, StaffDirectoryRepository staffDir, TenantContext tenantContext, PasswordEncoder pinEncoder, FieldCipher cipher,
                        JwtEncoder jwtEncoder, LoginGuard guard, Clock clock) {
-        this.repo = repo;
+        this.credentials = credentials; this.staffDir = staffDir;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.cipher = cipher;
@@ -58,7 +60,7 @@ public class StepUpTokenService {
     public StepUpTokenResponse issueStepUpToken(Jwt callerJwt, String code, String target) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
-        Staff staff = repo.findStaffById(staffId).orElseThrow(AuthErrors::mfaFailed);
+        Staff staff = staffDir.findStaffById(staffId).orElseThrow(AuthErrors::mfaFailed);
 
         if (staff.mfaSecretEnc() == null) {
             throw AuthErrors.mfaFailed();
@@ -102,9 +104,9 @@ public class StepUpTokenService {
     public StepUpTokenResponse issuePinAssertion(Jwt callerJwt, String pin, UUID approvalId) {
         UUID caller = UUID.fromString(callerJwt.getSubject());
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
-        guard.enforceLockout(repo.countFailedPinAssertionsSinceLastSuccess(caller), repo.lastFailedPinAssertionAt(caller), caller);
-        Staff owner = repo.findActiveOwners().stream().filter(o -> o.pinHash() != null && pinEncoder.matches(pin, o.pinHash())).findFirst().orElse(null);
-        repo.recordPinAssertionAttempt(tenantId, caller, owner != null);
+        guard.enforceLockout(credentials.countFailedPinAssertionsSinceLastSuccess(caller), credentials.lastFailedPinAssertionAt(caller), caller);
+        Staff owner = staffDir.findActiveOwners().stream().filter(o -> o.pinHash() != null && pinEncoder.matches(pin, o.pinHash())).findFirst().orElse(null);
+        credentials.recordPinAssertionAttempt(tenantId, caller, owner != null);
         if (owner == null) {
             throw new ApiException(HttpStatus.FORBIDDEN, "pin-invalid", "PIN not accepted", "No owner PIN matched.", java.util.Map.of("code", "PIN_INVALID"));
         }

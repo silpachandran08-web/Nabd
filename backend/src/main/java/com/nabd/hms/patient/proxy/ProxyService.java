@@ -420,7 +420,6 @@ class ProxyService implements ProxyAccess {
         return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, slug, title, detail, Map.of("code", slug));
     }
 
-
     private static ApiException notAProxy() { // unknown and foreign references answer alike: nothing to probe
         return new ApiException(HttpStatus.FORBIDDEN, "not-a-proxy", "Not allowed", "You do not act for that family member.", Map.of("code", "not-a-proxy"));
     }
