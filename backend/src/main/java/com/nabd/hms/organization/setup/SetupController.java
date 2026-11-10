@@ -8,7 +8,6 @@ import com.nabd.hms.organization.setup.dto.ClinicProfileResponse;
 import com.nabd.hms.organization.setup.dto.ClinicProfileWriteRequest;
 import com.nabd.hms.organization.setup.dto.ConsentContactResponse;
 import com.nabd.hms.organization.setup.dto.ConsentContactWriteRequest;
-import com.nabd.hms.organization.setup.dto.ExportJobRequest;
 import com.nabd.hms.organization.setup.dto.ExportJobResponse;
 import com.nabd.hms.organization.setup.dto.ImportJobRequest;
 import com.nabd.hms.organization.setup.dto.ImportJobResponse;
@@ -227,12 +226,7 @@ public class SetupController {
         return service.listExportJobs(tenantId(jwt));
     }
 
-    @PostMapping("/export-jobs")
-    @PreAuthorize("hasAuthority('setup:view')")
-    public ResponseEntity<ExportJobResponse> createExportJob(@AuthenticationPrincipal Jwt jwt,
-                                                              @Valid @RequestBody ExportJobRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addExportJob(tenantId(jwt), staffId(jwt), req));
-    }
+    // ADM-015: POST /export-jobs (start a full export) and GET /export-jobs/{id} live in organization.export.DataExportController
 
     // ── Licence registry ──
 

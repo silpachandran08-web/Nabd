@@ -4,6 +4,8 @@ import styles from "../setup.module.css";
 import PatientImport from "../../../components/setup/PatientImport";
 import { can } from "../../../lib/permissions";
 import { SetupTabBody, useSetupTab } from "../setupTab";
+import { useState } from "react";
+import ExportDrawer from "../../../components/setup/ExportDrawer";
 
 type ImportJob = { id: string; importType: string; fileName: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
@@ -11,9 +13,7 @@ type ExportJob = { id: string; exportType: string; status: string; resultUrl: st
 export default function DataTab() {
   const tab = useSetupTab<{ importJobs: ImportJob[]; exportJobs: ExportJob[] }>({ importJobs: "/setup/import-jobs", exportJobs: "/setup/export-jobs" }, { importJobs: [], exportJobs: [] });
   const { importJobs, exportJobs } = tab.data;
-  const createExport = async (exportType: string) => {
-    if (await tab.post("/setup/export-jobs", { exportType })) tab.loadAll();
-  };
+  const [exporting, setExporting] = useState(false); // ADM-015 drawer; the job itself runs on the server
   return (
     <SetupTabBody tab={tab}>
       <div className={styles.card}>
@@ -24,12 +24,15 @@ export default function DataTab() {
             <PatientImport />
           </div>
         )}
-        <div className={styles.row}>
-          <div className={styles.field}>
-            <label className={styles.label}>Export full tenant</label>
-            <button className={styles.btnPrimary} onClick={() => createExport("full_tenant")}>Start export job</button>
+        {can("setup:export") && (
+          <div className={styles.row}>
+            <div className={styles.field}>
+              <label className={styles.label}>Export all clinic data (Excel, CSV, FHIR R4 or PDF per patient)</label>
+              <button type="button" className={styles.btnPrimary} onClick={() => setExporting(true)}>Export data</button>
+            </div>
           </div>
-        </div>
+        )}
+        {exporting && <ExportDrawer onClose={() => { setExporting(false); tab.loadAll(); }} onStarted={() => tab.loadAll()} />}
         <h3 className={styles.cardTitle}>Recent import jobs</h3>
         <div className={styles.tableWrap}>
           <table className={styles.table}>

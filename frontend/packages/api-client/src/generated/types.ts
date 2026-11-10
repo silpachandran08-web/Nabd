@@ -147,8 +147,11 @@ export type DailySummaryPreviewResponse = { date?: string; params?: Array<string
 export type DailySummaryRecipient = { staffId?: string; };
 export type DailySummarySettingsRequest = { combined?: boolean; enabled?: boolean; recipients: Array<DailySummaryRecipient>; sendAt?: string; };
 export type DailySummarySettingsResponse = { branches?: number; candidates?: Array<DailySummaryCandidate>; combined?: boolean; enabled?: boolean; recipients?: Array<DailySummaryRecipient>; sendAt?: string; };
+export type DataExportDownloadRequest = { otp: string; };
+export type DataExportRequest = { branchIds?: Array<string>; datasets?: Array<string>; format: string; scope?: string; };
 export type DataQualityItem = { displayName?: string; patientId?: string; rawPhone?: string; };
 export type DataQualityPage = { items?: Array<DataQualityItem>; nextCursor?: string; };
+export type DatasetProgress = { name?: string; rows?: number; status?: string; };
 export type Day = { date?: string; holiday?: string; sessions?: Array<SessionCount>; };
 export type DayClose = { closed?: boolean; pendingCheckouts?: number; unbilledConsultations?: number; };
 export type DayCloseHistoryItem = { action?: string; actorName?: string; at?: string; countedCash?: number; date?: string; expectedCash?: number; id?: string; note?: string; variance?: number; };
@@ -232,7 +235,6 @@ export type EtaItem = { appointmentId?: string; p50At?: string; p80At?: string; 
 export type EtaResponse = { items?: Array<EtaItem>; v?: number; };
 export type ExpiredWithValue = { expiredOn?: string; instanceId?: string; packageName?: string; patientName?: string; remainingValue?: number; };
 export type ExpiringSoonResponse = { alertTier?: number; expiresOn?: string; instanceId?: string; packageName?: string; patientName?: string; quantityConsumed?: number; quantityTotal?: number; reminderSentForTier?: boolean; valueLeft?: number; };
-export type ExportJobRequest = { exportType: string; };
 export type ExportJobResponse = { createdAt?: string; errorMessage?: string; exportType?: string; id?: string; resultUrl?: string; status?: string; };
 export type ExtendRequest = { newValidityEnd: string; reason: string; };
 export type FacilityCheckInConfig = { checkinCode?: string; geofenceRadiusM?: number; geofenceRequired?: boolean; lat?: number; lng?: number; walkinAllowed?: boolean; whatsappNumber?: string; };
@@ -318,6 +320,7 @@ export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern:
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
 export type InvoiceSeriesResponse = { fiscalYear?: string; fyStartMonth?: number; id?: string; kind?: string; nextNumber?: number; pad?: number; prefix?: string; prefixPattern?: string; taxRegistrationId?: string; };
 export type Item = { classId?: string; lang?: string; matchKind?: string; value?: string; };
+export type Job = { archiveSha256?: string; bytes?: number; completedAt?: string; createdAt?: string; datasets?: Array<DatasetProgress>; format?: string; id?: string; linkExpiresAt?: string; linkSent?: boolean; status?: string; };
 export type JsonNode = Record<string, unknown>;
 export type Keys = { keyId?: string; keySecret?: string; };
 export type KillRequest = { active?: boolean; reason: string; };
@@ -339,6 +342,7 @@ export type LineItemRequest = { category?: string; chargeCode: string; chargeNam
 export type LineItemResponse = { category?: string; chargeCode?: string; chargeName?: string; id?: string; lineTotal?: number; listUnitPrice?: number; overrideReason?: string; quantity?: number; taxRatePercent?: number; taxableMinor?: number; taxes?: Array<TaxPart>; tier?: string; unitPrice?: number; };
 export type LinkOpenItem = { at?: string; deviceFamily?: string; id?: number; ip?: string; linkId?: string; outcome?: string; patientId?: string; resourceId?: string; resourceType?: string; };
 export type LinkOpensResponse = { items?: Array<LinkOpenItem>; };
+export type LinkView = { clinicName?: string; downloadsLeft?: number; expiresAt?: string; };
 export type LoginRequest = { email: string; pin: string; tenantSlug: string; };
 export type MeEntitlements = { killedFeatures?: Array<string>; modules?: Array<ModuleState>; seatLimit?: number; };
 export type Member = { age?: number; displayName?: string; guardianId?: string; lastVisitAt?: string; patientId?: string; relation?: string; sex?: string; };
@@ -587,6 +591,7 @@ export type StaffShiftWriteRequest = { effectiveFrom: string; effectiveTo?: stri
 export type StaffSummary = { active?: number; invited?: number; roles?: number; suspended?: number; };
 export type StaffSummaryResponse = { id?: string; name?: string; roleName?: string; };
 export type StartRequest = { clinicName?: string; consentToContact?: boolean; market?: string; mobile?: string; specialty?: string; };
+export type Started = { estimateMinutes?: number; id?: string; status?: string; };
 export type StepUpTokenResponse = { expiresIn?: number; stepUpToken?: string; };
 export type StockAdjustmentLine = { batchId?: string; delta?: number; itemId?: string; qtyAfter?: number; qtyBefore?: number; reasonCode?: string; };
 export type StockBatch = { batchId?: string; batchNo?: string; expiryDate?: string; expiryUnknown?: boolean; location?: string; mrp?: number; purchaseRate?: number; qtyOnHand?: number; status?: string; };
@@ -1076,6 +1081,9 @@ export type Operations = {
   ProxyInviteController_view: { method: "get"; path: "/v1/proxy-invites/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: InviteView };
   ProxyInviteController_accept: { method: "post"; path: "/v1/proxy-invites/{token}/accept"; permission: "public"; pathParams: { token: string; }; query: never; body: ProxyInviteAcceptRequest; response: ProxyInviteAccepted };
   ProxyInviteController_otp: { method: "post"; path: "/v1/proxy-invites/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
+  DataExportController_view: { method: "get"; path: "/v1/public/exports/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: LinkView };
+  DataExportController_download: { method: "post"; path: "/v1/public/exports/{token}/download"; permission: "public"; pathParams: { token: string; }; query: never; body: DataExportDownloadRequest; response: string };
+  DataExportController_otp: { method: "post"; path: "/v1/public/exports/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
   PublicSecureLinkController_open: { method: "post"; path: "/v1/public/links/{token}/open"; permission: "public"; pathParams: { token: string; }; query: never; body: SecureLinkOpenRequest; response: SecureLinkOpenResponse };
   PublicSecureLinkController_otp: { method: "post"; path: "/v1/public/links/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: void };
   PublicNoticeController_page: { method: "get"; path: "/v1/public/notices/{tenantSlug}/{version}"; permission: "public"; pathParams: { tenantSlug: string; version: string; }; query: { lang?: string; }; body: never; response: string };
@@ -1155,7 +1163,8 @@ export type Operations = {
   DpaController_pdf: { method: "get"; path: "/v1/setup/dpa/acceptances/{id}/pdf"; permission: "setup:view"; pathParams: { id: string; }; query: never; body: never; response: string };
   DpaController_requestOtp: { method: "post"; path: "/v1/setup/dpa/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };
   SetupController_exportJobs: { method: "get"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ExportJobResponse> };
-  SetupController_createExportJob: { method: "post"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: ExportJobRequest; response: ExportJobResponse };
+  DataExportController_start: { method: "post"; path: "/v1/setup/export-jobs"; permission: "setup:export"; pathParams: never; query: never; body: DataExportRequest; response: Started };
+  DataExportController_get: { method: "get"; path: "/v1/setup/export-jobs/{id}"; permission: "setup:export"; pathParams: { id: string; }; query: never; body: never; response: Job };
   GoLiveController_goLive: { method: "post"; path: "/v1/setup/go-live"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: GoLiveResponse };
   GoLiveController_checks: { method: "get"; path: "/v1/setup/go-live/checks"; permission: "setup:view"; pathParams: never; query: never; body: never; response: GoLiveChecksResponse };
   GoLiveController_poster: { method: "get"; path: "/v1/setup/go-live/poster"; permission: "setup:view"; pathParams: never; query: never; body: never; response: string };
@@ -1274,6 +1283,7 @@ export type Permission =
   | "reports:view"
   | "safety_content:edit"
   | "setup:edit"
+  | "setup:export"
   | "setup:view"
   | "specialty_dental:edit"
   | "specialty_dental:view"

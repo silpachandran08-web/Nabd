@@ -497,6 +497,30 @@ schemas:
       requested_by: operational
       created_at: operational
       updated_at: operational
+      datasets: operational
+      format: operational
+      progress: operational
+      manifest: operational  # row counts and checksums only
+      object_key: operational
+      link_id: operational
+      bytes: operational
+      step_up_id: operational
+      started_at: operational
+      completed_at: operational
+    data_export_links:
+      id: operational
+      tenant_id: operational
+      job_id: operational
+      token_hash: pii
+      recipient_staff_id: operational
+      expires_at: operational
+      max_downloads: operational
+      downloads: operational
+      otp_hash: pii
+      otp_expires_at: operational
+      otp_attempts: operational
+      otp_challenge_id: operational
+      created_at: operational
     data_import_jobs:
       upload_id: operational
       mapping: operational

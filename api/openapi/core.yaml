@@ -15207,6 +15207,90 @@ paths:
       tags:
       - patient
       x-required-permission: public
+  /v1/public/exports/{token}:
+    get:
+      operationId: DataExportController_view
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LinkView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: public
+  /v1/public/exports/{token}/download:
+    post:
+      operationId: DataExportController_download
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataExportDownloadRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: public
+  /v1/public/exports/{token}/otp:
+    post:
+      operationId: DataExportController_otp
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+          description: Accepted
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: public
   /v1/public/links/{token}/open:
     post:
       operationId: PublicSecureLinkController_open
@@ -18267,19 +18351,63 @@ paths:
       - organization
       x-required-permission: setup:view
     post:
-      operationId: SetupController_createExportJob
+      operationId: DataExportController_start
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ExportJobRequest"
+              $ref: "#/components/schemas/DataExportRequest"
         required: true
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Started"
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:export
+  /v1/setup/export-jobs/{id}:
+    get:
+      operationId: DataExportController_get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         "200":
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ExportJobResponse"
+                $ref: "#/components/schemas/Job"
           description: OK
         "401":
           content:
@@ -18301,7 +18429,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - organization
-      x-required-permission: setup:view
+      x-required-permission: setup:export
   /v1/setup/go-live:
     post:
       operationId: GoLiveController_goLive
@@ -23159,6 +23287,41 @@ components:
             $ref: "#/components/schemas/DailySummaryRecipient"
         sendAt:
           type: string
+    DataExportDownloadRequest:
+      type: object
+      properties:
+        otp:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{6}$"
+      required:
+      - otp
+    DataExportRequest:
+      type: object
+      properties:
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 20
+          minItems: 0
+        datasets:
+          type: array
+          items:
+            type: string
+            pattern: "[a-z_]{2,20}"
+          maxItems: 20
+          minItems: 0
+        format:
+          type: string
+          minLength: 1
+          pattern: xlsx|csv|fhir_ndjson|pdf_per_patient
+        scope:
+          type: string
+          pattern: full_tenant
+      required:
+      - format
     DataQualityItem:
       type: object
       properties:
@@ -23177,6 +23340,16 @@ components:
           items:
             $ref: "#/components/schemas/DataQualityItem"
         nextCursor:
+          type: string
+    DatasetProgress:
+      type: object
+      properties:
+        name:
+          type: string
+        rows:
+          type: integer
+          format: int64
+        status:
           type: string
     Day:
       type: object
@@ -24563,15 +24736,6 @@ components:
           type: boolean
         valueLeft:
           type: number
-    ExportJobRequest:
-      type: object
-      properties:
-        exportType:
-          type: string
-          minLength: 1
-          pattern: full_tenant|patients|invoices|charges
-      required:
-      - exportType
     ExportJobResponse:
       type: object
       properties:
@@ -25919,6 +26083,36 @@ components:
           type: string
         value:
           type: string
+    Job:
+      type: object
+      properties:
+        archiveSha256:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+        completedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        datasets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatasetProgress"
+        format:
+          type: string
+        id:
+          type: string
+          format: uuid
+        linkExpiresAt:
+          type: string
+          format: date-time
+        linkSent:
+          type: boolean
+        status:
+          type: string
     JsonNode:
       type: object
     Keys:
@@ -26310,6 +26504,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LinkOpenItem"
+    LinkView:
+      type: object
+      properties:
+        clinicName:
+          type: string
+        downloadsLeft:
+          type: integer
+          format: int32
+        expiresAt:
+          type: string
+          format: date-time
     LoginRequest:
       type: object
       properties:
@@ -30578,6 +30783,17 @@ components:
         mobile:
           type: string
         specialty:
+          type: string
+    Started:
+      type: object
+      properties:
+        estimateMinutes:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        status:
           type: string
     StepUpTokenResponse:
       type: object

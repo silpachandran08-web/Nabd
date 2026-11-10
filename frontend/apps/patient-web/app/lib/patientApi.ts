@@ -24,6 +24,8 @@ export type ProxyScope = "BOOK_ONLY" | "BOOK_AND_RECORDS" | "FULL";
 /** IDC-012: GET {base}/me/profile-claims/{token} (public; the OTP goes to the young adult's own number). */
 export type ProfileClaim = { clinicName: string; firstName: string; guardianFirstName: string; opensOn: string; expiresAt: string; ownPhone: boolean };
 export type KeepScope = "NONE" | "BOOK_ONLY" | "BOOK_AND_RECORDS";
+/** ADM-015: GET {base}/public/exports/{token} (the owner's data export link; every download needs an OTP to the owner's mobile). */
+export type ExportLink = { clinicName: string; expiresAt: string; downloadsLeft: number };
 export type Booking = { doctorName: string; clinicName: string; address?: string | null; startsAt: string; timeZone: string; status: "confirmed" | "held" | "cancelled" };
 export type Resolved =
   | { kind: "document"; contentType: string; fileName?: string | null }
@@ -89,6 +91,10 @@ export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
   profileClaimOtp: async (token: string): Promise<void> => { await call(f, `/me/profile-claims/${enc(token)}/otp`, { method: "POST" }); },
   claimProfile: async (token: string, otp: string, keepGuardianScope: KeepScope): Promise<{ claimed: boolean; keptScope: KeepScope }> =>
     (await call(f, `/me/profile-claims/${enc(token)}`, { method: "POST", body: JSON.stringify({ otp, keepGuardianScope }) })).json(),
+  exportLink: async (token: string): Promise<ExportLink> => (await call(f, `/public/exports/${enc(token)}`)).json(),
+  exportOtp: async (token: string): Promise<void> => { await call(f, `/public/exports/${enc(token)}/otp`, { method: "POST" }); },
+  exportDownload: async (token: string, otp: string): Promise<Blob> =>
+    (await call(f, `/public/exports/${enc(token)}/download`, { method: "POST", body: JSON.stringify({ otp }) })).blob(),
   decide: async (consentId: string, token: string, decision: "approve" | "decline", artefactHash: string, key: string): Promise<{ status: string }> =>
     (await call(f, `/exchange/consents/${enc(consentId)}/patient-decision`, { method: "POST", token, idempotencyKey: key, body: JSON.stringify({ decision, artefactHash }) })).json(),
 });

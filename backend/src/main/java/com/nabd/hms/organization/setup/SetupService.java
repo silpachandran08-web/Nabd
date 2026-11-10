@@ -11,7 +11,6 @@ import com.nabd.hms.organization.setup.dto.ClinicProfileResponse;
 import com.nabd.hms.organization.setup.dto.ClinicProfileWriteRequest;
 import com.nabd.hms.organization.setup.dto.ConsentContactResponse;
 import com.nabd.hms.organization.setup.dto.ConsentContactWriteRequest;
-import com.nabd.hms.organization.setup.dto.ExportJobRequest;
 import com.nabd.hms.organization.setup.dto.ExportJobResponse;
 import com.nabd.hms.organization.setup.dto.ImportJobRequest;
 import com.nabd.hms.organization.setup.dto.ImportJobResponse;
@@ -330,14 +329,6 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     public List<ExportJobResponse> listExportJobs(UUID tenantId) {
         tenantContext.set(tenantId);
         return repo.listExportJobs(tenantId).stream().map(this::toExportResponse).toList();
-    }
-
-    @Transactional
-    public ExportJobResponse addExportJob(UUID tenantId, UUID callerStaffId, ExportJobRequest req) {
-        tenantContext.set(tenantId);
-        UUID id = repo.insertExportJob(tenantId, callerStaffId, req.exportType());
-        log.info("export job {} created for tenant {} by {}", id, tenantId, callerStaffId);
-        return new ExportJobResponse(id.toString(), req.exportType(), "pending", null, null, null);
     }
 
     /** ADM-032: the register, soonest expiry first; kind (licence type) and status narrow it. */

@@ -190,6 +190,7 @@ super_admin,GET /v1/setup/consent-contact,setup:view,deny-401
 super_admin,GET /v1/setup/dpa,setup:view,deny-401
 super_admin,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 super_admin,GET /v1/setup/export-jobs,setup:view,deny-401
+super_admin,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 super_admin,GET /v1/setup/go-live/checks,setup:view,deny-401
 super_admin,GET /v1/setup/go-live/poster,setup:view,deny-401
 super_admin,GET /v1/setup/holidays,setup:view,deny-401
@@ -390,7 +391,7 @@ super_admin,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 super_admin,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 super_admin,POST /v1/setup/dpa/accept,setup:edit,deny-401
 super_admin,POST /v1/setup/dpa/otp,setup:edit,deny-401
-super_admin,POST /v1/setup/export-jobs,setup:view,deny-401
+super_admin,POST /v1/setup/export-jobs,setup:export,deny-401
 super_admin,POST /v1/setup/go-live,setup:edit,deny-401
 super_admin,POST /v1/setup/holidays,setup:edit,deny-401
 super_admin,POST /v1/setup/import-jobs,setup:edit,deny-401
@@ -625,6 +626,7 @@ implementation,GET /v1/setup/consent-contact,setup:view,deny-401
 implementation,GET /v1/setup/dpa,setup:view,deny-401
 implementation,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 implementation,GET /v1/setup/export-jobs,setup:view,deny-401
+implementation,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 implementation,GET /v1/setup/go-live/checks,setup:view,deny-401
 implementation,GET /v1/setup/go-live/poster,setup:view,deny-401
 implementation,GET /v1/setup/holidays,setup:view,deny-401
@@ -825,7 +827,7 @@ implementation,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 implementation,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 implementation,POST /v1/setup/dpa/accept,setup:edit,deny-401
 implementation,POST /v1/setup/dpa/otp,setup:edit,deny-401
-implementation,POST /v1/setup/export-jobs,setup:view,deny-401
+implementation,POST /v1/setup/export-jobs,setup:export,deny-401
 implementation,POST /v1/setup/go-live,setup:edit,deny-401
 implementation,POST /v1/setup/holidays,setup:edit,deny-401
 implementation,POST /v1/setup/import-jobs,setup:edit,deny-401
@@ -1060,6 +1062,7 @@ support_engineer,GET /v1/setup/consent-contact,setup:view,deny-401
 support_engineer,GET /v1/setup/dpa,setup:view,deny-401
 support_engineer,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 support_engineer,GET /v1/setup/export-jobs,setup:view,deny-401
+support_engineer,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 support_engineer,GET /v1/setup/go-live/checks,setup:view,deny-401
 support_engineer,GET /v1/setup/go-live/poster,setup:view,deny-401
 support_engineer,GET /v1/setup/holidays,setup:view,deny-401
@@ -1260,7 +1263,7 @@ support_engineer,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 support_engineer,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 support_engineer,POST /v1/setup/dpa/accept,setup:edit,deny-401
 support_engineer,POST /v1/setup/dpa/otp,setup:edit,deny-401
-support_engineer,POST /v1/setup/export-jobs,setup:view,deny-401
+support_engineer,POST /v1/setup/export-jobs,setup:export,deny-401
 support_engineer,POST /v1/setup/go-live,setup:edit,deny-401
 support_engineer,POST /v1/setup/holidays,setup:edit,deny-401
 support_engineer,POST /v1/setup/import-jobs,setup:edit,deny-401
@@ -1495,6 +1498,7 @@ billing,GET /v1/setup/consent-contact,setup:view,deny-401
 billing,GET /v1/setup/dpa,setup:view,deny-401
 billing,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 billing,GET /v1/setup/export-jobs,setup:view,deny-401
+billing,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 billing,GET /v1/setup/go-live/checks,setup:view,deny-401
 billing,GET /v1/setup/go-live/poster,setup:view,deny-401
 billing,GET /v1/setup/holidays,setup:view,deny-401
@@ -1695,7 +1699,7 @@ billing,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 billing,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 billing,POST /v1/setup/dpa/accept,setup:edit,deny-401
 billing,POST /v1/setup/dpa/otp,setup:edit,deny-401
-billing,POST /v1/setup/export-jobs,setup:view,deny-401
+billing,POST /v1/setup/export-jobs,setup:export,deny-401
 billing,POST /v1/setup/go-live,setup:edit,deny-401
 billing,POST /v1/setup/holidays,setup:edit,deny-401
 billing,POST /v1/setup/import-jobs,setup:edit,deny-401
@@ -1930,6 +1934,7 @@ sre,GET /v1/setup/consent-contact,setup:view,deny-401
 sre,GET /v1/setup/dpa,setup:view,deny-401
 sre,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 sre,GET /v1/setup/export-jobs,setup:view,deny-401
+sre,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 sre,GET /v1/setup/go-live/checks,setup:view,deny-401
 sre,GET /v1/setup/go-live/poster,setup:view,deny-401
 sre,GET /v1/setup/holidays,setup:view,deny-401
@@ -2130,7 +2135,7 @@ sre,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 sre,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 sre,POST /v1/setup/dpa/accept,setup:edit,deny-401
 sre,POST /v1/setup/dpa/otp,setup:edit,deny-401
-sre,POST /v1/setup/export-jobs,setup:view,deny-401
+sre,POST /v1/setup/export-jobs,setup:export,deny-401
 sre,POST /v1/setup/go-live,setup:edit,deny-401
 sre,POST /v1/setup/holidays,setup:edit,deny-401
 sre,POST /v1/setup/import-jobs,setup:edit,deny-401
@@ -2365,6 +2370,7 @@ commercial,GET /v1/setup/consent-contact,setup:view,deny-401
 commercial,GET /v1/setup/dpa,setup:view,deny-401
 commercial,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 commercial,GET /v1/setup/export-jobs,setup:view,deny-401
+commercial,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 commercial,GET /v1/setup/go-live/checks,setup:view,deny-401
 commercial,GET /v1/setup/go-live/poster,setup:view,deny-401
 commercial,GET /v1/setup/holidays,setup:view,deny-401
@@ -2565,7 +2571,7 @@ commercial,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 commercial,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 commercial,POST /v1/setup/dpa/accept,setup:edit,deny-401
 commercial,POST /v1/setup/dpa/otp,setup:edit,deny-401
-commercial,POST /v1/setup/export-jobs,setup:view,deny-401
+commercial,POST /v1/setup/export-jobs,setup:export,deny-401
 commercial,POST /v1/setup/go-live,setup:edit,deny-401
 commercial,POST /v1/setup/holidays,setup:edit,deny-401
 commercial,POST /v1/setup/import-jobs,setup:edit,deny-401
@@ -2800,6 +2806,7 @@ compliance_dpo,GET /v1/setup/consent-contact,setup:view,deny-401
 compliance_dpo,GET /v1/setup/dpa,setup:view,deny-401
 compliance_dpo,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-401
 compliance_dpo,GET /v1/setup/export-jobs,setup:view,deny-401
+compliance_dpo,GET /v1/setup/export-jobs/{id},setup:export,deny-401
 compliance_dpo,GET /v1/setup/go-live/checks,setup:view,deny-401
 compliance_dpo,GET /v1/setup/go-live/poster,setup:view,deny-401
 compliance_dpo,GET /v1/setup/holidays,setup:view,deny-401
@@ -3000,7 +3007,7 @@ compliance_dpo,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/dpa/accept,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/dpa/otp,setup:edit,deny-401
-compliance_dpo,POST /v1/setup/export-jobs,setup:view,deny-401
+compliance_dpo,POST /v1/setup/export-jobs,setup:export,deny-401
 compliance_dpo,POST /v1/setup/go-live,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/holidays,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/import-jobs,setup:edit,deny-401

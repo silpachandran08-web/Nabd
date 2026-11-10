@@ -75,5 +75,10 @@
  "claimKeepLabel": "What may {guardian} still do for you?",
  "claimKeepNone": "Nothing: my guardian's access ends",
  "claimSubmit": "Claim my profile",
- "claimDone": "Done. Your profile is now yours."
+ "claimDone": "Done. Your profile is now yours.",
+ "exportTitle": "Your clinic data export",
+ "exportIntro": "This link works until {date} and for {left} more download(s). A code is sent to the clinic owner's mobile for each download.",
+ "exportDownload": "Download the archive",
+ "exportDone": "Download started. Keep the file somewhere safe: it holds your clinic's records.",
+ "exportChecksum": "Check the archive against manifest.json inside it: every file is listed with its row count and SHA-256."
 }

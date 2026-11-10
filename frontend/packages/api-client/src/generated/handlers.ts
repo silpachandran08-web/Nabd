@@ -402,6 +402,9 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/proxy-invites/:token`, () => HttpResponse.json({"caregiverFirstName":"string","clinicName":"string","expiresAt":"2026-01-01T00:00:00Z","relation":"string"}, { status: 200 })), // ProxyInviteController_view
     http.post(`${baseUrl}/v1/proxy-invites/:token/accept`, () => HttpResponse.json({"scope":"string","status":"string"}, { status: 200 })), // ProxyInviteController_accept
     http.post(`${baseUrl}/v1/proxy-invites/:token/otp`, () => HttpResponse.json({}, { status: 202 })), // ProxyInviteController_otp
+    http.get(`${baseUrl}/v1/public/exports/:token`, () => HttpResponse.json({"clinicName":"string","downloadsLeft":0,"expiresAt":"2026-01-01T00:00:00Z"}, { status: 200 })), // DataExportController_view
+    http.post(`${baseUrl}/v1/public/exports/:token/download`, () => HttpResponse.json("AA==", { status: 200 })), // DataExportController_download
+    http.post(`${baseUrl}/v1/public/exports/:token/otp`, () => HttpResponse.json({}, { status: 202 })), // DataExportController_otp
     http.post(`${baseUrl}/v1/public/links/:token/open`, () => HttpResponse.json({"fileUrl":"string","mime":"string","title":"string"}, { status: 200 })), // PublicSecureLinkController_open
     http.post(`${baseUrl}/v1/public/links/:token/otp`, () => new HttpResponse(null, { status: 200 })), // PublicSecureLinkController_otp
     http.get(`${baseUrl}/v1/public/notices/:tenantSlug/:version`, () => HttpResponse.json("string", { status: 200 })), // PublicNoticeController_page
@@ -481,7 +484,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/setup/dpa/acceptances/:id/pdf`, () => HttpResponse.json("AA==", { status: 200 })), // DpaController_pdf
     http.post(`${baseUrl}/v1/setup/dpa/otp`, () => HttpResponse.json({"expiresAt":"2026-01-01T00:00:00Z","otpChallengeId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // DpaController_requestOtp
     http.get(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json([{"createdAt":"2026-01-01T00:00:00Z","errorMessage":"string","exportType":"string","id":"string","resultUrl":"string","status":"string"}], { status: 200 })), // SetupController_exportJobs
-    http.post(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json({"createdAt":"2026-01-01T00:00:00Z","errorMessage":"string","exportType":"string","id":"string","resultUrl":"string","status":"string"}, { status: 200 })), // SetupController_createExportJob
+    http.post(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json({"estimateMinutes":0,"id":"00000000-0000-7000-8000-000000000000","status":"string"}, { status: 202 })), // DataExportController_start
+    http.get(`${baseUrl}/v1/setup/export-jobs/:id`, () => HttpResponse.json({"archiveSha256":"string","bytes":0,"completedAt":"2026-01-01T00:00:00Z","createdAt":"2026-01-01T00:00:00Z","datasets":[{"name":"string","rows":0,"status":"string"}],"format":"string","id":"00000000-0000-7000-8000-000000000000","linkExpiresAt":"2026-01-01T00:00:00Z","linkSent":false,"status":"string"}, { status: 200 })), // DataExportController_get
     http.post(`${baseUrl}/v1/setup/go-live`, () => HttpResponse.json({"bookingUrl":"string","liveAt":"2026-01-01T00:00:00Z","qrPosterUrl":"string"}, { status: 200 })), // GoLiveController_goLive
     http.get(`${baseUrl}/v1/setup/go-live/checks`, () => HttpResponse.json({"blockers":[{"code":"string","fixUrl":"string","ok":false}],"niceToHave":[{"code":"string","note":"string","ok":false}]}, { status: 200 })), // GoLiveController_checks
     http.get(`${baseUrl}/v1/setup/go-live/poster`, () => HttpResponse.json("AA==", { status: 200 })), // GoLiveController_poster
@@ -553,4 +557,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 539;
+export const operationCount = 543;
