@@ -175,6 +175,7 @@ class S21QaAdm037PlanApiTest extends ApiTestBase {
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(again.getStatusCode().value()).isIn(202, 403, 409);
         if (again.getStatusCode() == HttpStatus.ACCEPTED) assertThat(again.getBody().get("changeId")).isEqualTo(first.getBody().get("changeId"));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM master.platform_invoices WHERE tenant_id = ?", Long.class, c.t().id())).isEqualTo(1);
+        // master.platform_invoices is under tenant RLS (V3061), so read it inside the clinic's transaction
+        assertThat(inTenantTx(c.t().id(), () -> jdbc.queryForObject("SELECT count(*) FROM master.platform_invoices WHERE tenant_id = ?", Long.class, c.t().id()))).isEqualTo(1);
     }
 }
