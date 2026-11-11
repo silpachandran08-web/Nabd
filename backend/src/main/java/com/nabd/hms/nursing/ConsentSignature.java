@@ -59,6 +59,24 @@ final class ConsentSignature {
         return strokes;
     }
 
+    /** QA N-2: a tap or a dot is not a signature. Mirrored by enoughInk() in the staff-web consent model. */
+    static final int MIN_POINTS = 10;
+    static final float MIN_SPAN = 40f;
+
+    /** At least MIN_POINTS points whose bounding box is at least MIN_SPAN wide or tall (pad units, 600 x 200). */
+    static boolean enoughInk(List<List<float[]>> strokes) {
+        int n = 0;
+        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+        for (List<float[]> s : strokes) {
+            for (float[] p : s) {
+                n++;
+                minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+                minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+            }
+        }
+        return n >= MIN_POINTS && Math.max(maxX - minX, maxY - minY) >= MIN_SPAN;
+    }
+
     static String toSvg(List<List<float[]>> strokes) {
         StringBuilder b = new StringBuilder("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 600 200\" width=\"600\" height=\"200\">");
         for (List<float[]> s : strokes) {

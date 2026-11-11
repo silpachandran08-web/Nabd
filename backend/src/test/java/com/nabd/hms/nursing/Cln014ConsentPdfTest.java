@@ -47,6 +47,16 @@ class Cln014ConsentPdfTest {
     }
 
     @Test
+    void aSignatureNeedsTenPointsSpanningFortyPadUnits() {
+        assertThat(ConsentSignature.enoughInk(ConsentSignature.parse("<svg><path d=\"M0 0\"/></svg>"))).isFalse();
+        assertThat(ConsentSignature.enoughInk(ConsentSignature.parse(
+                "<svg><path d=\"M0 0 L1 0 L2 0 L3 0 L4 0 L5 0 L6 0 L7 0 L8 0 L9 0 L10 0\"/></svg>"))).as("11 points, 10 wide").isFalse();
+        assertThat(ConsentSignature.enoughInk(ConsentSignature.parse(
+                "<svg><path d=\"M0 0 L5 1 L10 2 L15 3 L20 4\"/><path d=\"M25 5 L30 6 L35 7 L40 8 L45 9\"/></svg>"))).as("10 points, 45 wide").isTrue();
+        assertThat(ConsentSignature.enoughInk(java.util.List.of())).isFalse();
+    }
+
+    @Test
     void htmlBecomesPlainWrappedText() {
         assertThat(ConsentPdf.plainText("<p>Risks:</p><ul><li>redness</li><li>peeling</li></ul>")).isEqualTo("Risks:\n- redness\n- peeling");
         assertThat(ConsentPdf.wrap("aaa bbb ccc", 7)).containsExactly("aaa bbb", "ccc");

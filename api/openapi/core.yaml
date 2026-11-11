@@ -30173,6 +30173,8 @@ components:
         createdAt:
           type: string
           format: date-time
+        guardianName:
+          type: string
         id:
           type: string
           format: uuid
@@ -30183,6 +30185,8 @@ components:
           format: uuid
         patientLanguage:
           type: string
+        patientMinor:
+          type: boolean
         patientName:
           type: string
         prepNotes:

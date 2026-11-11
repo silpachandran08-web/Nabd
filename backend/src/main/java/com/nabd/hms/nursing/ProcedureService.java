@@ -90,6 +90,7 @@ public class ProcedureService {
     }
 
     ProcedureOrderResponse toResponse(UUID tenantId, ProcedureOrderRow row) {
+        NursingRepository.ConsentPatient cp = repo.findConsentPatient(tenantId, row.patientId()).orElse(null);
         String patientName = repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");
         String orderedByName = repo.findStaffName(tenantId, row.orderedBy()).orElse("Unknown staff");
         String completedByName = row.completedBy() == null ? null : repo.findStaffName(tenantId, row.completedBy()).orElse(null);
@@ -99,6 +100,8 @@ public class ProcedureService {
                 row.chargeCode(), row.chargeName(), row.baseAmount(), row.taxRatePercent(), row.prepNotes(),
                 row.consentNote(), row.status(), row.billed(), completedByName, row.completedAt(), row.createdAt(),
                 row.consentSignedName(), consentRecordedByName, row.consentSignedAt(), row.consentId(), row.consentSha256(),
-                row.consentWithdrawnAt(), row.consentWithdrawReason(), repo.findPatientLanguage(tenantId, row.patientId()).orElse(null));
+                row.consentWithdrawnAt(), row.consentWithdrawReason(), cp == null ? null : cp.language(),
+                cp == null || cp.dob() == null ? null : cp.dob().plusYears(ConsentService.ADULT_AGE).isAfter(clock.today(tenantId)),
+                cp == null ? null : cp.guardianName());
     }
 }

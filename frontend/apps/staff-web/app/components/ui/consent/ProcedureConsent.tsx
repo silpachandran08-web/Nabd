@@ -2,18 +2,19 @@
 
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { PatientDetailResponse } from "@nabd/api-client/generated";
 import { api, ApiError, intentKeys } from "../../../lib/api";
 import { selfStaffId } from "../../../lib/doctorQueries";
-import { can } from "../../../lib/permissions";
 import Dialog from "../Dialog";
 import Icon from "../Icon";
 import { ErrorState, Skeleton } from "../StateViews";
 import SignaturePad from "./SignaturePad";
-import { pickLang, plainText, signable, strokesToSvg, type ConsentTemplate, type Point } from "./consentModel";
+import { enoughInk, pickLang, plainText, signable, signerPlan, strokesToSvg, type ConsentTemplate, type Point, type SignerKind } from "./consentModel";
 import c from "./procedureConsent.module.css";
 
-export type ConsentOrder = { id: string; patientId?: string; patientName?: string; chargeCode?: string; chargeName?: string; patientLanguage?: string | null };
+export type ConsentOrder = {
+  id: string; patientId?: string; patientName?: string; chargeCode?: string; chargeName?: string; patientLanguage?: string | null;
+  patientMinor?: boolean | null; guardianName?: string | null;
+};
 
 const LANG_NAME: Record<string, string> = { en: "English", hi: "हिन्दी", kn: "ಕನ್ನಡ", te: "తెలుగు", ar: "العربية" };
 
@@ -25,10 +26,13 @@ export default function ProcedureConsent({ order, onClose, onRecorded }: { order
   const tx = useTranslations("consult.procedureConsent");
   const keys = useRef(intentKeys());
   const formRef = useRef<HTMLDivElement>(null);
-  const [loaded, setLoaded] = useState<{ items: ConsentTemplate[]; patient: PatientDetailResponse | null } | "error" | null>(null);
+  const [loaded, setLoaded] = useState<{ items: ConsentTemplate[] } | "error" | null>(null);
   const [lang, setLang] = useState<string | null>(null);
   const [readToEnd, setReadToEnd] = useState(false);
-  const [signer, setSigner] = useState<{ kind: "patient" | "guardian"; name: string }>({ kind: "patient", name: "" });
+  // QA N-3: who signs comes from the order (nursing:view), not from GET /patients/{id}
+  const plan = signerPlan(order);
+  const nameFor = (k: SignerKind) => (k === "guardian" ? plan.guardianName ?? "" : order.patientName ?? "");
+  const [signer, setSigner] = useState<{ kind: SignerKind; name: string }>(() => ({ kind: plan.defaultKind, name: nameFor(plan.defaultKind) }));
   const [strokes, setStrokes] = useState<Point[][]>([]);
   const [assent, setAssent] = useState<Point[][]>([]);
   const [confirmed, setConfirmed] = useState(false);
@@ -38,29 +42,23 @@ export default function ProcedureConsent({ order, onClose, onRecorded }: { order
   const load = useCallback(async () => {
     setLoaded((cur) => (cur === "error" ? null : cur));
     try {
-      const [list, p] = await Promise.all([
-        api.get<{ items: ConsentTemplate[] }>(`/nursing/consent-templates?chargeCode=${encodeURIComponent(order.chargeCode ?? "")}`),
-        can("patients:view") && order.patientId ? api.get<PatientDetailResponse>(`/patients/${order.patientId}`).catch(() => null) : Promise.resolve(null),
-      ]);
-      setLoaded({ items: list.items, patient: p });
+      const list = await api.get<{ items: ConsentTemplate[] }>(`/nursing/consent-templates?chargeCode=${encodeURIComponent(order.chargeCode ?? "")}`);
+      setLoaded({ items: list.items });
       setLang((cur) => (cur && signable(list.items).some((t) => t.lang === cur) ? cur : pickLang(list.items, order.patientLanguage)));
-      const minor = !!p?.isMinor;
-      setSigner((cur) => ({ kind: minor ? "guardian" : "patient", name: cur.name || (minor ? p?.guardianName ?? "" : p?.name ?? order.patientName ?? "") }));
     } catch {
       setLoaded("error");
     }
-  }, [order.chargeCode, order.patientId, order.patientLanguage, order.patientName]);
+  }, [order.chargeCode, order.patientLanguage]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   const items = loaded && loaded !== "error" ? loaded.items : null;
-  const patient = loaded && loaded !== "error" ? loaded.patient : null;
   const loadError = loaded === "error";
   const { kind, name } = signer;
   const setName = (n: string) => setSigner((cur) => ({ ...cur, name: n }));
   const template = signable(items ?? []).find((t) => t.lang === lang) ?? null;
-  const minor = !!patient?.isMinor;
+  const minor = plan.age === "minor";
 
   // A form short enough to fit counts as read; otherwise the reader must reach the end.
   useLayoutEffect(() => {
@@ -73,7 +71,7 @@ export default function ProcedureConsent({ order, onClose, onRecorded }: { order
     if (!template) return;
     const body = {
       templateId: template.id, templateVersion: template.version, lang: template.lang,
-      signer: { kind, name: name.trim(), ...(kind === "guardian" && patient?.guardianId ? { guardianId: patient.guardianId } : {}) },
+      signer: { kind, name: name.trim() }, // guardianId omitted: the server uses the guardian linked to the patient record
       signatureSvg: strokesToSvg(strokes), ...(minor && assent.length ? { assentSignatureSvg: strokesToSvg(assent) } : {}),
       witnessStaffId: selfStaffId(),
     };
@@ -102,8 +100,9 @@ export default function ProcedureConsent({ order, onClose, onRecorded }: { order
     }
   }
 
-  const guardianMissing = minor && !patient?.guardianId;
-  const canSign = !!template && readToEnd && name.trim().length > 0 && strokes.length > 0 && !guardianMissing && (kind === "patient" || !!patient?.guardianId);
+  const guardianMissing = minor && !plan.guardianName;
+  const inkOk = enoughInk(strokes) && (assent.length === 0 || enoughInk(assent));
+  const canSign = !!template && readToEnd && name.trim().length > 0 && inkOk && !guardianMissing && (kind === "patient" || !!plan.guardianName);
 
   return (
     <Dialog title={tx("recordProcedureConsent")} onClose={onClose} size="lg">
@@ -156,13 +155,19 @@ export default function ProcedureConsent({ order, onClose, onRecorded }: { order
                 {minor && (
                   <div className={`${c.notice} ${guardianMissing ? c.noticeDanger : c.noticeInfo}`} role="status">
                     <Icon name="alert" size={16} />
-                    <span>{guardianMissing ? tx("minorNoGuardian") : tx("minorGuardianSigns", { guardian: patient?.guardianName ?? "" })}</span>
+                    <span>{guardianMissing ? tx("minorNoGuardian") : tx("minorGuardianSigns", { guardian: plan.guardianName ?? "" })}</span>
                   </div>
                 )}
-                {!minor && patient?.guardianId && (
+                {plan.age === "unknown" && (
+                  <div className={`${c.notice} ${c.noticeWarn}`} role="status">
+                    <Icon name="alert" size={16} />
+                    <span>{plan.guardianName ? tx("ageUnknown", { guardian: plan.guardianName }) : tx("ageUnknownNoGuardian")}</span>
+                  </div>
+                )}
+                {plan.kinds.length > 1 && (
                   <div className={c.langs} role="radiogroup" aria-label={tx("whoSigns")}>
-                    <label className={`${c.check} ${c.big}`}><input type="radio" checked={kind === "patient"} onChange={() => setSigner({ kind: "patient", name: patient?.name ?? "" })} />{tx("signerPatient")}</label>
-                    <label className={`${c.check} ${c.big}`}><input type="radio" checked={kind === "guardian"} onChange={() => setSigner({ kind: "guardian", name: patient?.guardianName ?? "" })} />{tx("signerGuardian")}</label>
+                    <label className={`${c.check} ${c.big}`}><input type="radio" checked={kind === "patient"} onChange={() => setSigner({ kind: "patient", name: nameFor("patient") })} />{tx("signerPatient")}</label>
+                    <label className={`${c.check} ${c.big}`}><input type="radio" checked={kind === "guardian"} onChange={() => setSigner({ kind: "guardian", name: nameFor("guardian") })} />{tx("signerGuardian")}</label>
                   </div>
                 )}
                 <div className={c.field}>
@@ -172,6 +177,7 @@ export default function ProcedureConsent({ order, onClose, onRecorded }: { order
                 <span>{tx("signHere")}</span>
                 <SignaturePad label={tx("signaturePad")} strokes={strokes} onChange={setStrokes} />
                 <div><button type="button" className={c.btn} onClick={() => setStrokes([])} disabled={strokes.length === 0}>{tx("clear")}</button></div>
+                {strokes.length > 0 && !enoughInk(strokes) && <p className={c.muted} role="status">{tx("fullSignature")}</p>}
                 {minor && (
                   <>
                     <span>{tx("assentOptional")}</span>

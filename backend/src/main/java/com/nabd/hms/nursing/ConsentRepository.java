@@ -19,7 +19,7 @@ class ConsentRepository {
     record Consent(UUID id, UUID procedureOrderId, String status, UUID pdfFileId, String pdfSha256) {
     }
 
-    record PatientFacts(String name, LocalDate dob) {
+    record PatientFacts(String name, LocalDate dob, UUID guardianId) {
     }
 
     private static final String TEMPLATE_COLS = "id, tenant_id, charge_code, lang, version, title, body_html, placeholder";
@@ -57,8 +57,9 @@ class ConsentRepository {
     }
 
     Optional<PatientFacts> patient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT name, dob FROM patients WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> new PatientFacts(rs.getString("name"), rs.getObject("dob", LocalDate.class)), tenantId, patientId).stream().findFirst();
+        return jdbc.query("SELECT name, dob, guardian_id FROM patients WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> new PatientFacts(rs.getString("name"), rs.getObject("dob", LocalDate.class), rs.getObject("guardian_id", UUID.class)),
+                tenantId, patientId).stream().findFirst();
     }
 
     String clinicName(UUID tenantId) {
