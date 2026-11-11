@@ -180,6 +180,13 @@ class Com043ReminderApiTest extends ApiTestBase {
         assertThat(su().queryForObject("SELECT count(*) FROM desk_exceptions WHERE ref_id = ? AND resolved_at IS NULL", Integer.class, id)).isZero();
         assertThat(su().queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'scheduling.appointment.confirmed.v1' "
                 + "AND payload->>'appointmentId' = ? AND payload->>'source' = 'whatsapp_button'", Integer.class, c.tenant().id(), id.toString())).isEqualTo(1);
+
+        // QA S22 N-1: a second tap (a new message, so a new Idempotency-Key) answers the same time and publishes nothing new
+        ResponseEntity<Map> again = act(c, id, "confirm", Map.of());
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(again.getBody().get("patientConfirmedAt")).isEqualTo(confirmed.getBody().get("patientConfirmedAt"));
+        assertThat(su().queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'scheduling.appointment.confirmed.v1' "
+                + "AND payload->>'appointmentId' = ?", Integer.class, c.tenant().id(), id.toString())).as("one event per appointment").isEqualTo(1);
         sweep(c);
         assertThat(state(id)).as("confirmed stops the cascade").isEqualTo("confirmed");
     }

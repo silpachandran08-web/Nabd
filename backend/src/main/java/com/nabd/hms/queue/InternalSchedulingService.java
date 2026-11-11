@@ -190,11 +190,13 @@ class InternalSchedulingService {
             }
             if ("confirm".equals(action)) { // ACC-041: single owner of appointments.patient_confirmed_at
                 desk.onConfirmed(tid, id); // ACC-032: the patient answered, the 'unconfirmed' item goes
-                Instant at = confirmations.confirm(tid, id);
+                var confirmed = confirmations.confirm(tid, id);
                 record(tid, edge, "appointment.confirmed_via_edge", id, patientRef);
-                events.publish(tid, com.nabd.hms.common.DomainEventType.APPOINTMENT_CONFIRMED, id,
-                        Map.of("appointmentId", id, "source", "whatsapp_button")); // COM-043: the desk chip turns within the SSE fan-out
-                return Map.of("appointmentId", id, "status", status, "patientConfirmedAt", at);
+                if (confirmed.first()) { // COM-043: one event per appointment, however often the patient taps (QA S22 N-1)
+                    events.publish(tid, com.nabd.hms.common.DomainEventType.APPOINTMENT_CONFIRMED, id,
+                            Map.of("appointmentId", id, "source", "whatsapp_button")); // the desk chip turns within the SSE fan-out
+                }
+                return Map.of("appointmentId", id, "status", status, "patientConfirmedAt", confirmed.at());
             }
             if (!"confirm".equals(action)) {
                 requireOutsideWindow(tid, a.startTime());
