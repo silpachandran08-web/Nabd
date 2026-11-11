@@ -27,6 +27,8 @@ import java.util.UUID;
 public class FileService implements FileStore {
 
     static final Set<String> PURPOSES = Set.of("outside_report", "clinical_photo", "xray", "consent_form");
+    static final Set<String> GENERATED_PURPOSES = Set.of("claim_pack", "consent_form"); // FIN-035 / CLN-014: server-rendered documents
+    static final Set<String> GENERATED_TYPES = Set.of("application/pdf", "text/csv", "image/svg+xml");
     static final Set<String> TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
     static final Duration UPLOAD_TTL = Duration.ofMinutes(10);
     static final Duration DOWNLOAD_TTL = Duration.ofMinutes(5);
@@ -160,6 +162,27 @@ public class FileService implements FileStore {
         Duration t = ttl.compareTo(DOWNLOAD_TTL) > 0 ? DOWNLOAD_TTL : ttl;
         FileRepository.Row f = repo.find(tenantContext.current(), fileId).filter(r -> "available".equals(r.status())).orElseThrow(ApiException::notFound);
         return new SignedUrl(storage.presign(false, ObjectStorage.Bucket.CLEAN, f.storageKey(), t, 0), clock.instant().plus(t));
+    }
+
+    @Override
+    @Transactional
+    public UUID storeGenerated(UUID staffId, String purpose, String contentType, byte[] data, UUID patientId, UUID visitId) {
+        if (!GENERATED_PURPOSES.contains(purpose) || !GENERATED_TYPES.contains(contentType) || data.length == 0) {
+            throw new IllegalArgumentException("unsupported generated file");
+        }
+        UUID tenantId = tenantContext.current();
+        UUID id = UUID.randomUUID();
+        String key = "tenant/" + tenantId + "/" + id;
+        storage.put(ObjectStorage.Bucket.CLEAN, key, data);
+        repo.insertGenerated(id, tenantId, purpose, key, contentType, data.length, sha256(data), staffId, patientId, visitId, clock.instant());
+        return id;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<byte[]> content(UUID fileId) {
+        return repo.find(tenantContext.current(), fileId).filter(r -> "available".equals(r.status()))
+                .flatMap(r -> storage.get(ObjectStorage.Bucket.CLEAN, r.storageKey()));
     }
 
     private static byte[] sha256(byte[] d) {

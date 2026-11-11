@@ -60,7 +60,8 @@ final class QueueModels {
     record AppointmentRow(UUID id, UUID tenantId, UUID patientId, UUID doctorId, Instant startTime,
                            Instant endTime, String status, Instant createdAt, boolean isFollowUp, String cancelReason,
                            String decisionSource, String channel, String bookingKind, Integer sessionToken,
-                           String cancelReasonCode, Instant noShowAt, UUID noShowMarkedBy, UUID lateArrivalQueueEntryId, Instant patientConfirmedAt) {
+                           String cancelReasonCode, Instant noShowAt, UUID noShowMarkedBy, UUID lateArrivalQueueEntryId, Instant patientConfirmedAt,
+                           String confirmationState) {
     }
 
     /** NB-116: a follow-up appointment that was missed — no_show, or scheduled 15+ days past its start. */

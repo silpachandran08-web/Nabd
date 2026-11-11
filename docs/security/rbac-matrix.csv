@@ -5,7 +5,7 @@
 #   clinical:approve; owner_doctor = owner OR doctor plus clinical:approve; breakGlass (not a sheet column) stays with the Owner (RolePresets);
 #   PHL-010: pharmacy adjust_approve (not a sheet column) is derived from pharmacy approve (GrantsFlattener), so it is listed wherever that is;
 #   PHL-012: pharmacy dispense (not a sheet column) is derived from pharmacy edit (GrantsFlattener) in the same way.
-# plane=operator: 'SaaS Operator Roles' sheet as coded in PlatformPermissions (SSA-02, V2-005, V3-001, PLT-056, CLN-004).
+# plane=operator: 'SaaS Operator Roles' sheet as coded in PlatformPermissions (SSA-02, V2-005, V3-001, PLT-056, CLN-004, ADM-005/006 onboarding).
 # A change here must be matched in RolePresets / PlatformPermissions and the generated cases regenerated: mvn test -Dtest=RbacMatrixApiTest,OperatorMatrixApiTest -Drbac.write=true
 plane,role,module,actions
 clinic,owner,patients,view|create|edit|delete|approve|export
@@ -90,6 +90,7 @@ operator,super_admin,command_centre,view
 operator,super_admin,clinics_fleet,view
 operator,super_admin,tenant_detail,view|edit
 operator,super_admin,onboarding_provisioning,view
+operator,super_admin,onboarding,view|edit
 operator,super_admin,provisioning_jobs,view
 operator,super_admin,billing_revenue,view|edit|approve
 operator,super_admin,support_tickets,view
@@ -106,6 +107,7 @@ operator,implementation,command_centre,view
 operator,implementation,clinics_fleet,view
 operator,implementation,tenant_detail,view
 operator,implementation,onboarding_provisioning,view
+operator,implementation,onboarding,view|edit
 operator,implementation,provisioning_jobs,view
 operator,implementation,billing_revenue,
 operator,implementation,support_tickets,view
@@ -122,6 +124,7 @@ operator,support_engineer,command_centre,view
 operator,support_engineer,clinics_fleet,view
 operator,support_engineer,tenant_detail,view
 operator,support_engineer,onboarding_provisioning,
+operator,support_engineer,onboarding,
 operator,support_engineer,provisioning_jobs,
 operator,support_engineer,billing_revenue,
 operator,support_engineer,support_tickets,view
@@ -138,6 +141,7 @@ operator,billing,command_centre,view
 operator,billing,clinics_fleet,view
 operator,billing,tenant_detail,
 operator,billing,onboarding_provisioning,
+operator,billing,onboarding,
 operator,billing,provisioning_jobs,
 operator,billing,billing_revenue,view|edit
 operator,billing,support_tickets,
@@ -154,6 +158,7 @@ operator,sre,command_centre,view
 operator,sre,clinics_fleet,
 operator,sre,tenant_detail,
 operator,sre,onboarding_provisioning,
+operator,sre,onboarding,
 operator,sre,provisioning_jobs,view
 operator,sre,billing_revenue,
 operator,sre,support_tickets,
@@ -170,6 +175,7 @@ operator,commercial,command_centre,view
 operator,commercial,clinics_fleet,view
 operator,commercial,tenant_detail,
 operator,commercial,onboarding_provisioning,
+operator,commercial,onboarding,
 operator,commercial,provisioning_jobs,
 operator,commercial,billing_revenue,view
 operator,commercial,support_tickets,
@@ -186,6 +192,7 @@ operator,compliance_dpo,command_centre,view
 operator,compliance_dpo,clinics_fleet,view
 operator,compliance_dpo,tenant_detail,view
 operator,compliance_dpo,onboarding_provisioning,
+operator,compliance_dpo,onboarding,
 operator,compliance_dpo,provisioning_jobs,
 operator,compliance_dpo,billing_revenue,
 operator,compliance_dpo,support_tickets,

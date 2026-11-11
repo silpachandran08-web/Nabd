@@ -51,7 +51,9 @@ public enum DomainEventType {
     PATIENT_PROXY_CHANGED("patient.proxy.changed.v1", "core/patient"),
     PATIENT_GUARDIAN_HANDOVER_DUE("patient.guardian.handover_due.v1", "core/patient"),
     PATIENT_GUARDIAN_HANDOVER_COMPLETED("patient.guardian.handover_completed.v1", "core/patient"),
-    ORGANIZATION_EXPORT_READY("organization.export.ready.v1", "core/organization");
+    ORGANIZATION_EXPORT_READY("organization.export.ready.v1", "core/organization"),
+    TEMPLATE_STATUS_CHANGED("comms.template.status_changed.v1", "core/messaging"),
+    APPOINTMENT_CONFIRMED("scheduling.appointment.confirmed.v1", "core/scheduling");
 
     private final String type;
     private final String source;

@@ -1,0 +1,5 @@
+/* FEF-048: offline page. Logical properties (RTL), --nb-* tokens, 44px target. */
+.page { display: flex; flex-direction: column; align-items: flex-start; gap: var(--nb-space-16); max-inline-size: 560px; margin-inline: auto; padding: var(--nb-space-32) var(--nb-space-16); color: var(--nb-text-secondary); }
+.title { margin: 0; color: var(--nb-text-primary); font-size: 20px; font-weight: 600; }
+.warn { padding: var(--nb-space-8) var(--nb-space-16); border-radius: var(--nb-radius-md); background: var(--nb-warn-tint); color: var(--nb-warn-500); font-weight: 600; }
+.retry { min-block-size: 44px; padding-inline: var(--nb-space-16); border: none; border-radius: var(--nb-radius-md); background: var(--nb-accent-500); color: var(--nb-on-accent); font: inherit; font-weight: 600; cursor: pointer; }

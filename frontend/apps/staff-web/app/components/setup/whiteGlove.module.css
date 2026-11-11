@@ -1,0 +1,15 @@
+/* ADM-006: the wizard's white-glove booking card (own module: features do not share CSS). Tokens only, logical properties, 44 px targets. */
+.h3 { margin: 0; font-size: var(--nb-fs-md); color: var(--nb-text-primary); }
+.card { display: flex; flex-direction: column; gap: var(--nb-space-8); padding: var(--nb-space-12) var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-1); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--nb-space-8); min-block-size: 32px; }
+.muted { color: var(--nb-text-secondary); }
+.notice { padding: var(--nb-space-12); border-radius: var(--nb-radius-md); background: var(--nb-info-tint); color: var(--nb-text-primary); }
+.error { padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); background: var(--nb-danger-tint); color: var(--nb-danger-500); }
+.btn { min-block-size: 44px; padding-inline: var(--nb-space-16); border: 0; border-radius: var(--nb-radius-md); background: var(--nb-accent-fill); color: var(--nb-on-accent); font: inherit; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.link { display: inline-flex; align-items: center; min-block-size: 44px; color: var(--nb-accent-500); }
+.dialog { display: flex; flex-direction: column; gap: var(--nb-space-12); }
+.fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: var(--nb-space-16); }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); }
+.input { min-block-size: 44px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; }
+.actions { display: flex; justify-content: flex-end; gap: var(--nb-space-8); }

@@ -52,6 +52,7 @@ public class ImportWorker {
     private final EventPublisher events;
     private final ClinicClock clock;
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.organization.setup.SetupStepEvents stepEvents;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "adm-import-worker");
         t.setDaemon(true);
@@ -59,7 +60,9 @@ public class ImportWorker {
     });
 
     ImportWorker(ImportPipeline pipeline, ImportRepository repo, TenantScope scope, TenantContext tenant, PatientDirectory patients,
-                 ImportedAllergies allergies, EventPublisher events, ClinicClock clock, JdbcTemplate jdbc) {
+                 ImportedAllergies allergies, EventPublisher events, ClinicClock clock, JdbcTemplate jdbc,
+                 com.nabd.hms.organization.setup.SetupStepEvents stepEvents) {
+        this.stepEvents = stepEvents;
         this.pipeline = pipeline;
         this.repo = repo;
         this.scope = scope;
@@ -194,6 +197,7 @@ public class ImportWorker {
         repo.findJob(jobId, true).ifPresent(j -> {
             int n = j.errorMessage() != null && j.errorMessage().startsWith("RETRY:") ? Integer.parseInt(j.errorMessage().substring(6)) + 1 : 1;
             repo.setStatus(jobId, n >= MAX_FAILURES ? "failed" : j.status(), n >= MAX_FAILURES ? "CHUNK_FAILED" : "RETRY:" + n);
+            if (n >= MAX_FAILURES) stepEvents.changed(tenant.current(), "import", "failed", "CHUNK_FAILED"); // ADM-005: a failed commit attempt
         });
     }
 }

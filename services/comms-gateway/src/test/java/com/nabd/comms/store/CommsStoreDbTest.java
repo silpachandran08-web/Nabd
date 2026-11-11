@@ -44,7 +44,7 @@ class CommsStoreDbTest {
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword()); Statement s = c.createStatement()) {
             s.execute("CREATE ROLE comms_app LOGIN PASSWORD 'x' NOSUPERUSER NOBYPASSRLS");
             s.execute("CREATE DATABASE core_src");
-            for (String f : new String[] {"V3__outbound_messages.sql", "V4__backfill_markers.sql", "V5__sender_accounts_phone_routes.sql"}) {
+            for (String f : new String[] {"V3__outbound_messages.sql", "V4__backfill_markers.sql", "V5__sender_accounts_phone_routes.sql", "V22__template_versions.sql"}) {
                 s.execute(Files.readString(Path.of("src/main/resources/db/migration/" + f)));
             }
             s.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO comms_app");
@@ -126,7 +126,8 @@ class CommsStoreDbTest {
                     CREATE TABLE whatsapp_templates (id uuid PRIMARY KEY, tenant_id uuid, name text, meta_name text, language text, category text,
                       header_text text, body text, param_count int, status text, rejection_reason text, quality_rating text, meta_template_id text,
                       catalogue_key text, catalogue_version int, buttons jsonb, purpose text, submit_attempts int, next_attempt_at timestamptz,
-                      submitted_at timestamptz, created_at timestamptz, updated_at timestamptz);
+                      submitted_at timestamptz, created_at timestamptz, updated_at timestamptz,
+                      version int NOT NULL DEFAULT 1, active boolean NOT NULL DEFAULT true, paused_until timestamptz, meta_category text); -- COM-013 (Core V3100)
                     CREATE TABLE whatsapp_messages (id uuid PRIMARY KEY, tenant_id uuid, patient_id uuid, to_phone text, template_name text,
                       language text, params jsonb, status text, wamid text, error text, template_id uuid, attempts int, last_attempt_at timestamptz,
                       created_at timestamptz, updated_at timestamptz);

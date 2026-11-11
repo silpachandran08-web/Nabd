@@ -35,7 +35,8 @@ class ScheduleBoardRepository {
     }
 
     record AppointmentRow(UUID id, UUID doctorId, UUID patientId, String patientName, Instant start, Instant end,
-                          String status, boolean followUp, UUID queueEntryId, Integer token, String queueStatus, String actedByRelation) {
+                          String status, boolean followUp, UUID queueEntryId, Integer token, String queueStatus, String actedByRelation,
+                          String confirmationState) {
     }
 
     record WalkInRow(UUID queueEntryId, UUID doctorId, UUID patientId, String patientName, Instant createdAt,
@@ -104,7 +105,7 @@ class ScheduleBoardRepository {
     List<AppointmentRow> appointmentsBetween(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.query("""
                 SELECT a.id, a.doctor_id, a.patient_id, p.name AS patient_name, a.start_time, a.end_time, a.status,
-                       a.is_follow_up, q.id AS queue_entry_id, q.token_number, q.status AS queue_status, a.acted_by_relation
+                       a.is_follow_up, q.id AS queue_entry_id, q.token_number, q.status AS queue_status, a.acted_by_relation, a.confirmation_state
                 FROM appointments a
                 JOIN patients p ON p.id = a.patient_id
                 LEFT JOIN LATERAL (SELECT id, token_number, status FROM queue_entries
@@ -115,7 +116,8 @@ class ScheduleBoardRepository {
                         rs.getObject("patient_id", UUID.class), rs.getString("patient_name"),
                         rs.getTimestamp("start_time").toInstant(), rs.getTimestamp("end_time").toInstant(),
                         rs.getString("status"), rs.getBoolean("is_follow_up"), rs.getObject("queue_entry_id", UUID.class),
-                        (Integer) rs.getObject("token_number"), rs.getString("queue_status"), rs.getString("acted_by_relation")),
+                        (Integer) rs.getObject("token_number"), rs.getString("queue_status"), rs.getString("acted_by_relation"),
+                        rs.getString("confirmation_state")),
                 tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
     }
 

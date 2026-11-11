@@ -1,17 +1,17 @@
 "use client";
 // FEF-062: first-run tour per role (reception, nurse, doctor, owner): five text steps in a non-modal card, so it never blocks
-// work. Runs once per role and browser (help.ts: nabd_tour_done), is deferred while a consult is open, can be skipped (Escape or
-// the button) and replayed from the user menu (the "nabd:tour" event). Mounted in AppShell so it survives route changes.
+// work. Runs once per person and role (ACC-035: completion stored at Core, GET/PUT /v1/me/onboarding), is deferred while a consult
+// is open, can be skipped (Escape or the button) and replayed from Help or the user menu (the "nabd:tour" event). Mounted in
+// AppShell so it survives route changes. While the progress is loading or failed to load, no tour starts (never twice by mistake).
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import styles from "./shell.module.css";
-import { consultActive, isTourRole, markTourDone, TOUR_STEPS, tourDone, tourDue } from "./help";
-import { decodeAccessToken } from "../lib/session";
+import { consultActive, isTourRole, TOUR_STEPS, tourDone, tourDue, tourKey } from "./help";
 import { useShellNav } from "./useShellNav";
+import { useOnboarding } from "./useOnboarding";
 
 export const TOUR_EVENT = "nabd:tour";
-const staffId = (): string | null => { try { const t = localStorage.getItem("nabd_access_token"); return (t && decodeAccessToken(t)?.sub) || null; } catch { return null; } };
 
 export default function TourCard() {
   const t = useTranslations("help");
@@ -22,6 +22,7 @@ export default function TourCard() {
   const [replay, setReplay] = useState(false);
   const headRef = useRef<HTMLHeadingElement>(null);
   const consult = consultActive(pathname, search);
+  const { progress, complete } = useOnboarding(isTourRole(role));
 
   useEffect(() => {
     const on = () => setReplay(true);
@@ -32,19 +33,18 @@ export default function TourCard() {
   // Start when due (first sign-in for this role, no consult open) or when a replay was asked for.
   useEffect(() => {
     if (step > 0 || !isTourRole(role) || consult) return;
-    const id = staffId();
-    if (!id) return;
-    if (replay || tourDue({ role, done: tourDone(localStorage, id, role), consult })) {
+    if (replay || (progress && tourDue({ role, done: tourDone(progress, role), consult }))) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(1);
       setReplay(false);
     }
-  }, [role, consult, replay, step]);
+  }, [role, consult, replay, step, progress]);
 
   useEffect(() => { if (step > 0) headRef.current?.focus(); }, [step]);
 
   if (step === 0 || !isTourRole(role)) return null;
-  const finish = () => { const id = staffId(); if (id) markTourDone(localStorage, id, role); setStep(0); };
+  // a failed save only means the tour may show again on the next sign-in; it never blocks work
+  const finish = () => { if (!tourDone(progress, role)) complete(tourKey(role)).catch(() => {}); setStep(0); };
   const key = `tours.${role}.s${step}`;
   return (
     <aside className={styles.tour} aria-label={t("tour.label")} data-testid="tour-card" data-step={step}

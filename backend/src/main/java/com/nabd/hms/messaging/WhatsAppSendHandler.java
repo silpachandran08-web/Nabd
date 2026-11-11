@@ -37,9 +37,14 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     private final TenantScope tenantScope;
     private final int inFlightSeconds;
     private final OptOutRegistry optOut;
+    private final WhatsAppMessageService messages;
+    private final java.time.Clock clock;
 
     WhatsAppSendHandler(WhatsAppMessageRepository repo, WhatsAppClient client, ObjectMapper objectMapper,
-                        TenantScope tenantScope, OutboxProperties outbox, OptOutRegistry optOut) {
+                        TenantScope tenantScope, OutboxProperties outbox, OptOutRegistry optOut, WhatsAppMessageService messages,
+                        java.time.Clock clock) {
+        this.messages = messages;
+        this.clock = clock;
         this.optOut = optOut;
         this.repo = repo;
         this.client = client;
@@ -70,7 +75,7 @@ class WhatsAppSendHandler implements OutboxEventHandler {
         List<String> params = objectMapper.readValue(msg.paramsJson(), new TypeReference<>() { });
         String wamid;
         try {
-            wamid = client.sendTemplate(msg.toPhone(), msg.templateName(), msg.language(), params);
+            wamid = client.sendTemplate(msg.toPhone(), msg.sendName(), msg.language(), params); // COM-013: the active version
         } catch (RestClientResponseException e) {
             // 4xx (bad number, unapproved template, bad params) won't fix itself on retry — record it
             // and stop. 429/5xx rethrow so the outbox backs off and retries.
@@ -99,13 +104,33 @@ class WhatsAppSendHandler implements OutboxEventHandler {
         if ("sending".equals(msg.status()) && repo.sendInFlight(id, inFlightSeconds)) {
             throw new OutboxRetryLaterException("send of message " + id + " still in flight elsewhere", inFlightSeconds);
         }
-        if (msg.templateStatus() != null && !"approved".equals(msg.templateStatus()) && !"flagged".equals(msg.templateStatus())) {
-            // ponytail: Meta un-pauses templates after a few hours; failing now beats holding the event that long.
+        java.time.Instant now = clock.instant();
+        if (msg.notAfter() != null && !now.isBefore(msg.notAfter())) { // COM-013: never sent late
+            messages.expireAtClaim(id);
+            return null;
+        }
+        boolean pauseOver = "paused".equals(msg.templateStatus()) && msg.pausedUntil() != null && !msg.pausedUntil().isAfter(now);
+        if ("paused".equals(msg.templateStatus()) && !pauseOver && msg.notAfter() != null) {
+            // COM-013: Meta's pause is 3 h (6 h the second time). Hold a send with a window until it lifts; if the window
+            // ends first it is expired now rather than sent late. One retry, at the pause end (outbox attempts are capped).
+            java.time.Instant until = msg.pausedUntil() == null ? now.plus(TemplateLifecycle.FIRST_PAUSE) : msg.pausedUntil();
+            if (!msg.notAfter().isAfter(until)) {
+                messages.expireAtClaim(id);
+                return null;
+            }
+            throw new OutboxRetryLaterException("template of message " + id + " is paused", java.time.Duration.between(now, until).toSeconds() + 1);
+        }
+        if (msg.templateStatus() != null && !"approved".equals(msg.templateStatus()) && !"flagged".equals(msg.templateStatus()) && !pauseOver) {
+            // A send with no window (no not_after) still fails at once on a paused template: nothing says how long it may wait.
             repo.markFailed(id, "template is " + msg.templateStatus());
             return null;
         }
         if (msg.patientId() != null && !repo.hasMessagingConsent(msg.patientId())) {
             repo.markBlocked(id, "no active messaging consent");
+            return null;
+        }
+        if (msg.patientId() != null && "MARKETING".equals(msg.templateCategory()) && !repo.hasConsent(msg.patientId(), "marketing")) {
+            repo.markBlocked(id, "marketing template needs marketing consent"); // COM-013: also after Meta re-categorised it
             return null;
         }
         if (!isOptOutConfirmation(msg) && optedOut(tenantId, msg)) {

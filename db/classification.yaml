@@ -71,6 +71,7 @@ schemas:
       needs_reschedule_reason: operational
       confirmed_at: operational
       patient_confirmed_at: operational
+      confirmation_state: operational
       no_show_at: operational
       no_show_marked_by: operational
       no_show_reason_code: operational
@@ -110,6 +111,12 @@ schemas:
       appointment_id: operational
       kind: operational
       status: operational
+      created_at: operational
+    appointment_reminders:
+      tenant_id: operational
+      appointment_id: operational
+      kind: operational
+      request_id: operational
       created_at: operational
     booking_policy_versions:
       id: operational
@@ -349,6 +356,28 @@ schemas:
       tax_category: financial
       sac_hsn: financial
       tax_inclusive: financial
+    claim_pack_formats:
+      id: operational
+      tenant_id: operational
+      code: operational
+      jurisdiction: operational
+      insurer_name: operational
+      sections: operational
+      csv_columns: operational
+      active: operational
+      created_at: operational
+    claim_packs:
+      id: operational
+      tenant_id: operational
+      visit_id: operational
+      invoice_id: operational
+      patient_id: pii
+      format_code: operational
+      document_id: operational
+      csv_document_id: operational
+      pdf_sha256: operational
+      generated_by: operational
+      created_at: operational
     chronic_conditions:
       id: operational
       tenant_id: operational
@@ -440,6 +469,18 @@ schemas:
       remote: operational
       legacy_readonly: operational
       updated_at: operational
+    consent_templates:
+      id: operational
+      tenant_id: operational
+      charge_code: operational
+      lang: operational
+      version: operational
+      title: operational
+      body_html: operational
+      active: operational
+      placeholder: operational
+      created_by: operational
+      created_at: operational
     consents:
       id: operational
       tenant_id: operational
@@ -1727,6 +1768,27 @@ schemas:
       effective_from: operational
       created_by: operational
       created_at: operational
+    procedure_consents:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      procedure_order_id: operational
+      template_id: operational
+      template_version: operational
+      lang: operational
+      signer_kind: pii
+      guardian_id: pii
+      signer_name: pii
+      witness_staff_id: operational
+      signature_file_id: operational
+      pdf_file_id: operational
+      pdf_sha256: operational
+      status: phi
+      signed_by: operational
+      signed_at: operational
+      withdrawn_at: phi
+      withdrawn_by: operational
+      withdraw_reason: phi
     procedure_orders:
       id: operational
       tenant_id: operational
@@ -1747,6 +1809,9 @@ schemas:
       consent_signed_name: pii
       consent_recorded_by: operational
       consent_signed_at: operational
+      consent_withdrawn_at: phi
+      consent_withdrawn_by: operational
+      consent_withdraw_reason: phi
       change_seq: operational
       updated_at: operational
     projector_applied_events:
@@ -2080,6 +2145,23 @@ schemas:
       error_code: operational
       created_at: operational
       completed_at: operational
+    web_push_subscriptions:
+      id: operational
+      tenant_id: operational
+      staff_id: operational
+      endpoint: pii  # uncertain: a per-browser push service URL, identifies the device
+      p256dh: operational
+      auth_secret_enc: pii  # secret key material, same tier as mfa_secret_enc
+      device_label: pii  # uncertain: free text the user types, may name a person
+      created_at: operational
+      last_success_at: operational
+      failure_count: operational
+    staff_onboarding_progress:
+      tenant_id: operational
+      staff_id: operational
+      tour_key: operational
+      completed_at: operational
+      competency_passed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational
@@ -2194,6 +2276,7 @@ schemas:
       template_id: operational
       attempts: operational
       last_attempt_at: operational
+      not_after: operational
     whatsapp_inbound_events:
       id: operational
       tenant_id: operational
@@ -2239,6 +2322,13 @@ schemas:
       purpose: operational
       submit_attempts: operational
       next_attempt_at: operational
+      version: operational
+      active: operational
+      superseded_by: operational
+      meta_category: operational
+      paused_until: operational
+      category_changed_at: operational
+      example_values: operational
     workflow_definitions:
       id: operational
       code: operational

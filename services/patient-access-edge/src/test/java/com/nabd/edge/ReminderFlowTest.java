@@ -8,6 +8,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,7 +83,8 @@ class ReminderFlowTest extends EdgeTestBase {
     }
 
     void tapTitle(String title) {
-        for (JsonNode b : last().path("buttons")) {
+        JsonNode m = last();
+        for (JsonNode b : m.has("rows") ? m.path("rows") : m.path("buttons")) { // more than three choices go as a list message
             if (title.equals(b.path("title").asString())) {
                 String id = FakeUpstreams.id();
                 UP.inbound(id, contact, "", b.path("id").asString());
@@ -169,14 +171,26 @@ class ReminderFlowTest extends EdgeTestBase {
         assertEquals(1, last().path("buttons").size());
     }
 
+    /** COM-043: the reasons are ACC-007's coded cancel list; 'Transport' cancels with reason code transport in one tap. */
     @Test
     void cancelTakesOneTapForTheReasonAndFreesTheSlot() {
         tapAction(act("cancel"));
-        assertEquals(3, last().path("buttons").size());
-        tapTitle("Can't make it");
+        List<String> codes = new java.util.ArrayList<>();
+        last().path("rows").forEach(r -> codes.add(r.path("title").asString()));
+        assertEquals(List.of("Schedule clash", "Illness", "Cost", "Transport", "Clinic rescheduled", "Other reason"), codes);
+        tapTitle("Transport");
         String call = UP.coreLog.stream().filter(l -> l.startsWith("POST /appointments/" + appt + "/cancel")).findFirst().orElseThrow();
-        assertTrue(call.contains("\"reasonCode\":\"cant_make_it\""), call);
+        assertTrue(call.contains("\"reasonCode\":\"transport\""), call);
+        assertFalse(call.contains("\"note\""), call);
         assertTrue(text().contains("cancelled"));
+    }
+
+    @Test
+    void otherCarriesTheNoteAcc007Requires() {
+        tapAction(act("cancel"));
+        tapTitle("Other reason");
+        String call = UP.coreLog.stream().filter(l -> l.startsWith("POST /appointments/" + appt + "/cancel")).findFirst().orElseThrow();
+        assertTrue(call.contains("\"reasonCode\":\"other\"") && call.contains("\"note\":\"Cancelled from the WhatsApp reminder\""), call);
     }
 
     @Test

@@ -6,6 +6,8 @@ import { STALE } from "@nabd/api-client/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FlowStepResponse } from "@nabd/api-client/generated";
 import StatusPill from "../ui/StatusPill";
+import ProcedureConsent from "../ui/consent/ProcedureConsent";
+import { openConsentPdf } from "../ui/consent/consentPdf";
 import { EmptyState } from "../ui/StateViews";
 import { api, ApiError } from "../../lib/api";
 import { getter, key } from "../../lib/query";
@@ -63,21 +65,21 @@ export default function ProceduresTab({ proceduresPendingRows, procedureOrders, 
     void invalidateAll();
   }
 
-  // ── NB-119: signed consent gates starting the procedure ────────────────────
-  const [consentModal, setConsentModal] = useState<{ orderId: string; signedName: string } | null>(null);
-  const [consentError, setConsentError] = useState<string | null>(null);
+  // ── CLN-014: signed consent (tablet form + signature) gates starting the procedure; withdrawal blocks it again ──
+  const [consentFor, setConsentFor] = useState<ProcedureOrder | null>(null);
+  const [withdraw, setWithdraw] = useState<{ orderId: string; reason: string } | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
-  async function submitConsent() {
-    if (!consentModal || !consentModal.signedName.trim()) return;
-    setConsentError(null);
+  async function submitWithdraw() {
+    if (!withdraw || !withdraw.reason.trim()) return;
+    setWithdrawError(null);
     try {
-      await api.post(`/nursing/procedure-orders/${consentModal.orderId}/consent`, { signedName: consentModal.signedName });
+      await api.post(`/nursing/procedure-orders/${withdraw.orderId}/consent/withdraw`, { reason: withdraw.reason.trim() });
     } catch (err) {
-      // Stay open: consent that failed to record must not look recorded.
-      setConsentError(detailOf(err, "Couldn't record consent."));
+      setWithdrawError(detailOf(err, "Couldn't record the withdrawal."));
       return;
     }
-    setConsentModal(null);
+    setWithdraw(null);
     void invalidateAll();
   }
   return (
@@ -121,7 +123,7 @@ export default function ProceduresTab({ proceduresPendingRows, procedureOrders, 
                   <thead><tr><th scope="col">Patient</th><th scope="col">Procedure</th><th scope="col">Consent</th><th scope="col">Preparation</th><th scope="col">State</th><th scope="col"></th></tr></thead>
                   <tbody>
                     {procedureOrders.map((p) => {
-                      const consented = !!p.consentSignedName;
+                      const consented = !!p.consentSignedAt && !p.consentWithdrawnAt;
                       const open = p.status === "ordered" || p.status === "prepped";
                       // Wireframe (Today's Procedures): an open order without signed consent reads "Consent missing" /
                       // "Blocked until consent" / Paused. The backend refuses prepped/completed until consent (ProcedureService).
@@ -131,15 +133,23 @@ export default function ProceduresTab({ proceduresPendingRows, procedureOrders, 
                           <td data-label="Patient">{p.patientName}</td>
                           <td data-label="Procedure">{p.chargeName}</td>
                           <td data-label="Consent">
-                            {consented
-                              ? <span title={p.consentRecordedByName ? `Recorded by ${p.consentRecordedByName}` : undefined}>
-                                  <StatusPill tone="ok" icon="check" label={`Signed · ${p.consentSignedName}${p.consentSignedAt ? ` · ${hhmm(p.consentSignedAt)}` : ""}`} />
-                                </span>
+                            {p.consentWithdrawnAt
+                              ? <span title={p.consentWithdrawReason ?? undefined}><StatusPill tone="danger" icon="alert" label={`Withdrawn · ${hhmm(p.consentWithdrawnAt)}`} /></span>
+                              : consented
+                              ? <div className={styles.rowActions}>
+                                  <span title={p.consentRecordedByName ? `Recorded by ${p.consentRecordedByName}` : undefined}>
+                                    <StatusPill tone="ok" icon="check" label={`Signed · ${p.consentSignedName}${p.consentSignedAt ? ` · ${hhmm(p.consentSignedAt)}` : ""}`} />
+                                  </span>
+                                  {canEditOrders && open && <button className={styles.smallBtn} onClick={() => { setWithdrawError(null); setWithdraw({ orderId: p.id, reason: "" }); }}>Record withdrawal</button>}
+                                </div>
                               : <div className={styles.rowActions}>
                                   <StatusPill tone="danger" label="Consent missing" icon="alert" />
-                                  {canEditOrders && open && <button className={styles.smallBtn} onClick={() => { setConsentError(null); setConsentModal({ orderId: p.id, signedName: "" }); }}>Record consent</button>}
+                                  {canEditOrders && open && <button className={styles.smallBtn} onClick={() => setConsentFor(p)}>Take consent</button>}
                                 </div>}
-                            {/* No consent-form version field exists in the API yet; the free-text note given at ordering is shown as typed. */}
+                            {p.consentId && (
+                              <button className={styles.smallBtn} onClick={() => void openConsentPdf(p.consentId!).then((ok) => { if (!ok) setProcRowError((prev) => ({ ...prev, [p.id]: "Couldn't open the signed consent PDF." })); })}>Signed PDF</button>
+                            )}
+                            {p.consentWithdrawnAt && p.consentWithdrawReason && <span className={`${styles.mrn} ${styles.muted}`}>Reason: {p.consentWithdrawReason}</span>}
                             {p.consentNote && <span className={`${styles.mrn} ${styles.muted}`}>Note: {p.consentNote}</span>}
                           </td>
                           <td data-label="Preparation">
@@ -173,19 +183,24 @@ export default function ProceduresTab({ proceduresPendingRows, procedureOrders, 
           </div>
         </>
 
-      {consentModal && canEditOrders && (
-        <div className={styles.overlay} onClick={() => setConsentModal(null)}>
+      {consentFor && canEditOrders && (
+        <ProcedureConsent order={consentFor} onClose={() => setConsentFor(null)} onRecorded={() => { setConsentFor(null); void invalidateAll(); }} />
+      )}
+
+      {withdraw && canEditOrders && (
+        <div className={styles.overlay} onClick={() => setWithdraw(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Record consent</h2>
+            <h2 className={styles.modalTitle}>Record consent withdrawal</h2>
+            <p className={styles.muted}>The procedure is blocked from now on; a new order needs a new consent.</p>
             <div className={styles.field}>
-              <label className={styles.label}>Patient&apos;s typed name (stands in for a signature)</label>
-              <input className={styles.input} value={consentModal.signedName}
-                onChange={(e) => setConsentModal({ ...consentModal, signedName: e.target.value })} />
+              <label className={styles.label} htmlFor="withdrawReason">Reason given</label>
+              <input id="withdrawReason" className={styles.input} value={withdraw.reason} maxLength={500}
+                onChange={(e) => setWithdraw({ ...withdraw, reason: e.target.value })} />
             </div>
-            {consentError && <div className={styles.formError} role="alert">{consentError}</div>}
+            {withdrawError && <div className={styles.formError} role="alert">{withdrawError}</div>}
             <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setConsentModal(null)}>Cancel</button>
-              <button type="button" className={styles.submitBtn} disabled={!consentModal.signedName.trim()} onClick={submitConsent}>Record consent</button>
+              <button type="button" className={styles.cancelBtn} onClick={() => setWithdraw(null)}>Cancel</button>
+              <button type="button" className={styles.submitBtn} disabled={!withdraw.reason.trim()} onClick={() => void submitWithdraw()}>Record withdrawal</button>
             </div>
           </div>
         </div>

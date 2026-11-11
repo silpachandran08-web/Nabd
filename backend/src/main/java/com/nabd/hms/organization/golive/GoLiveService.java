@@ -38,9 +38,12 @@ public class GoLiveService {
     private final AuditService audit;
     private final EventPublisher events;
     private final String bookingBaseUrl;
+    private final com.nabd.hms.organization.setup.SetupStepEvents stepEvents;
 
     GoLiveService(List<GoLiveCheck> checks, JdbcTemplate jdbc, TenantContext tenantContext, ActorDirectory actors, TenantLifecyclePort lifecycle,
-                  AuditService audit, EventPublisher events, @Value("${app.booking.base-url:}") String bookingBaseUrl) {
+                  AuditService audit, EventPublisher events, @Value("${app.booking.base-url:}") String bookingBaseUrl,
+                  com.nabd.hms.organization.setup.SetupStepEvents stepEvents) {
+        this.stepEvents = stepEvents;
         this.checks = checks.stream().sorted(Comparator.comparingInt(GoLiveCheck::order)).toList();
         this.jdbc = jdbc;
         this.tenantContext = tenantContext;
@@ -93,6 +96,7 @@ public class GoLiveService {
         lifecycle.markLive(staffId);
         jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status, done_at) VALUES (?, 'go_live', 'done', now()) " +
                 "ON CONFLICT (tenant_id, step) DO UPDATE SET status = 'done', done_at = now(), skipped_at = NULL, updated_at = now()", tenantId);
+        stepEvents.changed(tenantId, "go_live", "done", null); // ADM-005: the funnel's time to go-live
         liveAt = liveAt();
         audit.record(tenantId, "staff", staffId, owner.name(), owner.role(), ip, "setup.went_live", "tenant", tenantId, null, Map.of("liveAt", liveAt.toString()));
         events.publish(tenantId, DomainEventType.ORGANIZATION_CONFIG_CHANGED, tenantId, Map.of("configKey", "tenant.went_live", "status", "updated"));

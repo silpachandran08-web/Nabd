@@ -109,7 +109,8 @@ public class ScheduleBoardService {
             int end = clock.secondOfClinicDay(tenantId, day, a.end()) / 60;
             bookings.add(new ScheduleGrid.BookingInput(a.doctorId(), start, Math.max(end, start + 1), new ScheduleDayResponse.Booking(
                     a.id(), a.queueEntryId(), a.patientId(), a.patientName(), a.followUp() ? "follow_up" : "appointment",
-                    ScheduleGrid.hhmm(start), a.token(), a.queueStatus() != null ? a.queueStatus() : a.status(), a.actedByRelation())));
+                    ScheduleGrid.hhmm(start), a.token(), a.queueStatus() != null ? a.queueStatus() : a.status(), a.actedByRelation(),
+                    a.confirmationState())));
         }
         for (ScheduleBoardRepository.WalkInRow w : walkIns) {
             if (w.doctorId() == null) {

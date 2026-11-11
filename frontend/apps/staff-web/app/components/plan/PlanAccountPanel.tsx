@@ -99,7 +99,7 @@ export default function PlanAccountPanel() {
           <ul className={styles.invoices}>
             {invQ.data.items.map((i) => (
               <li key={i.id} className={styles.row} data-testid="nabd-invoice">
-                <span><strong>{i.number}</strong><span className={styles.muted}> · {t(`kind.${i.kind === "proration" ? "proration" : "renewal"}`)} · {i.periodStart} – {i.periodEnd}</span></span>
+                <span><strong>{i.number}</strong><span className={styles.muted}> · {t(`kind.${i.kind === "proration" || i.kind === "white_glove" ? i.kind : "renewal"}`)} · {i.periodStart} – {i.periodEnd}</span></span>
                 <span>{money(i.amountMinor, i.currency)} · {t(`status.${["due", "paid", "void"].includes(i.status) ? i.status : "due"}`)}</span>
                 {i.pdfUrl ? <a className={styles.link} href={i.pdfUrl}>{t("downloadPdf")}</a> : <span className={styles.muted}>{t("pdfPending")}</span>}
               </li>

@@ -263,8 +263,8 @@ class NursingApiTest extends ApiTestBase {
 
         ResponseEntity<Map> blocked = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("status", "prepped")), Map.class);
-        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(blocked.getBody().get("type")).asString().contains("consent-required");
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.CONFLICT); // CLN-014: 409 CONSENT_REQUIRED
+        assertThat(blocked.getBody().get("type")).asString().contains("CONSENT_REQUIRED");
 
         ResponseEntity<Map> cancelled = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("status", "cancelled")), Map.class);
@@ -287,9 +287,10 @@ class NursingApiTest extends ApiTestBase {
 
         ResponseEntity<Map> consented = exchange("/v1/nursing/procedure-orders/" + procedureId + "/consent", HttpMethod.POST,
                 authedJsonBody(token, Map.of("signedName", "P11")), Map.class);
-        assertThat(consented.getBody().get("consentSignedName")).isEqualTo("P11");
-        assertThat(consented.getBody().get("consentRecordedByName")).isEqualTo("Test Staff");
-        assertThat(consented.getBody().get("consentSignedAt")).isNotNull();
+        Map<?, ?> consentedOrder = (Map<?, ?>) consented.getBody().get("order"); // CLN-014: the order now sits under "order"
+        assertThat(consentedOrder.get("consentSignedName")).isEqualTo("P11");
+        assertThat(consentedOrder.get("consentRecordedByName")).isEqualTo("Test Staff");
+        assertThat(consentedOrder.get("consentSignedAt")).isNotNull();
 
         ResponseEntity<Map> prepped = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("status", "prepped")), Map.class);

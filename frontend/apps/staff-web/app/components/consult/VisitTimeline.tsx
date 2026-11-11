@@ -12,6 +12,7 @@ const LABEL: Record<string, string> = {
   "Checked in": "event.checkedIn", "Vitals recorded": "event.vitalsRecorded", "Consultation started": "event.consultStarted", "Draft saved": "event.draftSaved",
   "Note signed": "event.noteSigned", "Visit completed": "event.visitCompleted", "Sent to checkout": "event.sentToCheckout",
   "Transferred to another department": "event.transferred", "Amendment added": "event.amendmentAdded",
+  "Consent signed": "event.consentSigned", "Consent withdrawn": "event.consentWithdrawn",
 };
 const SUB: Record<string, string> = { "not recorded yet": "sub.notRecordedYet", "status unavailable": "sub.statusUnavailable", "on this device · waiting to sync": "sub.onDeviceWaiting" };
 export const TIMELINE_TEXT = { LABEL, SUB };

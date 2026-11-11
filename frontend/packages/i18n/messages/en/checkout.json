@@ -215,5 +215,26 @@
     "payments": "Payments",
     "inWords": "Amount in words: {words}",
     "computerGenerated": "Computer-generated document."
+  },
+  "claimPack": {
+    "claimPack": "Claim pack",
+    "title": "Insurance claim pack",
+    "format": "Insurer format",
+    "loadingFormats": "Loading formats",
+    "couldNotLoadFormats": "Couldn't load the claim formats.",
+    "retry": "Retry",
+    "noFormats": "No claim formats are set up.",
+    "generate": "Create pack",
+    "generating": "Creating…",
+    "download": "Download PDF",
+    "downloadCsv": "Download CSV",
+    "send": "Send to patient (secure link)",
+    "sending": "Sending…",
+    "sent": "Secure link sent. The patient opens it with a one-time code.",
+    "failed": "Couldn't create the claim pack.",
+    "downloadFailed": "Couldn't download the file.",
+    "sendFailed": "Couldn't send the secure link.",
+    "contents": "Contains the invoice, the receipt and the consultation summary (diagnosis, procedures, prescription): no full clinical notes.",
+    "close": "Close"
   }
 }

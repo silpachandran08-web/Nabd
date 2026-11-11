@@ -23,6 +23,9 @@ owner,GET /v1/auth/break-glass/active,staff:view,allow
 owner,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 owner,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 owner,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,allow
+owner,GET /v1/billing/claim-pack-formats,billing:view,allow
+owner,GET /v1/billing/claim-packs/{id}/document,billing:view,allow
+owner,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,allow
 owner,GET /v1/billing/day-close,billing:view,allow
 owner,GET /v1/billing/day-close/history,billing:view,allow
 owner,GET /v1/billing/discount-approvals,billing:view,allow
@@ -93,6 +96,8 @@ owner,GET /v1/files/{id},clinical:view,allow
 owner,GET /v1/front-desk/exceptions,queue:view,allow
 owner,GET /v1/nursing/activity/today,nursing:view,allow
 owner,GET /v1/nursing/administration-orders/today,nursing:view,allow
+owner,GET /v1/nursing/consent-templates,nursing:view,allow
+owner,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,allow
 owner,GET /v1/nursing/procedure-orders/today,nursing:view,allow
 owner,GET /v1/nursing/vaccine-records/today,nursing:view,allow
 owner,GET /v1/nursing/worklist,queue:view,allow
@@ -134,6 +139,8 @@ owner,GET /v1/pharmacy/stock,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 owner,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 owner,GET /v1/pharmacy/worklist,pharmacy:dispense,allow
+owner,GET /v1/platform/activation/funnel,onboarding:view,deny-401
+owner,GET /v1/platform/activation/stuck,onboarding:view,deny-401
 owner,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 owner,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -151,6 +158,7 @@ owner,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
 owner,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 owner,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner,GET /v1/platform/territories,territories:view,deny-401
+owner,GET /v1/platform/white-glove,onboarding:view,deny-401
 owner,GET /v1/queue,queue:view,allow
 owner,GET /v1/queue/board,queue:view,allow
 owner,GET /v1/queue/eta,queue:view,allow
@@ -211,6 +219,7 @@ owner,GET /v1/setup/subscription/invoices,setup:view,allow
 owner,GET /v1/setup/subscription/invoices/{id},setup:view,allow
 owner,GET /v1/setup/trial,setup:view,allow
 owner,GET /v1/setup/whatsapp-templates,setup:view,allow
+owner,GET /v1/setup/white-glove,setup:view,allow
 owner,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 owner,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
 owner,GET /v1/staff,staff:view,allow
@@ -271,6 +280,8 @@ owner,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 owner,POST /v1/auth/break-glass/activate,clinical:breakGlass,allow
 owner,POST /v1/auth/pin-assertion,billing:create,allow
 owner,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
+owner,POST /v1/billing/claim-packs,billing:view,allow
+owner,POST /v1/billing/claim-packs/{id}/send,billing:view,allow
 owner,POST /v1/billing/day-close,billing:approve,allow
 owner,POST /v1/billing/day-close/reopen,billing:approve,allow
 owner,POST /v1/billing/discount-approvals,billing:create,allow
@@ -321,8 +332,10 @@ owner,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,allow
 owner,POST /v1/nursing/administration-orders,nursing:create,allow
 owner,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,allow
 owner,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,allow
+owner,POST /v1/nursing/consent-templates,clinical:approve,deny-403
 owner,POST /v1/nursing/procedure-orders,nursing:create,allow
 owner,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,allow
+owner,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,allow
 owner,POST /v1/nursing/vaccine-records,nursing:create,allow
 owner,POST /v1/packages,packages:create,allow
 owner,POST /v1/packages/instances/items/{itemId}/book,packages:edit,allow
@@ -374,6 +387,7 @@ owner,POST /v1/platform/support-access/grants/{id}/revoke,support_access:view,de
 owner,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-401
 owner,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-401
 owner,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-401
+owner,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-401
 owner,POST /v1/queue/check-in,queue:create,allow
 owner,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,allow
 owner,POST /v1/queue/late-arrival,queue:create,allow
@@ -408,6 +422,7 @@ owner,POST /v1/setup/trial/convert,setup:edit,allow
 owner,POST /v1/setup/trial/convert/otp,setup:edit,allow
 owner,POST /v1/setup/whatsapp-templates,setup:edit,allow
 owner,POST /v1/setup/whatsapp-templates:lint,setup:edit,allow
+owner,POST /v1/setup/white-glove,setup:edit,allow
 owner,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,allow
 owner,POST /v1/staff,staff:create,allow
 owner,POST /v1/staff/{id}/clinical-licence/override,staff:edit,allow
@@ -463,6 +478,9 @@ owner_doctor,GET /v1/auth/break-glass/active,staff:view,allow
 owner_doctor,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 owner_doctor,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 owner_doctor,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,allow
+owner_doctor,GET /v1/billing/claim-pack-formats,billing:view,allow
+owner_doctor,GET /v1/billing/claim-packs/{id}/document,billing:view,allow
+owner_doctor,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,allow
 owner_doctor,GET /v1/billing/day-close,billing:view,allow
 owner_doctor,GET /v1/billing/day-close/history,billing:view,allow
 owner_doctor,GET /v1/billing/discount-approvals,billing:view,allow
@@ -533,6 +551,8 @@ owner_doctor,GET /v1/files/{id},clinical:view,allow
 owner_doctor,GET /v1/front-desk/exceptions,queue:view,allow
 owner_doctor,GET /v1/nursing/activity/today,nursing:view,allow
 owner_doctor,GET /v1/nursing/administration-orders/today,nursing:view,allow
+owner_doctor,GET /v1/nursing/consent-templates,nursing:view,allow
+owner_doctor,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,allow
 owner_doctor,GET /v1/nursing/procedure-orders/today,nursing:view,allow
 owner_doctor,GET /v1/nursing/vaccine-records/today,nursing:view,allow
 owner_doctor,GET /v1/nursing/worklist,queue:view,allow
@@ -574,6 +594,8 @@ owner_doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/worklist,pharmacy:dispense,allow
+owner_doctor,GET /v1/platform/activation/funnel,onboarding:view,deny-401
+owner_doctor,GET /v1/platform/activation/stuck,onboarding:view,deny-401
 owner_doctor,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -591,6 +613,7 @@ owner_doctor,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
 owner_doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 owner_doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner_doctor,GET /v1/platform/territories,territories:view,deny-401
+owner_doctor,GET /v1/platform/white-glove,onboarding:view,deny-401
 owner_doctor,GET /v1/queue,queue:view,allow
 owner_doctor,GET /v1/queue/board,queue:view,allow
 owner_doctor,GET /v1/queue/eta,queue:view,allow
@@ -651,6 +674,7 @@ owner_doctor,GET /v1/setup/subscription/invoices,setup:view,allow
 owner_doctor,GET /v1/setup/subscription/invoices/{id},setup:view,allow
 owner_doctor,GET /v1/setup/trial,setup:view,allow
 owner_doctor,GET /v1/setup/whatsapp-templates,setup:view,allow
+owner_doctor,GET /v1/setup/white-glove,setup:view,allow
 owner_doctor,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 owner_doctor,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
 owner_doctor,GET /v1/staff,staff:view,allow
@@ -711,6 +735,8 @@ owner_doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 owner_doctor,POST /v1/auth/break-glass/activate,clinical:breakGlass,allow
 owner_doctor,POST /v1/auth/pin-assertion,billing:create,allow
 owner_doctor,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
+owner_doctor,POST /v1/billing/claim-packs,billing:view,allow
+owner_doctor,POST /v1/billing/claim-packs/{id}/send,billing:view,allow
 owner_doctor,POST /v1/billing/day-close,billing:approve,allow
 owner_doctor,POST /v1/billing/day-close/reopen,billing:approve,allow
 owner_doctor,POST /v1/billing/discount-approvals,billing:create,allow
@@ -761,8 +787,10 @@ owner_doctor,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,allow
 owner_doctor,POST /v1/nursing/administration-orders,nursing:create,allow
 owner_doctor,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,allow
 owner_doctor,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,allow
+owner_doctor,POST /v1/nursing/consent-templates,clinical:approve,allow
 owner_doctor,POST /v1/nursing/procedure-orders,nursing:create,allow
 owner_doctor,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,allow
+owner_doctor,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,allow
 owner_doctor,POST /v1/nursing/vaccine-records,nursing:create,allow
 owner_doctor,POST /v1/packages,packages:create,allow
 owner_doctor,POST /v1/packages/instances/items/{itemId}/book,packages:edit,allow
@@ -814,6 +842,7 @@ owner_doctor,POST /v1/platform/support-access/grants/{id}/revoke,support_access:
 owner_doctor,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-401
 owner_doctor,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-401
 owner_doctor,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-401
+owner_doctor,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-401
 owner_doctor,POST /v1/queue/check-in,queue:create,allow
 owner_doctor,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,allow
 owner_doctor,POST /v1/queue/late-arrival,queue:create,allow
@@ -848,6 +877,7 @@ owner_doctor,POST /v1/setup/trial/convert,setup:edit,allow
 owner_doctor,POST /v1/setup/trial/convert/otp,setup:edit,allow
 owner_doctor,POST /v1/setup/whatsapp-templates,setup:edit,allow
 owner_doctor,POST /v1/setup/whatsapp-templates:lint,setup:edit,allow
+owner_doctor,POST /v1/setup/white-glove,setup:edit,allow
 owner_doctor,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,allow
 owner_doctor,POST /v1/staff,staff:create,allow
 owner_doctor,POST /v1/staff/{id}/clinical-licence/override,staff:edit,allow
@@ -903,6 +933,9 @@ doctor,GET /v1/auth/break-glass/active,staff:view,deny-403
 doctor,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 doctor,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 doctor,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-403
+doctor,GET /v1/billing/claim-pack-formats,billing:view,allow
+doctor,GET /v1/billing/claim-packs/{id}/document,billing:view,allow
+doctor,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,allow
 doctor,GET /v1/billing/day-close,billing:view,allow
 doctor,GET /v1/billing/day-close/history,billing:view,allow
 doctor,GET /v1/billing/discount-approvals,billing:view,allow
@@ -973,6 +1006,8 @@ doctor,GET /v1/files/{id},clinical:view,allow
 doctor,GET /v1/front-desk/exceptions,queue:view,allow
 doctor,GET /v1/nursing/activity/today,nursing:view,allow
 doctor,GET /v1/nursing/administration-orders/today,nursing:view,allow
+doctor,GET /v1/nursing/consent-templates,nursing:view,allow
+doctor,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,allow
 doctor,GET /v1/nursing/procedure-orders/today,nursing:view,allow
 doctor,GET /v1/nursing/vaccine-records/today,nursing:view,allow
 doctor,GET /v1/nursing/worklist,queue:view,allow
@@ -1014,6 +1049,8 @@ doctor,GET /v1/pharmacy/stock,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 doctor,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 doctor,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
+doctor,GET /v1/platform/activation/funnel,onboarding:view,deny-401
+doctor,GET /v1/platform/activation/stuck,onboarding:view,deny-401
 doctor,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1031,6 +1068,7 @@ doctor,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
 doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 doctor,GET /v1/platform/territories,territories:view,deny-401
+doctor,GET /v1/platform/white-glove,onboarding:view,deny-401
 doctor,GET /v1/queue,queue:view,allow
 doctor,GET /v1/queue/board,queue:view,allow
 doctor,GET /v1/queue/eta,queue:view,allow
@@ -1091,6 +1129,7 @@ doctor,GET /v1/setup/subscription/invoices,setup:view,deny-403
 doctor,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 doctor,GET /v1/setup/trial,setup:view,deny-403
 doctor,GET /v1/setup/whatsapp-templates,setup:view,deny-403
+doctor,GET /v1/setup/white-glove,setup:view,deny-403
 doctor,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 doctor,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
 doctor,GET /v1/staff,staff:view,deny-403
@@ -1151,6 +1190,8 @@ doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 doctor,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 doctor,POST /v1/auth/pin-assertion,billing:create,deny-403
 doctor,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-403
+doctor,POST /v1/billing/claim-packs,billing:view,allow
+doctor,POST /v1/billing/claim-packs/{id}/send,billing:view,allow
 doctor,POST /v1/billing/day-close,billing:approve,deny-403
 doctor,POST /v1/billing/day-close/reopen,billing:approve,deny-403
 doctor,POST /v1/billing/discount-approvals,billing:create,deny-403
@@ -1201,8 +1242,10 @@ doctor,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,allow
 doctor,POST /v1/nursing/administration-orders,nursing:create,allow
 doctor,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-403
 doctor,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-403
+doctor,POST /v1/nursing/consent-templates,clinical:approve,deny-403
 doctor,POST /v1/nursing/procedure-orders,nursing:create,allow
 doctor,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-403
+doctor,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-403
 doctor,POST /v1/nursing/vaccine-records,nursing:create,allow
 doctor,POST /v1/packages,packages:create,allow
 doctor,POST /v1/packages/instances/items/{itemId}/book,packages:edit,allow
@@ -1254,6 +1297,7 @@ doctor,POST /v1/platform/support-access/grants/{id}/revoke,support_access:view,d
 doctor,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-401
 doctor,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-401
 doctor,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-401
+doctor,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-401
 doctor,POST /v1/queue/check-in,queue:create,deny-403
 doctor,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,allow
 doctor,POST /v1/queue/late-arrival,queue:create,deny-403
@@ -1288,6 +1332,7 @@ doctor,POST /v1/setup/trial/convert,setup:edit,deny-403
 doctor,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 doctor,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 doctor,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
+doctor,POST /v1/setup/white-glove,setup:edit,deny-403
 doctor,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,allow
 doctor,POST /v1/staff,staff:create,deny-403
 doctor,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
@@ -1343,6 +1388,9 @@ nurse,GET /v1/auth/break-glass/active,staff:view,deny-403
 nurse,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-403
 nurse,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-403
 nurse,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-403
+nurse,GET /v1/billing/claim-pack-formats,billing:view,deny-403
+nurse,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-403
+nurse,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-403
 nurse,GET /v1/billing/day-close,billing:view,deny-403
 nurse,GET /v1/billing/day-close/history,billing:view,deny-403
 nurse,GET /v1/billing/discount-approvals,billing:view,deny-403
@@ -1413,6 +1461,8 @@ nurse,GET /v1/files/{id},clinical:view,allow
 nurse,GET /v1/front-desk/exceptions,queue:view,allow
 nurse,GET /v1/nursing/activity/today,nursing:view,allow
 nurse,GET /v1/nursing/administration-orders/today,nursing:view,allow
+nurse,GET /v1/nursing/consent-templates,nursing:view,allow
+nurse,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,allow
 nurse,GET /v1/nursing/procedure-orders/today,nursing:view,allow
 nurse,GET /v1/nursing/vaccine-records/today,nursing:view,allow
 nurse,GET /v1/nursing/worklist,queue:view,allow
@@ -1454,6 +1504,8 @@ nurse,GET /v1/pharmacy/stock,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 nurse,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 nurse,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
+nurse,GET /v1/platform/activation/funnel,onboarding:view,deny-401
+nurse,GET /v1/platform/activation/stuck,onboarding:view,deny-401
 nurse,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 nurse,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 nurse,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1471,6 +1523,7 @@ nurse,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
 nurse,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 nurse,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 nurse,GET /v1/platform/territories,territories:view,deny-401
+nurse,GET /v1/platform/white-glove,onboarding:view,deny-401
 nurse,GET /v1/queue,queue:view,allow
 nurse,GET /v1/queue/board,queue:view,allow
 nurse,GET /v1/queue/eta,queue:view,allow
@@ -1531,6 +1584,7 @@ nurse,GET /v1/setup/subscription/invoices,setup:view,deny-403
 nurse,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 nurse,GET /v1/setup/trial,setup:view,deny-403
 nurse,GET /v1/setup/whatsapp-templates,setup:view,deny-403
+nurse,GET /v1/setup/white-glove,setup:view,deny-403
 nurse,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 nurse,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
 nurse,GET /v1/staff,staff:view,deny-403
@@ -1591,6 +1645,8 @@ nurse,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 nurse,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 nurse,POST /v1/auth/pin-assertion,billing:create,deny-403
 nurse,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-403
+nurse,POST /v1/billing/claim-packs,billing:view,deny-403
+nurse,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-403
 nurse,POST /v1/billing/day-close,billing:approve,deny-403
 nurse,POST /v1/billing/day-close/reopen,billing:approve,deny-403
 nurse,POST /v1/billing/discount-approvals,billing:create,deny-403
@@ -1641,8 +1697,10 @@ nurse,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,allow
 nurse,POST /v1/nursing/administration-orders,nursing:create,allow
 nurse,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,allow
 nurse,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,allow
+nurse,POST /v1/nursing/consent-templates,clinical:approve,deny-403
 nurse,POST /v1/nursing/procedure-orders,nursing:create,allow
 nurse,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,allow
+nurse,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,allow
 nurse,POST /v1/nursing/vaccine-records,nursing:create,allow
 nurse,POST /v1/packages,packages:create,deny-403
 nurse,POST /v1/packages/instances/items/{itemId}/book,packages:edit,allow
@@ -1694,6 +1752,7 @@ nurse,POST /v1/platform/support-access/grants/{id}/revoke,support_access:view,de
 nurse,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-401
 nurse,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-401
 nurse,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-401
+nurse,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-401
 nurse,POST /v1/queue/check-in,queue:create,deny-403
 nurse,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,allow
 nurse,POST /v1/queue/late-arrival,queue:create,deny-403
@@ -1728,6 +1787,7 @@ nurse,POST /v1/setup/trial/convert,setup:edit,deny-403
 nurse,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 nurse,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 nurse,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
+nurse,POST /v1/setup/white-glove,setup:edit,deny-403
 nurse,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-403
 nurse,POST /v1/staff,staff:create,deny-403
 nurse,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
@@ -1783,6 +1843,9 @@ receptionist,GET /v1/auth/break-glass/active,staff:view,deny-403
 receptionist,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 receptionist,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 receptionist,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,allow
+receptionist,GET /v1/billing/claim-pack-formats,billing:view,allow
+receptionist,GET /v1/billing/claim-packs/{id}/document,billing:view,allow
+receptionist,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,allow
 receptionist,GET /v1/billing/day-close,billing:view,allow
 receptionist,GET /v1/billing/day-close/history,billing:view,allow
 receptionist,GET /v1/billing/discount-approvals,billing:view,allow
@@ -1853,6 +1916,8 @@ receptionist,GET /v1/files/{id},clinical:view,deny-403
 receptionist,GET /v1/front-desk/exceptions,queue:view,allow
 receptionist,GET /v1/nursing/activity/today,nursing:view,deny-403
 receptionist,GET /v1/nursing/administration-orders/today,nursing:view,deny-403
+receptionist,GET /v1/nursing/consent-templates,nursing:view,deny-403
+receptionist,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-403
 receptionist,GET /v1/nursing/procedure-orders/today,nursing:view,deny-403
 receptionist,GET /v1/nursing/vaccine-records/today,nursing:view,deny-403
 receptionist,GET /v1/nursing/worklist,queue:view,allow
@@ -1894,6 +1959,8 @@ receptionist,GET /v1/pharmacy/stock,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 receptionist,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
+receptionist,GET /v1/platform/activation/funnel,onboarding:view,deny-401
+receptionist,GET /v1/platform/activation/stuck,onboarding:view,deny-401
 receptionist,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -1911,6 +1978,7 @@ receptionist,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
 receptionist,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 receptionist,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 receptionist,GET /v1/platform/territories,territories:view,deny-401
+receptionist,GET /v1/platform/white-glove,onboarding:view,deny-401
 receptionist,GET /v1/queue,queue:view,allow
 receptionist,GET /v1/queue/board,queue:view,allow
 receptionist,GET /v1/queue/eta,queue:view,allow
@@ -1971,6 +2039,7 @@ receptionist,GET /v1/setup/subscription/invoices,setup:view,deny-403
 receptionist,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 receptionist,GET /v1/setup/trial,setup:view,deny-403
 receptionist,GET /v1/setup/whatsapp-templates,setup:view,deny-403
+receptionist,GET /v1/setup/white-glove,setup:view,deny-403
 receptionist,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-403
 receptionist,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-403
 receptionist,GET /v1/staff,staff:view,deny-403
@@ -2031,6 +2100,8 @@ receptionist,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 receptionist,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 receptionist,POST /v1/auth/pin-assertion,billing:create,allow
 receptionist,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
+receptionist,POST /v1/billing/claim-packs,billing:view,allow
+receptionist,POST /v1/billing/claim-packs/{id}/send,billing:view,allow
 receptionist,POST /v1/billing/day-close,billing:approve,allow
 receptionist,POST /v1/billing/day-close/reopen,billing:approve,allow
 receptionist,POST /v1/billing/discount-approvals,billing:create,allow
@@ -2081,8 +2152,10 @@ receptionist,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,allow
 receptionist,POST /v1/nursing/administration-orders,nursing:create,deny-403
 receptionist,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-403
 receptionist,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-403
+receptionist,POST /v1/nursing/consent-templates,clinical:approve,deny-403
 receptionist,POST /v1/nursing/procedure-orders,nursing:create,deny-403
 receptionist,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-403
+receptionist,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-403
 receptionist,POST /v1/nursing/vaccine-records,nursing:create,deny-403
 receptionist,POST /v1/packages,packages:create,allow
 receptionist,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-403
@@ -2134,6 +2207,7 @@ receptionist,POST /v1/platform/support-access/grants/{id}/revoke,support_access:
 receptionist,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-401
 receptionist,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-401
 receptionist,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-401
+receptionist,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-401
 receptionist,POST /v1/queue/check-in,queue:create,allow
 receptionist,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,allow
 receptionist,POST /v1/queue/late-arrival,queue:create,allow
@@ -2168,6 +2242,7 @@ receptionist,POST /v1/setup/trial/convert,setup:edit,deny-403
 receptionist,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 receptionist,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 receptionist,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
+receptionist,POST /v1/setup/white-glove,setup:edit,deny-403
 receptionist,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-403
 receptionist,POST /v1/staff,staff:create,deny-403
 receptionist,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
@@ -2223,6 +2298,9 @@ frontdesk_vitals,GET /v1/auth/break-glass/active,staff:view,deny-403
 frontdesk_vitals,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 frontdesk_vitals,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 frontdesk_vitals,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,allow
+frontdesk_vitals,GET /v1/billing/claim-pack-formats,billing:view,allow
+frontdesk_vitals,GET /v1/billing/claim-packs/{id}/document,billing:view,allow
+frontdesk_vitals,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,allow
 frontdesk_vitals,GET /v1/billing/day-close,billing:view,allow
 frontdesk_vitals,GET /v1/billing/day-close/history,billing:view,allow
 frontdesk_vitals,GET /v1/billing/discount-approvals,billing:view,allow
@@ -2293,6 +2371,8 @@ frontdesk_vitals,GET /v1/files/{id},clinical:view,allow
 frontdesk_vitals,GET /v1/front-desk/exceptions,queue:view,allow
 frontdesk_vitals,GET /v1/nursing/activity/today,nursing:view,deny-403
 frontdesk_vitals,GET /v1/nursing/administration-orders/today,nursing:view,deny-403
+frontdesk_vitals,GET /v1/nursing/consent-templates,nursing:view,deny-403
+frontdesk_vitals,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-403
 frontdesk_vitals,GET /v1/nursing/procedure-orders/today,nursing:view,deny-403
 frontdesk_vitals,GET /v1/nursing/vaccine-records/today,nursing:view,deny-403
 frontdesk_vitals,GET /v1/nursing/worklist,queue:view,allow
@@ -2334,6 +2414,8 @@ frontdesk_vitals,GET /v1/pharmacy/stock,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock-takes,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-403
+frontdesk_vitals,GET /v1/platform/activation/funnel,onboarding:view,deny-401
+frontdesk_vitals,GET /v1/platform/activation/stuck,onboarding:view,deny-401
 frontdesk_vitals,GET /v1/platform/audit-log,audit_compliance:view,deny-401
 frontdesk_vitals,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 frontdesk_vitals,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
@@ -2351,6 +2433,7 @@ frontdesk_vitals,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
 frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 frontdesk_vitals,GET /v1/platform/territories,territories:view,deny-401
+frontdesk_vitals,GET /v1/platform/white-glove,onboarding:view,deny-401
 frontdesk_vitals,GET /v1/queue,queue:view,allow
 frontdesk_vitals,GET /v1/queue/board,queue:view,allow
 frontdesk_vitals,GET /v1/queue/eta,queue:view,allow
@@ -2411,6 +2494,7 @@ frontdesk_vitals,GET /v1/setup/subscription/invoices,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/trial,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/whatsapp-templates,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/white-glove,setup:view,deny-403
 frontdesk_vitals,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-403
 frontdesk_vitals,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-403
 frontdesk_vitals,GET /v1/staff,staff:view,deny-403
@@ -2471,6 +2555,8 @@ frontdesk_vitals,POST /v1/appointments/{id}/reschedule,queue:edit,allow
 frontdesk_vitals,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-403
 frontdesk_vitals,POST /v1/auth/pin-assertion,billing:create,allow
 frontdesk_vitals,POST /v1/billing/checkout/{queueEntryId},billing:create,allow
+frontdesk_vitals,POST /v1/billing/claim-packs,billing:view,allow
+frontdesk_vitals,POST /v1/billing/claim-packs/{id}/send,billing:view,allow
 frontdesk_vitals,POST /v1/billing/day-close,billing:approve,allow
 frontdesk_vitals,POST /v1/billing/day-close/reopen,billing:approve,allow
 frontdesk_vitals,POST /v1/billing/discount-approvals,billing:create,allow
@@ -2521,8 +2607,10 @@ frontdesk_vitals,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,allow
 frontdesk_vitals,POST /v1/nursing/administration-orders,nursing:create,deny-403
 frontdesk_vitals,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-403
 frontdesk_vitals,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-403
+frontdesk_vitals,POST /v1/nursing/consent-templates,clinical:approve,deny-403
 frontdesk_vitals,POST /v1/nursing/procedure-orders,nursing:create,deny-403
 frontdesk_vitals,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-403
+frontdesk_vitals,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-403
 frontdesk_vitals,POST /v1/nursing/vaccine-records,nursing:create,deny-403
 frontdesk_vitals,POST /v1/packages,packages:create,allow
 frontdesk_vitals,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-403
@@ -2574,6 +2662,7 @@ frontdesk_vitals,POST /v1/platform/support-access/grants/{id}/revoke,support_acc
 frontdesk_vitals,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-401
 frontdesk_vitals,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-401
 frontdesk_vitals,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-401
+frontdesk_vitals,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-401
 frontdesk_vitals,POST /v1/queue/check-in,queue:create,allow
 frontdesk_vitals,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,allow
 frontdesk_vitals,POST /v1/queue/late-arrival,queue:create,allow
@@ -2608,6 +2697,7 @@ frontdesk_vitals,POST /v1/setup/trial/convert,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
+frontdesk_vitals,POST /v1/setup/white-glove,setup:edit,deny-403
 frontdesk_vitals,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-403
 frontdesk_vitals,POST /v1/staff,staff:create,deny-403
 frontdesk_vitals,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
