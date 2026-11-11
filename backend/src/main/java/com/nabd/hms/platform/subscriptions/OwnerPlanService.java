@@ -2,6 +2,7 @@ package com.nabd.hms.platform.subscriptions;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.Cursor;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
@@ -24,7 +25,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -71,9 +72,10 @@ public class OwnerPlanService implements PlanAccount {
     private final EntitlementEvents entitlementEvents;
     private final TenantScope tenantScope;
     private final Clock clock;
+    private final ClinicClock clinicClock;
 
     OwnerPlanService(OwnerPlanRepository repo, TenantContext tenantContext, ActorDirectory actors, StepUpVerifier stepUp, AuditService audit,
-                     EntitlementEvents entitlementEvents, TenantScope tenantScope, Clock clock) {
+                     EntitlementEvents entitlementEvents, TenantScope tenantScope, Clock clock, ClinicClock clinicClock) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.actors = actors;
@@ -82,6 +84,7 @@ public class OwnerPlanService implements PlanAccount {
         this.entitlementEvents = entitlementEvents;
         this.tenantScope = tenantScope;
         this.clock = clock;
+        this.clinicClock = clinicClock;
     }
 
     /** The step-up "target" the owner asks /v1/auth/mfa/verify for: binds the confirmation to one plan and one timing. */
@@ -173,7 +176,7 @@ public class OwnerPlanService implements PlanAccount {
         if (now) {
             repo.moveSubscription(tenant, p.target().id(), p.target().version(), p.newMonthly());
             if (p.proration() > 0) {
-                repo.insertInvoice(tenant, "proration", LocalDate.now(clock), p.sub().renewalDate(), p.proration(), p.sub().currency(), changeId);
+                repo.insertInvoice(tenant, "proration", clinicClock.today(tenant), p.sub().renewalDate(), p.proration(), p.sub().currency(), changeId);
             }
         }
         Map<String, Object> before = new LinkedHashMap<>();
@@ -242,9 +245,9 @@ public class OwnerPlanService implements PlanAccount {
         long newMonthly = monthly(target, cliniciansIfNeeded(tenant, List.of(target)));
         String direction = newMonthly > sub.mrrMinor() ? "upgrade" : "downgrade";
         boolean now = "now".equals(effective);
-        LocalDate today = LocalDate.now(clock);
-        long proration = now ? prorationMinor(sub.mrrMinor(), newMonthly, today, sub.renewalDate()) : 0;
-        Instant effectiveAt = now ? clock.instant() : sub.renewalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
+        ZoneId zone = clinicClock.zone(tenant); // renewal_date is the clinic's calendar date: it starts at clinic midnight
+        long proration = now ? prorationMinor(sub.mrrMinor(), newMonthly, clinicClock.today(zone), sub.renewalDate()) : 0;
+        Instant effectiveAt = now ? clock.instant() : ClinicClock.startOf(sub.renewalDate(), zone);
         List<String> from = modulesOf(sub.planId(), sub.planVersion()), to = modulesOf(target.id(), target.version());
         List<String> readOnly = new ArrayList<>(from);
         readOnly.removeAll(to);

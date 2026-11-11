@@ -299,11 +299,13 @@ class SetupRepository {
                 ), tenantId).stream().findFirst().orElse(null);
     }
 
-    /** ADM-037: WhatsApp messages Meta accepted this calendar month (UTC). Core sends only utility templates (reminders,
+    /** ADM-037: WhatsApp messages Meta accepted this calendar month (clinic zone). Core sends only utility templates (reminders,
      * receipts, tokens); marketing goes through the comms gateway, so this is the utility count the plan's allowance uses. */
     long whatsappUtilityMessagesThisMonth(UUID tenantId) {
+        java.time.ZoneId zone = clock.zone(tenantId);
+        java.time.Instant monthStart = ClinicClock.startOf(clock.today(zone).withDayOfMonth(1), zone);
         Long n = jdbc.queryForObject("SELECT count(*) FROM whatsapp_messages WHERE tenant_id = ? AND status IN ('sent','delivered','read') " +
-                "AND created_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'", Long.class, tenantId);
+                "AND created_at >= ?", Long.class, tenantId, java.sql.Timestamp.from(monthStart));
         return n == null ? 0 : n;
     }
 

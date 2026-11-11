@@ -18,5 +18,10 @@
     "upi": "UPI",
     "mada": "Mada & digital",
     "other": "Other"
+  },
+  "stock": {
+    "in": "In stock · {qty}",
+    "low": "Low · {qty}",
+    "out": "Out of stock"
   }
 }

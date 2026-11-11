@@ -11,17 +11,19 @@
 
 The staff access token comes from NABD_M1_TOKEN (never stored); ${VAR} placeholders in a case are filled from the environment.
 Request and response bodies are redacted before they are written: ids and codes keep their last 4 characters, names, phones,
-Aadhaar, OTPs and emails are masked. Use sandbox test identities only.
+Aadhaar, ABHA numbers and addresses, OTPs and emails are masked (also spaced or hyphenated). Use sandbox test identities only.
 """
 import argparse, datetime, json, os, pathlib, re, sys, urllib.error, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ROOT / "docs/compliance/abdm/m1-test-cases.json"
 SUBMISSION = ROOT / "docs/compliance/abdm/m1-submission.json"
-SENSITIVE_KEYS = re.compile(r"(name|phone|mobile|aadhaar|otp|email|address|dob|birth|token|authorization)", re.I)
+SENSITIVE_KEYS = re.compile(r"(name|phone|mobile|aadhaar|otp|email|address|dob|birth|token|authorization|healthid|abha)", re.I)
 LONG_DIGITS = re.compile(r"\d{10,}")
+# +91 98765 43210, 1234 5678 9012, 91-1234-5678-9012; counts only with 10+ digits (see _number), so dates and UUID parts stay
+GROUPED_DIGITS = re.compile(r"(?<![\w:-])\+?\d{2,5}(?:[ -]\d{2,5}){1,4}(?![\w:-])")
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-ABHA_NUMBER = re.compile(r"\b\d{2}-?\d{4}-?\d{4}-?\d{4}\b")
+ABHA_ADDRESS = re.compile(r"[A-Za-z0-9._-]+@(?:sbx|abdm)\b", re.I)  # sandbox / production ABHA address handles
 
 
 def load_cases(path=CASES):
@@ -68,8 +70,16 @@ def mask(s):
     return "*" * max(0, len(s) - 4) + s[-4:] if len(s) > 4 else "****"
 
 
+def _number(m):
+    return sum(ch.isdigit() for ch in m.group(0)) >= 10
+
+
+def _phi(line):
+    return LONG_DIGITS.search(line) or any(map(_number, GROUPED_DIGITS.finditer(line))) or EMAIL.search(line) or ABHA_ADDRESS.search(line)
+
+
 def redact(value, key=""):
-    """Masks anything sensitive by key, and long digit runs and emails anywhere."""
+    """Masks anything sensitive by key, and phone/Aadhaar/ABHA numbers (plain, spaced or hyphenated), emails and ABHA addresses anywhere."""
     if isinstance(value, dict):
         return {k: redact(v, k) for k, v in value.items()}
     if isinstance(value, list):
@@ -77,17 +87,19 @@ def redact(value, key=""):
     if isinstance(value, str):
         if SENSITIVE_KEYS.search(key):
             return mask(value)
-        return EMAIL.sub("[email]", LONG_DIGITS.sub(lambda m: mask(m.group(0)), value))
+        value = LONG_DIGITS.sub(lambda m: mask(m.group(0)), value)
+        value = GROUPED_DIGITS.sub(lambda m: mask(m.group(0)) if _number(m) else m.group(0), value)
+        return ABHA_ADDRESS.sub("[abha-address]", EMAIL.sub("[email]", value))
     return value
 
 
 def scan(directory):
-    """Lines in the pack that look like unmasked PHI: a 10+ digit run, an email, or an ABHA number."""
+    """Lines in the pack that look like unmasked PHI: a phone, Aadhaar or ABHA number (plain, spaced or hyphenated), an email or an ABHA address."""
     hits = []
     for f in sorted(pathlib.Path(directory).rglob("*")):
-        if f.is_file() and f.suffix in (".json", ".md", ".txt", ".log"):
+        if f.is_file() and f.suffix in (".json", ".md", ".txt", ".log", ".csv"):
             for n, line in enumerate(f.read_text(errors="replace").splitlines(), 1):
-                if LONG_DIGITS.search(line) or EMAIL.search(line) or ABHA_NUMBER.search(line):
+                if _phi(line):
                     hits.append(f"{f.name}:{n}")
     return hits
 

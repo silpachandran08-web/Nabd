@@ -17,13 +17,15 @@
     "tx": "text-primary", "tx2": "text-secondary", "tx3": "text-tertiary", "tx4": "text-disabled"
   },
   "contrast": {
-    "_note": "[foreground, background, min ratio]. Body text >= 4.5, large/UI >= 3. A background that is semi-transparent is composited over surface-1.",
+    "_note": "[foreground, background, optional base]. Body text >= 4.5, large/UI >= 3. A semi-transparent background is composited over the base (default surface-1).",
     "text": [
       ["text-primary", "bg-root"], ["text-primary", "bg-canvas"], ["text-primary", "surface-1"], ["text-primary", "surface-2"], ["text-primary", "surface-3"],
       ["text-secondary", "bg-root"], ["text-secondary", "bg-canvas"], ["text-secondary", "surface-1"], ["text-secondary", "surface-2"], ["text-secondary", "surface-3"],
       ["text-tertiary", "bg-root"], ["text-tertiary", "bg-canvas"], ["text-tertiary", "surface-1"], ["text-tertiary", "surface-2"], ["text-tertiary", "surface-3"],
       ["accent-500", "surface-1"], ["accent-500", "accent-tint"], ["on-accent", "accent-fill"], ["danger-500", "surface-1"], ["warn-500", "surface-1"], ["ok-500", "surface-1"], ["info-500", "surface-1"], ["urgent-500", "surface-1"],
-      ["danger-500", "danger-tint"], ["ok-500", "ok-tint"], ["success-500", "success-tint"], ["warn-500", "warn-tint"], ["info-500", "info-tint"], ["sync-500", "sync-tint"], ["urgent-500", "urgent-tint"]
+      ["danger-500", "danger-tint"], ["ok-500", "ok-tint"], ["success-500", "success-tint"], ["warn-500", "warn-tint"], ["info-500", "info-tint"], ["sync-500", "sync-tint"], ["urgent-500", "urgent-tint"],
+      ["accent-500", "bg-root"], ["accent-500", "bg-nav"], ["accent-500", "surface-2"], ["accent-500", "surface-3"], ["accent-500", "accent-tint", "bg-root"], ["accent-500", "accent-tint", "bg-nav"],
+      ["danger-500", "bg-root"], ["danger-500", "surface-2"], ["danger-500", "surface-3"], ["danger-500", "danger-tint", "bg-root"]
     ],
     "ui": [
       ["focus-ring", "bg-root"], ["focus-ring", "surface-1"], ["focus-ring", "surface-3"]

@@ -10,6 +10,10 @@ import { NEW_PIN_PATTERN, needsPinChange } from "../../lib/pinPolicy";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { safeReturnTo, storeTokens, takeReturnTo, signOutReason } from "../../lib/apiClient";
 import { LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
+import { api } from "../../lib/api";
+import { COOKIE_AUTH } from "../../lib/bffShim";
+import { signInCookiesFrom } from "../../lib/bff";
+import { LOCALE_COOKIE } from "@nabd/i18n";
 import { initialLogin, loginReducer, problemAction, signInAction, type LoginProblem, type MfaChallenge, type MfaSetupRequired, type TokenPair } from "./loginMachine";
 import { ForgotView, MfaSetupView, MfaVerifyView, OtpView, PinChangeView, SignInView } from "./LoginViews";
 
@@ -27,7 +31,7 @@ export default function LoginPage() {
   const failed = (err: unknown) => dispatch(err instanceof LoginTimeoutError ? { type: "timeout", message: t("signIn.timeout") } : { type: "error", message: t("errors.network") });
   const applyProblem = (status: number, problem: LoginProblem) => dispatch(problemAction(status, problem, t));
 
-  function handleTokens(pair: TokenPair) {
+  async function handleTokens(pair: TokenPair) {
     storeTokens(pair);
     const claims = decodeAccessToken(pair.accessToken);
     if (needsPinChange(claims)) { // PIN predates the 6-8 digit policy: nothing else works until it is changed
@@ -35,7 +39,17 @@ export default function LoginPage() {
       return;
     }
     // FEF-002: back to the page the session ended on (validated same-origin path), else the role landing page.
-    router.replace(takeReturnTo() ?? landingPathFor(claims?.permissions ?? [], claims?.owner === true));
+    const to = takeReturnTo() ?? landingPathFor(claims?.permissions ?? [], claims?.owner === true);
+    // FEF-025 AC3: in bearer mode no BFF sets the saved theme/language cookies at sign-in, so take them from the preferences here.
+    // Best effort: a slow or failed answer keeps this machine's cookies.
+    if (!COOKIE_AUTH) {
+      const prefs = await api.get<Record<string, unknown>>("/me/preferences", { keepSession: true, signal: AbortSignal.timeout(3000) }).catch(() => null);
+      for (const c of signInCookiesFrom(prefs)) document.cookie = c;
+    }
+    // A different saved language needs a server render (<html lang dir>, messages); a soft navigation keeps the sign-in page's.
+    const locale = new RegExp(`(?:^|; )${LOCALE_COOKIE}=([a-z-]+)`).exec(document.cookie)?.[1];
+    if (locale && locale !== document.documentElement.lang) window.location.replace(to);
+    else router.replace(to);
   }
 
   /** PIN and OTP sign-in answer the same three ways: enrol MFA, verify a code, or tokens. */
@@ -64,7 +78,7 @@ export default function LoginPage() {
         body: JSON.stringify({ refreshToken: localStorage.getItem("nabd_refresh_token") }),
       }, slow);
       if (!r.ok) { dispatch({ type: "pinChangedSignIn", message: t("errors.pinChangedSignIn") }); return; }
-      handleTokens((await r.json()) as TokenPair);
+      await handleTokens((await r.json()) as TokenPair);
     } catch (err) {
       failed(err);
     } finally {
@@ -151,7 +165,7 @@ export default function LoginPage() {
       });
       const body = await res.json();
       if (res.ok) {
-        handleTokens(body as TokenPair);
+        await handleTokens(body as TokenPair);
         return;
       }
       applyProblem(res.status, body as LoginProblem);
