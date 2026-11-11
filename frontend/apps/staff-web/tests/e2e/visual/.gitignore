@@ -1,0 +1,4 @@
+vr-results/
+# only the CI (linux) baselines are reviewed and committed (git LFS); local runs on macOS/Windows render fonts differently
+baselines/darwin/
+baselines/win32/
