@@ -150,8 +150,9 @@ def review(model, samples, plan, proven_checkin_rps=None):
                "verify": bool(r["capacity"].get("verify")), "days": len(pts), "peak": None, "headroom": None, "peakAB": None, "headroomAB": None,
                "clinicsAt70": None, "dateAt70": None, "dateAt70Basis": None}
         rows.append(row)
-        if not pts:
-            actions.append({**row, "why": f"no telemetry for {r['id']} in the window: the metric is not emitted or not scraped"})
+        if not pts or all(v == 0 for _, v in pts):  # an all-zero window is a broken exporter until the owner says otherwise
+            why = "no telemetry" if not pts else "only zeros"
+            actions.append({**row, "why": f"{why} for {r['id']} in the window: the metric is not emitted, not scraped or its exporter is broken; no data is never headroom"})
             continue
         peak = max(v for _, v in pts)
         row["peak"] = peak
@@ -160,7 +161,7 @@ def review(model, samples, plan, proven_checkin_rps=None):
         if cap is None:
             actions.append({**row, "why": f"capacity unknown: {r['capacity']['source']}"})
             continue
-        row["headroom"] = cap / peak if peak > 0 else math.inf
+        row["headroom"] = cap / peak if peak > 0 else math.inf  # peak > 0 here unless every sample was negative
         row["headroomAB"] = cap / row["peakAB"] if row["peakAB"] > 0 else math.inf
         if scales and peak > 0:
             row["clinicsAt70"] = math.floor(alarm * cap / (peak / n))
@@ -177,8 +178,16 @@ def review(model, samples, plan, proven_checkin_rps=None):
             candidates.append((dt.date.fromisoformat(pts[-1][0]) + dt.timedelta(days=math.ceil((alarm * cap - pts[-1][1]) / s)), "trend"))
         if candidates:
             row["dateAt70"], row["dateAt70Basis"] = min(candidates)
+        # T1-BUG-4: cohort B readiness, not only today's peak: the projected A+B size and the 70% date count too.
+        why = []
         if row["headroom"] < bar:
-            actions.append({**row, "why": f"headroom {row['headroom']:.2f}x is below {bar}x of the pilot peak"})
+            why.append(f"headroom {row['headroom']:.2f}x is below {bar}x of the pilot peak")
+        if row["headroomAB"] < bar:
+            why.append(f"projected headroom at cohort A+B ({ab} clinics) is {row['headroomAB']:.2f}x, below {bar}x")
+        if row["dateAt70"] and row["dateAt70"] <= plan["cohort_b_date"]:
+            why.append(f"projected to reach {alarm:.0%} on {row['dateAt70'].isoformat()} ({row['dateAt70Basis']}), not after the cohort B entry date {plan['cohort_b_date'].isoformat()}")
+        if why:
+            actions.append({**row, "why": "; ".join(why)})
     by = {r["id"]: r for r in rows}
 
     def forecast(threshold, per_clinic_of):
@@ -319,8 +328,18 @@ def selftest():
     assert cpu["dateAt70"] == dt.date(2026, 12, 1) and cpu["dateAt70Basis"] == "rollout plan", cpu  # cohort B (20 clinics) crosses 70%
     assert by["hikari_active"]["capacity"] == 24  # the live hikaricp_connections_max wins over the model default
     acts = {a["id"]: a for a in rep["actions"]}
-    assert set(acts) == {"pgbouncer_server_connections", "valkey_memory", "checkin_rate"}, set(acts)
-    assert "below 2.0x" in acts["pgbouncer_server_connections"]["why"] and "no telemetry" in acts["valkey_memory"]["why"]
+    assert set(acts) == {"postgres_cpu", "pgbouncer_server_connections", "valkey_memory", "checkin_rate"}, set(acts)
+    assert "below 2.0x of the pilot peak" in acts["pgbouncer_server_connections"]["why"] and "no telemetry" in acts["valkey_memory"]["why"]
+    # T1-BUG-4: 3.74x today is not enough when cohort A+B (20 clinics) projects 0.93x and 70% falls on the cohort B date
+    assert "cohort A+B (20 clinics) is 0.93x" in acts["postgres_cpu"]["why"] and "on 2026-12-01" in acts["postgres_cpu"]["why"], acts["postgres_cpu"]["why"]
+    # QA case: 2.50x today, 0.62x at A+B -> action; an all-zero series is "no data", never infinite headroom
+    qa = review(model, {**samples, "series": {**series, "postgres_cpu": flat(40.0), "postgres_connections": flat(0)}}, plan)
+    qa_acts = {a["id"]: a for a in qa["actions"]}
+    assert "0.62x" in qa_acts["postgres_cpu"]["why"] and "below 2.0x of the pilot peak" not in qa_acts["postgres_cpu"]["why"], qa_acts["postgres_cpu"]
+    assert "only zeros" in qa_acts["postgres_connections"]["why"] and qa["rows"][2]["headroom"] is None, qa_acts["postgres_connections"]
+    # healthy at A+B and 70% well after cohort B entry: no action
+    calm = review(model, {**samples, "series": {**series, "postgres_cpu": flat(5.0)}}, plan)
+    assert "postgres_cpu" not in {a["id"] for a in calm["actions"]}, calm["rows"][0]
     assert "capacity unknown" in acts["checkin_rate"]["why"]
     assert "checkin_rate" not in {a["id"] for a in review(model, samples, plan, proven_checkin_rps=40)["actions"]}  # a green k6 run settles it
     tr = rep["triggers"]
