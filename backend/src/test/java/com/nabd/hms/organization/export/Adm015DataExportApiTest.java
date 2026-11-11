@@ -150,6 +150,21 @@ class Adm015DataExportApiTest extends ApiTestBase {
         assertThat(exchange("/v1/setup/export-jobs/" + ok.getBody().get("id"), HttpMethod.GET, authed(recToken), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    /** T1-BUG-3: setup:export granted to a custom role does not make its holder the owner. */
+    @Test
+    void aCustomRoleHoldingSetupExportCannotStartTheExport_andTheDenialIsAudited() throws Exception {
+        Clinic c = clinic();
+        UUID fake = seedRole(c.t().id(), "Practice Manager", false, new ModuleGrant("setup", true, true, true, true, false, false, true));
+        SeededStaff m = seedStaff(c.t(), fake, "adm015m-" + SEQ.incrementAndGet() + "@a.com", phone(), false);
+        String mt = loginAndGetAccessToken(m);
+        ResponseEntity<Map> denied = exchange("/v1/setup/export-jobs", HttpMethod.POST, authedJsonBodyWithHeader(mt, "X-Step-Up-Token", stepUp(mt, "data-export"),
+                Map.of("format", "csv")), Map.class);
+        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(su().queryForObject("SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'data_export.denied' AND actor_id = ? AND after->>'reason' = 'not owner'",
+                Integer.class, c.t().id(), m.id())).isEqualTo(1);
+        assertThat(su().queryForObject("SELECT count(*) FROM data_export_jobs WHERE tenant_id = ?", Integer.class, c.t().id())).isZero();
+    }
+
     @Test
     void theArchiveManifestMatchesTheDatabase_andTheLinkNeedsAnOtp_72Hours_3Downloads_eachAudited() throws Exception {
         Clinic c = clinic();

@@ -79,6 +79,7 @@ class DataExportController {
     DataExportService.Started start(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody StartBody b, HttpServletRequest http,
                                     @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
         UUID staff = UUID.fromString(jwt.getSubject());
+        service.requireOwner(staff);
         StepUpVerifier.StepUp su = stepUp.requireFor(stepUpToken, staff, DataExportService.STEP_UP_TARGET);
         return service.start(staff, su.assertionId(), new DataExportService.StartRequest(b.scope(), b.datasets(), b.format(), b.branchIds()), RequestMeta.clientIp(http));
     }
@@ -91,11 +92,12 @@ class DataExportController {
 
     /** 403 like the security chain's, after an audit row naming who tried (ids only). */
     @ExceptionHandler(AccessDeniedException.class)
-    ResponseEntity<ProblemDetail> denied(HttpServletRequest http) {
+    ResponseEntity<ProblemDetail> denied(AccessDeniedException denial, HttpServletRequest http) {
+        String reason = DataExportService.NOT_OWNER.equals(denial.getMessage()) ? DataExportService.NOT_OWNER : "missing setup:export";
         if (SecurityContextHolder.getContext().getAuthentication() != null && SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof Jwt jwt
                 && jwt.getClaimAsString("tenantId") != null) {
             try {
-                tenantScope.run(UUID.fromString(jwt.getClaimAsString("tenantId")), () -> service.denied(UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http)));
+                tenantScope.run(UUID.fromString(jwt.getClaimAsString("tenantId")), () -> service.denied(UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http), reason));
             } catch (RuntimeException e) {
                 log.warn("export denial not audited ({})", e.getClass().getSimpleName());
             }
