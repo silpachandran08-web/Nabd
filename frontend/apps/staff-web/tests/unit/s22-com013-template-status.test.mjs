@@ -1,7 +1,7 @@
 // COM-013: plain-language rejection reasons and the owner's attention banner. Fakes only.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { attention, pendingChange, reasonHelp } from "../../app/(clinic)/setup/templateStatus.ts";
+import { attention, editLabel, pendingChange, reasonHelp } from "../../app/(clinic)/setup/templateStatus.ts";
 
 const v = (version, status, extra = {}) => ({ id: "v" + version, version, status, rejectionReason: null, active: false, headerText: "Clinic", body: "b", createdAt: "2026-11-10T10:00:00Z", ...extra });
 const tpl = (extra = {}) => ({ id: "t1", name: "visit", key: "visit", source: "custom", language: "en", status: "approved", rejectionReason: null,
@@ -33,4 +33,15 @@ test("pause, disable and a move to Marketing each raise one alert; a clinic-chos
   assert.match(attention([tpl({ category: "MARKETING", categoryChangedAt: "2026-11-10T10:00:00Z" })], label)[0].text, /marketing messages/);
   assert.equal(attention([tpl({ category: "MARKETING", requestedCategory: "MARKETING" })], label).length, 0);
   assert.equal(attention([tpl()], label).length, 0);
+});
+
+test("T1-BUG-1: without setup:edit there is no Edit or Fix & resubmit; with it, only custom templates not in review", () => {
+  const rejectedV2 = tpl({ versions: [v(2, "rejected", { rejectionReason: "PROMOTIONAL" }), v(1, "approved", { active: true })] });
+  assert.equal(editLabel(rejectedV2, false), null);
+  assert.equal(editLabel(tpl(), false), null);
+  assert.equal(editLabel(rejectedV2, true), "Fix & resubmit");
+  assert.equal(editLabel(tpl(), true), "Edit");
+  assert.equal(editLabel(tpl({ source: "catalogue" }), true), null);
+  assert.equal(editLabel(tpl({ versions: [v(2, "pending"), v(1, "approved", { active: true })] }), true), null);
+  assert.equal(editLabel(tpl({ status: "pending" }), true), null);
 });
