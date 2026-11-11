@@ -67,3 +67,15 @@ export function screensOf(app) {
 }
 
 export const SCREENS = [...screensOf('staff'), ...screensOf('patient')];
+
+/** T1-BUG-5: what the error boundaries render (RouteError, consult PanelBoundary, global-error). Also covers anonymous and /platform
+ * pages, which send no client telemetry. */
+export const CRASH_SELECTOR = '[data-testid^="route-error-"], [data-testid^="panel-error-"], body > main[role="alert"]';
+
+/** T1-BUG-5: every error boundary (global-error, RouteError, PanelBoundary) reports itself through OPS-028 client telemetry with a
+ * metric "boundary.<group>.<...>". Such a request means the screen crashed: the harness fails it instead of keeping the crash as a
+ * baseline. Returns the metric, or null for any other request. */
+export function boundaryCrash(method, url, postData) {
+  if (method !== 'POST' || !/\/client-telemetry$/.test(new URL(url).pathname)) return null;
+  try { const m = JSON.parse(postData ?? '{}').metric; return typeof m === 'string' && m.startsWith('boundary.') ? m : null; } catch { return null; }
+}
