@@ -91,7 +91,7 @@ public class ReplyService {
             if (t.optedOut()) {
                 throw new InboxException(HttpStatus.CONFLICT, "OPTED_OUT");
             }
-            var tpl = jdbc.query("SELECT name, language, param_count FROM whatsapp_templates WHERE id = ? AND status = 'approved'",
+            var tpl = jdbc.query("SELECT name, language, param_count FROM whatsapp_templates WHERE id = ? AND status = 'approved' AND active",
                     (rs, i) -> new Object[]{rs.getString(1), rs.getString(2), rs.getInt(3)}, templateId);
             if (tpl.isEmpty() || (int) tpl.get(0)[2] != p.size() || p.stream().anyMatch(x -> x == null || x.isBlank() || x.length() > 200)) {
                 throw new InboxException(HttpStatus.UNPROCESSABLE_ENTITY, "TEMPLATE_NOT_SENDABLE");
@@ -107,7 +107,7 @@ public class ReplyService {
     public List<SendableTemplate> sendableTemplates(UUID tenant, String language) {
         return tx.execute(s -> {
             bind(tenant);
-            return jdbc.query("SELECT id, name, language, category, body, param_count FROM whatsapp_templates WHERE status = 'approved' "
+            return jdbc.query("SELECT id, name, language, category, body, param_count FROM whatsapp_templates WHERE status = 'approved' AND active "
                             + "AND (?::text IS NULL OR language = ?) ORDER BY name, language",
                     (rs, i) -> new SendableTemplate(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getInt(6)),
                     language, language);

@@ -42,7 +42,7 @@ class ConsentGateDbTest {
         PG.start();
         try (Connection c = DriverManager.getConnection(PG.getJdbcUrl(), PG.getUsername(), PG.getPassword()); Statement s = c.createStatement()) {
             s.execute("CREATE ROLE comms_app LOGIN PASSWORD 'x' NOSUPERUSER NOBYPASSRLS");
-            for (String f : new String[] {"V3__outbound_messages.sql", "V14__send_refusals.sql"}) {
+            for (String f : new String[] {"V3__outbound_messages.sql", "V14__send_refusals.sql", "V22__template_versions.sql"}) {
                 s.execute(Files.readString(Path.of("src/main/resources/db/migration/" + f)));
             }
             s.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO comms_app");

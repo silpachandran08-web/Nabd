@@ -71,6 +71,7 @@ schemas:
       needs_reschedule_reason: operational
       confirmed_at: operational
       patient_confirmed_at: operational
+      confirmation_state: operational
       no_show_at: operational
       no_show_marked_by: operational
       no_show_reason_code: operational
@@ -110,6 +111,12 @@ schemas:
       appointment_id: operational
       kind: operational
       status: operational
+      created_at: operational
+    appointment_reminders:
+      tenant_id: operational
+      appointment_id: operational
+      kind: operational
+      request_id: operational
       created_at: operational
     booking_policy_versions:
       id: operational
@@ -2194,6 +2201,7 @@ schemas:
       template_id: operational
       attempts: operational
       last_attempt_at: operational
+      not_after: operational
     whatsapp_inbound_events:
       id: operational
       tenant_id: operational
@@ -2239,6 +2247,13 @@ schemas:
       purpose: operational
       submit_attempts: operational
       next_attempt_at: operational
+      version: operational
+      active: operational
+      superseded_by: operational
+      meta_category: operational
+      paused_until: operational
+      category_changed_at: operational
+      example_values: operational
     workflow_definitions:
       id: operational
       code: operational
