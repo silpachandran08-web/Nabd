@@ -1,6 +1,7 @@
 import { decodeJwtPayload } from "./jwt.ts";
 import { clearIntents } from "./idempotency.ts";
 import { clearLocalSessionData } from "./idleLock.ts";
+import { dropPushSubscription } from "./push.ts";
 import { COUNTER_ROLES, navFor } from "../shell/navRegistry.ts";
 // The access token's "permissions" claim (SecurityConfig.java: authoritiesClaimName) already
 // carries everything the client needs for nav/redirect — decoding it here avoids a round trip
@@ -142,6 +143,11 @@ export function getSessionExpiresAt(): Date | null {
 export async function signOut(): Promise<void> {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
   const token = localStorage.getItem("nabd_access_token");
+  // FEF-048: this device stops getting "patient ready" pushes; done before the logout revokes the token that authorises it.
+  await dropPushSubscription((id) => fetch(`${API_BASE}/me/push-subscriptions/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }));
   if (token) {
     await fetch(`${API_BASE}/auth/logout`, {
       method: "POST",

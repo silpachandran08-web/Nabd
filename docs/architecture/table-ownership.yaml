@@ -28,7 +28,7 @@ modules:
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
     # (remaining direct staff reads elsewhere are baseline debt).
     packages: [iam, auth, staff]
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_preferences]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences]
     reads: []
   messaging:
     owns: [comms_cutover_flags, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
@@ -65,6 +65,10 @@ modules:
   queue:
     owns: [appointment_change_offers, appointment_desk_exceptions, appointments, booking_request_details, booking_request_offers, booking_routing_settings, checkin_attempts, delay_broadcast_recipients, desk_exceptions, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_checkin_settings, facility_queue_settings, queue_entries, queue_entry_events, reason_code_catalogue, service_time_stats, session_reserved_slots, specialty_service_defaults, tenant_reason_codes, waitlist_entries]
     reads: [tenants]  # ACC-040: the clinic name shown on the WhatsApp booking card (no organization.api accessor yet)
+  realtime:
+    # FEF-048: Web Push subscriptions per staff and device; the queue module asks realtime.WebPushSender to send 'patient ready'
+    owns: [web_push_subscriptions]
+    reads: []
   shared:
     owns: [file_blocked_alerts, file_objects, idempotency_keys, projector_applied_events, shedlock]
     reads: [staff, roles]  # PLT-029: file_blocked_alerts fans out to the owner staff (built-in role); no owner API exists yet

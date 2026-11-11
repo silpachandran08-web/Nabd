@@ -520,6 +520,9 @@ export const ProvisioningJobResponseSchema = z.object({ approvedAt: z.string().o
 export const ProxyInviteAcceptRequestSchema = z.object({ otp: z.string().min(1), scope: z.string().min(1) });
 export const ProxyInviteAcceptedSchema = z.object({ scope: z.string().optional(), status: z.string().optional() });
 export const ProxyRevokeRequestSchema = z.object({ reason: z.string().min(0).max(200) });
+export const PushSubscriptionCreatedSchema = z.object({ id: z.string().optional() });
+export const PushSubscriptionKeysSchema = z.object({ auth: z.string().optional(), p256dh: z.string().optional() });
+export const PushSubscriptionRequestSchema = z.object({ deviceLabel: z.string().optional(), endpoint: z.string().optional(), keys: PushSubscriptionKeysSchema.optional() });
 export const QueueBoardEntrySchema = z.object({ allergyFlag: z.boolean().optional(), displayName: z.string().optional(), flags: z.array(z.string()).optional(), id: z.string().optional(), mrn: z.string().optional(), p50At: z.string().optional(), p80At: z.string().optional(), patientId: z.string().optional(), position: z.number().int().optional(), previousToken: z.number().int().optional(), priority: z.boolean().optional(), stage: z.string().optional(), token: z.number().int().optional(), vitalsRecorded: z.boolean().optional() });
 export const QueueBoardDoctorSchema = z.object({ delayMinutes: z.number().int().optional(), doctorId: z.string().optional(), entries: z.array(QueueBoardEntrySchema).optional(), name: z.string().optional(), nowServing: z.number().int().optional(), state: z.string().optional() });
 export const QueueBoardSchema = z.object({ date: z.string().optional(), doctors: z.array(QueueBoardDoctorSchema).optional(), v: z.number().int().optional() });
@@ -612,6 +615,7 @@ export const StaffHprRequestSchema = z.object({ hprId: z.string().min(1) });
 export const StaffInviteRequestSchema = z.object({ departmentId: z.string().optional(), email: z.string().min(1), mobilePhone: z.string().min(1), name: z.string().min(1), roleId: z.string(), scope: z.string().optional() });
 export const StaffResponseSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), email: z.string().optional(), emailVerified: z.boolean().optional(), fieldGrants: z.array(z.string()).optional(), id: z.string().optional(), lastSeenAt: z.string().optional(), loginFactors: z.array(z.string()).optional(), loginMethod: z.string().optional(), mobilePhone: z.string().optional(), mobileVerified: z.boolean().optional(), name: z.string().optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional(), status: z.string().optional() });
 export const StaffInviteResponseSchema = z.object({ expiresAt: z.string().optional(), inviteId: z.string().optional(), inviteToken: z.string().optional(), staff: StaffResponseSchema.optional() });
+export const StaffOnboardingProgressSchema = z.object({ competencyPassedAt: z.string().optional(), completed: z.array(z.string()).optional() });
 export const StaffPageSchema = z.object({ data: z.array(StaffResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const StaffPatchRequestSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), fieldGrants: z.array(z.string()).optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional() });
 export const StaffPerformanceResponseSchema = z.object({ collected: z.number().optional(), discountCount: z.number().int().optional(), handledCount: z.number().int().optional(), overrideCount: z.number().int().optional(), paymentCount: z.number().int().optional(), staffId: z.string().optional(), staffName: z.string().optional() });
@@ -940,11 +944,15 @@ export const operationSchemas = {
   DeskExceptionController_list: { response: DeskExceptionPageSchema },
   DeskExceptionController_act: { body: ActionRequestSchema, response: DeskExceptionActionResponseSchema },
   MeEntitlementsController_get: { response: MeEntitlementsSchema },
+  StaffOnboardingController_get: { response: StaffOnboardingProgressSchema },
+  StaffOnboardingController_complete: { response: StaffOnboardingProgressSchema },
   MePreferencesController_get: { response: UiPreferencesReadSchema },
   MePreferencesController_put: { body: UiPreferencesWriteSchema, response: UiPreferencesSchema },
   ProfileClaimController_view: { response: ViewSchema },
   ProfileClaimController_claim: { body: ProfileClaimRequestSchema, response: ProfileClaimedSchema },
   ProfileClaimController_otp: { response: z.record(z.string(), z.boolean()) },
+  PushSubscriptionController_register: { body: PushSubscriptionRequestSchema, response: PushSubscriptionCreatedSchema },
+  PushSubscriptionController_delete: {  },
   OwnerMessagingController_quality: { response: z.record(z.string(), z.string()) },
   NursingController_activityToday: { response: z.array(ActivityEntryResponseSchema) },
   NursingController_orderAdministration: { body: AdministrationOrderRequestSchema, response: AdministrationOrderResponseSchema },

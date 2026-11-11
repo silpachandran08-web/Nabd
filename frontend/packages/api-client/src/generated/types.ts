@@ -491,6 +491,9 @@ export type ProvisioningStepResponse = { completedAt?: string; errorDetail?: str
 export type ProxyInviteAcceptRequest = { otp: string; scope: string; };
 export type ProxyInviteAccepted = { scope?: string; status?: string; };
 export type ProxyRevokeRequest = { reason: string; };
+export type PushSubscriptionCreated = { id?: string; };
+export type PushSubscriptionKeys = { auth?: string; p256dh?: string; };
+export type PushSubscriptionRequest = { deviceLabel?: string; endpoint?: string; keys?: PushSubscriptionKeys; };
 export type Question = { answers?: Array<Answer>; id?: string; text?: string; };
 export type QueueBoard = { date?: string; doctors?: Array<QueueBoardDoctor>; v?: number; };
 export type QueueBoardDoctor = { delayMinutes?: number; doctorId?: string; entries?: Array<QueueBoardEntry>; name?: string; nowServing?: number; state?: string; };
@@ -596,6 +599,7 @@ export type StaffHpr = { hprId?: string; hprVerified?: boolean; staffId?: string
 export type StaffHprRequest = { hprId: string; };
 export type StaffInviteRequest = { departmentId?: string; email: string; mobilePhone: string; name: string; roleId: string; scope?: string; };
 export type StaffInviteResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; staff?: StaffResponse; };
+export type StaffOnboardingProgress = { competencyPassedAt?: string; completed?: Array<string>; };
 export type StaffPage = { data?: Array<StaffResponse>; page?: PageMeta; };
 export type StaffPatchRequest = { clinician?: boolean; departmentId?: string; fieldGrants?: Array<string>; professionalRegistrationNo?: string; roleId?: string; scope?: string; };
 export type StaffPerformanceReport = { rows?: Array<StaffPerformanceResponse>; scopeNote?: string; };
@@ -938,11 +942,15 @@ export type Operations = {
   DeskExceptionController_list: { method: "get"; path: "/v1/front-desk/exceptions"; permission: "queue:view"; pathParams: never; query: { kind?: string; cursor?: string; limit?: number; }; body: never; response: DeskExceptionPage };
   DeskExceptionController_act: { method: "post"; path: "/v1/front-desk/exceptions/{id}/{action}"; permission: "queue:edit"; pathParams: { id: string; action: string; }; query: never; body: ActionRequest; response: DeskExceptionActionResponse };
   MeEntitlementsController_get: { method: "get"; path: "/v1/me/entitlements"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MeEntitlements };
+  StaffOnboardingController_get: { method: "get"; path: "/v1/me/onboarding"; permission: "authenticated"; pathParams: never; query: never; body: never; response: StaffOnboardingProgress };
+  StaffOnboardingController_complete: { method: "put"; path: "/v1/me/onboarding/{key}"; permission: "authenticated"; pathParams: { key: string; }; query: never; body: never; response: StaffOnboardingProgress };
   MePreferencesController_get: { method: "get"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: never; response: UiPreferencesRead };
   MePreferencesController_put: { method: "put"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: UiPreferencesWrite; response: UiPreferences };
   ProfileClaimController_view: { method: "get"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: View };
   ProfileClaimController_claim: { method: "post"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: ProfileClaimRequest; response: ProfileClaimed };
   ProfileClaimController_otp: { method: "post"; path: "/v1/me/profile-claims/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
+  PushSubscriptionController_register: { method: "post"; path: "/v1/me/push-subscriptions"; permission: "authenticated"; pathParams: never; query: never; body: PushSubscriptionRequest; response: PushSubscriptionCreated };
+  PushSubscriptionController_delete: { method: "delete"; path: "/v1/me/push-subscriptions/{id}"; permission: "authenticated"; pathParams: { id: string; }; query: never; body: never; response: void };
   OwnerMessagingController_quality: { method: "get"; path: "/v1/messaging/quality"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: Record<string, string> };
   NursingController_activityToday: { method: "get"; path: "/v1/nursing/activity/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<ActivityEntryResponse> };
   NursingController_orderAdministration: { method: "post"; path: "/v1/nursing/administration-orders"; permission: "nursing:create"; pathParams: never; query: never; body: AdministrationOrderRequest; response: AdministrationOrderResponse };

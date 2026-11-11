@@ -5,6 +5,7 @@ import styles from "./account.module.css";
 import { storeTokens } from "../../lib/apiClient";
 import { api, reasonText } from "../../lib/api";
 import ThemeSwitch from "../../shell/ThemeSwitch";
+import PushToggle from "../../components/pwa/PushToggle";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
@@ -110,6 +111,9 @@ export default function AccountPage() {
 
       {/* FEF-025: same choice as the user menu */}
       <div className={styles.card}><ThemeSwitch variant="page" /></div>
+
+      {/* FEF-048: "patient ready" push on this device (doctors only) */}
+      <PushToggle />
 
       <h2 className={styles.sectionTitle}>Two-factor authentication</h2>
       <div className={styles.card}>

@@ -7,7 +7,11 @@ const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_RELEASE: (process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NABD_RELEASE ?? "dev").slice(0, 12) },
   // FEF-010: on every response, assets included; the nonce CSP itself is per request in proxy.ts.
   async headers() {
-    return [{ source: "/:path*", headers: Object.entries(STATIC_HEADERS).map(([key, value]) => ({ key, value })) }];
+    return [
+      { source: "/:path*", headers: Object.entries(STATIC_HEADERS).map(([key, value]) => ({ key, value })) },
+      // FEF-048: the browser must always check for a new service worker (a stale one would keep an old shell cache).
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] },
+    ];
   },
 };
 

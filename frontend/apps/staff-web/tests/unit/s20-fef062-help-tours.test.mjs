@@ -4,12 +4,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createTranslator } from "next-intl";
 import { loadMessages } from "@nabd/i18n";
-import { HELP_VIDEOS, SCREEN_IDS, TOUR_ROLES, TOUR_STEPS, consultActive, markTourDone, screenIdFor, tourDone, tourDue } from "../../app/shell/help.ts";
+import { HELP_VIDEOS, SCREEN_IDS, TOUR_ROLES, TOUR_STEPS, consultActive, screenIdFor, tourDone, tourDue } from "../../app/shell/help.ts";
 import { SHORTCUTS } from "../../app/shell/shortcuts.ts";
 
 const msgDir = new URL("../../../../packages/i18n/messages/", import.meta.url).pathname;
 const cat = (loc) => JSON.parse(readFileSync(`${msgDir}${loc}/help.json`, "utf8"));
-const fakeStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) }; };
 
 test("screen id: route prefix with a path boundary, generic otherwise", () => {
   assert.equal(screenIdFor("/arrivals"), "arrivals");
@@ -44,18 +43,16 @@ test("the tour renders in the UI language: step 1 of the reception tour in hi is
   assert.equal((await say("hi"))("panel.title", { screen: "x" }), "मदद: x");
 });
 
-test("first sign-in: due for a tour role until marked done; completion is per staff id and role, never for a role without a tour", () => {
-  const store = fakeStore();
-  assert.equal(tourDue({ role: "reception", done: tourDone(store, "s1", "reception"), consult: false }), true);
-  markTourDone(store, "s1", "reception");
-  assert.equal(tourDone(store, "s1", "reception"), true);
-  assert.equal(tourDue({ role: "reception", done: tourDone(store, "s1", "reception"), consult: false }), false);
-  assert.equal(tourDone(store, "s2", "reception"), false, "another staff member on the same browser");
-  assert.equal(tourDone(store, "s1", "nurse"), false, "another role context");
+test("first sign-in: due for a tour role until done; completion is per role (ACC-035 moved it from the browser to the account)", () => {
+  const p = { completed: [], competencyPassedAt: null };
+  assert.equal(tourDue({ role: "reception", done: tourDone(p, "reception"), consult: false }), true);
+  const done = { ...p, completed: ["tour.reception"] };
+  assert.equal(tourDone(done, "reception"), true);
+  assert.equal(tourDue({ role: "reception", done: tourDone(done, "reception"), consult: false }), false);
+  assert.equal(tourDone(done, "nurse"), false, "another role context");
+  assert.equal(tourDone(undefined, "reception"), false, "not loaded yet");
   assert.equal(tourDue({ role: "pharmacist", done: false, consult: false }), false);
   assert.equal(tourDue({ role: null, done: false, consult: false }), false);
-  store.setItem("nabd_tour_done", "{garbage");
-  assert.equal(tourDone(store, "s1", "reception"), false, "a corrupt value reads as not done");
 });
 
 test("an open consult defers the tour (consult workspace with ?entry=); the consult list without a visit does not", () => {

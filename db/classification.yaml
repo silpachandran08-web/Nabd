@@ -2138,6 +2138,23 @@ schemas:
       error_code: operational
       created_at: operational
       completed_at: operational
+    web_push_subscriptions:
+      id: operational
+      tenant_id: operational
+      staff_id: operational
+      endpoint: pii  # uncertain: a per-browser push service URL, identifies the device
+      p256dh: operational
+      auth_secret_enc: pii  # secret key material, same tier as mfa_secret_enc
+      device_label: pii  # uncertain: free text the user types, may name a person
+      created_at: operational
+      last_success_at: operational
+      failure_count: operational
+    staff_onboarding_progress:
+      tenant_id: operational
+      staff_id: operational
+      tour_key: operational
+      completed_at: operational
+      competency_passed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational

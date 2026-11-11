@@ -41,3 +41,10 @@
 .themeFieldset { margin: 0; padding: var(--nb-space-12) var(--nb-space-16); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); display: flex; flex-wrap: wrap; gap: var(--nb-space-8) var(--nb-space-16); }
 .themeFieldset legend { padding-inline: var(--nb-space-4); font-size: 13px; font-weight: 600; }
 .themeOption { display: inline-flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; font-size: 14px; cursor: pointer; }
+/* ACC-035: competency check and desk video slots in the Help panel */
+.competency { display: flex; flex-direction: column; gap: var(--nb-space-8); padding-block-start: var(--nb-space-12); border-block-start: 1px solid var(--nb-border-subtle); }
+.competencyTitle { margin: 0; font-size: 14px; font-weight: 600; color: var(--nb-text-primary); }
+.competencyList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.competencyRow { display: flex; align-items: center; gap: var(--nb-space-12); min-block-size: 44px; cursor: pointer; }
+.competencyRow input { inline-size: 20px; block-size: 20px; flex: none; }
+.videoRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-16); min-block-size: 44px; }
