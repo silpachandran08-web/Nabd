@@ -245,6 +245,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/me/profile-claims/:token`, () => HttpResponse.json({"clinicName":"string","expiresAt":"2026-01-01T00:00:00Z","firstName":"string","guardianFirstName":"string","opensOn":"2026-01-01","ownPhone":false}, { status: 200 })), // ProfileClaimController_view
     http.post(`${baseUrl}/v1/me/profile-claims/:token`, () => HttpResponse.json({"claimed":false,"keptScope":"string"}, { status: 200 })), // ProfileClaimController_claim
     http.post(`${baseUrl}/v1/me/profile-claims/:token/otp`, () => HttpResponse.json({}, { status: 202 })), // ProfileClaimController_otp
+    http.post(`${baseUrl}/v1/me/push-subscriptions`, () => HttpResponse.json({"id":"00000000-0000-7000-8000-000000000000"}, { status: 201 })), // PushSubscriptionController_register
+    http.delete(`${baseUrl}/v1/me/push-subscriptions/:id`, () => new HttpResponse(null, { status: 204 })), // PushSubscriptionController_delete
     http.get(`${baseUrl}/v1/messaging/quality`, () => HttpResponse.json({}, { status: 200 })), // OwnerMessagingController_quality
     http.get(`${baseUrl}/v1/nursing/activity/today`, () => HttpResponse.json([{"activity":"string","kind":"string","occurredAt":"2026-01-01T00:00:00Z","patientName":"string"}], { status: 200 })), // NursingController_activityToday
     http.post(`${baseUrl}/v1/nursing/administration-orders`, () => HttpResponse.json({"createdAt":"2026-01-01T00:00:00Z","dose":"string","drugName":"string","id":"00000000-0000-7000-8000-000000000000","orderedByName":"string","patientId":"00000000-0000-7000-8000-000000000000","patientName":"string","queueEntryId":"00000000-0000-7000-8000-000000000000","recordedAt":"2026-01-01T00:00:00Z","recordedByName":"string","refuseReason":"string","route":"string","site":"string","status":"string","witnessedByName":"string"}, { status: 201 })), // NursingController_orderAdministration
@@ -563,4 +565,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 549;
+export const operationCount = 551;

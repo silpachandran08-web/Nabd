@@ -494,5 +494,21 @@
   "routeError": {
     "title": "This panel failed",
     "home": "Go home"
+  },
+  "pwa": {
+    "ready": "Token {token} ready",
+    "notifyTitle": "Notifications on this device",
+    "notifyToggle": "Notify me when a patient is ready",
+    "notifyHint": "The notification shows the token number only, never the patient's name. Tap it to open My Day.",
+    "notifyLoading": "Checking this device…",
+    "notifyUnsupported": "This browser cannot show notifications. On an iPad or iPhone (iPadOS or iOS 16.4 or later), add Nabd to the Home Screen first (Share, then Add to Home Screen) and open it from there.",
+    "notifyNotConfigured": "Notifications are not set up for this clinic yet.",
+    "notifyBlocked": "Notifications are blocked for Nabd in this browser's settings. Allow them there, then try again.",
+    "notifyFailed": "Couldn't change notifications on this device. Try again.",
+    "offlineTitle": "You are offline",
+    "offlineBody": "This device can't reach the Nabd server right now. Most work needs a connection.",
+    "offlineDrafts": "Still available: consult notes and vitals you were writing stay saved on this device and are sent when you are back online.",
+    "offlinePayments": "Payments cannot be taken while offline. Do not collect money until the connection is back.",
+    "offlineRetry": "Try again"
   }
 }

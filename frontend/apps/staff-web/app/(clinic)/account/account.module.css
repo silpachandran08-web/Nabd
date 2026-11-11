@@ -168,3 +168,17 @@
   color: var(--nb-text-secondary);
   font-size: 13px;
 }
+
+/* FEF-048: the push toggle row (44px target) */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-12);
+  min-block-size: 44px;
+  cursor: pointer;
+}
+
+.toggleRow input {
+  inline-size: 20px;
+  block-size: 20px;
+}

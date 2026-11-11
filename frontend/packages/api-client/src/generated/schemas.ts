@@ -511,6 +511,9 @@ export const ProvisioningJobResponseSchema = z.object({ approvedAt: z.string().o
 export const ProxyInviteAcceptRequestSchema = z.object({ otp: z.string().min(1), scope: z.string().min(1) });
 export const ProxyInviteAcceptedSchema = z.object({ scope: z.string().optional(), status: z.string().optional() });
 export const ProxyRevokeRequestSchema = z.object({ reason: z.string().min(0).max(200) });
+export const PushSubscriptionCreatedSchema = z.object({ id: z.string().optional() });
+export const PushSubscriptionKeysSchema = z.object({ auth: z.string().optional(), p256dh: z.string().optional() });
+export const PushSubscriptionRequestSchema = z.object({ deviceLabel: z.string().optional(), endpoint: z.string().optional(), keys: PushSubscriptionKeysSchema.optional() });
 export const QueueBoardEntrySchema = z.object({ allergyFlag: z.boolean().optional(), displayName: z.string().optional(), flags: z.array(z.string()).optional(), id: z.string().optional(), mrn: z.string().optional(), p50At: z.string().optional(), p80At: z.string().optional(), patientId: z.string().optional(), position: z.number().int().optional(), previousToken: z.number().int().optional(), priority: z.boolean().optional(), stage: z.string().optional(), token: z.number().int().optional(), vitalsRecorded: z.boolean().optional() });
 export const QueueBoardDoctorSchema = z.object({ delayMinutes: z.number().int().optional(), doctorId: z.string().optional(), entries: z.array(QueueBoardEntrySchema).optional(), name: z.string().optional(), nowServing: z.number().int().optional(), state: z.string().optional() });
 export const QueueBoardSchema = z.object({ date: z.string().optional(), doctors: z.array(QueueBoardDoctorSchema).optional(), v: z.number().int().optional() });
@@ -935,6 +938,8 @@ export const operationSchemas = {
   ProfileClaimController_view: { response: ViewSchema },
   ProfileClaimController_claim: { body: ProfileClaimRequestSchema, response: ProfileClaimedSchema },
   ProfileClaimController_otp: { response: z.record(z.string(), z.boolean()) },
+  PushSubscriptionController_register: { body: PushSubscriptionRequestSchema, response: PushSubscriptionCreatedSchema },
+  PushSubscriptionController_delete: {  },
   OwnerMessagingController_quality: { response: z.record(z.string(), z.string()) },
   NursingController_activityToday: { response: z.array(ActivityEntryResponseSchema) },
   NursingController_orderAdministration: { body: AdministrationOrderRequestSchema, response: AdministrationOrderResponseSchema },

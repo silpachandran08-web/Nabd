@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import BffBoot from "./BffBoot";
 import TelemetryReporter from "./TelemetryReporter";
+import PwaBoot from "./PwaBoot";
 import { QueryProvider } from "./lib/query";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
@@ -25,7 +26,12 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Nabd",
   description: "Nabd clinic staff sign-in",
+  // FEF-048: installable PWA (app/manifest.webmanifest is linked by Next); iOS reads these for the Home Screen app.
+  appleWebApp: { capable: true, title: "Nabd", statusBarStyle: "black-translucent" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#06090C" };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection(); // FEF-010: render per request so Next stamps the CSP nonce on its scripts (static pages would carry none).
@@ -47,6 +53,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <I18nBoot locale={lang} />
           <ThemeBoot />
           <TelemetryReporter />
+          <PwaBoot />
           <BffBoot />
           {/* FEF-029: each route group's layout adds its own shell: (clinic) nav + top bar + idle lock, the others a plain frame. */}
           <QueryProvider>{children}</QueryProvider>
