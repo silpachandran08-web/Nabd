@@ -58,6 +58,26 @@ class M1(unittest.TestCase):
         self.assertIn("[email]", r["note"])
         self.assertEqual(r["txnId"], "abc")
 
+    def test_redaction_masks_abdm_shapes_spaced_numbers_and_abha_addresses(self):  # T1-BUG-6
+        r = m.redact({"healthId": "riya.menon@sbx", "healthIdNumber": "91-1234-5678-9012", "abhaAddress": "riya@abdm",
+                      "telecom": [{"system": "phone", "value": "+91 98765 43210"}], "value": "98765-43210",
+                      "message": "Aadhaar 1234 5678 9012 verified", "detail": "linked riya.menon@sbx via 91-1234-5678-9012",
+                      "at": "2026-11-11 10:00:00", "id": "3f2a9c1e-4321-8765-2109-0a1b2c3d4e5f", "date": "2026-11-11"})
+        out = json.dumps(r)
+        for leak in ("riya", "1234-5678", "98765", "5678 9012"):
+            self.assertNotIn(leak, out)
+        self.assertEqual(r["message"], "Aadhaar **********9012 verified")
+        self.assertEqual(r["detail"], "linked [abha-address] via *************9012")
+        self.assertEqual((r["at"], r["id"], r["date"]), ("2026-11-11 10:00:00", "3f2a9c1e-4321-8765-2109-0a1b2c3d4e5f", "2026-11-11"))
+        (self.tmp / "r.json").write_text(out)
+        self.assertEqual(m.scan(self.tmp), [], "redacted output passes the scan")
+
+    def test_scan_flags_spaced_numbers_abha_addresses_and_reads_csv(self):  # T1-BUG-6
+        (self.tmp / "a.json").write_text('{"v": "+91 98765 43210"}\n{"h": "riya.menon@sbx"}\n{"a": "1234 5678 9012"}\n'
+                                         '{"t": "2026-11-11 10:00:00", "d": "2026-11-11"}\n{"u": "3f2a9c1e-1234-5678-9012-0a1b2c3d4e5f"}\n')
+        (self.tmp / "b.csv").write_text("name,phone\nTest Person,9876543210\n")
+        self.assertEqual(m.scan(self.tmp), ["a.json:1", "a.json:2", "a.json:3", "b.csv:2"])
+
     def test_run_records_redacted_evidence_merges_manual_results_and_never_stores_the_token(self):
         cases = [
             {"id": "A1", "nha_ref": "TC-1", "mandatory": True, "kind": "auto", "title": "status", "request": {"method": "GET", "path": "/v1/abha/status"}, "expect": {"status": 200, "json": {"enabled": True}}},

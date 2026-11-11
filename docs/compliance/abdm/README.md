@@ -18,8 +18,10 @@ the NHA submission and the audit booking are external steps.
 4. Run the manual cases in the browser, save screenshots under the pack folder, and write their results to a JSON file:
    `{"M1-03": {"result": "pass", "evidence": ["shots/m1-03.png"], "note": ""}, ...}`.
 5. `python3 scripts/abdm/m1_runner.py run --base https://<staging-api>/ --out docs/compliance/abdm/evidence/<date> --manual results.json`
-   writes `summary.json`, `summary.md` and one redacted request/response file per auto case. Names, phones, Aadhaar, OTPs and
-   emails are masked by key, and any 10+ digit run or email is masked anywhere.
+   writes `summary.json`, `summary.md` and one redacted request/response file per auto case. Names, phones, Aadhaar, ABHA ids
+   (healthId, abha*), OTPs and emails are masked by key; anywhere else, any 10+ digit number (also spaced or hyphenated, e.g.
+   `+91 98765 43210`, `1234 5678 9012`), email or ABHA address (`x@sbx`, `x@abdm`) is masked. The scan also reads `.csv` files.
+   Names under neutral keys (e.g. FHIR `text`) cannot be recognised: use sandbox identities only.
 6. `python3 scripts/abdm/m1_runner.py scan docs/compliance/abdm/evidence/<date>` must report 0 lines before anything is committed
    or sent. Screenshots are not scanned: check them by eye for real data.
 
