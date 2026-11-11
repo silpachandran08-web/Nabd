@@ -151,6 +151,8 @@ class S22QaCom043ReminderApiTest extends ApiTestBase {
         assertThat(confirmedEvents(c.tenant().id(), appt)).isEqualTo(1);
         ResponseEntity<Map> second = confirm(c.edge(), c.base(), appt, p[1], UUID.randomUUID().toString());
         System.out.println("QA COM-043 b03: a second tap (new key) -> " + second.getStatusCode() + ", confirmed events now " + confirmedEvents(c.tenant().id(), appt));
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(confirmedEvents(c.tenant().id(), appt)).as("round 2 (N-1 fix): a repeated Confirm publishes no second event").isEqualTo(1);
     }
 
     @Test

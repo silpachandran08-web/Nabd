@@ -112,6 +112,10 @@ class S22QaAdm006WhiteGloveApiTest extends ApiTestBase {
         long deskAudit = auditRows(c.t().id(), desk.id()), mgrAudit = auditRows(c.t().id(), mgr.id());
         System.out.println("QA ADM-006 d01: audit rows for refused receptionist=" + deskAudit + " manager=" + mgrAudit);
         assertThat(deskAudit + mgrAudit).as("QA brief: owner-only refusals are audited (receptionist and manager)").isGreaterThanOrEqualTo(2);
+        for (SeededStaff s : List.of(desk, mgr)) {
+            assertThat(inTenantTx(c.t().id(), () -> jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE tenant_id = ? AND actor_id = ? AND action = 'setup.white_glove_denied'",
+                    Long.class, c.t().id(), s.id()))).as("denied row for " + s.email()).isEqualTo(1);
+        }
     }
 
     @Test
