@@ -1,6 +1,7 @@
 package com.nabd.hms.realtime;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -31,7 +32,7 @@ class PushSubscriptionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    Created register(@AuthenticationPrincipal Jwt jwt, @RequestBody PushSubscriptionService.Register req) {
+    Created register(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PushSubscriptionService.Register req) {
         return new Created(service.register(UUID.fromString(jwt.getSubject()), req));
     }
 

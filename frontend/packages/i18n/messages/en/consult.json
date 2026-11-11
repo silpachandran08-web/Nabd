@@ -418,7 +418,10 @@
     "assentOptional": "Patient's assent (optional)",
     "witnessIsYou": "You are recorded as the witness. The signed PDF is stored with its fingerprint (SHA-256).",
     "submitSigned": "Submit signed consent",
-    "formChanged": "The consent form was updated. The new version is shown: read it again before signing."
+    "formChanged": "The consent form was updated. The new version is shown: read it again before signing.",
+    "ageUnknown": "The patient's date of birth is not recorded. If the patient is under 18, {guardian} (guardian) signs; choose Patient only for an adult.",
+    "ageUnknownNoGuardian": "The patient's date of birth is not recorded and no guardian is linked. Only an adult patient can sign; for a minor, link the guardian on the patient record first.",
+    "fullSignature": "Sign with a full signature: a dot or a short tap is not accepted."
   },
   "rxPad": {
     "genericName": "Generic name",

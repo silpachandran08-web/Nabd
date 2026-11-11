@@ -1,22 +1,22 @@
 package com.nabd.hms.realtime.integration;
 
+import com.nabd.hms.shared.integration.ResilientHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
@@ -34,7 +34,7 @@ import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.ECPublicKeySpec;
-import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
@@ -56,15 +56,19 @@ public class WebPushClient {
     public record Target(String endpoint, String p256dh, byte[] authSecret) {
     }
 
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+    private final RestClient http;
+    private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     private final String publicKeyB64;
     private final PrivateKey privateKey;
     private final String subject;
 
-    public WebPushClient(@Value("${app.webpush.vapid-public-key:}") String publicKeyB64,
+    public WebPushClient(ResilientHttpClient resilient, Clock clock,
+                         @Value("${app.webpush.vapid-public-key:}") String publicKeyB64,
                          @Value("${app.webpush.vapid-private-key:}") String privateKeyB64,
                          @Value("${app.webpush.subject:mailto:push-ops@nabd.invalid}") String subject) {
+        this.http = resilient.builder("webpush").build(); // OPS-012: timeouts, circuit breaker, never inside a DB transaction
+        this.clock = clock;
         this.publicKeyB64 = publicKeyB64 == null ? "" : publicKeyB64.trim();
         this.privateKey = privateKeyB64 == null || privateKeyB64.isBlank() ? null : privateKey(decode(privateKeyB64.trim()));
         this.subject = subject;
@@ -83,17 +87,13 @@ public class WebPushClient {
             byte[] body = encrypt(payload, decode(target.p256dh()), target.authSecret(), ephemeral(), salt());
             URI uri = URI.create(target.endpoint());
             String audience = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() == -1 ? "" : ":" + uri.getPort());
-            HttpRequest req = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(4))
-                    .header("TTL", String.valueOf(TTL_SECONDS)).header("Urgency", "high")
-                    .header("Content-Encoding", "aes128gcm").header("Content-Type", "application/octet-stream")
-                    .header("Authorization", "vapid t=" + jwt(audience, Instant.now()) + ", k=" + publicKeyB64)
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
-            return http.send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
-        } catch (IOException | GeneralSecurityException | IllegalArgumentException e) {
+            String auth = "vapid t=" + jwt(audience, clock.instant()) + ", k=" + publicKeyB64;
+            return http.post().uri(uri).header("TTL", String.valueOf(TTL_SECONDS)).header("Urgency", "high")
+                    .header("Content-Encoding", "aes128gcm").header("Authorization", auth)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM).body(body)
+                    .exchange((req, res) -> res.getStatusCode().value()); // every status is an answer (404/410 = gone), never an exception
+        } catch (GeneralSecurityException | RuntimeException e) { // network error, timeout, open circuit, bad key or URL
             log.warn("web push send failed: {}", e.getClass().getSimpleName()); // no endpoint or key material in logs
-            return -1;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             return -1;
         }
     }

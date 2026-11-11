@@ -29,3 +29,28 @@ export function pickLang(items: ConsentTemplate[], patientLang: string | null | 
   const want = (patientLang ?? "").toLowerCase().split("-")[0];
   return langs.includes(want) ? want : langs.includes("en") ? "en" : langs[0] ?? null;
 }
+
+/** QA N-2, same rule as the server (ConsentSignature.enoughInk): at least 10 points spanning 40 pad units, so a tap is not a signature. */
+export const MIN_POINTS = 10;
+export const MIN_SPAN = 40;
+export function enoughInk(strokes: Point[][]): boolean {
+  const pts = strokes.flat();
+  if (pts.length < MIN_POINTS) return false;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) >= MIN_SPAN;
+}
+
+export type SignerKind = "patient" | "guardian";
+export type SignerPlan = { age: "minor" | "unknown" | "adult"; kinds: SignerKind[]; defaultKind: SignerKind; guardianName: string | null };
+
+/**
+ * QA N-3: who signs, from the procedure order itself (nursing:view), never from a patients:view call. patientMinor null = the date
+ * of birth is unknown: the guardian flow is offered first rather than assuming an adult (the server decides on the record).
+ */
+export function signerPlan(o: { patientMinor?: boolean | null; guardianName?: string | null }): SignerPlan {
+  const guardianName = o.guardianName ?? null;
+  if (o.patientMinor === true) return { age: "minor", kinds: ["guardian"], defaultKind: "guardian", guardianName };
+  if (o.patientMinor === false) return { age: "adult", kinds: guardianName ? ["patient", "guardian"] : ["patient"], defaultKind: "patient", guardianName };
+  return { age: "unknown", kinds: ["guardian", "patient"], defaultKind: "guardian", guardianName };
+}

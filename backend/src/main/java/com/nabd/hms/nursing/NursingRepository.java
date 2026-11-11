@@ -237,9 +237,14 @@ class NursingRepository {
                 "WHERE tenant_id = ? AND id = ? AND consent_withdrawn_at IS NULL", staffId, reason, tenantId, id) == 1;
     }
 
-    Optional<String> findPatientLanguage(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT preferred_language FROM patients WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> rs.getString(1), tenantId, patientId).stream().filter(java.util.Objects::nonNull).findFirst();
+    /** CLN-014: what the consent dialog needs about the patient (language, age, linked guardian's name), readable with nursing:view. */
+    record ConsentPatient(String language, LocalDate dob, String guardianName) {
+    }
+
+    Optional<ConsentPatient> findConsentPatient(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT p.preferred_language, p.dob, g.name AS guardian_name FROM patients p "
+                        + "LEFT JOIN patients g ON g.tenant_id = p.tenant_id AND g.id = p.guardian_id WHERE p.tenant_id = ? AND p.id = ?",
+                (rs, i) -> new ConsentPatient(rs.getString(1), rs.getObject(2, LocalDate.class), rs.getString(3)), tenantId, patientId).stream().findFirst();
     }
 
     // ── NB-148: completed activity — a read across three existing write paths, no new table ──

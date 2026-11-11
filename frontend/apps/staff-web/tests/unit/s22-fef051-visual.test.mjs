@@ -2,7 +2,8 @@
 // the matrix, and PR selection (feature folder -> its screens; packages/tokens, packages/ui -> the full matrix). No browser.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCREENS, screensOf, routesOf, EXCLUDED, STAFF_LOCALES, PATIENT_LOCALES, THEMES, STAFF_DEVICES, PATIENT_DEVICES, DEVICES } from '../e2e/visual/screens.mjs';
+import { readFileSync } from 'node:fs';
+import { SCREENS, screensOf, routesOf, EXCLUDED, boundaryCrash, CRASH_SELECTOR, STAFF_LOCALES, PATIENT_LOCALES, THEMES, STAFF_DEVICES, PATIENT_DEVICES, DEVICES } from '../e2e/visual/screens.mjs';
 import { selectScreens } from '../e2e/visual/select.mjs';
 
 const ids = (sel) => [...sel.ids].sort();
@@ -63,4 +64,21 @@ test('selection: a shared component folder selects the screens that name it; pat
   const patient = selectScreens(['frontend/apps/patient-web/app/components/LinkFlow.tsx']);
   assert.ok(patient.mode === 'some' && patient.ids.every((i) => i.startsWith('patient/')) && patient.ids.length === screensOf('patient').length);
   assert.equal(selectScreens(['backend/src/main/java/X.java', 'frontend/apps/staff-web/tests/unit/x.test.mjs', '']).mode, 'none');
+});
+
+test('T1-BUG-5: an error-boundary report or error-boundary markup fails the screen instead of becoming a baseline', () => {
+  const T = 'http://localhost:8080/v1/client-telemetry';
+  assert.equal(boundaryCrash('POST', T, JSON.stringify({ kind: 'error', metric: 'boundary.global.TypeError' })), 'boundary.global.TypeError');
+  assert.equal(boundaryCrash('POST', T, JSON.stringify({ metric: 'boundary.clinic.Error', release: 'r1' })), 'boundary.clinic.Error');
+  assert.equal(boundaryCrash('POST', T, JSON.stringify({ kind: 'vital', metric: 'LCP', value: 1200 })), null); // web vitals are not crashes
+  assert.equal(boundaryCrash('POST', T, 'not json'), null);
+  assert.equal(boundaryCrash('GET', T, null), null);
+  assert.equal(boundaryCrash('POST', 'http://localhost:8080/v1/queue/check-in', JSON.stringify({ metric: 'boundary.x' })), null);
+  // the selector names exactly the markers the app's boundaries render (fails if a boundary changes its marker)
+  const app = new URL('../../app/', import.meta.url);
+  const src = (p) => readFileSync(new URL(p, app), 'utf8');
+  assert.match(src('components/ui/RouteError.tsx'), /data-testid=\{`route-error-\$\{group\}`\}/);
+  assert.match(src('components/consult/visit/PanelBoundary.tsx'), /data-testid=\{`panel-error-\$\{this\.props\.panel\}`\}/);
+  assert.match(src('global-error.tsx'), /<body[^>]*>\s*<main role="alert">/);
+  for (const m of ['route-error-', 'panel-error-', 'body > main[role="alert"]']) assert.ok(CRASH_SELECTOR.includes(m), m);
 });

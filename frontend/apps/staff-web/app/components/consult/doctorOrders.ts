@@ -13,7 +13,7 @@ export type ProcOrder = {
   consentSignedAt: string | null;
   // CLN-014: the signed form (null for a typed-name consent), a withdrawal, and the patient's language for the form
   patientId?: string; consentId?: string | null; consentSha256?: string | null; consentWithdrawnAt?: string | null;
-  consentWithdrawReason?: string | null; patientLanguage?: string | null;
+  consentWithdrawReason?: string | null; patientLanguage?: string | null; patientMinor?: boolean | null; guardianName?: string | null;
 };
 // AdministrationOrderRequest.route pattern: IM|IV|SC|infusion|oral|topical (route is optional).
 export const ROUTES = ["IM", "IV", "SC", "infusion", "oral", "topical"] as const;

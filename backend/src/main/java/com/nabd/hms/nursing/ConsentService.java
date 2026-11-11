@@ -122,7 +122,9 @@ public class ConsentService {
         ConsentRepository.PatientFacts patient = repo.patient(tenantId, order.patientId()).orElseThrow(ApiException::notFound);
         boolean minor = patient.dob() != null && patient.dob().plusYears(ADULT_AGE).isAfter(clock.today(tenantId));
         boolean guardian = "guardian".equals(signer.kind());
-        if ((minor && !guardian) || (guardian && (signer.guardianId() == null || !guardians.isGuardianOf(signer.guardianId(), order.patientId())))) {
+        // QA N-3: the client may omit guardianId (a nurse without patients:view cannot read it); the linked guardian is then used
+        UUID guardianId = !guardian ? null : signer.guardianId() != null ? signer.guardianId() : patient.guardianId();
+        if ((minor && !guardian) || (guardian && (guardianId == null || !guardians.isGuardianOf(guardianId, order.patientId())))) {
             throw new ApiException(HttpStatus.CONFLICT, "GUARDIAN_REQUIRED", "Guardian signature required",
                     "The patient is under " + ADULT_AGE + ": the guardian linked to the patient record must sign.");
         }
@@ -136,8 +138,9 @@ public class ConsentService {
         } catch (IllegalArgumentException e) {
             throw invalid("The signature is not valid stroke data.");
         }
-        if (strokes.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "SIGNATURE_REQUIRED", "Signature required", "Capture the signature before submitting.");
+        if (!ConsentSignature.enoughInk(strokes) || (!assent.isEmpty() && !ConsentSignature.enoughInk(assent))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SIGNATURE_REQUIRED", "Signature required",
+                    "Capture a full signature before submitting: a dot or a short tap is not accepted.");
         }
 
         UUID consentId = UUID.randomUUID();
@@ -151,7 +154,7 @@ public class ConsentService {
                 ConsentSignature.toSvg(strokes).getBytes(StandardCharsets.UTF_8), order.patientId(), order.queueEntryId());
         UUID pdfFile = files.storeGenerated(staffId, "consent_form", "application/pdf", pdf, order.patientId(), order.queueEntryId());
         try {
-            repo.insertConsent(consentId, tenantId, order.patientId(), order.id(), t, signer.kind(), guardian ? signer.guardianId() : null,
+            repo.insertConsent(consentId, tenantId, order.patientId(), order.id(), t, signer.kind(), guardianId,
                     signer.name().strip(), witness.id(), signatureFile, pdfFile, sha, staffId, signedAt);
         } catch (DuplicateKeyException e) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_CONSENTED", "Already consented", "A signed consent is already on file for this order.");

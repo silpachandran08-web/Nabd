@@ -35,6 +35,15 @@ export function pendingChange(t: TemplateLike): TemplateVersion | null {
 
 export const inReview = (status: string) => status === "submitting" || status === "queued" || status === "pending";
 
+/** The edit button's label, or null when it must be absent: no setup:edit (T1-BUG-1), a starter template (the platform fixes
+ * those), or a version still in review (a second edit would be refused with VERSION_IN_REVIEW). */
+export function editLabel(t: TemplateLike, canEdit: boolean): string | null {
+  if (!canEdit || t.source !== "custom") return null;
+  const change = pendingChange(t);
+  if (inReview(t.status) || (change !== null && inReview(change.status))) return null;
+  return t.status === "rejected" || change?.status === "rejected" ? "Fix & resubmit" : "Edit";
+}
+
 export type Alert = { id: string; tone: "warn" | "danger"; text: string };
 
 /** What needs the owner: a rejected version (with the fix), a pause (sends are held), a disabled template, or Meta moving a

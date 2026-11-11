@@ -31,7 +31,9 @@ import java.security.MessageDigest;
 import java.util.UUID;
 
 /**
- * PLT-026 (T-031): exactly-once for @Idempotent POSTs. Registered inside the Spring Security chain (SecurityConfig), after
+ * PLT-026 (T-031): exactly-once for @Idempotent POSTs. COM-013: also for an @Idempotent PATCH that carries a UUID
+ * Idempotency-Key; a PATCH without one (or with a non-UUID key) passes through unchanged, so the older @Idempotent PATCH callers
+ * that send no key (calendar holidays) or their own string keys (the Edge's patient completion) behave exactly as before. Registered inside the Spring Security chain (SecurityConfig), after
  * authentication, because the key is scoped to (tenant, actor). Only 2xx responses are stored and replayed; a 4xx/5xx
  * releases the key so the corrected or retried request runs again. The request body is only hashed, never stored.
  * shortcut: the request body is buffered in memory, fine for JSON commands, move to a size cap if an @Idempotent upload appears.
@@ -56,12 +58,17 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!"POST".equals(request.getMethod()) || !(auth instanceof JwtAuthenticationToken jwt) || !isIdempotent(request)) {
+        boolean patch = "PATCH".equals(request.getMethod());
+        if (!("POST".equals(request.getMethod()) || patch) || !(auth instanceof JwtAuthenticationToken jwt) || !isIdempotent(request)) {
             chain.doFilter(request, response);
             return;
         }
         String rawKey = request.getHeader(HEADER);
         UUID key = parse(rawKey);
+        if (patch && key == null) { // opt-in for PATCH: only a caller that sends a UUID key gets exactly-once
+            chain.doFilter(request, response);
+            return;
+        }
         UUID tenant = parse(jwt.getToken().getClaimAsString("tenantId"));
         UUID actor = parse(jwt.getToken().getSubject());
         if (tenant == null && "internal".equals(jwt.getToken().getClaimAsString("typ"))) { // ACC-038: a service token keys on (path tenant, service id)

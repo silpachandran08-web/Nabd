@@ -71,7 +71,7 @@ class Fef048WebPushApiTest extends ApiTestBase {
     static void push(DynamicPropertyRegistry r) {
         r.add("app.webpush.vapid-public-key", () -> B64.encodeToString(point((ECPublicKey) VAPID.getPublic())));
         r.add("app.webpush.vapid-private-key", () -> B64.encodeToString(fixed32(((ECPrivateKey) VAPID.getPrivate()).getS())));
-        r.add("app.webpush.allowed-hosts", () -> "127.0.0.1,fcm.googleapis.com");
+        r.add("app.webpush.allowed-hosts", () -> "127.0.0.1:" + PUSH.getAddress().getPort() + ",fcm.googleapis.com"); // a non-default port is allowed only as host:port
         r.add("app.webpush.allow-http", () -> "true");
     }
 
@@ -128,11 +128,15 @@ class Fef048WebPushApiTest extends ApiTestBase {
 
         Map<String, Object> keys = Map.of("p256dh", B64.encodeToString(point((ECPublicKey) d.keys().getPublic())), "auth", B64.encodeToString(d.auth()));
         for (String bad : List.of("https://169.254.169.254/latest/meta-data", "https://evil.example.com/push", "ftp://fcm.googleapis.com/x",
-                "https://fcm.googleapis.com.evil.example/x", "not a url")) {
+                "https://fcm.googleapis.com.evil.example/x", "not a url",
+                "https://fcm.googleapis.com:6379/fcm/send/x", "http://127.0.0.1:" + (PUSH.getAddress().getPort() == 1 ? 2 : 1) + "/push/x")) { // QA S22 N-4: the port counts
             ResponseEntity<Map> r = exchange("/v1/me/push-subscriptions", HttpMethod.POST, authedJsonBody(token, Map.of("endpoint", bad, "keys", keys)), Map.class);
             assertThat(r.getStatusCode().value()).as(bad).isEqualTo(422);
             assertThat(r.getBody().get("code")).isEqualTo("INVALID_SUBSCRIPTION");
         }
+        ResponseEntity<Map> defaultPort = exchange("/v1/me/push-subscriptions", HttpMethod.POST, authedJsonBody(token,
+                Map.of("endpoint", "https://fcm.googleapis.com:443/fcm/send/abc", "keys", keys)), Map.class);
+        assertThat(defaultPort.getStatusCode()).isEqualTo(HttpStatus.CREATED); // the scheme's own port is the bare host
         byte[] offCurve = new byte[65];
         offCurve[0] = 4;
         offCurve[64] = 1;
@@ -146,7 +150,7 @@ class Fef048WebPushApiTest extends ApiTestBase {
         }
         assertThat(exchange("/v1/me/push-subscriptions", HttpMethod.POST, jsonBody(Map.of("endpoint", d.endpoint())), Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(inTenantTx(t.id(), () -> jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action = 'push.subscription_registered' AND actor_id = ?", Integer.class, s.id()))).isEqualTo(2);
+        assertThat(inTenantTx(t.id(), () -> jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action = 'push.subscription_registered' AND actor_id = ?", Integer.class, s.id()))).isEqualTo(3); // two for the same endpoint, one for the :443 one
     }
 
     @Test

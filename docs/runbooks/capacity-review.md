@@ -2,8 +2,10 @@
 
 Compares four weeks of pilot telemetry with the DP section 6 capacity model and decides whether the cell can take cohort B
 (10-15 more clinics) without hitting a pool, Valkey or SSE limit. Run it once the pilot has 4 full weeks of telemetry, and
-again before every cohort after B. Bar: every resource has **2x headroom over the 4-week pilot peak**; anything below is an
-action with an owner, ticketed before cohort B entry.
+again before every cohort after B. Bar: every resource has **2x headroom over the 4-week pilot peak**, still has 2x at the
+projected cohort A+B size, and does not reach 70% on or before the cohort B entry date. Anything that misses one of these, and
+any resource with no data or only zeros in the window (a broken exporter is never headroom), is an action with an owner,
+ticketed before cohort B entry.
 
 Code: `infra/observability/capacity/` (`model.yaml` = resources, queries, capacities, owners; `capacity_review.py` = pull,
 report, dashboard). Dashboard: Grafana "Nabd capacity review (OPS-060, per cell)" (`infra/observability/dashboards/capacity-review.json`,
@@ -35,7 +37,7 @@ rollout plan (the clinic count at which the scaled peak passes 70%) and the tren
    ```
    Terraform outputs `postgres` and `valkey` name the ids. The samples hold daily maxima only (no tenant, patient or request data).
 2. **Report**: `python3 infra/observability/capacity/capacity_review.py report samples.json --clinics <live pilot clinics> --cohort-b-date <entry date> --clinics-per-month <rollout pace after B> --out review/`.
-   Exit 1 means there are actions. Check every capacity marked `(verify)` against the cell (RDS console: provisioned IOPS).
+   The report goes to `review/` here (default `./capacity-review/` of the current directory). Exit 1 means there are actions. Check every capacity marked `(verify)` against the cell (RDS console: provisioned IOPS).
 3. **Re-run the morning rush at A+B** in staging-in with the command the report prints (`PERF_TENANTS=<A+B> PEAK_RPS=<scaled check-ins/s> perf/run.sh rush --seed`;
    `run.sh` drives 2x `PEAK_RPS`). The gate is the OPS-047 rush gate: check-in p95 < 300 ms, board p95 < 200 ms, checkout p95 < 500 ms, DB CPU < 70%.
    Then report again with `--proven-checkin-rps <2 x PEAK_RPS of the green run>` so the check-in row has a capacity.
