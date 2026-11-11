@@ -1,0 +1,15 @@
+/* ADM-005/006: activation funnel and white-glove queue. Tokens only, logical properties, 44 px targets. */
+.section { display: flex; flex-direction: column; gap: var(--nb-space-12); margin-block-end: var(--nb-space-24); }
+.h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--nb-text-primary); }
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--nb-space-12); }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 13px; color: var(--nb-text-secondary); }
+.input { min-block-size: 44px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; }
+.cohort { display: flex; flex-direction: column; gap: var(--nb-space-8); padding: var(--nb-space-16); border-block-end: 1px solid var(--nb-border-subtle); }
+.cohortHead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--nb-space-8); font-size: 13.5px; }
+.bars { display: grid; grid-template-columns: minmax(120px, 160px) 1fr minmax(96px, auto); gap: var(--nb-space-4) var(--nb-space-12); align-items: center; font-size: 13px; }
+.bar { position: relative; block-size: 12px; border-radius: 999px; background: var(--nb-surface-3); overflow: hidden; }
+.reached, .completed { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 999px; }
+.reached { background: var(--nb-accent-tint); }
+.completed { background: var(--nb-accent-fill); }
+.checks { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.check { display: inline-flex; align-items: center; gap: var(--nb-space-4); min-block-size: 44px; }

@@ -9,14 +9,14 @@ class PlatformPermissionsTest {
 
     @Test
     void superAdminSeesEverySurface() {
-        assertThat(PlatformPermissions.forRole("super_admin").stream().filter(p -> p.endsWith(":view"))).hasSize(14);
+        assertThat(PlatformPermissions.forRole("super_admin").stream().filter(p -> p.endsWith(":view"))).hasSize(15); // ADM-005: onboarding
     }
 
     @Test
     void onlySuperAdminAndImplementationCanReachOnboarding() {
-        assertThat(PlatformPermissions.forRole("implementation")).contains("onboarding_provisioning:view");
+        assertThat(PlatformPermissions.forRole("implementation")).contains("onboarding_provisioning:view", "onboarding:view", "onboarding:edit");
         for (String role : new String[]{"support_engineer", "billing", "sre", "commercial", "compliance_dpo"}) {
-            assertThat(PlatformPermissions.forRole(role)).doesNotContain("onboarding_provisioning:view");
+            assertThat(PlatformPermissions.forRole(role)).doesNotContain("onboarding_provisioning:view", "onboarding:view", "onboarding:edit");
         }
     }
 

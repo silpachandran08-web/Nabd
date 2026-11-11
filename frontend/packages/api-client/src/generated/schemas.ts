@@ -53,6 +53,9 @@ export const BatchAdjustmentRequestSchema = z.object({ approverPin: z.string().m
 export const BatchAdjustmentResponseSchema = z.object({ approverName: z.string().optional(), batchId: z.string().optional(), delta: z.number().int().optional(), itemId: z.string().optional(), makerName: z.string().optional(), qtyAfter: z.number().int().optional(), qtyBefore: z.number().int().optional(), reasonCode: z.string().optional() });
 export const EntrySchema = z.object({ patientId: z.string().optional(), patientName: z.string().optional(), priorNoShowCount: z.number().int().optional() });
 export const BillingLeakageResponseSchema = z.object({ entries: z.array(EntrySchema).optional(), rule: z.string().optional(), thresholdAmount: z.number().optional() });
+export const BookRequestSchema = z.object({ notes: z.string().min(0).max(500).optional(), preferredSlots: z.array(z.string()) });
+export const FeeSchema = z.object({ amountMinor: z.number().int().optional(), currency: z.string().optional(), status: z.string().optional() });
+export const BookedSchema = z.object({ engagementId: z.string().optional(), fee: FeeSchema.optional(), paymentLink: z.string().optional(), waiverReason: z.string().optional() });
 export const BookingSchema = z.object({ actedByRelation: z.string().optional(), appointmentId: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), queueEntryId: z.string().optional(), status: z.string().optional(), time: z.string().optional(), token: z.number().int().optional(), visitType: z.string().optional() });
 export const BookingPolicyChangeSchema = z.object({ after: z.record(z.string(), z.unknown()).optional(), before: z.record(z.string(), z.unknown()).optional(), pointer: z.string().optional() });
 export const BookingPolicyDraftSchema = z.object({ config: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), updatedAt: z.string().optional() });
@@ -138,6 +141,8 @@ export const ClinicProfileResponseSchema = z.object({ id: z.string().optional(),
 export const ClinicProfileWriteRequestSchema = z.object({ name: z.string().min(1), specialties: z.array(z.string()).optional(), taxId: z.string().optional(), taxIdType: z.string().optional(), timezone: z.string().min(1), whatsappNumber: z.string().optional() });
 export const ClinicianReviewEntrySchema = z.object({ clinician: z.boolean().optional(), name: z.string().optional(), reason: z.string().optional(), roleName: z.string().optional(), staffId: z.string().optional() });
 export const CloseSchema = z.object({ closeCount: z.number().int().optional(), closedAt: z.string().optional(), closedByName: z.string().optional(), countedCash: z.number().optional(), expectedCash: z.number().optional(), note: z.string().optional(), reopenReason: z.string().optional(), reopenedAt: z.string().optional(), reopenedByName: z.string().optional(), status: z.string().optional(), variance: z.number().optional() });
+export const StepCountSchema = z.object({ completed: z.number().int().optional(), reached: z.number().int().optional(), step: z.string().optional() });
+export const CohortViewSchema = z.object({ medianHoursToLive: z.number().optional(), signups: z.number().int().optional(), steps: z.array(StepCountSchema).optional(), week: z.string().optional() });
 export const CollectionsSchema = z.object({ collected: z.number().optional(), invoices: z.number().int().optional(), pendingInvoices: z.number().int().optional() });
 export const LicencesSchema = z.object({ expired: z.number().int().optional(), expiringSoon: z.number().int().optional(), total: z.number().int().optional() });
 export const ComplianceHealthResponseSchema = z.object({ items: z.array(ItemSchema).optional(), licences: LicencesSchema.optional() });
@@ -254,6 +259,7 @@ export const EncounterListItemSchema = z.object({ amendmentCount: z.number().int
 export const EncounterListPageSchema = z.object({ data: z.array(EncounterListItemSchema).optional(), page: PageMetaSchema.optional() });
 export const EncounterResponseSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), doctorId: z.string().optional(), medications: z.string().optional(), occurredAt: z.string().optional(), queueEntryId: z.string().optional() });
 export const EncounterPageSchema = z.object({ data: z.array(EncounterResponseSchema).optional(), page: PageMetaSchema.optional() });
+export const EngagementSchema = z.object({ closedAt: z.string().optional(), coveredSteps: z.array(z.string()).optional(), createdAt: z.string().optional(), fee: FeeSchema.optional(), id: z.string().optional(), preferredSlots: z.array(z.string()).optional(), slotAt: z.string().optional(), status: z.string().optional(), waiverReason: z.string().optional() });
 export const EtaAccuracyItemSchema = z.object({ clinicDate: z.string().optional(), doctorId: z.string().optional(), lowConfidence: z.boolean().optional(), maeMin: z.number().optional(), n: z.number().int().optional(), p80HitRate: z.number().optional(), within10Pct: z.number().optional() });
 export const EtaAccuracyResponseSchema = z.object({ items: z.array(EtaAccuracyItemSchema).optional() });
 export const EtaItemSchema = z.object({ appointmentId: z.string().optional(), p50At: z.string().optional(), p80At: z.string().optional(), position: z.number().int().optional(), queueEntryId: z.string().optional(), rangeLabel: z.string().optional() });
@@ -297,6 +303,7 @@ export const FleetSummaryResponseSchema = z.object({ byStatus: z.record(z.string
 export const FlowStepResponseSchema = z.object({ stepType: z.string().optional() });
 export const FollowUpItemSchema = z.object({ appointmentId: z.string().optional(), cancelReason: z.string().optional(), patientId: z.string().optional(), patientMrn: z.string().optional(), patientName: z.string().optional(), startTime: z.string().optional(), status: z.string().optional() });
 export const FollowUpPageSchema = z.object({ data: z.array(FollowUpItemSchema).optional(), page: PageMetaSchema.optional() });
+export const FunnelSchema = z.object({ cohorts: z.array(CohortViewSchema).optional() });
 export const GoLiveBlockerSchema = z.object({ code: z.string().optional(), fixUrl: z.string().optional(), ok: z.boolean().optional() });
 export const GoLiveNiceToHaveSchema = z.object({ code: z.string().optional(), note: z.string().optional(), ok: z.boolean().optional() });
 export const GoLiveChecksResponseSchema = z.object({ blockers: z.array(GoLiveBlockerSchema).optional(), niceToHave: z.array(GoLiveNiceToHaveSchema).optional() });
@@ -398,6 +405,7 @@ export const NoteResponseSchema = z.object({ assessment: z.string().optional(), 
 export const NoteUpsertRequestSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), subjective: z.string().optional() });
 export const NotificationClaimRecipientSchema = z.object({ patientId: z.string().optional(), phoneE164: z.string().optional() });
 export const NotificationClaimSchema = z.object({ consentClass: z.string().optional(), language: z.string().optional(), notAfter: z.string().optional(), notBefore: z.string().optional(), params: z.array(z.string()).optional(), purpose: z.string().optional(), recipient: NotificationClaimRecipientSchema.optional(), requestId: z.string().optional(), templateKey: z.string().optional(), tenantId: z.string().optional() });
+export const OfferSchema = z.object({ currency: z.string().optional(), feeMinor: z.number().int().optional(), feeStatus: z.string().optional(), waiverReason: z.string().optional() });
 export const OperatorLoginRequestSchema = z.object({ email: z.string().min(1), pin: z.string().min(1) });
 export const OperatorProfileResponseSchema = z.object({ email: z.string().optional(), id: z.string().optional(), name: z.string().optional(), permissions: z.array(z.string()).optional(), role: z.string().optional() });
 export const OtcChargesResponseSchema = z.object({ charges: z.array(ChargeResponseSchema).optional(), currency: z.string().optional() });
@@ -419,6 +427,7 @@ export const OwnerMfaEnrollRequestSchema = z.object({ setupToken: z.string().min
 export const OwnerMfaVerifyRequestSchema = z.object({ challengeToken: z.string().min(1), code: z.string().min(1) });
 export const SupportAccessRequestItemSchema = z.object({ declineNote: z.string().optional(), expiresAt: z.string().optional(), id: z.string().optional(), minutes: z.number().int().optional(), operatorName: z.string().optional(), reason: z.string().optional(), requestedAt: z.string().optional(), scope: z.string().optional(), status: z.string().optional(), windowEndsAt: z.string().optional(), windowStartedAt: z.string().optional() });
 export const OwnerRequestResponseSchema = z.object({ items: z.array(SupportAccessRequestItemSchema).optional() });
+export const OwnerViewSchema = z.object({ engagement: EngagementSchema.optional(), offer: OfferSchema.optional() });
 export const OwnerWorkspaceTokenResponseSchema = z.object({ expiresIn: z.number().int().optional(), remainingRecoveryCodes: z.number().int().optional(), workspaceToken: z.string().optional() });
 export const PackageItemInputSchema = z.object({ itemType: z.string().optional(), name: z.string().min(1), quantity: z.number().int().gt(0).optional(), taxRatePercent: z.number().gte(0).optional(), unitListPrice: z.number().gte(0) });
 export const PackageItemResponseSchema = z.object({ id: z.string().optional(), itemType: z.string().optional(), listValue: z.number().optional(), name: z.string().optional(), quantity: z.number().int().optional(), taxRatePercent: z.number().optional(), unitListPrice: z.number().optional() });
@@ -515,6 +524,7 @@ export const QueueBoardEntrySchema = z.object({ allergyFlag: z.boolean().optiona
 export const QueueBoardDoctorSchema = z.object({ delayMinutes: z.number().int().optional(), doctorId: z.string().optional(), entries: z.array(QueueBoardEntrySchema).optional(), name: z.string().optional(), nowServing: z.number().int().optional(), state: z.string().optional() });
 export const QueueBoardSchema = z.object({ date: z.string().optional(), doctors: z.array(QueueBoardDoctorSchema).optional(), v: z.number().int().optional() });
 export const QueueFacilitySettingsRequestSchema = z.object({ etaDisplayMode: z.string().min(1) });
+export const QueueItemSchema = z.object({ closedAt: z.string().optional(), coveredSteps: z.array(z.string()).optional(), createdAt: z.string().optional(), fee: FeeSchema.optional(), id: z.string().optional(), notes: z.string().optional(), operatorId: z.string().optional(), preferredSlots: z.array(z.string()).optional(), slotAt: z.string().optional(), status: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional(), ticketId: z.string().optional(), waiverReason: z.string().optional() });
 export const QueueReassignRequestSchema = z.object({ expectedStatus: z.string().min(1), reasonCode: z.string().min(1), toDoctorId: z.string() });
 export const QueueReassignResponseSchema = z.object({ entry: QueueEntryResponseSchema.optional(), previousToken: z.number().int().optional() });
 export const QueueReorderRequestSchema = z.object({ priority: z.boolean(), reason: z.string().optional() });
@@ -629,6 +639,8 @@ export const StockTakeSummarySchema = z.object({ approvedByName: z.string().opti
 export const StockTakeSheetSchema = z.object({ lines: z.array(StockTakeLineSchema).optional(), summary: StockTakeSummarySchema.optional() });
 export const StockTakeStartRequestSchema = z.object({ location: z.string().min(0).max(80).optional(), scheduleClass: z.string().min(0).max(40).optional(), scope: z.string() });
 export const StockTakeStartedSchema = z.object({ lineCount: z.number().int().optional(), stockTakeId: z.string().optional() });
+export const StuckItemSchema = z.object({ nudgesSent: z.number().int().optional(), since: z.string().optional(), step: z.string().optional(), tenantId: z.string().optional() });
+export const StuckPageSchema = z.object({ items: z.array(StuckItemSchema).optional(), nextCursor: z.string().optional() });
 export const SubscriptionResponseSchema = z.object({ createdAt: z.string().optional(), currency: z.string().optional(), id: z.string().optional(), mrrCents: z.number().int().optional(), planCode: z.string().optional(), planId: z.string().optional(), planName: z.string().optional(), region: z.string().optional(), renewalDate: z.string().optional(), seatLimit: z.number().int().optional(), seatsUsed: z.number().int().optional(), tenantId: z.string().optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional(), tenantStatus: z.string().optional() });
 export const SubscriptionPageSchema = z.object({ data: z.array(SubscriptionResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const UsageSchema = z.object({ aiChecks: z.number().int().optional(), branchesLimit: z.number().int().optional(), branchesUsed: z.number().int().optional(), seatsLimit: z.number().int().optional(), seatsUsed: z.number().int().optional(), whatsappPassThroughMinor: z.number().int().optional(), whatsappUtilityMessages: z.number().int().optional() });
@@ -657,7 +669,8 @@ export const TransferGraphRequestSchema = z.object({ edges: z.array(TransferEdge
 export const TransferRequestSchema = z.object({ doctorId: z.string(), reason: z.string().optional(), reasonNote: z.string().min(0).max(200).optional(), toDepartmentId: z.string() });
 export const TransferResponseSchema = z.object({ closedLeg: QueueEntryResponseSchema.optional(), newLeg: QueueEntryResponseSchema.optional() });
 export const TransferTargetResponseSchema = z.object({ departmentId: z.string().optional(), departmentName: z.string().optional(), doctors: z.array(StaffRosterEntrySchema).optional() });
-export const TransitionRequestSchema = z.object({ reason: z.string().min(1), toStatus: z.string().min(1) });
+export const TransitionRequestSchema = z.object({ coveredSteps: z.array(z.string()).optional(), slotAt: z.string().optional(), toStatus: z.string().min(1) });
+export const TransitionedSchema = z.object({ id: z.string().optional(), status: z.string().optional(), summarySent: z.boolean().optional() });
 export const TrialConversionSchema = z.object({ jobId: z.string().optional(), status: z.string().optional(), syntheticRowsDeleted: z.number().int().optional() });
 export const TrialConvertRequestSchema = z.object({ confirm: z.boolean(), otp: z.string().min(1), otpChallengeId: z.string() });
 export const TrialConvertResponseSchema = z.object({ conversionJobId: z.string().optional() });
@@ -1043,6 +1056,8 @@ export const operationSchemas = {
   PhiReadAlertController_phiReadAlerts: { response: AlertsResponseSchema },
   LinkOpenController_linkOpens: { response: LinkOpensResponseSchema },
   PlanCatalogueController_catalogue: { response: z.array(PlanCatalogueEntrySchema) },
+  ActivationController_funnel: { response: FunnelSchema },
+  ActivationController_stuck: { response: StuckPageSchema },
   AuditSearchController_search: { response: AuditLogPageSchema },
   AuditSearchController_export: { response: z.string() },
   PlatformAuthController_login: { body: OperatorLoginRequestSchema, response: z.record(z.string(), z.unknown()) },
@@ -1088,6 +1103,8 @@ export const operationSchemas = {
   TenantRegionController_change: { body: RegionChangeRequestSchema, response: TenantRegionResponseSchema },
   TemplateLintController_createWithOverride: { body: TemplateOverrideRequestSchema, response: TemplateResponseSchema },
   TerritoryController_list: { response: z.array(RegionSummaryResponseSchema) },
+  WhiteGloveAdminController_queue: { response: z.array(QueueItemSchema) },
+  WhiteGloveAdminController_transition: { body: TransitionRequestSchema, response: TransitionedSchema },
   ProxyInviteController_view: { response: InviteViewSchema },
   ProxyInviteController_accept: { body: ProxyInviteAcceptRequestSchema, response: ProxyInviteAcceptedSchema },
   ProxyInviteController_otp: { response: z.record(z.string(), z.boolean()) },
@@ -1216,6 +1233,8 @@ export const operationSchemas = {
   WhatsAppTemplateController_create: { body: TemplateRequestSchema, response: TemplateResponseSchema },
   WhatsAppTemplateController_resubmit: { body: TemplateRequestSchema, response: TemplateResponseSchema },
   TemplateLintController_dryRun: { body: TemplateLintRequestSchema, response: TemplateLintResponseSchema },
+  WhiteGloveController_view: { response: OwnerViewSchema },
+  WhiteGloveController_book: { body: BookRequestSchema, response: BookedSchema },
   DentalController_chart: { response: z.array(ToothResponseSchema) },
   DentalController_history: { response: z.array(ToothHistoryEntryResponseSchema) },
   DentalController_addSupernumerary: { body: SupernumeraryToothRequestSchema, response: ToothResponseSchema },

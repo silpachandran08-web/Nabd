@@ -13373,6 +13373,111 @@ paths:
       tags:
       - platform
       x-required-permission: public
+  /v1/platform/activation/funnel:
+    get:
+      operationId: ActivationController_funnel
+      parameters:
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: market
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: specialty
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Funnel"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: onboarding:view
+  /v1/platform/activation/stuck:
+    get:
+      operationId: ActivationController_stuck
+      parameters:
+      - in: query
+        name: hours
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 48
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StuckPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: onboarding:view
   /v1/platform/audit-log:
     get:
       operationId: AuditSearchController_search
@@ -15124,6 +15229,90 @@ paths:
       tags:
       - platform
       x-required-permission: territories:view
+  /v1/platform/white-glove:
+    get:
+      operationId: WhiteGloveAdminController_queue
+      parameters:
+      - in: query
+        name: includeClosed
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QueueItem"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: onboarding:view
+  /v1/platform/white-glove/{id}/transitions:
+    post:
+      operationId: WhiteGloveAdminController_transition
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Transitioned"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: onboarding:edit
   /v1/proxy-invites/{token}:
     get:
       operationId: ProxyInviteController_view
@@ -19993,6 +20182,79 @@ paths:
       tags:
       - messaging
       x-required-permission: setup:edit
+  /v1/setup/white-glove:
+    get:
+      operationId: WhiteGloveController_view
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/OwnerView"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: setup:view
+    post:
+      operationId: WhiteGloveController_book
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Booked"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: setup:edit
   /v1/specialty/dental/patients/{patientId}/chart:
     get:
       operationId: DentalController_chart
@@ -22026,6 +22288,34 @@ components:
           type: string
         thresholdAmount:
           type: number
+    BookRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          maxLength: 500
+          minLength: 0
+        preferredSlots:
+          type: array
+          items:
+            type: string
+            format: date-time
+          maxItems: 3
+          minItems: 0
+      required:
+      - preferredSlots
+    Booked:
+      type: object
+      properties:
+        engagementId:
+          type: string
+          format: uuid
+        fee:
+          $ref: "#/components/schemas/Fee"
+        paymentLink:
+          type: string
+        waiverReason:
+          type: string
     Booking:
       type: object
       properties:
@@ -23127,6 +23417,22 @@ components:
           type: string
         variance:
           type: number
+    CohortView:
+      type: object
+      properties:
+        medianHoursToLive:
+          type: number
+          format: double
+        signups:
+          type: integer
+          format: int64
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepCount"
+        week:
+          type: string
+          format: date
     Collections:
       type: object
       properties:
@@ -24833,6 +25139,36 @@ components:
         queueEntryId:
           type: string
           format: uuid
+    Engagement:
+      type: object
+      properties:
+        closedAt:
+          type: string
+          format: date-time
+        coveredSteps:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        fee:
+          $ref: "#/components/schemas/Fee"
+        id:
+          type: string
+          format: uuid
+        preferredSlots:
+          type: array
+          items:
+            type: string
+            format: date-time
+        slotAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        waiverReason:
+          type: string
     Entry:
       type: object
       properties:
@@ -25163,6 +25499,16 @@ components:
         scope:
           type: string
           pattern: mine|shared|standard
+    Fee:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        status:
+          type: string
     FefoPickEntry:
       type: object
       properties:
@@ -25395,6 +25741,13 @@ components:
             $ref: "#/components/schemas/FollowUpItem"
         page:
           $ref: "#/components/schemas/PageMeta"
+    Funnel:
+      type: object
+      properties:
+        cohorts:
+          type: array
+          items:
+            $ref: "#/components/schemas/CohortView"
     GoLiveBlocker:
       type: object
       properties:
@@ -27203,6 +27556,18 @@ components:
           format: uuid
         phoneE164:
           type: string
+    Offer:
+      type: object
+      properties:
+        currency:
+          type: string
+        feeMinor:
+          type: integer
+          format: int64
+        feeStatus:
+          type: string
+        waiverReason:
+          type: string
     OperatorLoginRequest:
       type: object
       properties:
@@ -27431,6 +27796,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SupportAccessRequestItem"
+    OwnerView:
+      type: object
+      properties:
+        engagement:
+          $ref: "#/components/schemas/Engagement"
+        offer:
+          $ref: "#/components/schemas/Offer"
     OwnerWorkspaceTokenResponse:
       type: object
       properties:
@@ -29469,6 +29841,49 @@ components:
           minLength: 1
       required:
       - etaDisplayMode
+    QueueItem:
+      type: object
+      properties:
+        closedAt:
+          type: string
+          format: date-time
+        coveredSteps:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        fee:
+          $ref: "#/components/schemas/Fee"
+        id:
+          type: string
+          format: uuid
+        notes:
+          type: string
+        operatorId:
+          type: string
+          format: uuid
+        preferredSlots:
+          type: array
+          items:
+            type: string
+            format: date-time
+        slotAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+        tenantName:
+          type: string
+        ticketId:
+          type: string
+          format: uuid
+        waiverReason:
+          type: string
     QueueReassignRequest:
       type: object
       properties:
@@ -31088,6 +31503,17 @@ components:
           format: uuid
         status:
           type: string
+    StepCount:
+      type: object
+      properties:
+        completed:
+          type: integer
+          format: int64
+        reached:
+          type: integer
+          format: int64
+        step:
+          type: string
     StepUpTokenResponse:
       type: object
       properties:
@@ -31393,6 +31819,29 @@ components:
         stockTakeId:
           type: string
           format: uuid
+    StuckItem:
+      type: object
+      properties:
+        nudgesSent:
+          type: integer
+          format: int32
+        since:
+          type: string
+          format: date-time
+        step:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+    StuckPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StuckItem"
+        nextCursor:
+          type: string
     SubscriptionPage:
       type: object
       properties:
@@ -32008,15 +32457,31 @@ components:
     TransitionRequest:
       type: object
       properties:
-        reason:
+        coveredSteps:
+          type: array
+          items:
+            type: string
+          maxItems: 9
+          minItems: 0
+        slotAt:
           type: string
-          minLength: 1
+          format: date-time
         toStatus:
           type: string
           minLength: 1
+          pattern: scheduled|in_progress|done|cancelled
       required:
-      - reason
       - toStatus
+    Transitioned:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        summarySent:
+          type: boolean
     TrialConversion:
       type: object
       properties:

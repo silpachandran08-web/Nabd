@@ -45,7 +45,11 @@ public enum NotificationPurpose {
     /** ADM-004: the owner is told how many trial days are left (one param: the number; no clinical content). */
     TRIAL_EXPIRING("trial_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** ADM-043: the owner's end-of-day summary (staff recipient); 4 params: day, figures, attention items, overview link. Counts and amounts only. */
-    DAILY_SUMMARY("daily_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    DAILY_SUMMARY("daily_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-005: the owner is stuck on a setup step (staff recipient); 2 params: the step's name, the help link. REMINDER, so quiet hours apply. */
+    SETUP_NUDGE("setup_nudge", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-006: Nabd finished the white-glove setup (staff recipient); 1 param: the steps that were set up. */
+    WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;

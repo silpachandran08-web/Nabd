@@ -7,7 +7,7 @@ final class SetupSteps {
     private SetupSteps() {
     }
 
-    static final List<String> ALL = List.of("profile", "preset", "doctors", "prices", "whatsapp", "tax", "dpa", "import", "go_live");
+    static final List<String> ALL = com.nabd.hms.organization.api.SetupProgress.STEPS;
     /** The DPA is the one step that cannot be skipped (ADM-002 gate). */
     static final String DPA = "dpa";
     /** Draft payloads are small forms; a bound keeps one tenant from filling the table. */
