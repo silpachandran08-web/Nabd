@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -130,6 +131,18 @@ public class DataExportService {
 
     // ---------------------------------------------------------------- owner: start, progress
 
+    static final String NOT_OWNER = "not owner";
+
+    /** T1-BUG-3: a full export is the owner's alone (spec "owner; export:full"); a custom role granted setup:export is refused, and
+     * the controller's AccessDeniedException handler audits it like a missing permission. Checked on the built-in Owner role (as ADM-004's
+     * owner lookup), not the role name. */
+    @Transactional(readOnly = true)
+    public void requireOwner(UUID staffId) {
+        if (actors.activeOwners(tenantContext.current()).stream().noneMatch(o -> o.id().equals(staffId))) {
+            throw new AccessDeniedException(NOT_OWNER);
+        }
+    }
+
     @Transactional
     public Started start(UUID staffId, UUID stepUpId, StartRequest r, String ip) {
         UUID tenant = tenantContext.current();
@@ -195,11 +208,11 @@ public class DataExportService {
     }
 
     @Transactional
-    public void denied(UUID staffId, String ip) {
+    public void denied(UUID staffId, String ip, String reason) {
         UUID tenant = tenantContext.current();
         ActorDirectory.Actor a = actors.findActor(tenant, staffId).orElse(null);
         audit.record(tenant, "staff", staffId, a == null ? "unknown" : a.name(), a == null ? null : a.role(), ip, "data_export.denied", "data_export_job", null, null,
-                Map.of("reason", "missing setup:export"));
+                Map.of("reason", reason));
     }
 
     // ---------------------------------------------------------------- worker steps (each its own tenant transaction)
