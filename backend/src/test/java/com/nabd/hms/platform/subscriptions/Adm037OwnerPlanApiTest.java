@@ -261,4 +261,43 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
         assertThat((List<?>) exchange("/v1/setup/subscription/invoices", HttpMethod.GET, authed(a.owner()), Map.class).getBody().get("items")).hasSize(1);
         assertThat((List<?>) exchange("/v1/setup/subscription/invoices", HttpMethod.GET, authed(b.owner()), Map.class).getBody().get("items")).isEmpty();
     }
+
+    private Clinic dueDowngrade() throws Exception {
+        Clinic c = clinic(10);
+        String target = "plan-change:" + c.starterCode() + ":renewal";
+        assertThat(change(c.owner(), stepUp(c.owner(), target), c.starterCode(), "renewal", c.name()).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        inTenantTx(c.t().id(), () -> jdbc.update("UPDATE master.subscription_changes SET effective_at = now() - interval '1 minute' WHERE tenant_id = ? AND status = 'scheduled'", c.t().id()));
+        return c;
+    }
+
+    private Map<String, Object> changeRow(Clinic c) {
+        return inTenantTx(c.t().id(), () -> jdbc.queryForMap("SELECT status, applied_at FROM master.subscription_changes WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1", c.t().id()));
+    }
+
+    @Test
+    void aFailedRenewalDowngradeGoesBackToScheduledAndIsRetried_theOtherClinicStillApplies() throws Exception {
+        Clinic failing = dueDowngrade(), ok = dueDowngrade();
+        var su = new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource());
+        // test-only seam: this one clinic's subscription cannot be moved, so its apply transaction rolls back
+        su.execute("CREATE FUNCTION adm037_test_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'adm037 test: apply fails'; END $$");
+        su.execute("CREATE TRIGGER adm037_test_fail BEFORE UPDATE ON master.subscriptions FOR EACH ROW WHEN (OLD.tenant_id = '" + failing.t().id()
+                + "') EXECUTE FUNCTION adm037_test_fail()");
+        try {
+            service.applyDue();
+        } finally {
+            su.execute("DROP TRIGGER adm037_test_fail ON master.subscriptions");
+            su.execute("DROP FUNCTION adm037_test_fail()");
+        }
+        assertThat(changeRow(failing)).containsEntry("status", "scheduled").containsEntry("applied_at", null);
+        assertThat(jdbc.queryForObject("SELECT plan_id FROM master.subscriptions WHERE tenant_id = ?", UUID.class, failing.t().id())).isEqualTo(planId(failing.clinicCode()));
+        assertThat(inTenantTx(failing.t().id(), () -> jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'setup.plan_changed'", Long.class, failing.t().id())))
+                .as("no audit for a change that did not happen").isZero();
+        assertThat(changeRow(ok)).containsEntry("status", "applied");
+        assertThat(jdbc.queryForObject("SELECT plan_id FROM master.subscriptions WHERE tenant_id = ?", UUID.class, ok.t().id())).isEqualTo(planId(ok.starterCode()));
+
+        // the next hourly run retries it
+        assertThat(service.applyDue()).isEqualTo(1);
+        assertThat(changeRow(failing)).containsEntry("status", "applied");
+        assertThat(jdbc.queryForObject("SELECT plan_id FROM master.subscriptions WHERE tenant_id = ?", UUID.class, failing.t().id())).isEqualTo(planId(failing.starterCode()));
+    }
 }

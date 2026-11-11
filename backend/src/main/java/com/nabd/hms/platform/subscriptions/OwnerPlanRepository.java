@@ -117,6 +117,12 @@ class OwnerPlanRepository {
         return jdbc.query("SELECT * FROM claim_due_plan_changes(?)", (rs, i) -> change(rs), Timestamp.from(now));
     }
 
+    /** A claimed change whose apply failed goes back to 'scheduled' (the next run retries it). Clinic's tenant transaction. */
+    void unclaim(UUID tenantId, UUID id) {
+        jdbc.update("UPDATE master.subscription_changes SET status = 'scheduled', applied_at = NULL WHERE tenant_id = ? AND id = ? AND status = 'applied'",
+                tenantId, id);
+    }
+
     UUID insertInvoice(UUID tenantId, String kind, LocalDate from, LocalDate to, long amountMinor, String currency, UUID changeId) {
         long seq = jdbc.queryForObject("SELECT nextval('master.platform_invoice_seq')", Long.class);
         String number = String.format("NBD-%d-%06d", from.getYear(), seq);
