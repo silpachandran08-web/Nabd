@@ -18,6 +18,7 @@ export function resourcesFor(type: string): readonly string[] {
   if (type.startsWith("nursing.")) return ["nursing"];
   if (type.startsWith("doctor.status")) return ["roster", "doctor-delay", "wait-estimate", "doctor-status"];
   if (type.startsWith("comms.message.")) return ["patient-messages"]; // COM-006
+  if (type === "scheduling.appointment.confirmed") return ["booking-requests", "schedule", "queue"]; // COM-043: confirmed-by-patient chip
   if (type.startsWith("scheduling.booking.") || type.startsWith("scheduling.appointment.")) return ["booking-requests"]; // ACC-010
   if (type.startsWith("desk.exception.")) return ["desk-exceptions"]; // ACC-032
   if (type.startsWith("billing.discount.")) return ["discount-approvals"]; // FIN-018: desk banner + owner inbox

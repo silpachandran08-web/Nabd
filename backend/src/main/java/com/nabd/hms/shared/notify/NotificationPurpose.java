@@ -7,6 +7,10 @@ package com.nabd.hms.shared.notify;
  */
 public enum NotificationPurpose {
     APPT_REMINDER_24H("appt_reminder_24h", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-043: two hours before (first name, time); window 45 min. */
+    APPT_REMINDER_2H("appt_reminder_2h", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-043: no answer to the day-before reminder by the clinic cutoff (first name, date, time). */
+    APPT_NUDGE("appt_nudge", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
     RECALL_DUE("recall_due", ConsentClass.MESSAGING, Priority.BULK, ChannelPolicy.WHATSAPP_THEN_SMS),
     REVIEW_REQUEST("review_request", ConsentClass.MARKETING, Priority.BULK, ChannelPolicy.WHATSAPP_ONLY),
     SECURE_LINK("secure_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),

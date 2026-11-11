@@ -19,6 +19,7 @@ import { getter, key, prefix } from "../../lib/query";
 import { useHasMounted } from "../../lib/useHasMounted";
 import type { Full } from "../../lib/gen";
 import DeskShortcuts from "../../components/arrivals/shortcuts/DeskShortcuts";
+import { confirmationChip } from "./confirmationChip";
 import type { Booking as GBooking, Cell as GCell, Counts as GCounts, Day as GWeekDay, Doctor as GDoctor, ScheduleDayResponse, ScheduleWeekResponse, Session as GSession, SessionCount as GSessionCount } from "@nabd/api-client/generated";
 
 // GET /v1/schedule/day and /week (ScheduleBoardController): the generated types, with the fields the server always sends marked present.
@@ -301,6 +302,7 @@ export default function SchedulePage() {
             ["Token", dialog.booking.token != null ? `T-${dialog.booking.token}` : "Not checked in yet"],
             ["Status", statusLabel(dialog.booking.status)],
             ...(dialog.booking.actedByRelation ? [["Booked by", bookedBy(dialog.booking.actedByRelation).replace("Booked by ", "")] as [string, string]] : []),
+            ...(confirmationChip(dialog.booking.confirmationState, dialog.booking.status) ? [["Confirmation", confirmationChip(dialog.booking.confirmationState, dialog.booking.status)!.label] as [string, string]] : []),
           ]}
           action={day.today ? { label: "Open live queue", href: "/arrivals" } : undefined}
           extra={dialog.booking.appointmentId ? (
@@ -368,6 +370,7 @@ function RowCells({ time, cells, doctors, visitFilter, canBook, onBooking, onCel
                     onClick={() => onBooking(b, doctor)}>
                     <span className={styles.slotName}>{b.status === "scheduled" ? "◷" : b.status === "no_show" ? "✕" : "✓"} {b.patientName}</span>
                     <span className={styles.slotSub}>{VISIT_LABELS[b.visitType]} · {b.token != null ? `T-${b.token}` : b.time}{b.actedByRelation ? ` · ${bookedBy(b.actedByRelation)}` : ""}</span>
+                    {(() => { const chip = confirmationChip(b.confirmationState, b.status); return chip && <span className={`${styles.confirmChip} ${styles[`confirm_${chip.tone}`]}`}>{chip.label}</span>; })()}
                   </button>
                 ))}
                 {cell.bookings.length > 2 && <div className={styles.more}>+{cell.bookings.length - 2} more</div>}
