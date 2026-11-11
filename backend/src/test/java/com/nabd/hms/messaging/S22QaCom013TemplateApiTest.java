@@ -125,6 +125,12 @@ class S22QaCom013TemplateApiTest extends ApiTestBase {
         assertThat(retry.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(retry.getBody().get("id")).as("spec: PATCH is idempotent; a retry returns the version it created").isEqualTo(first.getBody().get("id"));
         assertThat(versions(t.id())).isEqualTo(2);
+        assertThat(retry.getHeaders().getFirst("Idempotent-Replayed")).isEqualTo("true");
+        // round 2: the same key with another body is refused, nothing new is created
+        ResponseEntity<Map> reused = patch(owner, id, "Hello {{1}}, we moved you to {{2}}.", List.of("Asha", "11:00"), key);
+        assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(String.valueOf(reused.getBody().get("code"))).isEqualTo("IDEMPOTENCY_KEY_REUSED");
+        assertThat(versions(t.id())).isEqualTo(2);
     }
 
     @Test

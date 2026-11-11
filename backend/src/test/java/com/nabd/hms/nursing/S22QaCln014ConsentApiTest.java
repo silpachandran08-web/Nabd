@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SuppressWarnings({"unchecked", "rawtypes"})
 class S22QaCln014ConsentApiTest extends ApiTestBase {
 
-    private static final String SIG = "<svg viewBox=\"0 0 600 200\"><path d=\"M10 10 L100 50 L200 80\"/></svg>";
+    private static final String SIG = "<svg viewBox=\"0 0 600 200\"><path d=\"M10 10 L30 20 L50 35 L70 30 L90 50 L110 45 L130 60 L150 55 L170 70 L190 65 L210 80\"/></svg>";
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 400_000) + 100_000);
 
     private record Clinic(SeededTenant tenant, SeededStaff staff, String token) {
@@ -178,6 +178,29 @@ class S22QaCln014ConsentApiTest extends ApiTestBase {
     }
 
     @Test
+    void e05_round2_theOrderTellsTheDialogTheMinorAndGuardian_andGuardianIdMayBeOmittedOnlyWhenOneIsLinked() {
+        Clinic c = clinic();
+        Map<String, Object> peel = template(c, "PEEL");
+        String g = patient(c, "1979-04-04", null);
+        String minor = patient(c, LocalDate.now().minusYears(15).toString(), g);
+        // a minor cannot be registered without a guardian (400), so: registered as an adult, date of birth corrected afterwards
+        String alone = patient(c, "1990-06-06", null);
+        inTenantTx(c.tenant().id(), () -> jdbc.update("UPDATE patients SET dob = ? WHERE id = ?::uuid", LocalDate.now().minusYears(16), alone));
+        String withGuardian = order(c, minor, "PEEL");
+        String noGuardian = order(c, alone, "PEEL");
+        List<Map<String, Object>> today = exchange("/v1/nursing/procedure-orders/today", HttpMethod.GET, authed(c.token()), List.class).getBody();
+        Map<String, Object> row = today.stream().filter(o -> withGuardian.equals(o.get("id"))).findFirst().orElseThrow();
+        assertThat(row).containsEntry("patientMinor", true).containsKey("guardianName");
+        assertThat(row.get("guardianName")).isNotNull();
+        assertThat(capture(c.token(), noGuardian, body(peel, "guardian", null, c.staff().id(), SIG), UUID.randomUUID().toString()).getStatusCode())
+                .as("no linked guardian: still refused").isEqualTo(HttpStatus.CONFLICT);
+        ResponseEntity<Map> ok = capture(c.token(), withGuardian, body(peel, "guardian", null, c.staff().id(), SIG), UUID.randomUUID().toString());
+        assertThat(ok.getStatusCode()).as("guardianId omitted, linked guardian used: %s", ok.getBody()).isEqualTo(HttpStatus.CREATED);
+        assertThat(inTenantTx(c.tenant().id(), () -> jdbc.queryForObject("SELECT guardian_id::text FROM procedure_consents WHERE procedure_order_id = ?::uuid",
+                String.class, withGuardian))).isEqualTo(g);
+    }
+
+    @Test
     void e04_signatureDataAtTheTrustBoundary() {
         Clinic c = clinic();
         Map<String, Object> peel = template(c, "PEEL");
@@ -189,7 +212,7 @@ class S22QaCln014ConsentApiTest extends ApiTestBase {
         assertThat(capture(c.token(), a, body(peel, "patient", null, c.staff().id(), "<svg><path d=\"M10 10 C 20 20 30 30 40 40\"/></svg>"), UUID.randomUUID().toString())
                 .getStatusCode()).as("curve commands").isEqualTo(HttpStatus.BAD_REQUEST);
 
-        String withScript = "<svg onload=\"alert(1)\"><script>alert(2)</script><path d=\"M10 10 L50 50\" onclick=\"x()\"/></svg>";
+        String withScript = "<svg onload=\"alert(1)\"><script>alert(2)</script><path d=\"M10 10 L30 20 L50 35 L70 30 L90 50 L110 45 L130 60 L150 55 L170 70 L190 65 L210 80\" onclick=\"x()\"/></svg>";
         ResponseEntity<Map> ok = capture(c.token(), a, body(peel, "patient", null, c.staff().id(), withScript), UUID.randomUUID().toString());
         assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String storedSvg = inTenantTx(c.tenant().id(), () -> jdbc.queryForObject("SELECT signature_file_id::text FROM procedure_consents WHERE procedure_order_id = ?::uuid",
@@ -197,7 +220,14 @@ class S22QaCln014ConsentApiTest extends ApiTestBase {
         assertThat(storedSvg).isNotNull();
 
         String b = order(c, patient(c, "1971-03-03", null), "PEEL");
-        ResponseEntity<Map> dot = capture(c.token(), b, body(peel, "patient", null, c.staff().id(), "<svg><path d=\"M0 0\"/></svg>"), UUID.randomUUID().toString());
-        System.out.println("QA CLN-014 e04: a single-point 'signature' at (0,0) -> " + dot.getStatusCode());
+        // round 2 (N-2 fix): too little ink is not a signature: a dot, a 3-point tap, 11 points within 10 units
+        for (String svg : new String[]{"<svg><path d=\"M0 0\"/></svg>", "<svg><path d=\"M100 100 L101 101 L102 100\"/></svg>",
+                "<svg><path d=\"M100 100 L101 100 L102 100 L103 100 L104 100 L105 100 L106 100 L107 100 L108 100 L109 100 L110 100\"/></svg>"}) {
+            ResponseEntity<Map> r = capture(c.token(), b, body(peel, "patient", null, c.staff().id(), svg), UUID.randomUUID().toString());
+            assertThat(r.getStatusCode()).as("too little ink " + svg).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(String.valueOf(r.getBody().get("type"))).contains("SIGNATURE_REQUIRED");
+        }
+        assertThat(consents(c, b)).isZero();
+        assertThat(capture(c.token(), b, body(peel, "patient", null, c.staff().id(), SIG), UUID.randomUUID().toString()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 }
