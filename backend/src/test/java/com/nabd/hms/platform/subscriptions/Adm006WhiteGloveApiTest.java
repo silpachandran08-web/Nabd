@@ -197,6 +197,32 @@ class Adm006WhiteGloveApiTest extends ApiTestBase {
         assertThat(move(op, id, Map.of("toStatus", "cancelled")).getStatusCode()).as("done is final").isEqualTo(HttpStatus.CONFLICT);
     }
 
+    /** T1-BUG-3: the refused booking of a receptionist (no setup:edit) and of a non-owner manager are each audited, and nothing is booked. */
+    @Test
+    void refusedBookingsByAReceptionistAndANonOwnerManagerAreAudited() throws Exception {
+        Clinic c = clinic("INR", 499900, "monthly");
+        UUID tenant = c.t().id();
+        UUID receptionRole = seedRole(tenant, "Receptionist", false, new com.nabd.hms.common.ModuleGrant("setup", true, false, false, false, false, false, false));
+        SeededStaff reception = seedStaff(c.t(), receptionRole, "rec-" + c.t().slug() + "@wg.test", "+919400000021", false);
+        SeededStaff manager = seedStaff(c.t(), seedRole(tenant, "Manager", false, fullGrant("setup")), "mgr2-" + c.t().slug() + "@wg.test", "+919400000022", false);
+        String r = loginAndGetAccessToken(reception), m = loginAndGetAccessToken(manager);
+
+        ResponseEntity<Map> byReception = book(r, stepUp(r, WhiteGloveService.STEP_UP_TARGET));
+        assertThat(byReception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        ResponseEntity<Map> byManager = book(m, stepUp(m, WhiteGloveService.STEP_UP_TARGET));
+        assertThat(byManager.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(byManager.getBody().get("title")).isEqualTo("NOT_OWNER");
+
+        java.util.function.Function<UUID, List<Map<String, Object>>> rows = actor -> inTenantTx(tenant, () -> jdbc.queryForList(
+                "SELECT action, after::text AS after FROM audit_log WHERE tenant_id = ? AND actor_id = ? AND action LIKE 'setup.white_glove%'", tenant, actor));
+        assertThat(rows.apply(reception.id())).singleElement().satisfies(a -> assertThat(a).containsEntry("action", "setup.white_glove_denied")
+                .satisfies(x -> assertThat((String) x.get("after")).contains("missing setup:edit")));
+        assertThat(rows.apply(manager.id())).singleElement().satisfies(a -> assertThat(a).containsEntry("action", "setup.white_glove_denied")
+                .satisfies(x -> assertThat((String) x.get("after")).contains("not owner")));
+        assertThat(inTenantTx(tenant, () -> jdbc.queryForObject("SELECT count(*) FROM master.white_glove_engagements WHERE tenant_id = ?", Long.class, tenant))).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM master.support_tickets WHERE tenant_id = ?", Long.class, tenant)).as("refusal rolled back").isZero();
+    }
+
     @Test
     void engagementsAreTenantIsolatedAtTheDatabase() throws Exception {
         Clinic a = clinic("INR", 499900, "monthly"), b = clinic("INR", 499900, "monthly");
