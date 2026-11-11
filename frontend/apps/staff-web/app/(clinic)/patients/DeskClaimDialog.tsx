@@ -28,9 +28,9 @@ export default function DeskClaimDialog({ patientId, patientName, guardianName, 
   async function run(step: "send" | "claim") {
     if (busy) return;
     setBusy(true); setErr(null);
-    try {
+    try { // keepSession: a wrong code answers 401 "otp-invalid", which must not refresh, replay the attempt and sign the receptionist out
       if (step === "send") { await api.post(`/patients/${patientId}/profile-claim/otp`, {}); setSent(true); setCode(""); }
-      else { await api.post(`/patients/${patientId}/profile-claim`, { otp: code, keepGuardianScope: scope }); onDone(); }
+      else { await api.post(`/patients/${patientId}/profile-claim`, { otp: code, keepGuardianScope: scope }, { keepSession: true }); onDone(); }
     } catch (e) { setErr(claimError(e, step)); } finally { setBusy(false); }
   }
 

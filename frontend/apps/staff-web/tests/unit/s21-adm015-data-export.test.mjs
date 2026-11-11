@@ -25,3 +25,9 @@ test("sizes and errors read as the owner needs them", () => {
   assert.match(startError({ status: 403 }), /Only the clinic owner/);
   assert.match(startError(new TypeError("x")), /No export was started/);
 });
+
+test("T1-BUG-2: the drawer lives outside SetupTabBody, so the refresh after a start does not unmount it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../app/(clinic)/setup/data/page.tsx", import.meta.url), "utf8");
+  assert.ok(src.indexOf("<ExportDrawer") > src.indexOf("</SetupTabBody>"), "ExportDrawer is rendered after </SetupTabBody>");
+});

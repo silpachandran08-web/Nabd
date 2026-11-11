@@ -100,13 +100,13 @@
   --nb-border-subtle: rgba(6, 9, 12, 0.09);
   --nb-border-default: rgba(6, 9, 12, 0.14);
   --nb-border-strong: rgba(6, 9, 12, 0.24);
-  --nb-accent-500: #0b7f8b;
+  --nb-accent-500: #0a7580;
   --nb-accent-fill: #2ed3e0;
   --nb-accent-gradient: linear-gradient(90deg, #3ee0c4 0%, #35c9e8 100%);
   --nb-accent-tint: rgba(11, 127, 139, 0.04);
   --nb-accent-glow: 0 6px 18px rgba(21, 143, 156, 0.22);
   --nb-on-accent: #04231f;
-  --nb-danger-500: #d42a2d;
+  --nb-danger-500: #c4272a;
   --nb-danger-tint: rgba(212, 42, 45, 0.07);
   --nb-danger-600: #9c1f18;
   --nb-ok-500: #0b7a52;

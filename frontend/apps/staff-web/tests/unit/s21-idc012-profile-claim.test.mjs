@@ -21,3 +21,11 @@ test("problem codes map to what the receptionist should do next", () => {
   assert.match(claimError({ status: 500 }, "claim"), /Guardian access is unchanged/);
   assert.match(claimError(new TypeError("fetch failed"), "send"), /Couldn't reach the server/);
 });
+
+test("T1-BUG-1: a wrong desk code (401 otp-invalid) keeps the receptionist signed in", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../app/(clinic)/patients/DeskClaimDialog.tsx", import.meta.url), "utf8");
+  const claim = src.split("\n").find((l) => l.includes("/profile-claim`,"));
+  assert.ok(claim, "claim call found");
+  assert.match(claim, /\{ keepSession: true \}/);
+});

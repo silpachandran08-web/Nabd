@@ -13,15 +13,16 @@ export default function RouteChrome() {
   const pathname = usePathname();
   const [announce, setAnnounce] = useState("");
   useEffect(() => {
-    const want = routeTitle(pathname, getIdentity()?.tenantName);
+    const tr = (key: string) => t(`pages.${key}`);
+    const want = routeTitle(pathname, getIdentity()?.tenantName, tr);
     document.title = want;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAnnounce(pageName(pathname));
+    setAnnounce(pageName(pathname, tr));
     // Next re-applies its static metadata title ("Nabd") after hydration and on head sync; put ours back.
     const obs = new MutationObserver(() => { if (document.title !== want) document.title = want; });
     obs.observe(document.head, { childList: true, subtree: true, characterData: true });
     return () => obs.disconnect();
-  }, [pathname]);
+  }, [pathname, t]);
 
   function skip(e: React.MouseEvent) {
     e.preventDefault();
