@@ -3,6 +3,8 @@
 import styles from "../setup.module.css";
 import PatientImport from "../../../components/setup/PatientImport";
 import { can } from "../../../lib/permissions";
+import { isOwner } from "../../../lib/session";
+import { useHasMounted } from "../../../lib/useHasMounted";
 import { SetupTabBody, useSetupTab } from "../setupTab";
 import { useState } from "react";
 import ExportDrawer from "../../../components/setup/ExportDrawer";
@@ -14,6 +16,8 @@ export default function DataTab() {
   const tab = useSetupTab<{ importJobs: ImportJob[]; exportJobs: ExportJob[] }>({ importJobs: "/setup/import-jobs", exportJobs: "/setup/export-jobs" }, { importJobs: [], exportJobs: [] });
   const { importJobs, exportJobs } = tab.data;
   const [exporting, setExporting] = useState(false); // ADM-015 drawer; the job itself runs on the server
+  // T1-BUG-3: Core starts a full export only for the clinic Owner (403 otherwise), so for anyone else the control is absent.
+  const canExport = useHasMounted() && isOwner() && can("setup:export");
   return (
     <>
       <SetupTabBody tab={tab}>
@@ -25,7 +29,7 @@ export default function DataTab() {
               <PatientImport />
             </div>
           )}
-          {can("setup:export") && (
+          {canExport && (
             <div className={styles.row}>
               <div className={styles.field}>
                 <label className={styles.label}>Export all clinic data (Excel, CSV, FHIR R4 or PDF per patient)</label>
