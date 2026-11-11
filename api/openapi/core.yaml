@@ -22167,6 +22167,8 @@ components:
           type: string
         channel:
           type: string
+        confirmationState:
+          type: string
         decisionSource:
           type: string
         doctorId:
@@ -22439,6 +22441,8 @@ components:
         appointmentId:
           type: string
           format: uuid
+        confirmationState:
+          type: string
         patientId:
           type: string
           format: uuid
@@ -32322,10 +32326,18 @@ components:
     TemplateResponse:
       type: object
       properties:
+        active:
+          type: boolean
+        activeVersion:
+          type: integer
+          format: int32
         body:
           type: string
         category:
           type: string
+        categoryChangedAt:
+          type: string
+          format: date-time
         headerText:
           type: string
         id:
@@ -32340,9 +32352,14 @@ components:
         paramCount:
           type: integer
           format: int32
+        pausedUntil:
+          type: string
+          format: date-time
         qualityRating:
           type: string
         rejectionReason:
+          type: string
+        requestedCategory:
           type: string
         source:
           type: string
@@ -32351,6 +32368,13 @@ components:
         updatedAt:
           type: string
           format: date-time
+        version:
+          type: integer
+          format: int32
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/VersionInfo"
     TenantLifecycleResponse:
       type: object
       properties:
@@ -32856,6 +32880,28 @@ components:
       properties:
         otp:
           type: string
+    VersionInfo:
+      type: object
+      properties:
+        active:
+          type: boolean
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        headerText:
+          type: string
+        id:
+          type: string
+          format: uuid
+        rejectionReason:
+          type: string
+        status:
+          type: string
+        version:
+          type: integer
+          format: int32
     View:
       type: object
       properties:

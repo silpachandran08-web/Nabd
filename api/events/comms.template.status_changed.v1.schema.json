@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:comms.template.status_changed.v1",
+  "title": "comms.template.status_changed.v1",
+  "description": "A clinic's WhatsApp template version moved (COM-013): Meta approved, rejected, paused, disabled or reinstated it, or re-categorised it (from = to and category set). A newer approved version replaces the active one. Alerts the owner (in-app banner) and platform ops.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "templateId", "key", "language", "templateVersion", "from", "to", "version"],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "templateId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "The whatsapp_templates row of this version."
+    },
+    "key": { "type": "string", "pattern": "^[a-z0-9_]{1,512}$", "description": "Catalogue key, or the clinic's template name (config, no patient data)." },
+    "language": { "type": "string", "pattern": "^[a-z]{2,3}(_[A-Z]{2})?$" },
+    "templateVersion": { "type": "integer", "minimum": 1 },
+    "from": { "type": "string", "enum": ["submitting", "queued", "pending", "approved", "flagged", "paused", "disabled", "rejected"] },
+    "to": { "type": "string", "enum": ["submitting", "queued", "pending", "approved", "flagged", "paused", "disabled", "rejected"] },
+    "reason": { "type": "string", "pattern": "^[A-Z_]{1,40}$", "description": "Meta's rejection code, e.g. INCORRECT_CATEGORY." },
+    "category": { "type": "string", "enum": ["UTILITY", "MARKETING", "AUTHENTICATION"], "description": "Set when Meta re-categorised the template." },
+    "version": { "type": "integer", "minimum": 1 }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "templateId": "22222222-2222-4222-8222-222222222222",
+      "key": "appt_reminder_24h",
+      "language": "en",
+      "templateVersion": 2,
+      "from": "approved",
+      "to": "approved",
+      "category": "MARKETING",
+      "version": 1
+    }
+  ]
+}

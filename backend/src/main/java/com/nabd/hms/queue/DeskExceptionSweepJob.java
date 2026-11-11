@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/** ACC-032: every minute, per tenant: open the items only time creates (unconfirmed soon, requests near their SLA, checkout waiting) and close the ones that settled. */
+/** COM-043: plus the appointment reminder cascade (AppointmentReminders). ACC-032: every minute, per tenant: open the items only time creates (unconfirmed soon, requests near their SLA, checkout waiting) and close the ones that settled. */
 @Component
 public class DeskExceptionSweepJob {
 
@@ -19,8 +19,10 @@ public class DeskExceptionSweepJob {
     private final JdbcTemplate jdbc;
     private final TenantScope tenantScope;
     private final DeskExceptions desk;
+    private final AppointmentReminders reminders;
 
-    DeskExceptionSweepJob(JdbcTemplate jdbc, TenantScope tenantScope, DeskExceptions desk) {
+    DeskExceptionSweepJob(JdbcTemplate jdbc, TenantScope tenantScope, DeskExceptions desk, AppointmentReminders reminders) {
+        this.reminders = reminders;
         this.jdbc = jdbc;
         this.tenantScope = tenantScope;
         this.desk = desk;
@@ -36,6 +38,11 @@ public class DeskExceptionSweepJob {
     public int runOnce() {
         int total = 0;
         for (UUID tenantId : jdbc.queryForList("SELECT id FROM tenants", UUID.class)) {
+            try {
+                total += tenantScope.run(tenantId, reminders::sweep); // COM-043: reminders, nudge and the unconfirmed flag first
+            } catch (RuntimeException e) {
+                log.warn("reminder sweep failed for tenant {}; the next run retries", tenantId, e);
+            }
             try {
                 total += tenantScope.run(tenantId, desk::sweep);
             } catch (RuntimeException e) {

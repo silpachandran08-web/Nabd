@@ -39,6 +39,7 @@ class SseFanoutConsumer implements EventConsumer {
     static {
         java.util.Map<String, Route> all = new java.util.HashMap<>(BASE_ROUTES);
         all.put("scheduling.appointment.no_show.v1", new Route(List.of(RealtimeTopic.REQUESTS), "appointmentId"));
+        all.put("scheduling.appointment.confirmed.v1", new Route(List.of(RealtimeTopic.REQUESTS, RealtimeTopic.QUEUE), "appointmentId")); // COM-043: confirmed-by-patient chip
         all.put("billing.payment.recorded.v1", BILLING_ROUTE);
         all.put("billing.invoice.paid.v1", BILLING_ROUTE);
         Route approvals = new Route(List.of(RealtimeTopic.BILLING), "approvalId"); // FIN-018: the desk banner and the owner inbox

@@ -7,5 +7,7 @@ import java.util.UUID;
 public record AppointmentResponse(UUID id, UUID patientId, UUID doctorId, Instant startTime, Instant endTime,
                                    String status, boolean isFollowUp, String cancelReason, String decisionSource, String channel,
                                    String bookingKind, Integer sessionToken, String expectedRange,
-                                   String cancelReasonCode, Instant noShowAt, UUID noShowMarkedBy, UUID lateArrivalQueueEntryId, Instant patientConfirmedAt) {
+                                   String cancelReasonCode, Instant noShowAt, UUID noShowMarkedBy, UUID lateArrivalQueueEntryId, Instant patientConfirmedAt,
+                                   /** COM-043: none | nudged | confirmed | unconfirmed_flagged (the reminder cascade). */
+                                   String confirmationState) {
 }

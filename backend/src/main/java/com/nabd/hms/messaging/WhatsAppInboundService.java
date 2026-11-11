@@ -43,10 +43,12 @@ class WhatsAppInboundService {
     private final TenantScope scope;
     private final OptOutService optOut;
     private final java.util.List<com.nabd.hms.shared.notify.InboundButtonListener> buttonListeners;
+    private final TemplateLifecycle lifecycle;
 
     WhatsAppInboundService(WhatsAppInboundRepository repo, WhatsAppTemplateRepository templates, FieldCipher cipher,
                            EventPublisher events, ObjectMapper mapper, Clock clock, TenantScope scope, OptOutService optOut,
-                           java.util.List<com.nabd.hms.shared.notify.InboundButtonListener> buttonListeners) {
+                           java.util.List<com.nabd.hms.shared.notify.InboundButtonListener> buttonListeners, TemplateLifecycle lifecycle) {
+        this.lifecycle = lifecycle;
         this.buttonListeners = buttonListeners;
         this.scope = scope;
         this.optOut = optOut;
@@ -140,17 +142,24 @@ class WhatsAppInboundService {
         return move.get().tenantId();
     }
 
+    /** COM-013: the template's clinic is resolved from Meta's id, then status, pause, quality and category changes run under that
+     * clinic's tenant (TemplateLifecycle). An id we do not know (another WABA user, a deleted row) changes nothing. */
     private UUID template(String field, JsonNode v) {
-        String id = v.path("message_template_id").asString();
-        if ("message_template_quality_update".equals(field)) {
-            templates.applyUpdate(id, null, null, v.path("new_quality_score").asString("UNKNOWN"));
-        } else {
-            templates.applyUpdate(id, WhatsAppTemplateService.statusOf(v.path("event").asString()),
-                    v.path("reason").isNull() || "NONE".equals(v.path("reason").asString())
-                            ? null : v.path("reason").asString(null),
-                    null);
+        String id = v.path("message_template_id").asString("");
+        UUID tenant = id.isBlank() ? null : templates.tenantOfMeta(id).orElse(null);
+        if (tenant == null) {
+            return null;
         }
-        return null;
+        scope.run(tenant, () -> {
+            switch (field) {
+                case "message_template_quality_update" -> lifecycle.onQuality(tenant, id, v.path("new_quality_score").asString("UNKNOWN"));
+                case "template_category_update" -> lifecycle.onCategory(tenant, id, v.path("new_category").asString(""));
+                default -> lifecycle.onStatus(tenant, id, v.path("event").asString(),
+                        v.path("reason").isNull() || "NONE".equals(v.path("reason").asString()) ? null : v.path("reason").asString(null),
+                        v.path("other_info").path("title").asString(""));
+            }
+        });
+        return tenant;
     }
 
     /** An inbound patient message. A reply carries the wamid of our message (context.id), which names the clinic; a message

@@ -44,8 +44,8 @@ public class ConsentChangedHandler implements CommsEventHandler {
         boolean changed = snapshot.applyChanged(event.tenantId(), patient, type, status, version);
         if (changed && !granted) {
             // messaging withdrawn: everything not yet sent; marketing withdrawn: the promotional templates only
-            String promo = "marketing".equals(type) ? "AND template_id IN (SELECT id FROM whatsapp_templates WHERE category = 'MARKETING') "
-                    : "AND (template_id IS NULL OR template_id IN (SELECT id FROM whatsapp_templates WHERE category = 'UTILITY')) ";
+            String promo = "marketing".equals(type) ? "AND template_id IN (SELECT id FROM whatsapp_templates WHERE COALESCE(meta_category, category) = 'MARKETING') "
+                    : "AND (template_id IS NULL OR template_id IN (SELECT id FROM whatsapp_templates WHERE COALESCE(meta_category, category) = 'UTILITY')) ";
             if ("messaging".equals(type) || "marketing".equals(type)) {
                 jdbc.update("UPDATE outbound_messages SET status = 'cancelled', error_code = 'consent-withdrawn', updated_at = now() "
                         + "WHERE patient_ref = ? AND status IN ('scheduled','queued') " + promo, patient);

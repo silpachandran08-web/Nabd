@@ -104,20 +104,20 @@ class WhatsAppTemplateApiTest extends ApiTestBase {
         assertThat(rejected.get("status")).isEqualTo("rejected");
         assertThat(rejected.get("rejectionReason")).isEqualTo("INCORRECT_CATEGORY");
 
+        // COM-013: the fix is a new version (LoggingWhatsAppClient approves it at once, so it takes over from the rejected one)
         ResponseEntity<Map> resubmitted = exchange("/v1/setup/whatsapp-templates/" + templateId, HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("body", "This week, {{1}} off all consultations.", "examples", List.of("20%"))), Map.class);
-        assertThat(resubmitted.getBody().get("status")).isEqualTo("pending");
+        assertThat(resubmitted.getBody().get("version")).isEqualTo(2);
+        assertThat(resubmitted.getBody().get("status")).isEqualTo("approved");
         assertThat(resubmitted.getBody().get("rejectionReason")).isNull();
-
-        // only rejected templates are editable
-        assertThat(exchange("/v1/setup/whatsapp-templates/" + templateId, HttpMethod.PATCH,
-                authedJsonBody(token, Map.of("body", "Again {{1}} off.", "examples", List.of("20%"))), Map.class)
-                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        String v2 = (String) resubmitted.getBody().get("id");
+        String v2Meta = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT meta_template_id FROM whatsapp_templates WHERE id = ?::uuid", String.class, v2));
 
         postWebhook("""
                 {"entry":[{"changes":[{"field":"message_template_quality_update","value":{
-                 "message_template_id":"%s","new_quality_score":"RED"}}]}]}""".formatted(metaId));
-        assertThat(template(token, templateId).get("qualityRating")).isEqualTo("RED");
+                 "message_template_id":"%s","new_quality_score":"RED"}}]}]}""".formatted(v2Meta));
+        assertThat(template(token, v2).get("qualityRating")).isEqualTo("RED");
     }
 
     @Test

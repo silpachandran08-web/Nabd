@@ -45,14 +45,21 @@ public class WhatsAppMessageService {
     @Transactional
     public UUID queueTemplate(UUID patientId, String toPhone, String templateName,
                               String language, List<String> params) {
+        return queueTemplate(patientId, toPhone, templateName, language, params, null);
+    }
+
+    /** COM-013: {@code notAfter} is the send window's end (null = none): a paused template holds the send until then, never later. */
+    @Transactional
+    public UUID queueTemplate(UUID patientId, String toPhone, String templateName,
+                              String language, List<String> params, java.time.Instant notAfter) {
         UUID tenantId = tenantContext.current(); // PLT-019: bound at transaction start (request) or by TenantScope (worker)
         WhatsAppTemplateRepository.Template template = templates.findByName(tenantId, templateName, language)
-                .filter(WhatsAppTemplateRepository.Template::sendable)
+                .filter(WhatsAppTemplateRepository.Template::queueable)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "whatsapp-template-not-sendable",
                         "WhatsApp template not available",
                         "No approved template called " + templateName + " in " + language + "."));
         TemplateRules.checkParams(params, template.paramCount());
-        UUID id = repo.insert(tenantId, patientId, toPhone, template.id(), template.metaName(), language, toJson(params));
+        UUID id = repo.insert(tenantId, patientId, toPhone, template.id(), template.metaName(), language, toJson(params), notAfter);
         publisher.publish(tenantId, EVENT_TYPE, Map.of("messageId", id.toString()));
         return id;
     }
@@ -78,11 +85,18 @@ public class WhatsAppMessageService {
         return stop(messageId, "expired");
     }
 
+    /** COM-013: the send handler found the window closed while it held the claim (the provider was not called). */
+    @Transactional
+    boolean expireAtClaim(UUID messageId) {
+        return repo.markExpired(messageId) && changed(messageId, "expired");
+    }
+
     @Transactional
     boolean stop(UUID messageId, String status) {
-        if (!repo.markTerminal(messageId, status)) {
-            return false;
-        }
+        return repo.markTerminal(messageId, status) && changed(messageId, status);
+    }
+
+    private boolean changed(UUID messageId, String status) {
         Map<String, Object> data = new LinkedHashMap<>(); // same event as the delivery callbacks (COM-001): one schema, status delivered|read|failed|cancelled|expired
         data.put("messageId", messageId.toString());
         data.put("channel", "whatsapp");

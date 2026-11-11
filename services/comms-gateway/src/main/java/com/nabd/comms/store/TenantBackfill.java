@@ -76,7 +76,8 @@ public class TenantBackfill {
         String sel = switch (table) {
             case TEMPLATES -> "SELECT id::text k, id, name, meta_name, language, category, header_text, body, param_count, status, rejection_reason, "
                     + "quality_rating, meta_template_id, catalogue_key, catalogue_version, buttons::text, purpose, submit_attempts, next_attempt_at, "
-                    + "submitted_at, created_at, updated_at FROM whatsapp_templates WHERE tenant_id = ? AND id > ?::uuid ORDER BY id LIMIT " + BATCH;
+                    + "submitted_at, created_at, updated_at, version, active, paused_until, meta_category " // COM-013 versions
+                    + "FROM whatsapp_templates WHERE tenant_id = ? AND id > ?::uuid ORDER BY id LIMIT " + BATCH;
             case MESSAGES -> "SELECT id::text k, id, patient_id, to_phone, template_name, language, params::text, status, wamid, error, template_id, "
                     + "attempts, last_attempt_at, created_at, updated_at FROM whatsapp_messages WHERE tenant_id = ? AND id > ?::uuid ORDER BY id LIMIT " + BATCH;
             default -> "SELECT id::text k, source, dedupe_key, field, phone_number_id, body_enc, status, attempts, locked_until, received_at, "
@@ -85,7 +86,8 @@ public class TenantBackfill {
         String ins = switch (table) {
             case TEMPLATES -> "INSERT INTO whatsapp_templates (id, tenant_id, name, meta_name, language, category, header_text, body, param_count, status, "
                     + "rejection_reason, quality_rating, meta_template_id, catalogue_key, catalogue_version, buttons, purpose, submit_attempts, "
-                    + "next_attempt_at, submitted_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
+                    + "next_attempt_at, submitted_at, created_at, updated_at, version, active, paused_until, meta_category) "
+                    + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
             case MESSAGES -> "INSERT INTO outbound_messages (id, tenant_id, channel, patient_ref, to_address_enc, to_hash, template_name, language, "
                     + "params_enc, status, provider_message_id, error_code, template_id, attempts, last_attempt_at, created_at, updated_at) "
                     + "VALUES (?,?,'whatsapp',?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING";
@@ -108,7 +110,7 @@ public class TenantBackfill {
                         case TEMPLATES -> {
                             w.setObject(i++, rs.getObject(2));
                             w.setObject(i++, tenantId);
-                            for (int c = 3; c <= 22; c++) {
+                            for (int c = 3; c <= 26; c++) {
                                 w.setObject(i++, rs.getObject(c));
                             }
                         }

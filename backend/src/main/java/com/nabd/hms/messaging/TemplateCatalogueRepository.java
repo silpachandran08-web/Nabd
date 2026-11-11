@@ -9,7 +9,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
-/** template_catalogue is platform reference data (no RLS); the whatsapp_templates calls are tenant-scoped (RLS). */
+/** template_catalogue is platform reference data (no RLS); the whatsapp_templates calls are tenant-scoped (RLS). COM-013: the
+ * queued rows are catalogue rows and new template versions (clinic rename), so the catalogue join is optional. */
 @Repository
 class TemplateCatalogueRepository {
 
@@ -62,14 +63,24 @@ class TemplateCatalogueRepository {
 
     List<Due> due(UUID tenantId, int limit) {
         return jdbc.query("""
-                SELECT t.id, t.meta_name, t.language, t.category, t.header_text, t.body, t.submit_attempts, c.example_values
+                SELECT t.id, t.meta_name, t.language, t.category, t.header_text, t.body, t.submit_attempts, t.param_count,
+                       COALESCE(t.example_values, c.example_values) AS example_values
                   FROM whatsapp_templates t
-                  JOIN template_catalogue c ON c.key = t.catalogue_key AND c.language = t.language AND c.version = t.catalogue_version
+                  LEFT JOIN template_catalogue c ON c.key = t.catalogue_key AND c.language = t.language AND c.version = t.catalogue_version
                  WHERE t.tenant_id = ? AND t.status = 'queued' AND (t.next_attempt_at IS NULL OR t.next_attempt_at <= now())
                  ORDER BY t.created_at, t.id LIMIT ?
                 """, (rs, i) -> new Due(rs.getObject("id", UUID.class), rs.getString("meta_name"), rs.getString("language"),
-                rs.getString("category"), rs.getString("header_text"), rs.getString("body"), texts(rs, "example_values"),
-                rs.getInt("submit_attempts")), tenantId, limit);
+                rs.getString("category"), rs.getString("header_text"), rs.getString("body"),
+                examplesOrPlaceholders(texts(rs, "example_values"), rs.getInt("param_count")), rs.getInt("submit_attempts")), tenantId, limit);
+    }
+
+    /** COM-013: custom templates created before V3100 kept no examples; Meta needs one per slot to review a new version.
+     * shortcut: generic placeholders ("example 1") may draw a rejection; the clinic then fixes it through the edit path. */
+    static List<String> examplesOrPlaceholders(List<String> examples, int slots) {
+        if (examples != null && examples.size() == slots) {
+            return examples;
+        }
+        return java.util.stream.IntStream.rangeClosed(1, slots).mapToObj(i -> "example " + i).toList();
     }
 
     void deleteInstantiated(UUID tenantId) {

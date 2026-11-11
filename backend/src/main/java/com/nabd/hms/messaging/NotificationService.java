@@ -82,7 +82,7 @@ public class NotificationService implements NotificationPort {
         NotificationPurpose purpose = r.purpose();
         String language = r.language() == null ? "en" : r.language();
         var template = templates.findByName(tenantId, purpose.templateKey(), language)
-                .filter(WhatsAppTemplateRepository.Template::sendable)
+                .filter(WhatsAppTemplateRepository.Template::queueable)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "template-not-sendable",
                         "Notification template not available",
                         "No approved template for " + purpose.code() + " in " + language + ".", Map.of("code", "TEMPLATE_NOT_SENDABLE")));
@@ -118,7 +118,7 @@ public class NotificationService implements NotificationPort {
     @Transactional
     public boolean sendable(NotificationPurpose purpose, String language) {
         return templates.findByName(tenantContext.current(), purpose.templateKey(), language == null ? "en" : language)
-                .filter(WhatsAppTemplateRepository.Template::sendable).isPresent();
+                .filter(WhatsAppTemplateRepository.Template::queueable).isPresent();
     }
 
     @Override
@@ -182,7 +182,7 @@ public class NotificationService implements NotificationPort {
             return;
         }
         NotificationClaim c = render(row, () -> repo.patientPhone(tenantId, row.recipientPatientId()));
-        whatsApp.queueTemplate(c.recipient().patientId(), c.recipient().phoneE164(), c.templateKey(), c.language(), c.params());
+        whatsApp.queueTemplate(c.recipient().patientId(), c.recipient().phoneE164(), c.templateKey(), c.language(), c.params(), row.notAfter());
         repo.move(tenantId, id, "dispatched");
     }
 

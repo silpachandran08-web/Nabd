@@ -57,6 +57,9 @@ class InternalSchedulingService {
     /** ADM-032: doctors whose licence lapsed are not offered online. Field-injected on purpose: keeps this class's constructor untouched for the other ACC stories. */
     @org.springframework.beans.factory.annotation.Autowired
     private com.nabd.hms.iam.api.StaffLicenceSync staffSync;
+    /** COM-043: scheduling.appointment.confirmed.v1 for the desk (field-injected for the same reason as staffSync). */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.EventPublisher events;
 
     InternalSchedulingService(TenantScope tenantScope, AppointmentService appointments, AppointmentRepository appointmentRepo,
                               ScheduleRepository scheduleRepo, PatientRefs patientRefs, ClinicPolicies policies, AuditService audit,
@@ -170,6 +173,10 @@ class InternalSchedulingService {
                 throw new ApiException(HttpStatus.CONFLICT, "appointment-arrived", "Appointment already arrived",
                         "The patient has checked in; the appointment can no longer be changed.", Map.of("code", "APPOINTMENT_ARRIVED"));
             }
+            if ("confirm".equals(action) && "cancelled".equals(a.status())) { // COM-043: a late tap on an old reminder
+                throw new ApiException(HttpStatus.CONFLICT, "already-cancelled", "Appointment already cancelled",
+                        "This appointment was cancelled; it cannot be confirmed.", Map.of("code", "ALREADY_CANCELLED"));
+            }
             if (!"scheduled".equals(a.status())) {
                 throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
             }
@@ -185,6 +192,8 @@ class InternalSchedulingService {
                 desk.onConfirmed(tid, id); // ACC-032: the patient answered, the 'unconfirmed' item goes
                 Instant at = confirmations.confirm(tid, id);
                 record(tid, edge, "appointment.confirmed_via_edge", id, patientRef);
+                events.publish(tid, com.nabd.hms.common.DomainEventType.APPOINTMENT_CONFIRMED, id,
+                        Map.of("appointmentId", id, "source", "whatsapp_button")); // COM-043: the desk chip turns within the SSE fan-out
                 return Map.of("appointmentId", id, "status", status, "patientConfirmedAt", at);
             }
             if (!"confirm".equals(action)) {
