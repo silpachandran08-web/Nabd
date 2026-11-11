@@ -28,6 +28,7 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
 
     @Autowired JwtEncoder encoder;
     @Autowired OwnerPlanService service;
+    @Autowired com.nabd.hms.common.ClinicClock clinicClock;
 
     private record Clinic(SeededTenant t, String owner, String name, String clinicCode, String plusCode, String starterCode) {
     }
@@ -131,7 +132,7 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
         Map<String, Object> preview = exchange("/v1/setup/subscription/change-preview?targetPlanCode=" + c.plusCode() + "&effective=now",
                 HttpMethod.GET, authed(c.owner()), Map.class).getBody();
         LocalDate renewal = jdbc.queryForObject("SELECT renewal_date FROM master.subscriptions WHERE tenant_id = ?", LocalDate.class, c.t().id());
-        long expected = OwnerPlanService.prorationMinor(100000, 200000, LocalDate.now(java.time.ZoneOffset.UTC), renewal); // the billing day is UTC
+        long expected = OwnerPlanService.prorationMinor(100000, 200000, clinicClock.today(c.t().id()), renewal); // the clinic's calendar day
         assertThat(expected).isPositive();
         assertThat(preview).containsEntry("direction", "upgrade").containsEntry("prorationMinor", (int) expected).containsEntry("requiresClinicName", false);
         assertThat((List<String>) preview.get("modulesTurningReadOnly")).isEmpty();
@@ -237,5 +238,29 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
         assertThat(exchange("/v1/setup/subscription/invoices/" + id, HttpMethod.GET, authed(b.owner()), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat((List<?>) exchange("/v1/setup/subscription/invoices", HttpMethod.GET, authed(b.owner()), Map.class).getBody().get("items")).isEmpty();
         assertThat(a.plusCode()).isNotEqualTo(b.plusCode());
+    }
+
+    /** ClinicClockUsageTest: the month of the WhatsApp count and the renewal instant are the clinic's calendar, not UTC. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void usageMonthAndRenewalInstantFollowTheClinicZone() {
+        Clinic c = clinic(10);
+        java.time.ZoneId zone = java.time.ZoneId.of("Asia/Kolkata"); // +05:30: the clinic month starts 18:30 UTC the day before
+        jdbc.update("UPDATE tenants SET timezone = ? WHERE id = ?", zone.getId(), c.t().id());
+        clinicClock.evict(c.t().id());
+        Instant monthStart = LocalDate.now(zone).withDayOfMonth(1).atStartOfDay(zone).toInstant();
+        inTenantTx(c.t().id(), () -> {
+            for (Instant at : List.of(monthStart.minusSeconds(60), monthStart.plusSeconds(60))) {
+                jdbc.update("INSERT INTO whatsapp_messages (tenant_id, to_phone, template_name, language, status, created_at) VALUES (?, '+919500000000', 'visit_reminder', 'en', 'sent', ?)",
+                        c.t().id(), java.sql.Timestamp.from(at));
+            }
+        });
+        assertThat((Map<String, Object>) summary(c.owner()).get("usage")).as("only the message after clinic midnight on the 1st")
+                .containsEntry("whatsappUtilityMessages", 1);
+
+        Map<String, Object> preview = exchange("/v1/setup/subscription/change-preview?targetPlanCode=" + c.starterCode() + "&effective=renewal",
+                HttpMethod.GET, authed(c.owner()), Map.class).getBody();
+        LocalDate renewal = jdbc.queryForObject("SELECT renewal_date FROM master.subscriptions WHERE tenant_id = ?", LocalDate.class, c.t().id());
+        assertThat(Instant.parse((String) preview.get("effectiveAt"))).isEqualTo(renewal.atStartOfDay(zone).toInstant());
     }
 }
