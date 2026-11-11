@@ -30308,17 +30308,31 @@ components:
       properties:
         auth:
           type: string
+          maxLength: 100
+          minLength: 0
         p256dh:
           type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - auth
+      - p256dh
     PushSubscriptionRequest:
       type: object
       properties:
         deviceLabel:
           type: string
+          maxLength: 80
+          minLength: 0
         endpoint:
           type: string
+          maxLength: 2048
+          minLength: 0
         keys:
           $ref: "#/components/schemas/PushSubscriptionKeys"
+      required:
+      - endpoint
+      - keys
     Question:
       type: object
       properties:

@@ -6,6 +6,10 @@ import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.realtime.integration.WebPushClient;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,11 +32,11 @@ class PushSubscriptionService {
     static final String TABLE = "web_push_subscriptions";
 
     @io.swagger.v3.oas.annotations.media.Schema(name = "PushSubscriptionKeys")
-    record Keys(String p256dh, String auth) {
+    record Keys(@NotBlank @Size(max = 200) String p256dh, @NotBlank @Size(max = 100) String auth) {
     }
 
     @io.swagger.v3.oas.annotations.media.Schema(name = "PushSubscriptionRequest")
-    record Register(String endpoint, Keys keys, String deviceLabel) {
+    record Register(@NotBlank @Size(max = 2048) String endpoint, @NotNull @Valid Keys keys, @Size(max = 80) String deviceLabel) {
     }
 
     private final PushSubscriptionRepository repo;
