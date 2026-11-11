@@ -1,0 +1,790 @@
+{
+ "editable": false,
+ "panels": [
+  {
+   "description": "percent of the instance; DP section 6 plans < 30% at peak with the push architecture. Owner @nabd/db-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70.0
+       },
+       {
+        "color": "red",
+        "value": 100
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 0
+   },
+   "id": 1,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "DBInstanceIdentifier": "${DB_INSTANCE}"
+     },
+     "hide": false,
+     "matchExact": true,
+     "metricName": "CPUUtilization",
+     "namespace": "AWS/RDS",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    }
+   ],
+   "title": "Postgres CPU (India primary) (capacity 100)",
+   "type": "timeseries"
+  },
+  {
+   "description": "gp3 baseline for >= 400 GB allocated (prod-in 500 GB, infra/terraform/cells/in/prod.tfvars); staging-in (50 GB) has 3000. Owner @nabd/db-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 8400.0
+       },
+       {
+        "color": "red",
+        "value": 12000
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 0
+   },
+   "id": 2,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "DBInstanceIdentifier": "${DB_INSTANCE}"
+     },
+     "hide": true,
+     "matchExact": true,
+     "metricName": "ReadIOPS",
+     "namespace": "AWS/RDS",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    },
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "DBInstanceIdentifier": "${DB_INSTANCE}"
+     },
+     "hide": true,
+     "matchExact": true,
+     "metricName": "WriteIOPS",
+     "namespace": "AWS/RDS",
+     "period": "300",
+     "refId": "B",
+     "region": "default",
+     "statistic": "Maximum"
+    },
+    {
+     "datasource": {
+      "type": "__expr__",
+      "uid": "__expr__"
+     },
+     "expression": "$A + $B",
+     "refId": "S",
+     "type": "math"
+    }
+   ],
+   "title": "Postgres read + write IOPS (capacity 12000)",
+   "type": "timeseries"
+  },
+  {
+   "description": "max_connections (docs/runbooks/data-tier.md pool budget, db_max_connections). Owner @nabd/db-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 140.0
+       },
+       {
+        "color": "red",
+        "value": 200
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 8
+   },
+   "id": 3,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "DBInstanceIdentifier": "${DB_INSTANCE}"
+     },
+     "hide": false,
+     "matchExact": true,
+     "metricName": "DatabaseConnections",
+     "namespace": "AWS/RDS",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    }
+   ],
+   "title": "Postgres connections (capacity 200)",
+   "type": "timeseries"
+  },
+  {
+   "description": "pgbouncer_app_pool_size 24 + nabd_reports 4 per instance (variables_ops055.tf, data-tier.md). Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 19.599999999999998
+       },
+       {
+        "color": "red",
+        "value": 28
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 8
+   },
+   "id": 4,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "Instance": "*"
+     },
+     "hide": false,
+     "matchExact": false,
+     "metricName": "SvActive",
+     "namespace": "Nabd/PgBouncer",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    }
+   ],
+   "title": "PgBouncer server connections in use (per instance) (capacity 28)",
+   "type": "timeseries"
+  },
+  {
+   "description": "alarm <cell>-pgbouncer-wait (AvgWaitTimeMs > 100 for 5 min, data-tier.md). Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70.0
+       },
+       {
+        "color": "red",
+        "value": 100
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 16
+   },
+   "id": 5,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "Instance": "*"
+     },
+     "hide": false,
+     "matchExact": false,
+     "metricName": "AvgWaitTimeMs",
+     "namespace": "Nabd/PgBouncer",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    }
+   ],
+   "title": "PgBouncer client wait (worst database) (capacity 100)",
+   "type": "timeseries"
+  },
+  {
+   "description": "spring.datasource.hikari.maximum-pool-size, DB_POOL_SIZE default 20 (application.yml); the live max wins when Prometheus has it. Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 14.0
+       },
+       {
+        "color": "red",
+        "value": 20
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 16
+   },
+   "id": 6,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(hikaricp_connections_active)",
+     "legendFormat": "observed",
+     "refId": "A"
+    }
+   ],
+   "title": "Hikari pool connections in use (worst pod) (capacity 20)",
+   "type": "timeseries"
+  },
+  {
+   "description": "percent of maxmemory on the node type (valkey_node_type, default cache.m7g.large). Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70.0
+       },
+       {
+        "color": "red",
+        "value": 100
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 24
+   },
+   "id": 7,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "ReplicationGroupId": "${VALKEY_CLUSTER}"
+     },
+     "hide": false,
+     "matchExact": true,
+     "metricName": "DatabaseMemoryUsagePercentage",
+     "namespace": "AWS/ElastiCache",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    }
+   ],
+   "title": "Valkey memory used (capacity 100)",
+   "type": "timeseries"
+  },
+  {
+   "description": "percent of the single Valkey engine thread: the limit on ops/s. Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70.0
+       },
+       {
+        "color": "red",
+        "value": 100
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 24
+   },
+   "id": 8,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "cloudwatch",
+      "uid": "cloudwatch"
+     },
+     "dimensions": {
+      "ReplicationGroupId": "${VALKEY_CLUSTER}"
+     },
+     "hide": false,
+     "matchExact": true,
+     "metricName": "EngineCPUUtilization",
+     "namespace": "AWS/ElastiCache",
+     "period": "300",
+     "refId": "A",
+     "region": "default",
+     "statistic": "Maximum"
+    }
+   ],
+   "title": "Valkey engine CPU (ops saturation) (capacity 100)",
+   "type": "timeseries"
+  },
+  {
+   "description": "app.realtime.max-connections default 2000 per pod (RealtimeHub). Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1400.0
+       },
+       {
+        "color": "red",
+        "value": 2000
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 32
+   },
+   "id": 9,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(realtime_sse_connections)",
+     "legendFormat": "observed",
+     "refId": "A"
+    }
+   ],
+   "title": "SSE connections (worst pod) (capacity 2000)",
+   "type": "timeseries"
+  },
+  {
+   "description": "Realtime extraction trigger, lower bound (DP section 6: ~2-3k). Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1400.0
+       },
+       {
+        "color": "red",
+        "value": 2000
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 32
+   },
+   "id": 10,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum(realtime_sse_connections)",
+     "legendFormat": "observed",
+     "refId": "A"
+    }
+   ],
+   "title": "SSE connections (all pods) (capacity 2000)",
+   "type": "timeseries"
+  },
+  {
+   "description": "alert NabdOutboxOldestPendingOver30s (outbox-relay.rules.yml). Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 21.0
+       },
+       {
+        "color": "red",
+        "value": 30
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 40
+   },
+   "id": 11,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(outbox_oldest_pending_age_seconds)",
+     "legendFormat": "observed",
+     "refId": "A"
+    }
+   ],
+   "title": "Outbox oldest pending event (capacity 30)",
+   "type": "timeseries"
+  },
+  {
+   "description": "the rate the last green k6 rush run sustained in staging-in (perf/run.sh rush drives 2 x PEAK_RPS); pass --proven-checkin-rps. Owner @nabd/platform-owners.",
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "thresholdsStyle": {
+       "mode": "line"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     }
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 40
+   },
+   "id": 12,
+   "options": {
+    "legend": {
+     "calcs": [
+      "max"
+     ],
+     "displayMode": "table"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum(rate(http_server_requests_seconds_count{uri=\"/v1/queue/check-in\",method=\"POST\"}[5m]))",
+     "legendFormat": "observed",
+     "refId": "A"
+    }
+   ],
+   "title": "Check-ins per second (morning rush driver) (capacity from k6)",
+   "type": "timeseries"
+  }
+ ],
+ "refresh": "",
+ "schemaVersion": 39,
+ "tags": [
+  "nabd",
+  "ops-060"
+ ],
+ "templating": {
+  "list": [
+   {
+    "label": "RDS instance id",
+    "name": "DB_INSTANCE",
+    "type": "textbox"
+   },
+   {
+    "label": "Valkey replication group",
+    "name": "VALKEY_CLUSTER",
+    "type": "textbox"
+   }
+  ]
+ },
+ "time": {
+  "from": "now-28d",
+  "to": "now"
+ },
+ "title": "Nabd capacity review (OPS-060, per cell)",
+ "uid": "nabd-capacity",
+ "version": 1
+}

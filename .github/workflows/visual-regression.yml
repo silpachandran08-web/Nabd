@@ -1,0 +1,117 @@
+# FEF-051: visual regression (Playwright toHaveScreenshot) over screen x language x theme x device. Harness: frontend/apps/staff-web/tests/e2e/visual/.
+# PR: only the screens whose feature folder changed (select.mjs); packages/tokens, packages/ui, packages/i18n and shared shell code run the full
+# staff matrix, 8 shards x 2 workers (target: within 12 minutes; estimate: 1,140 snapshots x ~3.5 s / 16 workers = ~4 min + build, not yet measured on a runner). Locales en + hi (ar from Phase 4). A diff over 0.1% fails until approved.
+# Approve: a reviewer adds the label "visual-approve"; the update job re-renders the selected screens on the same runner image, commits the new
+# baselines (git LFS) to the PR branch and drops the label; the reviewer checks the PNG diff in the PR and approves the PR as usual.
+# Nightly: the full matrix incl. ar, plus patient-web on phone + desktop in every patient locale.
+# Needs external action: GitHub runners, git LFS quota, the "visual-approve" label, and the first linux baseline (run workflow_dispatch with update=true).
+name: visual-regression
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths: ["frontend/**", ".github/workflows/visual-regression.yml"]
+  schedule:
+    - cron: "40 21 * * *"   # after journeys-nightly (21:17 UTC)
+  workflow_dispatch:
+    inputs:
+      update: { type: boolean, default: false, description: "re-render and commit baselines for the full matrix" }
+permissions:
+  contents: read
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  NODE_VERSION: "22"
+  PLAYWRIGHT_VERSION: "1.64.1"
+  VR: frontend/apps/staff-web/tests/e2e/visual
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      mode: ${{ steps.s.outputs.mode }}
+      screens: ${{ steps.s.outputs.screens }}
+      projects: ${{ steps.s.outputs.projects }}
+      locales: ${{ steps.s.outputs.locales }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - id: s
+        env: { BASE: "${{ github.event.pull_request.base.sha }}" }
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            sel=$(git diff --name-only "$BASE"...HEAD | node "$VR/select.mjs")
+            echo "mode=$(echo "$sel" | jq -r .mode)" >> "$GITHUB_OUTPUT"
+            echo "screens=$(echo "$sel" | jq -r 'if .mode == "all" then "" else (.ids | join(",")) end')" >> "$GITHUB_OUTPUT"
+            echo "projects=$(echo "$sel" | jq -r 'if any(.ids[]; startswith("patient/")) then "all" else "staff" end')" >> "$GITHUB_OUTPUT"
+            echo "locales=en,hi" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=all" >> "$GITHUB_OUTPUT"; echo "screens=" >> "$GITHUB_OUTPUT"; echo "projects=all" >> "$GITHUB_OUTPUT"; echo "locales=en,hi,ar" >> "$GITHUB_OUTPUT"
+          fi
+
+  snapshots:
+    needs: select
+    if: needs.select.outputs.mode != 'none' && !(github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'visual-approve')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # the approve/update path commits baselines
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8] }
+    env:
+      UPDATE: ${{ (github.event_name == 'workflow_dispatch' && inputs.update) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'visual-approve')) }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true, ref: "${{ github.event.pull_request.head.ref || github.ref }}" }
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Playwright Chromium (kept out of the app's lockfile)
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e" && cd "$RUNNER_TEMP/e2e" && npm init -y >/dev/null
+          npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" && npx playwright install --with-deps chromium
+      - name: build and start staff-web (3031) and patient-web (3032)
+        working-directory: frontend
+        env: { NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080/v1" }   # nothing listens there: every call is a Playwright mock
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter staff-web exec next build && (NABD_UI_GALLERY=1 pnpm --filter staff-web exec next start -p 3031 &)
+          if [ "${{ needs.select.outputs.projects }}" = all ]; then pnpm --filter patient-web exec next build && (pnpm --filter patient-web exec next start -p 3032 &); fi
+          for i in $(seq 60); do curl -sf -o /dev/null http://localhost:3031/login && break; sleep 1; done
+      - name: "snapshots shard ${{ matrix.shard }}/8"
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/e2e/node_modules/playwright/index.mjs
+          VR_SCREENS: ${{ needs.select.outputs.screens }}
+          VR_LOCALES: ${{ needs.select.outputs.locales }}
+          VR_OUT: vr-results
+          VR_WORKERS: "2"
+        run: |
+          proj=$([ "${{ needs.select.outputs.projects }}" = all ] && echo "" || echo "--project=staff-*")
+          upd=$([ "$UPDATE" = true ] && echo "--update-snapshots" || echo "")
+          node "$RUNNER_TEMP/e2e/node_modules/playwright/cli.js" test -c "$VR/visual.config.mjs" --shard=${{ matrix.shard }}/8 $proj $upd
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "visual-${{ matrix.shard }}", path: vr-results, retention-days: 14 }   # HTML report with expected / actual / diff
+      - name: commit approved baselines (LFS)
+        if: env.UPDATE == 'true' && github.event_name != 'schedule'
+        run: |
+          git config user.name "nabd-visual-bot"; git config user.email "visual-bot@users.noreply.github.com"
+          git add "$VR/baselines/linux"
+          git diff --cached --quiet && exit 0
+          git commit -m "test(visual): FEF-051 approved baselines (shard ${{ matrix.shard }}/8)"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done   # the shards push to the same branch
+
+  drop-label:
+    needs: snapshots
+    if: always() && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'visual-approve')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --remove-label visual-approve

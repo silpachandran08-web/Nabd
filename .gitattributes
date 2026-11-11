@@ -1,0 +1,2 @@
+# FEF-051: reviewed visual-regression baselines (linux, rendered in CI) live in git LFS.
+frontend/apps/staff-web/tests/e2e/visual/baselines/** filter=lfs diff=lfs merge=lfs -text
