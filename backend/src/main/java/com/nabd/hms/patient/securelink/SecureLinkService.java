@@ -43,7 +43,7 @@ import java.util.UUID;
  * expiry and the 5-attempt lock are the control. Move to a keyed HMAC with the tenant data key when a secret store is wired.
  */
 @Service
-public class SecureLinkService {
+public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumentLinks {
 
     private static final Logger log = LoggerFactory.getLogger(SecureLinkService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -147,6 +147,13 @@ public class SecureLinkService {
                     req.language() == null ? "en" : req.language(), List.of(firstName, baseUrl + "/l/" + token), null, null, null, "secure-link:" + id));
         }
         return new Issued(id, expires);
+    }
+
+    @Override
+    @Transactional
+    public com.nabd.hms.patient.api.SecureDocumentLinks.Issued issueForFile(UUID staffId, String ip, UUID fileId, UUID recipientPatientId, String language) {
+        Issued i = issue(staffId, ip, new IssueRequest("document", fileId, recipientPatientId, null, true, language));
+        return new com.nabd.hms.patient.api.SecureDocumentLinks.Issued(i.linkId(), i.expiresAt());
     }
 
     // ---------------------------------------------------------------- public: otp, open

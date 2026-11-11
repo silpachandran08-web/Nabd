@@ -11,8 +11,8 @@
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
-    owns: [billing_documents, charge_catalogue, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
-    reads: [charge_doctor_fees, patients, pharmacy_item_profiles, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout
+    owns: [billing_documents, charge_catalogue, claim_pack_formats, claim_packs, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
+    reads: [charge_doctor_fees, licence_registry, patients, pharmacy_item_profiles, staff, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout; FIN-035: the claim pack prints the doctor's registration number (staff) and the facility licence (licence_registry)
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, rx_coding_suggestions, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
@@ -34,8 +34,8 @@ modules:
     owns: [comms_cutover_flags, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands
   nursing:
-    owns: [administration_orders, administration_records, procedure_orders, vaccine_records]
-    reads: []
+    owns: [administration_orders, administration_records, consent_templates, procedure_consents, procedure_orders, vaccine_records]
+    reads: [patients, tenants]  # CLN-014: the consent PDF names the patient and clinic; the age-18 guardian rule reads the patient's dob
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.

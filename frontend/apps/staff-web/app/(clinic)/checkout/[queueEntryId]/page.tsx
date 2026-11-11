@@ -634,7 +634,7 @@ export default function CheckoutPage() {
               <div className={styles.totalsRow}><span>{tr("balanceDue")}</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
             </div>
 
-            {invoice.id && invoice.status !== "void" && can("billing:view") && invoice.payments.length > 0 && <InvoiceActions invoiceId={invoice.id} />}
+            {invoice.id && invoice.status !== "void" && can("billing:view") && invoice.payments.length > 0 && <InvoiceActions invoiceId={invoice.id} visitId={queueEntryId} paid={invoice.status === "paid"} />}
 
             {context.queueStatus === "billing_pending" && canAdvance && (
               <>

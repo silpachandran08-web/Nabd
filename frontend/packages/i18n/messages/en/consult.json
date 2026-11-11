@@ -139,7 +139,10 @@
     "consentRecorded": "Consent recorded",
     "consentRecordedBy": "Consent recorded · {name}",
     "couldnTMarkTheProcedure": "Couldn't mark the procedure ready.",
-    "couldnTReachTheServer": "Couldn't reach the server. The procedure was not changed."
+    "couldnTReachTheServer": "Couldn't reach the server. The procedure was not changed.",
+    "consentWithdrawn": "Consent withdrawn: procedure blocked",
+    "signedConsentPdf": "Signed consent (PDF)",
+    "couldNotOpenConsentPdf": "Couldn't open the signed consent PDF."
   },
   "documentSheet": {
     "previewNotIssued": "Preview — not issued",
@@ -387,18 +390,35 @@
     "saveFailed": "Couldn't save. Nothing was recorded."
   },
   "procedureConsent": {
-    "recordProcedureConsent": "Record procedure consent",
+    "recordProcedureConsent": "Procedure consent",
     "hardGateThisProcedureCannot": "Hard gate: this procedure cannot be marked ready or completed until consent is recorded.",
-    "consentNoteEnteredBy": "Consent note entered by {orderedByName}",
-    "noConsentWordingWasEntered": "No consent wording was entered with this order. The clinic must supply its approved procedure consent text (clinical and legal sign-off) before relying on this record.",
     "nameOfThePersonGiving": "Name of the person giving consent (patient or guardian)",
     "theProcedureWasExplainedAnd": "The procedure was explained and the person named above agreed to it.",
-    "recordedTheTypedNameYour": "Recorded: the typed name, your name and the time. Not recorded yet: form version, language, guardian verification or a handwritten signature.",
     "cancel": "Cancel",
     "recording": "Recording…",
     "recordConsent": "Record consent",
     "consentWasNotRecordedTry": "Consent was not recorded. Try again.",
-    "couldnTReachTheServer": "Couldn't reach the server. Consent was not recorded."
+    "loadingForm": "Loading the consent form",
+    "couldNotLoadForm": "Couldn't load the consent form. Consent was not recorded.",
+    "retry": "Retry",
+    "noClinicForm": "This clinic has no consent form for this procedure yet, so only a typed name can be recorded. An owner-doctor can add the clinic's reviewed form.",
+    "language": "Language",
+    "formVersion": "Form version {version}",
+    "scrollToEnd": "Read the whole form: scroll to the end to sign.",
+    "minorNoGuardian": "The patient is under 18 and no guardian is linked to their record. Link the guardian on the patient record first.",
+    "minorGuardianSigns": "The patient is under 18: {guardian} (guardian) signs. The patient's own signature below is optional.",
+    "whoSigns": "Who signs",
+    "signerPatient": "Patient",
+    "signerGuardian": "Guardian",
+    "signerName": "Name of the person signing",
+    "signHere": "Sign with a finger in the box",
+    "signaturePad": "Signature pad",
+    "assentPad": "Patient assent signature pad",
+    "clear": "Clear",
+    "assentOptional": "Patient's assent (optional)",
+    "witnessIsYou": "You are recorded as the witness. The signed PDF is stored with its fingerprint (SHA-256).",
+    "submitSigned": "Submit signed consent",
+    "formChanged": "The consent form was updated. The new version is shown: read it again before signing."
   },
   "rxPad": {
     "genericName": "Generic name",
@@ -561,7 +581,9 @@
       "visitCompleted": "Visit completed",
       "sentToCheckout": "Sent to checkout",
       "transferred": "Transferred to another department",
-      "amendmentAdded": "Amendment added"
+      "amendmentAdded": "Amendment added",
+      "consentSigned": "Consent signed",
+      "consentWithdrawn": "Consent withdrawn"
     },
     "sub": {
       "notRecordedYet": "not recorded yet",

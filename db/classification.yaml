@@ -349,6 +349,28 @@ schemas:
       tax_category: financial
       sac_hsn: financial
       tax_inclusive: financial
+    claim_pack_formats:
+      id: operational
+      tenant_id: operational
+      code: operational
+      jurisdiction: operational
+      insurer_name: operational
+      sections: operational
+      csv_columns: operational
+      active: operational
+      created_at: operational
+    claim_packs:
+      id: operational
+      tenant_id: operational
+      visit_id: operational
+      invoice_id: operational
+      patient_id: pii
+      format_code: operational
+      document_id: operational
+      csv_document_id: operational
+      pdf_sha256: operational
+      generated_by: operational
+      created_at: operational
     chronic_conditions:
       id: operational
       tenant_id: operational
@@ -440,6 +462,18 @@ schemas:
       remote: operational
       legacy_readonly: operational
       updated_at: operational
+    consent_templates:
+      id: operational
+      tenant_id: operational
+      charge_code: operational
+      lang: operational
+      version: operational
+      title: operational
+      body_html: operational
+      active: operational
+      placeholder: operational
+      created_by: operational
+      created_at: operational
     consents:
       id: operational
       tenant_id: operational
@@ -1727,6 +1761,27 @@ schemas:
       effective_from: operational
       created_by: operational
       created_at: operational
+    procedure_consents:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      procedure_order_id: operational
+      template_id: operational
+      template_version: operational
+      lang: operational
+      signer_kind: pii
+      guardian_id: pii
+      signer_name: pii
+      witness_staff_id: operational
+      signature_file_id: operational
+      pdf_file_id: operational
+      pdf_sha256: operational
+      status: phi
+      signed_by: operational
+      signed_at: operational
+      withdrawn_at: phi
+      withdrawn_by: operational
+      withdraw_reason: phi
     procedure_orders:
       id: operational
       tenant_id: operational
@@ -1747,6 +1802,9 @@ schemas:
       consent_signed_name: pii
       consent_recorded_by: operational
       consent_signed_at: operational
+      consent_withdrawn_at: phi
+      consent_withdrawn_by: operational
+      consent_withdraw_reason: phi
       change_seq: operational
       updated_at: operational
     projector_applied_events:

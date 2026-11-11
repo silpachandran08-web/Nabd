@@ -63,17 +63,7 @@ public class InvoiceDocumentService {
             return stored.get();
         }
         boolean thermal = "thermal80".equals(layout);
-        // PHL-021: a pharmacy invoice (a line of a stocked item) carries the drug licence numbers in the header and the zero-rating reason on its lines
-        var heads = repo.catalogueIds(tenantId, invoiceId);
-        var pharmacyLines = pharmacy.inputs(heads.stream().filter(java.util.Objects::nonNull).distinct().toList());
-        var supplier = repo.supplier(tenantId, clock.zone(tenantId));
-        if (!pharmacyLines.isEmpty()) {
-            supplier = new InvoiceDocumentText.Supplier(supplier.legalName(), supplier.gstin(), supplier.stateCode(), supplier.zone(), pharmacy.licenceLines());
-        }
-        List<String> notes = heads.stream().map(h -> h != null && pharmacyLines.containsKey(h) && pharmacyLines.get(h).zeroRated()
-                ? com.nabd.hms.billing.tax.PharmacyTaxLines.ZERO_RATED_NOTE : null).toList();
-        var lines = InvoiceDocumentText.build(inv, supplier, kind, receipt ? repo.latestReceiptNumber(tenantId, invoiceId) : null,
-                thermal ? 48 : 90, repo.sacHsn(tenantId, invoiceId), notes);
+        var lines = lines(tenantId, inv, kind, thermal ? 48 : 90);
         byte[] pdf = thermal ? SimplePdf.render(lines, 226.8f, 0, 12f, 7f, true) : SimplePdf.render(lines, 595.3f, 841.9f, 40f, 9f, false);
         String key = "tenants/" + tenantId + "/billing/" + invoiceId + "/" + kind + "-" + layout + "-v" + version + ".pdf";
         if (repo.store(tenantId, invoiceId, kind, layout, version, key, sha256(pdf), pdf)) {
@@ -83,6 +73,23 @@ public class InvoiceDocumentService {
             return pdf;
         }
         return repo.find(tenantId, invoiceId, kind, layout, version).orElse(pdf);
+    }
+
+    /** The printed lines of an invoice or receipt; FIN-035's claim pack reuses them so the pack shows the same document. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    List<String> lines(UUID tenantId, InvoiceResponse inv, String kind, int cols) {
+        UUID invoiceId = inv.id();
+        // PHL-021: a pharmacy invoice (a line of a stocked item) carries the drug licence numbers in the header and the zero-rating reason on its lines
+        var heads = repo.catalogueIds(tenantId, invoiceId);
+        var pharmacyLines = pharmacy.inputs(heads.stream().filter(java.util.Objects::nonNull).distinct().toList());
+        var supplier = repo.supplier(tenantId, clock.zone(tenantId));
+        if (!pharmacyLines.isEmpty()) {
+            supplier = new InvoiceDocumentText.Supplier(supplier.legalName(), supplier.gstin(), supplier.stateCode(), supplier.zone(), pharmacy.licenceLines());
+        }
+        List<String> notes = heads.stream().map(h -> h != null && pharmacyLines.containsKey(h) && pharmacyLines.get(h).zeroRated()
+                ? com.nabd.hms.billing.tax.PharmacyTaxLines.ZERO_RATED_NOTE : null).toList();
+        return InvoiceDocumentText.build(inv, supplier, kind, "receipt".equals(kind) ? repo.latestReceiptNumber(tenantId, invoiceId) : null,
+                cols, repo.sacHsn(tenantId, invoiceId), notes);
     }
 
     private static String sha256(byte[] b) {

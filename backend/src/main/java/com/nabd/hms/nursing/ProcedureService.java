@@ -3,7 +3,6 @@ package com.nabd.hms.nursing;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.nursing.dto.ProcedureConsentRequest;
 import com.nabd.hms.nursing.dto.ProcedureNotesRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderResponse;
@@ -64,21 +63,22 @@ public class ProcedureService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "already-final", "Already final",
                     "This procedure is already " + row.status() + ".");
         }
-        if (!"cancelled".equals(req.status()) && row.consentSignedAt() == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "consent-required", "Consent required",
-                    "Record the patient's signed consent before starting this procedure.");
+        if (!"cancelled".equals(req.status()) && (row.consentSignedAt() == null || row.consentWithdrawnAt() != null)) {
+            throw consentRequired();
         }
-        repo.updateProcedureStatus(tenantId, id, req.status(), "completed".equals(req.status()) ? staffId : null);
+        try {
+            repo.updateProcedureStatus(tenantId, id, req.status(), "completed".equals(req.status()) ? staffId : null);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // CLN-014: V3140 trigger: the clinic has a consent form for this procedure and no signed form is on file
+            if (String.valueOf(e.getMostSpecificCause().getMessage()).contains("procedure_orders_consent_required")) throw consentRequired();
+            throw e;
+        }
         return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
     }
 
-    /** NB-119: gates updateStatus above — a typed name is this app's stand-in for a signature. */
-    @Transactional
-    public ProcedureOrderResponse recordConsent(UUID tenantId, UUID staffId, UUID id, ProcedureConsentRequest req) {
-        tenantContext.set(tenantId);
-        repo.findProcedureOrder(tenantId, id).orElseThrow(ApiException::notFound);
-        repo.recordConsent(tenantId, id, req.signedName(), staffId);
-        return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
+    private static ApiException consentRequired() {
+        return new ApiException(HttpStatus.CONFLICT, "CONSENT_REQUIRED", "Consent required",
+                "This procedure has no valid signed consent (missing or withdrawn). Record consent before starting it.");
     }
 
     @Transactional
@@ -89,7 +89,7 @@ public class ProcedureService {
         return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
     }
 
-    private ProcedureOrderResponse toResponse(UUID tenantId, ProcedureOrderRow row) {
+    ProcedureOrderResponse toResponse(UUID tenantId, ProcedureOrderRow row) {
         String patientName = repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");
         String orderedByName = repo.findStaffName(tenantId, row.orderedBy()).orElse("Unknown staff");
         String completedByName = row.completedBy() == null ? null : repo.findStaffName(tenantId, row.completedBy()).orElse(null);
@@ -98,6 +98,7 @@ public class ProcedureService {
         return new ProcedureOrderResponse(row.id(), row.queueEntryId(), row.patientId(), patientName, orderedByName,
                 row.chargeCode(), row.chargeName(), row.baseAmount(), row.taxRatePercent(), row.prepNotes(),
                 row.consentNote(), row.status(), row.billed(), completedByName, row.completedAt(), row.createdAt(),
-                row.consentSignedName(), consentRecordedByName, row.consentSignedAt());
+                row.consentSignedName(), consentRecordedByName, row.consentSignedAt(), row.consentId(), row.consentSha256(),
+                row.consentWithdrawnAt(), row.consentWithdrawReason(), repo.findPatientLanguage(tenantId, row.patientId()).orElse(null));
     }
 }

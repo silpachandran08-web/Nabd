@@ -20,7 +20,8 @@ final class NursingModels {
     record ProcedureOrderRow(UUID id, UUID queueEntryId, UUID patientId, UUID orderedBy, String chargeCode,
                               String chargeName, BigDecimal baseAmount, BigDecimal taxRatePercent, String prepNotes,
                               String consentNote, String status, boolean billed, UUID completedBy, Instant completedAt,
-                              Instant createdAt, String consentSignedName, UUID consentRecordedBy, Instant consentSignedAt) {
+                              Instant createdAt, String consentSignedName, UUID consentRecordedBy, Instant consentSignedAt,
+                              Instant consentWithdrawnAt, String consentWithdrawReason, UUID consentId, String consentSha256) {
     }
 
     record VaccineRecordRow(UUID id, UUID patientId, UUID queueEntryId, UUID recordedBy, String vaccineName, String dose,
