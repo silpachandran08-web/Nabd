@@ -14,7 +14,7 @@ import { isOwner } from "../../lib/session";
 import { requestStepUpToken } from "../../lib/stepUp";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { isOpen, MAX_SLOTS, slotsToIso, WHITE_GLOVE_STEP_UP, type Booked, type OwnerView } from "./whiteGlove";
-import styles from "../plan/planAccount.module.css";
+import styles from "./whiteGlove.module.css";
 
 const money = (minor: number, currency: string) => formatMoney(minor, currency, { minor: true });
 
