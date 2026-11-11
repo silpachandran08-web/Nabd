@@ -106,3 +106,36 @@ test("no behaviour change: the unlock reasons sent to the server stay the record
   assert.match(s, /value=\{r\}/);
   assert.match(s, /api\.post<Summary>\("\/billing\/day-close\/reopen", \{ reason, date \}\)/);
 });
+
+test("T1-BUG-7: page titles and the route announcement come from shell.pages (en = the route table, hi for every page)", async () => {
+  const { PAGES, pageKey, pageName, routeTitle } = await import("../../app/lib/routeTitle.ts");
+  const en = msg("en", "shell").pages, hi = msg("hi", "shell").pages;
+  assert.equal(Object.keys(en).length, PAGES.length, "one catalogue key per route prefix");
+  for (const [prefix, name] of PAGES) {
+    assert.equal(en[pageKey(prefix)], name, `en ${prefix}`);
+    assert.ok(hi[pageKey(prefix)]?.trim(), `hi ${prefix}`);
+  }
+  const tr = (k) => hi[k];
+  assert.equal(routeTitle("/checkout/otc", "QA Clinic", tr), "चेकआउट · QA Clinic · Nabd");
+  assert.equal(pageName("/account", tr), "मेरा खाता");
+  assert.equal(routeTitle("/nowhere", "C", tr), "C · Nabd");
+  const chrome = readFileSync(`${app}app/RouteChrome.tsx`, "utf8");
+  assert.match(chrome, /t\(`pages\.\$\{key\}`\)/);
+  assert.match(chrome, /routeTitle\(pathname, getIdentity\(\)\?\.tenantName, tr\)/);
+  assert.match(chrome, /pageName\(pathname, tr\)/);
+});
+
+test("T1-BUG-7: the route error panel, the Retry button and the stock pill read the catalogue (en + hi)", () => {
+  const src = (f) => readFileSync(`${app}app/components/ui/${f}`, "utf8");
+  assert.ok(!/This panel failed|Nothing you typed|Go home/.test(src("RouteError.tsx")));
+  assert.match(src("RouteError.tsx"), /t\("routeError\.title"\)[\s\S]*t\("globalError\.body"\)[\s\S]*t\("routeError\.home"\)/);
+  assert.ok(!/"Retry"/.test(src("StateViews.tsx")));
+  assert.match(src("StateViews.tsx"), /retryLabel \?\? t\("retry"\)/);
+  assert.ok(!/In stock|Out of stock|Low ·/.test(src("StockPill.tsx")));
+  for (const l of ["en", "hi"]) {
+    const shell = msg(l, "shell"), common = msg(l, "common");
+    for (const v of [shell.routeError.title, shell.routeError.home, shell.globalError.body, common.retry, common.stock.out]) assert.ok(v?.trim(), `${l} ${v}`);
+    for (const k of ["in", "low"]) assert.match(common.stock[k], /\{qty\}/, `${l} common.stock.${k}`);
+  }
+  assert.equal(msg("hi", "common").stock.in, "स्टॉक में · {qty}");
+});

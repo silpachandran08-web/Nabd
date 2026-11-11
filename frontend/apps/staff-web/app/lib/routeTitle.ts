@@ -1,5 +1,6 @@
 // FEF-027: document.title per route, '<Page> · <Clinic> · Nabd'. Pure so it is unit-tested.
-const PAGES: [prefix: string, name: string][] = [
+// FEF-040: the names below are the English text of shell.pages.<pageKey>; RouteChrome passes the translator.
+export const PAGES: [prefix: string, name: string][] = [
   ["/arrivals", "Today"], ["/schedule", "Queue & Appointments"], ["/patients", "Patients"], ["/consult", "Consultation"],
   ["/pharmacy", "Pharmacy"], ["/billing", "Billing"], ["/checkout", "Checkout"], ["/packages", "Treatment Packages"],
   ["/staff", "Staff & Access"], ["/reports", "Reports"], ["/setup", "Setup"], ["/account", "My account"],
@@ -11,13 +12,17 @@ const PAGES: [prefix: string, name: string][] = [
   ["/owner", "Workspaces"], ["/platform", "Platform console"],
 ];
 
-export function pageName(pathname: string | null): string {
+/** Catalogue key of a page prefix: "/solo/consult" -> "solo-consult". */
+export const pageKey = (prefix: string) => prefix.slice(1).replace(/\//g, "-");
+type Translate = (key: string, english: string) => string;
+
+export function pageName(pathname: string | null, tr: Translate = (_k, en) => en): string {
   const p = pathname ?? "/";
   const hit = PAGES.find(([prefix]) => p === prefix || p.startsWith(`${prefix}/`));
-  return hit ? hit[1] : "Nabd";
+  return hit ? tr(pageKey(hit[0]), hit[1]) : "Nabd";
 }
 
-export function routeTitle(pathname: string | null, clinic: string | null | undefined): string {
-  const page = pageName(pathname);
+export function routeTitle(pathname: string | null, clinic: string | null | undefined, tr?: Translate): string {
+  const page = pageName(pathname, tr);
   return [page === "Nabd" ? null : page, clinic || null, "Nabd"].filter(Boolean).join(" · ");
 }
