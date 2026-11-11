@@ -2080,6 +2080,12 @@ schemas:
       error_code: operational
       created_at: operational
       completed_at: operational
+    staff_onboarding_progress:
+      tenant_id: operational
+      staff_id: operational
+      tour_key: operational
+      completed_at: operational
+      competency_passed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational

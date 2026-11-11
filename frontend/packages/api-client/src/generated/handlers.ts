@@ -238,6 +238,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/front-desk/exceptions`, () => HttpResponse.json({"items":[{"actions":[],"createdAt":"2026-01-01T00:00:00Z","id":"00000000-0000-7000-8000-000000000000","kind":"string","params":{},"refId":"00000000-0000-7000-8000-000000000000","refType":"string","severity":"string","summary":"string"}],"nextCursor":"string"}, { status: 200 })), // DeskExceptionController_list
     http.post(`${baseUrl}/v1/front-desk/exceptions/:id/:action`, () => HttpResponse.json({"id":"00000000-0000-7000-8000-000000000000","status":"string"}, { status: 200 })), // DeskExceptionController_act
     http.get(`${baseUrl}/v1/me/entitlements`, () => HttpResponse.json({"killedFeatures":["string"],"modules":[{"code":"string","enabled":false}],"seatLimit":0}, { status: 200 })), // MeEntitlementsController_get
+    http.get(`${baseUrl}/v1/me/onboarding`, () => HttpResponse.json({"competencyPassedAt":"2026-01-01T00:00:00Z","completed":["string"]}, { status: 200 })), // StaffOnboardingController_get
+    http.put(`${baseUrl}/v1/me/onboarding/:key`, () => HttpResponse.json({"competencyPassedAt":"2026-01-01T00:00:00Z","completed":["string"]}, { status: 200 })), // StaffOnboardingController_complete
     http.get(`${baseUrl}/v1/me/preferences`, () => HttpResponse.json({"clinicDefaultLocale":"string","digitStyle":"string","uiLocale":"string","uiTheme":"string"}, { status: 200 })), // MePreferencesController_get
     http.put(`${baseUrl}/v1/me/preferences`, () => HttpResponse.json({"digitStyle":"string","uiLocale":"string","uiTheme":"string"}, { status: 200 })), // MePreferencesController_put
     http.get(`${baseUrl}/v1/me/profile-claims/:token`, () => HttpResponse.json({"clinicName":"string","expiresAt":"2026-01-01T00:00:00Z","firstName":"string","guardianFirstName":"string","opensOn":"2026-01-01","ownPhone":false}, { status: 200 })), // ProfileClaimController_view
@@ -561,4 +563,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 547;
+export const operationCount = 549;

@@ -587,6 +587,7 @@ export type StaffHpr = { hprId?: string; hprVerified?: boolean; staffId?: string
 export type StaffHprRequest = { hprId: string; };
 export type StaffInviteRequest = { departmentId?: string; email: string; mobilePhone: string; name: string; roleId: string; scope?: string; };
 export type StaffInviteResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; staff?: StaffResponse; };
+export type StaffOnboardingProgress = { competencyPassedAt?: string; completed?: Array<string>; };
 export type StaffPage = { data?: Array<StaffResponse>; page?: PageMeta; };
 export type StaffPatchRequest = { clinician?: boolean; departmentId?: string; fieldGrants?: Array<string>; professionalRegistrationNo?: string; roleId?: string; scope?: string; };
 export type StaffPerformanceReport = { rows?: Array<StaffPerformanceResponse>; scopeNote?: string; };
@@ -925,6 +926,8 @@ export type Operations = {
   DeskExceptionController_list: { method: "get"; path: "/v1/front-desk/exceptions"; permission: "queue:view"; pathParams: never; query: { kind?: string; cursor?: string; limit?: number; }; body: never; response: DeskExceptionPage };
   DeskExceptionController_act: { method: "post"; path: "/v1/front-desk/exceptions/{id}/{action}"; permission: "queue:edit"; pathParams: { id: string; action: string; }; query: never; body: ActionRequest; response: DeskExceptionActionResponse };
   MeEntitlementsController_get: { method: "get"; path: "/v1/me/entitlements"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MeEntitlements };
+  StaffOnboardingController_get: { method: "get"; path: "/v1/me/onboarding"; permission: "authenticated"; pathParams: never; query: never; body: never; response: StaffOnboardingProgress };
+  StaffOnboardingController_complete: { method: "put"; path: "/v1/me/onboarding/{key}"; permission: "authenticated"; pathParams: { key: string; }; query: never; body: never; response: StaffOnboardingProgress };
   MePreferencesController_get: { method: "get"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: never; response: UiPreferencesRead };
   MePreferencesController_put: { method: "put"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: UiPreferencesWrite; response: UiPreferences };
   ProfileClaimController_view: { method: "get"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: View };

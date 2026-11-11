@@ -602,6 +602,7 @@ export const StaffHprRequestSchema = z.object({ hprId: z.string().min(1) });
 export const StaffInviteRequestSchema = z.object({ departmentId: z.string().optional(), email: z.string().min(1), mobilePhone: z.string().min(1), name: z.string().min(1), roleId: z.string(), scope: z.string().optional() });
 export const StaffResponseSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), email: z.string().optional(), emailVerified: z.boolean().optional(), fieldGrants: z.array(z.string()).optional(), id: z.string().optional(), lastSeenAt: z.string().optional(), loginFactors: z.array(z.string()).optional(), loginMethod: z.string().optional(), mobilePhone: z.string().optional(), mobileVerified: z.boolean().optional(), name: z.string().optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional(), status: z.string().optional() });
 export const StaffInviteResponseSchema = z.object({ expiresAt: z.string().optional(), inviteId: z.string().optional(), inviteToken: z.string().optional(), staff: StaffResponseSchema.optional() });
+export const StaffOnboardingProgressSchema = z.object({ competencyPassedAt: z.string().optional(), completed: z.array(z.string()).optional() });
 export const StaffPageSchema = z.object({ data: z.array(StaffResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const StaffPatchRequestSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), fieldGrants: z.array(z.string()).optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional() });
 export const StaffPerformanceResponseSchema = z.object({ collected: z.number().optional(), discountCount: z.number().int().optional(), handledCount: z.number().int().optional(), overrideCount: z.number().int().optional(), paymentCount: z.number().int().optional(), staffId: z.string().optional(), staffName: z.string().optional() });
@@ -927,6 +928,8 @@ export const operationSchemas = {
   DeskExceptionController_list: { response: DeskExceptionPageSchema },
   DeskExceptionController_act: { body: ActionRequestSchema, response: DeskExceptionActionResponseSchema },
   MeEntitlementsController_get: { response: MeEntitlementsSchema },
+  StaffOnboardingController_get: { response: StaffOnboardingProgressSchema },
+  StaffOnboardingController_complete: { response: StaffOnboardingProgressSchema },
   MePreferencesController_get: { response: UiPreferencesReadSchema },
   MePreferencesController_put: { body: UiPreferencesWriteSchema, response: UiPreferencesSchema },
   ProfileClaimController_view: { response: ViewSchema },
