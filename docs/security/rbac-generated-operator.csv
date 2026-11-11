@@ -23,6 +23,9 @@ super_admin,GET /v1/auth/break-glass/active,staff:view,deny-401
 super_admin,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 super_admin,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 super_admin,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+super_admin,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+super_admin,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+super_admin,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 super_admin,GET /v1/billing/day-close,billing:view,deny-401
 super_admin,GET /v1/billing/day-close/history,billing:view,deny-401
 super_admin,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -93,6 +96,8 @@ super_admin,GET /v1/files/{id},clinical:view,deny-401
 super_admin,GET /v1/front-desk/exceptions,queue:view,deny-401
 super_admin,GET /v1/nursing/activity/today,nursing:view,deny-401
 super_admin,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+super_admin,GET /v1/nursing/consent-templates,nursing:view,deny-401
+super_admin,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 super_admin,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 super_admin,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 super_admin,GET /v1/nursing/worklist,queue:view,deny-401
@@ -271,6 +276,8 @@ super_admin,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 super_admin,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 super_admin,POST /v1/auth/pin-assertion,billing:create,deny-401
 super_admin,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+super_admin,POST /v1/billing/claim-packs,billing:view,deny-401
+super_admin,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 super_admin,POST /v1/billing/day-close,billing:approve,deny-401
 super_admin,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 super_admin,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -321,8 +328,10 @@ super_admin,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-401
 super_admin,POST /v1/nursing/administration-orders,nursing:create,deny-401
 super_admin,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 super_admin,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+super_admin,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 super_admin,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 super_admin,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+super_admin,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 super_admin,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 super_admin,POST /v1/packages,packages:create,deny-401
 super_admin,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401
@@ -463,6 +472,9 @@ implementation,GET /v1/auth/break-glass/active,staff:view,deny-401
 implementation,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 implementation,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 implementation,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+implementation,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+implementation,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+implementation,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 implementation,GET /v1/billing/day-close,billing:view,deny-401
 implementation,GET /v1/billing/day-close/history,billing:view,deny-401
 implementation,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -533,6 +545,8 @@ implementation,GET /v1/files/{id},clinical:view,deny-401
 implementation,GET /v1/front-desk/exceptions,queue:view,deny-401
 implementation,GET /v1/nursing/activity/today,nursing:view,deny-401
 implementation,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+implementation,GET /v1/nursing/consent-templates,nursing:view,deny-401
+implementation,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 implementation,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 implementation,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 implementation,GET /v1/nursing/worklist,queue:view,deny-401
@@ -711,6 +725,8 @@ implementation,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 implementation,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 implementation,POST /v1/auth/pin-assertion,billing:create,deny-401
 implementation,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+implementation,POST /v1/billing/claim-packs,billing:view,deny-401
+implementation,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 implementation,POST /v1/billing/day-close,billing:approve,deny-401
 implementation,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 implementation,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -761,8 +777,10 @@ implementation,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-401
 implementation,POST /v1/nursing/administration-orders,nursing:create,deny-401
 implementation,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 implementation,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+implementation,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 implementation,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 implementation,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+implementation,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 implementation,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 implementation,POST /v1/packages,packages:create,deny-401
 implementation,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401
@@ -903,6 +921,9 @@ support_engineer,GET /v1/auth/break-glass/active,staff:view,deny-401
 support_engineer,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 support_engineer,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 support_engineer,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+support_engineer,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+support_engineer,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+support_engineer,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 support_engineer,GET /v1/billing/day-close,billing:view,deny-401
 support_engineer,GET /v1/billing/day-close/history,billing:view,deny-401
 support_engineer,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -973,6 +994,8 @@ support_engineer,GET /v1/files/{id},clinical:view,deny-401
 support_engineer,GET /v1/front-desk/exceptions,queue:view,deny-401
 support_engineer,GET /v1/nursing/activity/today,nursing:view,deny-401
 support_engineer,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+support_engineer,GET /v1/nursing/consent-templates,nursing:view,deny-401
+support_engineer,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 support_engineer,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 support_engineer,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 support_engineer,GET /v1/nursing/worklist,queue:view,deny-401
@@ -1151,6 +1174,8 @@ support_engineer,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 support_engineer,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 support_engineer,POST /v1/auth/pin-assertion,billing:create,deny-401
 support_engineer,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+support_engineer,POST /v1/billing/claim-packs,billing:view,deny-401
+support_engineer,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 support_engineer,POST /v1/billing/day-close,billing:approve,deny-401
 support_engineer,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 support_engineer,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -1201,8 +1226,10 @@ support_engineer,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-40
 support_engineer,POST /v1/nursing/administration-orders,nursing:create,deny-401
 support_engineer,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 support_engineer,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+support_engineer,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 support_engineer,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 support_engineer,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+support_engineer,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 support_engineer,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 support_engineer,POST /v1/packages,packages:create,deny-401
 support_engineer,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401
@@ -1343,6 +1370,9 @@ billing,GET /v1/auth/break-glass/active,staff:view,deny-401
 billing,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 billing,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 billing,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+billing,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+billing,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+billing,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 billing,GET /v1/billing/day-close,billing:view,deny-401
 billing,GET /v1/billing/day-close/history,billing:view,deny-401
 billing,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -1413,6 +1443,8 @@ billing,GET /v1/files/{id},clinical:view,deny-401
 billing,GET /v1/front-desk/exceptions,queue:view,deny-401
 billing,GET /v1/nursing/activity/today,nursing:view,deny-401
 billing,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+billing,GET /v1/nursing/consent-templates,nursing:view,deny-401
+billing,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 billing,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 billing,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 billing,GET /v1/nursing/worklist,queue:view,deny-401
@@ -1591,6 +1623,8 @@ billing,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 billing,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 billing,POST /v1/auth/pin-assertion,billing:create,deny-401
 billing,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+billing,POST /v1/billing/claim-packs,billing:view,deny-401
+billing,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 billing,POST /v1/billing/day-close,billing:approve,deny-401
 billing,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 billing,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -1641,8 +1675,10 @@ billing,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-401
 billing,POST /v1/nursing/administration-orders,nursing:create,deny-401
 billing,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 billing,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+billing,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 billing,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 billing,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+billing,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 billing,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 billing,POST /v1/packages,packages:create,deny-401
 billing,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401
@@ -1783,6 +1819,9 @@ sre,GET /v1/auth/break-glass/active,staff:view,deny-401
 sre,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 sre,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 sre,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+sre,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+sre,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+sre,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 sre,GET /v1/billing/day-close,billing:view,deny-401
 sre,GET /v1/billing/day-close/history,billing:view,deny-401
 sre,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -1853,6 +1892,8 @@ sre,GET /v1/files/{id},clinical:view,deny-401
 sre,GET /v1/front-desk/exceptions,queue:view,deny-401
 sre,GET /v1/nursing/activity/today,nursing:view,deny-401
 sre,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+sre,GET /v1/nursing/consent-templates,nursing:view,deny-401
+sre,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 sre,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 sre,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 sre,GET /v1/nursing/worklist,queue:view,deny-401
@@ -2031,6 +2072,8 @@ sre,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 sre,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 sre,POST /v1/auth/pin-assertion,billing:create,deny-401
 sre,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+sre,POST /v1/billing/claim-packs,billing:view,deny-401
+sre,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 sre,POST /v1/billing/day-close,billing:approve,deny-401
 sre,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 sre,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -2081,8 +2124,10 @@ sre,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-401
 sre,POST /v1/nursing/administration-orders,nursing:create,deny-401
 sre,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 sre,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+sre,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 sre,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 sre,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+sre,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 sre,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 sre,POST /v1/packages,packages:create,deny-401
 sre,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401
@@ -2223,6 +2268,9 @@ commercial,GET /v1/auth/break-glass/active,staff:view,deny-401
 commercial,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 commercial,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 commercial,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+commercial,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+commercial,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+commercial,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 commercial,GET /v1/billing/day-close,billing:view,deny-401
 commercial,GET /v1/billing/day-close/history,billing:view,deny-401
 commercial,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -2293,6 +2341,8 @@ commercial,GET /v1/files/{id},clinical:view,deny-401
 commercial,GET /v1/front-desk/exceptions,queue:view,deny-401
 commercial,GET /v1/nursing/activity/today,nursing:view,deny-401
 commercial,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+commercial,GET /v1/nursing/consent-templates,nursing:view,deny-401
+commercial,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 commercial,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 commercial,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 commercial,GET /v1/nursing/worklist,queue:view,deny-401
@@ -2471,6 +2521,8 @@ commercial,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 commercial,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 commercial,POST /v1/auth/pin-assertion,billing:create,deny-401
 commercial,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+commercial,POST /v1/billing/claim-packs,billing:view,deny-401
+commercial,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 commercial,POST /v1/billing/day-close,billing:approve,deny-401
 commercial,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 commercial,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -2521,8 +2573,10 @@ commercial,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-401
 commercial,POST /v1/nursing/administration-orders,nursing:create,deny-401
 commercial,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 commercial,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+commercial,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 commercial,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 commercial,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+commercial,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 commercial,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 commercial,POST /v1/packages,packages:create,deny-401
 commercial,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401
@@ -2663,6 +2717,9 @@ compliance_dpo,GET /v1/auth/break-glass/active,staff:view,deny-401
 compliance_dpo,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 compliance_dpo,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 compliance_dpo,GET /v1/billing/checkout/{queueEntryId}/prefill,billing:create,deny-401
+compliance_dpo,GET /v1/billing/claim-pack-formats,billing:view,deny-401
+compliance_dpo,GET /v1/billing/claim-packs/{id}/document,billing:view,deny-401
+compliance_dpo,GET /v1/billing/claim-packs/{id}/document.csv,billing:view,deny-401
 compliance_dpo,GET /v1/billing/day-close,billing:view,deny-401
 compliance_dpo,GET /v1/billing/day-close/history,billing:view,deny-401
 compliance_dpo,GET /v1/billing/discount-approvals,billing:view,deny-401
@@ -2733,6 +2790,8 @@ compliance_dpo,GET /v1/files/{id},clinical:view,deny-401
 compliance_dpo,GET /v1/front-desk/exceptions,queue:view,deny-401
 compliance_dpo,GET /v1/nursing/activity/today,nursing:view,deny-401
 compliance_dpo,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
+compliance_dpo,GET /v1/nursing/consent-templates,nursing:view,deny-401
+compliance_dpo,GET /v1/nursing/procedure-consents/{consentId}/pdf,nursing:view,deny-401
 compliance_dpo,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
 compliance_dpo,GET /v1/nursing/vaccine-records/today,nursing:view,deny-401
 compliance_dpo,GET /v1/nursing/worklist,queue:view,deny-401
@@ -2911,6 +2970,8 @@ compliance_dpo,POST /v1/appointments/{id}/reschedule,queue:edit,deny-401
 compliance_dpo,POST /v1/auth/break-glass/activate,clinical:breakGlass,deny-401
 compliance_dpo,POST /v1/auth/pin-assertion,billing:create,deny-401
 compliance_dpo,POST /v1/billing/checkout/{queueEntryId},billing:create,deny-401
+compliance_dpo,POST /v1/billing/claim-packs,billing:view,deny-401
+compliance_dpo,POST /v1/billing/claim-packs/{id}/send,billing:view,deny-401
 compliance_dpo,POST /v1/billing/day-close,billing:approve,deny-401
 compliance_dpo,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 compliance_dpo,POST /v1/billing/discount-approvals,billing:create,deny-401
@@ -2961,8 +3022,10 @@ compliance_dpo,POST /v1/front-desk/exceptions/{id}/{action},queue:edit,deny-401
 compliance_dpo,POST /v1/nursing/administration-orders,nursing:create,deny-401
 compliance_dpo,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 compliance_dpo,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
+compliance_dpo,POST /v1/nursing/consent-templates,clinical:approve,deny-401
 compliance_dpo,POST /v1/nursing/procedure-orders,nursing:create,deny-401
 compliance_dpo,POST /v1/nursing/procedure-orders/{id}/consent,nursing:edit,deny-401
+compliance_dpo,POST /v1/nursing/procedure-orders/{id}/consent/withdraw,nursing:edit,deny-401
 compliance_dpo,POST /v1/nursing/vaccine-records,nursing:create,deny-401
 compliance_dpo,POST /v1/packages,packages:create,deny-401
 compliance_dpo,POST /v1/packages/instances/items/{itemId}/book,packages:edit,deny-401

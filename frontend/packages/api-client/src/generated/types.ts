@@ -136,6 +136,12 @@ export type ConsentContactResponse = { email?: string; name?: string; phone?: st
 export type ConsentContactWriteRequest = { email: string; name: string; phone?: string; };
 export type ConsentDecision = { granted: boolean; purpose: string; };
 export type ConsentPurposeState = { capturedAt?: string; channel?: string; granted?: boolean; language?: string; noticeVersion?: string; };
+export type ConsentTemplateCreated = { id?: string; version?: number; };
+export type ConsentTemplateList = { items?: Array<ConsentTemplateResponse>; };
+export type ConsentTemplateRequest = { bodyHtml: string; chargeCode: string; lang: string; title: string; };
+export type ConsentTemplateResponse = { bodyHtml?: string; chargeCode?: string; id?: string; lang?: string; placeholder?: boolean; title?: string; version?: number; };
+export type ConsentWithdrawRequest = { reason: string; };
+export type ConsentWithdrawResponse = { status?: string; };
 export type ConsultExtendRequest = { minutes: number; };
 export type ConsultExtendResponse = { extendedBy?: number; queueEntryId?: string; };
 export type Counts = { appointments?: number; freeSlots?: number; walkIns?: number; };
@@ -268,6 +274,10 @@ export type FleetSummaryResponse = { byStatus?: Record<string, number>; live?: n
 export type FlowStepResponse = { stepType?: string; };
 export type FollowUpItem = { appointmentId?: string; cancelReason?: string; patientId?: string; patientMrn?: string; patientName?: string; startTime?: string; status?: string; };
 export type FollowUpPage = { data?: Array<FollowUpItem>; page?: PageMeta; };
+export type FormatList = { items?: Array<FormatView>; };
+export type FormatView = { code?: string; csv?: boolean; insurerName?: string; jurisdiction?: string; sections?: Array<string>; };
+export type GenerateRequest = { formatCode: string; visitId: string; };
+export type Generated = { csvUrl?: string; documentUrl?: string; packId?: string; };
 export type GoLiveBlocker = { code?: string; fixUrl?: string; ok?: boolean; };
 export type GoLiveChecksResponse = { blockers?: Array<GoLiveBlocker>; niceToHave?: Array<GoLiveNiceToHave>; };
 export type GoLiveNiceToHave = { code?: string; note?: string; ok?: boolean; };
@@ -323,6 +333,7 @@ export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; create
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
 export type InvoiceSeriesResponse = { fiscalYear?: string; fyStartMonth?: number; id?: string; kind?: string; nextNumber?: number; pad?: number; prefix?: string; prefixPattern?: string; taxRegistrationId?: string; };
+export type Issued = { expiresAt?: string; linkId?: string; };
 export type Item = { classId?: string; lang?: string; matchKind?: string; value?: string; };
 export type Job = { archiveSha256?: string; bytes?: number; completedAt?: string; createdAt?: string; datasets?: Array<DatasetProgress>; format?: string; id?: string; linkExpiresAt?: string; linkSent?: boolean; status?: string; };
 export type JsonNode = Record<string, unknown>;
@@ -471,10 +482,10 @@ export type PrivacyNoticeStatus = { acceptedVersion?: string; currentVersion?: s
 export type PrivacyNoticeVersion = { bodyMd?: string; current?: boolean; effectiveFrom?: string; language?: string; legalReviewed?: boolean; lockedClauses?: Array<string>; mandatoryHash?: string; templateKey?: string; version?: string; };
 export type PrivacyNoticeVersions = { versions?: Array<PrivacyNoticeVersion>; };
 export type Problem = { code?: string; detail?: string; errors?: Array<{ field?: string; message?: string; }>; instance?: string; status?: number; title?: string; traceId?: string; type?: string; };
-export type ProcedureConsentRequest = { signedName: string; };
+export type ProcedureConsentRequest = { assentSignatureSvg?: string; lang?: string; signatureSvg?: string; signedName?: string; signer?: Signer; templateId?: string; templateVersion?: number; witnessStaffId?: string; };
 export type ProcedureNotesRequest = { consentNote?: string; prepNotes?: string; };
 export type ProcedureOrderRequest = { chargeCode: string; consentNote?: string; prepNotes?: string; queueEntryId: string; };
-export type ProcedureOrderResponse = { baseAmount?: number; billed?: boolean; chargeCode?: string; chargeName?: string; completedAt?: string; completedByName?: string; consentNote?: string; consentRecordedByName?: string; consentSignedAt?: string; consentSignedName?: string; createdAt?: string; id?: string; orderedByName?: string; patientId?: string; patientName?: string; prepNotes?: string; queueEntryId?: string; status?: string; taxRatePercent?: number; };
+export type ProcedureOrderResponse = { baseAmount?: number; billed?: boolean; chargeCode?: string; chargeName?: string; completedAt?: string; completedByName?: string; consentId?: string; consentNote?: string; consentRecordedByName?: string; consentSha256?: string; consentSignedAt?: string; consentSignedName?: string; consentWithdrawReason?: string; consentWithdrawnAt?: string; createdAt?: string; id?: string; orderedByName?: string; patientId?: string; patientLanguage?: string; patientName?: string; prepNotes?: string; queueEntryId?: string; status?: string; taxRatePercent?: number; };
 export type ProcedureStatusRequest = { status?: string; };
 export type ProfileClaimRequest = { keepGuardianScope?: string; otp: string; };
 export type ProfileClaimed = { claimed?: boolean; keptScope?: string; };
@@ -566,6 +577,7 @@ export type SelfCheckInRequest = { appointmentId?: string; channel?: string; loc
 export type SelfCheckInResponse = { expectedRange?: string; position?: number; queueEntryId?: string; token?: number; };
 export type SelfCheckInWalkIn = { doctorId?: string; };
 export type SellPackageRequest = { packageId: string; patientId: string; paymentMethod: string; };
+export type SendRequest = { language?: string; recipientPatientId?: string; };
 export type SenderEvent = { at?: string; kind?: string; text?: string; };
 export type Service = { name?: string; revenue?: number; };
 export type ServiceTimeItem = { medianMin?: number; n?: number; p80Min?: number; priorSource?: string; visitType?: string; };
@@ -581,6 +593,7 @@ export type Settings = { effectiveMode?: string; effectiveSource?: string; etaDi
 export type SetupChecklistItemResponse = { doneAt?: string; draft?: JsonNode; skippedAt?: string; status?: string; step?: string; updatedAt?: string; version?: number; };
 export type SetupDraftRequest = { draft: JsonNode; version: number; };
 export type SetupDraftResponse = { step?: string; version?: number; };
+export type Signer = { guardianId?: string; kind: string; name: string; };
 export type SourceBreakdownResponse = { revenue?: number; source?: string; untaggedCount?: number; visitCount?: number; };
 export type SseEmitter = { timeout?: number; };
 export type StaffHpr = { hprId?: string; hprVerified?: boolean; staffId?: string; };
@@ -779,6 +792,11 @@ export type Operations = {
   CheckoutController_checkout: { method: "post"; path: "/v1/billing/checkout/{queueEntryId}"; permission: "billing:create"; pathParams: { queueEntryId: string; }; query: never; body: CheckoutRequest; response: InvoiceResponse };
   CheckoutController_existingInvoice: { method: "get"; path: "/v1/billing/checkout/{queueEntryId}/invoice"; permission: "billing:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: InvoiceResponse };
   CheckoutController_prefill: { method: "get"; path: "/v1/billing/checkout/{queueEntryId}/prefill"; permission: "billing:create"; pathParams: { queueEntryId: string; }; query: never; body: never; response: CheckoutPrefillResponse };
+  ClaimPackController_formats: { method: "get"; path: "/v1/billing/claim-pack-formats"; permission: "billing:view"; pathParams: never; query: { jurisdiction?: string; }; body: never; response: FormatList };
+  ClaimPackController_generate: { method: "post"; path: "/v1/billing/claim-packs"; permission: "billing:view"; pathParams: never; query: never; body: GenerateRequest; response: Generated };
+  ClaimPackController_document: { method: "get"; path: "/v1/billing/claim-packs/{id}/document"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: never; response: string };
+  ClaimPackController_csv: { method: "get"; path: "/v1/billing/claim-packs/{id}/document.csv"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: never; response: string };
+  ClaimPackController_send: { method: "post"; path: "/v1/billing/claim-packs/{id}/send"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: SendRequest; response: Issued };
   DayCloseController_summary: { method: "get"; path: "/v1/billing/day-close"; permission: "billing:view"; pathParams: never; query: { date?: string; }; body: never; response: DayCloseSummaryResponse };
   DayCloseController_close: { method: "post"; path: "/v1/billing/day-close"; permission: "billing:approve"; pathParams: never; query: never; body: DayCloseRequest; response: DayCloseSummaryResponse };
   DayCloseController_history: { method: "get"; path: "/v1/billing/day-close/history"; permission: "billing:view"; pathParams: never; query: { from?: string; to?: string; cursor?: string; limit?: number; }; body: never; response: DayCloseHistoryResponse };
@@ -936,9 +954,13 @@ export type Operations = {
   NursingController_administrationOrdersToday: { method: "get"; path: "/v1/nursing/administration-orders/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<AdministrationOrderResponse> };
   NursingController_administer: { method: "post"; path: "/v1/nursing/administration-orders/{id}/administer"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: AdministerRequest; response: AdministrationOrderResponse };
   NursingController_refuse: { method: "post"; path: "/v1/nursing/administration-orders/{id}/refuse"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: RefuseRequest; response: AdministrationOrderResponse };
+  NursingController_consentTemplates: { method: "get"; path: "/v1/nursing/consent-templates"; permission: "nursing:view"; pathParams: never; query: { chargeCode: string; lang?: string; }; body: never; response: ConsentTemplateList };
+  NursingController_addConsentTemplate: { method: "post"; path: "/v1/nursing/consent-templates"; permission: "clinical:approve"; pathParams: never; query: never; body: ConsentTemplateRequest; response: ConsentTemplateCreated };
+  NursingController_consentPdf: { method: "get"; path: "/v1/nursing/procedure-consents/{consentId}/pdf"; permission: "nursing:view"; pathParams: { consentId: string; }; query: never; body: never; response: string };
   NursingController_orderProcedure: { method: "post"; path: "/v1/nursing/procedure-orders"; permission: "nursing:create"; pathParams: never; query: never; body: ProcedureOrderRequest; response: ProcedureOrderResponse };
   NursingController_procedureOrdersToday: { method: "get"; path: "/v1/nursing/procedure-orders/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<ProcedureOrderResponse> };
-  NursingController_recordProcedureConsent: { method: "post"; path: "/v1/nursing/procedure-orders/{id}/consent"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: ProcedureConsentRequest; response: ProcedureOrderResponse };
+  NursingController_recordProcedureConsent: { method: "post"; path: "/v1/nursing/procedure-orders/{id}/consent"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: ProcedureConsentRequest; response: ConsentCaptureResponse };
+  NursingController_withdrawProcedureConsent: { method: "post"; path: "/v1/nursing/procedure-orders/{id}/consent/withdraw"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: ConsentWithdrawRequest; response: ConsentWithdrawResponse };
   NursingController_updateProcedureNotes: { method: "patch"; path: "/v1/nursing/procedure-orders/{id}/notes"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: ProcedureNotesRequest; response: ProcedureOrderResponse };
   NursingController_updateProcedureStatus: { method: "patch"; path: "/v1/nursing/procedure-orders/{id}/status"; permission: "nursing:edit"; pathParams: { id: string; }; query: never; body: ProcedureStatusRequest; response: ProcedureOrderResponse };
   NursingController_recordVaccine: { method: "post"; path: "/v1/nursing/vaccine-records"; permission: "nursing:create"; pathParams: never; query: never; body: VaccineRecordRequest; response: VaccineRecordResponse };

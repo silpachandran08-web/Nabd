@@ -349,6 +349,28 @@ schemas:
       tax_category: financial
       sac_hsn: financial
       tax_inclusive: financial
+    claim_pack_formats:
+      id: operational
+      tenant_id: operational
+      code: operational
+      jurisdiction: operational
+      insurer_name: operational
+      sections: operational
+      csv_columns: operational
+      active: operational
+      created_at: operational
+    claim_packs:
+      id: operational
+      tenant_id: operational
+      visit_id: operational
+      invoice_id: operational
+      patient_id: pii
+      format_code: operational
+      document_id: operational
+      csv_document_id: operational
+      pdf_sha256: operational
+      generated_by: operational
+      created_at: operational
     chronic_conditions:
       id: operational
       tenant_id: operational
