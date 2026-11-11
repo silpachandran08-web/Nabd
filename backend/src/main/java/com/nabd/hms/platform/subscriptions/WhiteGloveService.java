@@ -45,6 +45,7 @@ public class WhiteGloveService {
 
     private static final Logger log = LoggerFactory.getLogger(WhiteGloveService.class);
     public static final String STEP_UP_TARGET = "white-glove:book";
+    static final String NOT_OWNER = "NOT_OWNER";
     static final Duration MAX_AHEAD = Duration.ofDays(90);
     private static final Map<String, Set<String>> NEXT = Map.of(
             "requested", Set.of("scheduled", "cancelled"),
@@ -124,7 +125,7 @@ public class WhiteGloveService {
     public Booked book(UUID staffId, String ip, List<Instant> preferredSlots, String notes, String stepUpToken) {
         UUID tenant = tenantContext.current();
         ActorDirectory.Actor owner = actors.findActor(tenant, staffId).filter(a -> "Owner".equals(a.role()))
-                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "NOT_OWNER", "NOT_OWNER", "Only the clinic owner can book the setup."));
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "NOT_OWNER", NOT_OWNER, "Only the clinic owner can book the setup."));
         StepUpVerifier.StepUp su = stepUp.requireFor(stepUpToken, staffId, STEP_UP_TARGET);
         Instant now = clock.instant();
         if (preferredSlots == null || preferredSlots.isEmpty() || preferredSlots.size() > 3
@@ -166,6 +167,16 @@ public class WhiteGloveService {
         audit.record(tenant, "staff", staffId, owner.name(), owner.role(), ip, "setup.white_glove_booked", "white_glove_engagement", id, null, after);
         log.info("white-glove engagement {} booked for tenant {} ({})", id, tenant, offer.feeStatus());
         return new Booked(id, new Fee(offer.feeMinor(), offer.currency(), offer.feeStatus()), offer.waiverReason(), null);
+    }
+
+    /** T1-BUG-3: a refused booking (not the owner, or no setup:edit) is audited like ADM-015's refused export. The controller calls this
+     * in a fresh tenant transaction after the refused one rolled back, so the row survives. Ids and the reason only. */
+    @Transactional
+    public void denied(UUID staffId, String ip, String reason) {
+        UUID tenant = tenantContext.current();
+        ActorDirectory.Actor a = actors.findActor(tenant, staffId).orElse(null);
+        audit.record(tenant, "staff", staffId, a == null ? "unknown" : a.name(), a == null ? null : a.role(), ip, "setup.white_glove_denied",
+                "white_glove_engagement", null, null, Map.of("reason", reason));
     }
 
     // ---- operator ----------------------------------------------------------------------------------------------------------
