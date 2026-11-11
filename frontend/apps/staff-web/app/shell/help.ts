@@ -35,14 +35,25 @@ export function consultActive(pathname: string | null, search: { get(k: string):
 // ACC-035: completion lives at Core per account (GET/PUT /v1/me/onboarding, table staff_onboarding_progress), so a tour runs
 // once per person and role whatever the browser; it replaced FEF-062's per-browser nabd_tour_done flag.
 export type Onboarding = { completed: string[]; competencyPassedAt: string | null };
+/** The answer of GET/PUT /me/onboarding if it has the expected shape, else undefined: a wrong body (an array, an error page,
+ * a proxy's HTML) must read as "no tour state", never take the shell down (QA S22 T1-BUG-5). */
+export function asOnboarding(body: unknown): Onboarding | undefined {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const { completed, competencyPassedAt } = body as Record<string, unknown>;
+  if (!Array.isArray(completed) || !completed.every((k) => typeof k === "string")) return undefined;
+  return { completed, competencyPassedAt: typeof competencyPassedAt === "string" ? competencyPassedAt : null };
+}
 export const tourKey = (role: TourRole): string => `tour.${role}`;
-export const tourDone = (p: Onboarding | undefined, role: TourRole): boolean => !!p?.completed.includes(tourKey(role));
+export const tourDone = (p: Onboarding | undefined, role: TourRole): boolean => !!asOnboarding(p)?.completed.includes(tourKey(role));
 
 /** ACC-035: the ten reception competency tasks (docs/training/reception-train-the-trainer.md; Core's allow-list, keys "task.<id>"). */
 export const COMPETENCY_TASKS = ["walkin", "checkin", "queue", "requests", "delay", "checkout", "reschedule", "noshow", "search", "offline"] as const;
 export type CompetencyTask = (typeof COMPETENCY_TASKS)[number];
 export const taskKey = (t: CompetencyTask): string => `task.${t}`;
-export const tasksDone = (p: Onboarding | undefined): number => COMPETENCY_TASKS.filter((t) => p?.completed.includes(taskKey(t))).length;
+export const tasksDone = (p: Onboarding | undefined): number => {
+  const ok = asOnboarding(p);
+  return COMPETENCY_TASKS.filter((t) => ok?.completed.includes(taskKey(t))).length;
+};
 
 /** ACC-035: the top five desk tasks each get a video under 2 minutes per language. Placeholders: Product & Design record and host
  * them (external content); an empty slot renders "not available yet", never an invented link. */

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createTranslator } from "next-intl";
 import { loadMessages } from "@nabd/i18n";
-import { COMPETENCY_TASKS, DESK_VIDEO_TASKS, DESK_VIDEOS, TOUR_ROLES, VIDEO_LANGS, taskKey, tasksDone, tourKey } from "../../app/shell/help.ts";
+import { COMPETENCY_TASKS, DESK_VIDEO_TASKS, DESK_VIDEOS, TOUR_ROLES, VIDEO_LANGS, asOnboarding, taskKey, tasksDone, tourDone, tourDue, tourKey } from "../../app/shell/help.ts";
 
 const app = new URL("../../", import.meta.url).pathname;
 const repo = new URL("../../../../../", import.meta.url).pathname;
@@ -66,4 +66,24 @@ test("train-the-trainer pack lists the same ten tasks and the competency rule", 
   const pack = readFileSync(`${repo}docs/training/reception-train-the-trainer.md`, "utf8");
   for (const task of COMPETENCY_TASKS) assert.ok(pack.includes(taskKey(task)), task);
   assert.match(pack, /all ten/i);
+});
+
+test("QA S22 T1-BUG-5: an unexpected /me/onboarding answer ([] , an error body, a malformed object) is 'no tour state', never a crash", () => {
+  const bad = [[], { status: 500, title: "Internal Server Error", detail: "boom" }, { completed: "tour.reception" }, { completed: [1, 2] },
+    { competencyPassedAt: "2026-11-11T00:00:00Z" }, null, undefined, "<html>proxy error</html>", 42];
+  for (const body of bad) {
+    assert.equal(asOnboarding(body), undefined, JSON.stringify(body));
+    assert.doesNotThrow(() => tourDone(body, "nurse"));
+    assert.equal(tourDone(body, "nurse"), false);
+    assert.equal(tasksDone(body), 0);
+  }
+  assert.deepEqual(asOnboarding({ completed: ["tour.nurse"], competencyPassedAt: null, extra: 1 }), { completed: ["tour.nurse"], competencyPassedAt: null });
+  assert.deepEqual(asOnboarding({ completed: [], competencyPassedAt: 7 }), { completed: [], competencyPassedAt: null });
+  // the hook turns a bad body into an error state: the tour does not auto-start (progress undefined) and the checklist shows its error
+  const hook = readFileSync(`${app}app/shell/useOnboarding.ts`, "utf8");
+  assert.match(hook, /asOnboarding\(await read\(ctx\)\)/);
+  assert.match(hook, /asOnboarding\(await api\.put/);
+  const card = readFileSync(`${app}app/shell/TourCard.tsx`, "utf8");
+  assert.ok(card.includes("progress && tourDue("), "no auto-start without a valid answer");
+  assert.equal(tourDue({ role: "nurse", done: tourDone(undefined, "nurse"), consult: false }), true, "the due rule itself is unchanged");
 });

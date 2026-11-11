@@ -5,10 +5,18 @@ import { useCallback } from "react";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { getter, key } from "../lib/query";
-import type { Onboarding } from "./help";
+import { asOnboarding, type Onboarding } from "./help";
 
+// A body of the wrong shape is a failed read (error state), so the tour just does not start and the shell keeps working.
+const read = getter<unknown>("/me/onboarding");
 const onboardingQuery = () => queryOptions({
-  queryKey: key("me/onboarding"), queryFn: getter<Onboarding>("/me/onboarding"), staleTime: Infinity, refetchOnWindowFocus: false,
+  queryKey: key("me/onboarding"),
+  queryFn: async (ctx: { signal: AbortSignal }): Promise<Onboarding> => {
+    const p = asOnboarding(await read(ctx));
+    if (!p) throw new Error("unexpected /me/onboarding answer");
+    return p;
+  },
+  staleTime: Infinity, refetchOnWindowFocus: false,
 });
 
 export function useOnboarding(enabled = true) {
@@ -17,7 +25,8 @@ export function useOnboarding(enabled = true) {
   const complete = useCallback(async (k: string) => {
     // optimistic: a finished tour must not restart while the PUT is in flight (a failed PUT keeps it done for this session)
     qc.setQueryData(onboardingQuery().queryKey, (old) => (old && !old.completed.includes(k) ? { ...old, completed: [...old.completed, k] } : old));
-    const next = await api.put<Onboarding>(`/me/onboarding/${encodeURIComponent(k)}`);
+    const next = asOnboarding(await api.put<unknown>(`/me/onboarding/${encodeURIComponent(k)}`));
+    if (!next) throw new Error("unexpected /me/onboarding answer"); // keeps the optimistic state; callers show their save error
     qc.setQueryData(onboardingQuery().queryKey, next);
     return next;
   }, [qc]);

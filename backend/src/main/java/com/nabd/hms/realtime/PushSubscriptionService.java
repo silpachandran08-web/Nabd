@@ -112,7 +112,13 @@ class PushSubscriptionService {
         }
         String host = u == null || u.getHost() == null ? "" : u.getHost().toLowerCase(Locale.ROOT);
         boolean scheme = u != null && ("https".equals(u.getScheme()) || (allowHttp && "http".equals(u.getScheme())));
-        boolean known = allowedHosts.stream().anyMatch(h -> host.equals(h) || host.endsWith("." + h));
+        // The scheme's default port matches a bare host entry (suffix match); any other port must be allowed explicitly as
+        // "host:port" (exact host), so an allowed push host cannot be aimed at another service on it (QA S22 N-4).
+        int port = u == null ? -1 : u.getPort();
+        boolean defaultPort = port == -1 || (port == 443 && "https".equals(u.getScheme())) || (port == 80 && "http".equals(u.getScheme()));
+        boolean known = defaultPort
+                ? allowedHosts.stream().anyMatch(h -> !h.contains(":") && (host.equals(h) || host.endsWith("." + h)))
+                : allowedHosts.contains(host + ":" + port);
         if (!scheme || !known || u.getUserInfo() != null) throw invalid("The endpoint is not a supported browser push service.");
         return endpoint;
     }
