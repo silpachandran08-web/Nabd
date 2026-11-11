@@ -175,7 +175,7 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
         assertThat((Map<String, Object>) summary(c.owner()).get("pendingChange")).containsEntry("toPlanCode", c.starterCode());
 
         // renewal date reached: the hourly job applies it once
-        jdbc.update("UPDATE master.subscription_changes SET effective_at = now() - interval '1 minute' WHERE tenant_id = ? AND status = 'scheduled'", c.t().id());
+        inTenantTx(c.t().id(), () -> jdbc.update("UPDATE master.subscription_changes SET effective_at = now() - interval '1 minute' WHERE tenant_id = ? AND status = 'scheduled'", c.t().id()));
         service.applyDue();
         assertThat(service.applyDue()).isZero();
         assertThat(jdbc.queryForObject("SELECT plan_id FROM master.subscriptions WHERE tenant_id = ?", UUID.class, c.t().id())).isEqualTo(planId(c.starterCode()));
@@ -196,7 +196,7 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
         ResponseEntity<Map> replay = change(c.owner(), sched, c.starterCode(), "renewal", c.name());
         assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(replay.getBody().get("title")).isEqualTo("STEP_UP_REUSED");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM master.subscription_changes WHERE tenant_id = ? AND status = 'scheduled'", Long.class, c.t().id()))
+        assertThat(inTenantTx(c.t().id(), () -> jdbc.queryForObject("SELECT count(*) FROM master.subscription_changes WHERE tenant_id = ? AND status = 'scheduled'", Long.class, c.t().id())))
                 .as("the refused replay did not cancel the waiting change").isEqualTo(1);
     }
 
@@ -237,5 +237,28 @@ class Adm037OwnerPlanApiTest extends ApiTestBase {
         assertThat(exchange("/v1/setup/subscription/invoices/" + id, HttpMethod.GET, authed(b.owner()), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat((List<?>) exchange("/v1/setup/subscription/invoices", HttpMethod.GET, authed(b.owner()), Map.class).getBody().get("items")).isEmpty();
         assertThat(a.plusCode()).isNotEqualTo(b.plusCode());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void planChangesAndInvoicesAreTenantIsolatedAtTheDatabase() throws Exception {
+        Clinic a = clinic(15), b = clinic(15);
+        assertThat(change(a.owner(), stepUp(a.owner(), "plan-change:" + a.plusCode() + ":now"), a.plusCode(), "now", null).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        UUID aId = a.t().id();
+        assertThat(inTenantTx(aId, () -> jdbc.queryForObject("SELECT count(*) FROM master.subscription_changes", Long.class))).isEqualTo(1);
+        assertThat(inTenantTx(aId, () -> jdbc.queryForObject("SELECT count(*) FROM master.platform_invoices", Long.class))).isEqualTo(1);
+        // clinic B's transaction sees none of A's rows, even naming A's tenant id, and cannot touch or forge them
+        for (String t : List.of("master.subscription_changes", "master.platform_invoices")) {
+            assertThat(inTenantTx(b.t().id(), () -> jdbc.queryForObject("SELECT count(*) FROM " + t + " WHERE tenant_id = ?", Long.class, aId))).as(t).isZero();
+            assertThat(inTenantTx(b.t().id(), () -> jdbc.update("UPDATE " + t + " SET currency = currency WHERE tenant_id = ?", aId))).as(t + " update").isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM " + t + " WHERE tenant_id = ?", Long.class, aId)).as(t + " without tenant context").isZero();
+        }
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> inTenantTx(b.t().id(), () -> jdbc.update(
+                "INSERT INTO master.platform_invoices (tenant_id, number, kind, period_start, period_end, amount_minor, currency) "
+                        + "VALUES (?, ?, 'renewal', current_date, current_date, 0, 'INR')", aId, "NBD-X-" + UUID.randomUUID())))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class).rootCause().hasMessageContaining("row-level security");
+        // the owner's own invoice list still works under RLS, and B's is empty
+        assertThat((List<?>) exchange("/v1/setup/subscription/invoices", HttpMethod.GET, authed(a.owner()), Map.class).getBody().get("items")).hasSize(1);
+        assertThat((List<?>) exchange("/v1/setup/subscription/invoices", HttpMethod.GET, authed(b.owner()), Map.class).getBody().get("items")).isEmpty();
     }
 }
