@@ -2,6 +2,7 @@
 // FEF-052/034: Ctrl/Cmd+K. One list: the actions this role may run, the screens it may open, and patients found by name, phone or MRN.
 // Registry-driven, so anything the role lacks is never listed. Opens synchronously on the key press (no fetch before first paint).
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./shell.module.css";
 import Icon, { type IconName } from "../components/ui/Icon";
@@ -15,6 +16,7 @@ import { useNavBadges, WAITING_STATUSES } from "./useNavBadges";
 type Row = { key: string; href: string; label: string; sub: string; icon: IconName; hint?: string };
 
 export default function CommandPalette() {
+  const tp = useTranslations("shell.palette");
   const router = useRouter();
   const pathname = usePathname();
   const { input, role } = useShellNav();
@@ -59,19 +61,19 @@ export default function CommandPalette() {
   if (!open || !hasSession) return null;
 
   return (
-    <Dialog title="Command palette" onClose={() => setOpen(false)}>
+    <Dialog title={tp("title")} onClose={() => setOpen(false)}>
       <div className={styles.palette}>
-        <input className={styles.paletteInput} autoFocus role="combobox" aria-expanded="true" aria-controls="nb-jump-list" aria-label="Jump to a screen, action or patient"
-          aria-activedescendant={rows[at] ? `nb-jump-${at}` : undefined} placeholder="Search patients (name, phone, MRN), actions, screens…" value={q}
+        <input className={styles.paletteInput} autoFocus role="combobox" aria-expanded="true" aria-controls="nb-jump-list" aria-label={tp("input")}
+          aria-activedescendant={rows[at] ? `nb-jump-${at}` : undefined} placeholder={tp("placeholder")} value={q}
           onChange={(e) => { setQ(e.target.value); setSel(0); }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") { e.preventDefault(); setSel(Math.min(at + 1, rows.length - 1)); }
             else if (e.key === "ArrowUp") { e.preventDefault(); setSel(Math.max(at - 1, 0)); }
             else if (e.key === "Enter" && rows[at]) { e.preventDefault(); go(rows[at].href); }
           }} />
-        {searchFailed && <div className={styles.empty} role="alert">Couldn&apos;t search patients. Actions and screens still work.</div>}
-        {rows.length === 0 ? <div className={styles.empty} role="status">Nothing matches &ldquo;{q}&rdquo;.</div> : (
-          <ul id="nb-jump-list" className={styles.results} role="listbox" aria-label="Results">
+        {searchFailed && <div className={styles.empty} role="alert">{tp("searchFailed")}</div>}
+        {rows.length === 0 ? <div className={styles.empty} role="status">{tp("noMatch", { q })}</div> : (
+          <ul id="nb-jump-list" className={styles.results} role="listbox" aria-label={tp("results")}>
             {rows.map((r, i) => (
               <li key={r.key} id={`nb-jump-${i}`} role="option" aria-selected={i === at} className={styles.result} onMouseEnter={() => setSel(i)} onClick={() => go(r.href)}>
                 <Icon name={r.icon} size={16} />{r.label}<span className={styles.resultSub}>{r.hint ? <kbd>{r.hint}</kbd> : r.sub}</span>

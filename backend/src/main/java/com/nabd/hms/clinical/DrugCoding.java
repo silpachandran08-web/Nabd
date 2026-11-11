@@ -54,7 +54,7 @@ class DrugCoding {
 
     @Transactional(propagation = Propagation.MANDATORY)
     Resolved resolve(String drugId) {
-        DrugMasterRepository.Drug d = masters.find(region(), drugId).orElseThrow(DrugMasterService::notFound);
+        DrugMasterRepository.Drug d = masters.find(region(), drugId).orElseThrow(DrugMasterService::drugNotFound);
         List<DrugMasterRepository.Ingredient> ing = masters.ingredients(d.id());
         return new Resolved(d.id(), DrugDisplay.generic(ing.stream().map(DrugMasterRepository.Ingredient::name).toList()),
                 new Codes(ing.stream().map(DrugMasterRepository.Ingredient::id).collect(Collectors.toSet()),
@@ -65,7 +65,7 @@ class DrugCoding {
     @Transactional(propagation = Propagation.MANDATORY)
     void requireAllergen(String ingredientId, String classId) {
         if ((ingredientId != null && !masters.ingredientExists(ingredientId)) || (classId != null && !masters.classExists(classId))) {
-            throw DrugMasterService.notFound();
+            throw DrugMasterService.drugNotFound();
         }
     }
 

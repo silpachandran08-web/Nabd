@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * OPS-020: the Valkey revocation cache is only correct if EVERY statement that revokes a tenant session tells it.
  * Each "UPDATE sessions SET revoked_at" in main code must RETURN the ids and hand them to RevokedSessions.revoked
- * (directly or through AuthRepository.revoked) in the same Java statement. No Docker needed.
+ * (directly or through AuthSessionRepository.revoked) in the same Java statement. No Docker needed.
  */
 class Ops020RevocationWriteThroughTest {
 
@@ -43,7 +43,7 @@ class Ops020RevocationWriteThroughTest {
                 }
             }
         }
-        assertThat(sites).as("revoke statements found (AuthRepository 5, BreakGlass 1, Staff 1, Role 1)").hasSizeGreaterThanOrEqualTo(8);
+        assertThat(sites).as("revoke statements found (, BreakGlass 1, Staff 1, Role 1)").hasSizeGreaterThanOrEqualTo(8);
         assertThat(bad).as("revoke statements that bypass the Valkey revocation cache").isEmpty();
     }
 }

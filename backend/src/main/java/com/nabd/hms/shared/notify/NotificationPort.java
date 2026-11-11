@@ -17,4 +17,9 @@ public interface NotificationPort {
     /** Cancels pending requests about a subject (appointment cancelled or moved); late consumers get 410 SUBJECT_GONE.
      * @return how many requests were cancelled */
     int cancelBySubject(String subjectType, UUID subjectId, CancelReason reason);
+
+    /** IDC-014: does this clinic have an approved template for the purpose? Lets an event consumer skip quietly instead of failing. */
+    default boolean sendable(NotificationPurpose purpose, String language) {
+        return true;
+    }
 }

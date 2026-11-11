@@ -219,7 +219,9 @@ test("labels come from packages/i18n (en and hi) for every counter item", () => 
   }
   const en = JSON.parse(readFileSync(new URL("../../../../packages/i18n/messages/en/shell.json", import.meta.url), "utf8")).counterNav;
   for (const r of COUNTER_ROLES) for (const i of NAV[r]) assert.deepEqual([en[i.id].label, en[i.id].short], [i.label, i.short], i.id);
-  assert.match(src("ClinicNav.tsx"), /COUNTER_ROLES\.includes\(role\) \? \{ \.\.\.i0, label: t\(`counterNav\.\$\{i0\.id\}\.label`\)/);
+  // FEF-040: one resolver (shell/navText.ts) picks the nav model's catalogue block; the counter roles read counterNav.
+  assert.match(src("ClinicNav.tsx"), /label: navText\(t, i0, role\), short: navText\(t, i0, role, "short"\)/);
+  assert.match(src("shell/navText.ts"), /COUNTER_ROLES\.includes\(role\) \? "counterNav"/);
 });
 
 // ---- keyboard-wedge barcode handler ----

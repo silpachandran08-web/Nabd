@@ -32,6 +32,8 @@ Service `services/patient-access-edge` (Spring Boot, package `com.nabd.edge`). O
   published during the outage must be replayed from Core's outbox redrive (events.md section 8).
 * Slot looks wrong: the projection lives at most 30 s; `scheduling.booking_policy.published.v1` drops a tenant's projection.
 * Metrics and alerts: `infra/observability/patient-edge.rules.yml`, dashboard `infra/observability/dashboards/patient-edge.json`.
+* Cohort B GA (ACC-045): SLOs, outage drills, per-clinic rollout (`clinic_rollout`, V21), funnel (`funnel_steps`, V20), load test
+  and on-call: `docs/runbooks/edge-cohort-b.md`.
 
 ## Reminder buttons, travel time and leave-now (ACC-041, ACC-044)
 - Button action ids (signed with the shared button key, 24 h token; COM-043 issues them on the reminders): `confirm:<appointment id, 32 hex>`, `resched:<id>`, `cancel:<id>`, `callme:<id>`, `status`. Follow-ups the Edge issues itself: `slot:<epoch seconds>`, `why:<reason code>`, `travel:<10|20|30>` and `travel:change`. `ReminderIntent.action(verb, appointmentId)` builds them.

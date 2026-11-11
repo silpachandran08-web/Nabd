@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import jakarta.validation.Valid;
 import com.nabd.hms.shared.Idempotent;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -40,7 +41,7 @@ class DeskExceptionController {
     @PostMapping("/{id}/{action}")
     @PreAuthorize("hasAuthority('queue:edit')")
     DeskExceptions.Done act(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @PathVariable String action,
-                            @RequestBody(required = false) ActionRequest req) {
+                            @Valid @RequestBody(required = false) ActionRequest req) {
         return service.act(UUID.fromString(jwt.getSubject()), id, action, req == null ? null : req.snoozeMinutes());
     }
 }

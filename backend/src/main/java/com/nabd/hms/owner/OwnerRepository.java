@@ -73,7 +73,7 @@ class OwnerRepository {
                 pinHash, ownerId);
     }
 
-    /** Same "failures since last success" window as AuthRepository's staff equivalent. */
+    /** Same "failures since last success" window as CredentialRepository's staff equivalent. */
     int countFailedAttemptsSinceLastSuccess(UUID ownerId) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM login_attempts " +

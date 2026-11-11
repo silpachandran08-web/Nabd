@@ -1,5 +1,6 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.auth.internal.guard.OtpSendLimiter;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -19,6 +19,11 @@
   "online": "Online",
   "language": "Language",
   "languageSaveFailed": "Could not save your language. It will reset when you reload.",
+  "theme": "Theme",
+  "themeSystem": "System",
+  "themeDark": "Dark",
+  "themeLight": "Light",
+  "themeSaveFailed": "Couldn't save your theme. It applies on this computer only.",
   "ownerSection": {
     "run": "Run the clinic",
     "people": "People & access",
@@ -207,5 +212,287 @@
       "label": "Test catalogue",
       "short": "Catalogue"
     }
+  },
+  "clinicNav": {
+    "arrivals": {
+      "label": "Today / Arrivals",
+      "short": "Today"
+    },
+    "requests": {
+      "label": "Booking requests",
+      "short": "Requests"
+    },
+    "calendar": {
+      "label": "Queue & Appointments",
+      "short": "Queue"
+    },
+    "patients": {
+      "label": "Patients",
+      "short": "Patients"
+    },
+    "checkin": {
+      "label": "Self check-in",
+      "short": "Check-in"
+    },
+    "display": {
+      "label": "Display",
+      "short": "Display"
+    },
+    "messages": {
+      "label": "WhatsApp inbox",
+      "short": "Inbox"
+    },
+    "billing": {
+      "label": "Checkout & Billing",
+      "short": "Billing"
+    },
+    "pharmacy": {
+      "label": "Pharmacy",
+      "short": "Pharmacy"
+    },
+    "packages": {
+      "label": "Treatment Packages",
+      "short": "Packages"
+    },
+    "staff": {
+      "label": "Staff & Access",
+      "short": "Staff"
+    },
+    "reports": {
+      "label": "Owner Insights",
+      "short": "Insights"
+    },
+    "setup": {
+      "label": "Setup",
+      "short": "Setup"
+    },
+    "account": {
+      "label": "My account",
+      "short": "Account"
+    },
+    "myday": {
+      "label": "My Day",
+      "short": "My Day"
+    },
+    "consult": {
+      "label": "Consultation Workspace",
+      "short": "Consult"
+    },
+    "results": {
+      "label": "Results",
+      "short": "Results"
+    },
+    "inpatients": {
+      "label": "Ward rounds",
+      "short": "Rounds"
+    },
+    "rx": {
+      "label": "Prescriptions & Templates",
+      "short": "Rx sets"
+    },
+    "schedule": {
+      "label": "Schedule",
+      "short": "Schedule"
+    },
+    "my-schedule": {
+      "label": "My Schedule",
+      "short": "Hours"
+    },
+    "encounters": {
+      "label": "Encounters",
+      "short": "Encounters"
+    },
+    "records": {
+      "label": "Record requests",
+      "short": "Records"
+    },
+    "specialty": {
+      "label": "Specialty workspace",
+      "short": "Specialty"
+    },
+    "recalls": {
+      "label": "Recalls",
+      "short": "Recalls"
+    },
+    "follow-ups": {
+      "label": "Follow-ups",
+      "short": "Follow-ups"
+    },
+    "tele": {
+      "label": "Teleconsult",
+      "short": "Tele"
+    },
+    "triage": {
+      "label": "Triage & Vitals",
+      "short": "Triage"
+    },
+    "orders": {
+      "label": "Nursing Orders",
+      "short": "Orders"
+    },
+    "procedures": {
+      "label": "Today's Procedures",
+      "short": "Procedures"
+    },
+    "vaccines": {
+      "label": "Vaccines & Injections",
+      "short": "Vaccines"
+    },
+    "nurse-inbox": {
+      "label": "Clinical Inbox",
+      "short": "Inbox"
+    },
+    "priority": {
+      "label": "Priority Patients",
+      "short": "Priority"
+    },
+    "nurse-packages": {
+      "label": "Package Sessions",
+      "short": "Packages"
+    },
+    "activity": {
+      "label": "Completed Activity",
+      "short": "Activity"
+    }
+  },
+  "role": {
+    "owner": "Owner",
+    "doctor": "Doctor",
+    "nurse": "Nurse",
+    "reception": "Reception",
+    "pharmacist": "Pharmacist",
+    "lab": "Lab",
+    "billing": "Billing"
+  },
+  "nav": {
+    "mainNav": "Main",
+    "brand": "nabd",
+    "planName": "Plan: {plan}",
+    "noPlan": "No plan assigned",
+    "planSub": "{status} · view catalog",
+    "signedIn": "Signed in",
+    "activeRole": "Active role",
+    "region": "Region",
+    "fixedAtProvisioning": "Fixed at provisioning",
+    "session": "Session",
+    "accountSecurity": "Account & Security",
+    "signingOut": "Signing out…",
+    "signOut": "Sign out",
+    "more": "More",
+    "switchClinic": "Switch clinic",
+    "switchClinicAgain": "Switch clinic (sign in again)",
+    "expired": "expired",
+    "expiresInHm": "expires in {h}h {m}m",
+    "expiresInM": "expires in {m}m"
+  },
+  "idleLock": {
+    "warning": "Screen locks in {seconds} s. Press any key to stay signed in.",
+    "title": "Screen locked",
+    "hint": "Enter your PIN to continue where you left off.",
+    "pin": "PIN",
+    "checking": "Checking…",
+    "unlock": "Unlock",
+    "signingOut": "Signing out…",
+    "notYou": "Not you? Sign out"
+  },
+  "chrome": {
+    "skip": "Skip to content"
+  },
+  "globalError": {
+    "title": "Something went wrong",
+    "body": "Nothing you typed was lost: drafts stay on this device.",
+    "retry": "Retry"
+  },
+  "palette": {
+    "searchFailed": "Couldn't search patients. Actions and screens still work.",
+    "noMatch": "Nothing matches “{q}”.",
+    "title": "Command palette",
+    "input": "Jump to a screen, action or patient",
+    "placeholder": "Search patients (name, phone, MRN), actions, screens…",
+    "results": "Results"
+  },
+  "facility": {
+    "clinicAll": "Clinic: All facilities",
+    "clinicNamed": "Clinic: {name}",
+    "allFacilities": "All facilities",
+    "menu": "Clinic & branch",
+    "loading": "Loading your clinics…",
+    "showingAll": "Showing all · read-only",
+    "readOnlyAggregate": "Read-only aggregate",
+    "current": "Current",
+    "brandRegion": "{brand} · {region}",
+    "entering": "Entering…",
+    "moreBranches": "More branches",
+    "locked": "Locked: needs Multi-branch module",
+    "signingOut": "Signing out…",
+    "switchClinic": "Switch clinic",
+    "signsOut": "Signs you out here; sign in again to pick a clinic."
+  },
+  "gate": {
+    "loading": "Loading {screen}",
+    "noAccess": "You do not have access to {screen}.",
+    "notYet": "{screen} is not available yet.",
+    "beingBuilt": "This screen is being built by {team}.",
+    "unverified": "Couldn't confirm that {screen} is part of your clinic's plan. Check your connection and try again."
+  },
+  "userMenu": {
+    "chip": "Account menu, active role {role}",
+    "menu": "Account",
+    "context": "{role} context",
+    "signOut": "Sign out"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts on this screen",
+    "hint": "Single-key shortcuts work when you are not typing in a field.",
+    "list": "Shortcuts"
+  },
+  "urgent": {
+    "word": " urgent"
+  },
+  "pages": {
+    "arrivals": "Today",
+    "schedule": "Queue & Appointments",
+    "patients": "Patients",
+    "consult": "Consultation",
+    "pharmacy": "Pharmacy",
+    "billing": "Billing",
+    "checkout": "Checkout",
+    "packages": "Treatment Packages",
+    "staff": "Staff & Access",
+    "reports": "Reports",
+    "setup": "Setup",
+    "account": "My account",
+    "my-day": "My Day",
+    "solo-consult": "Consult summary",
+    "solo": "Today",
+    "my-schedule": "My Schedule",
+    "prescriptions": "Prescriptions",
+    "encounters": "Encounters",
+    "follow-ups": "Follow-ups",
+    "nursing": "Nursing",
+    "overview": "Overview",
+    "compliance": "Support access",
+    "documents": "Documents",
+    "security": "Security",
+    "login": "Sign in",
+    "accept-invite": "Accept invitation",
+    "requests": "Booking requests",
+    "checkin": "Self check-in",
+    "display": "Display",
+    "messages": "WhatsApp inbox",
+    "results": "Results",
+    "inpatients": "Ward rounds",
+    "records": "Record requests",
+    "specialty": "Specialty workspace",
+    "recalls": "Recalls",
+    "tele": "Teleconsult",
+    "inbox": "Clinical inbox",
+    "lab": "Lab",
+    "owner": "Workspaces",
+    "platform": "Platform console"
+  },
+  "routeError": {
+    "title": "This panel failed",
+    "home": "Go home"
   }
 }

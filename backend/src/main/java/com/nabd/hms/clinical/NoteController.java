@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.dto.NoteAmendmentRequest;
 import com.nabd.hms.clinical.dto.NoteAmendmentResponse;
 import com.nabd.hms.clinical.dto.NoteResponse;
@@ -45,25 +47,25 @@ public class NoteController {
 
     @PatchMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public NoteResponse upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+    public NoteResponse upsert(@CurrentTenant UUID tenantId, @PathVariable UUID queueEntryId,
                                 @Valid @RequestBody NoteUpsertRequest req) {
-        return service.upsert(tenantId(jwt), queueEntryId, req);
+        return service.upsert(tenantId, queueEntryId, req);
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public NoteResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
+    public NoteResponse sign(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
+        return service.sign(tenantId, queueEntryId, staffId, canApprove(jwt));
     }
 
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/{queueEntryId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public NoteAmendmentResponse amend(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+    public NoteAmendmentResponse amend(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                         @Valid @RequestBody NoteAmendmentRequest req) {
-        return service.amend(tenantId(jwt), staffId(jwt), canApprove(jwt), queueEntryId, req);
+        return service.amend(tenantId, staffId, canApprove(jwt), queueEntryId, req);
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -76,16 +78,8 @@ public class NoteController {
         return FieldGrantMasker.amendments(scope, service.listAmendments(scope.tenantId(), queueEntryId));
     }
 
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
     private static boolean canApprove(Jwt jwt) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
         return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

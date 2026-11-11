@@ -8,16 +8,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * ponytail: activePackages is still stubbed (zero) — Packages doesn't exist yet. lastVisit (LIVE-03) is
+ * activePackages is always 0: the packages module exists (PackageInstanceService) but this response does not count a
+ * patient's instances yet (PLT-034 / T-202: comment corrected, value unchanged). lastVisit (LIVE-03) is
  * the registry's definition — latest queue_date of a non-no-show queue entry — so the drawer and the
  * registry list agree; lastVisitAt (deprecated) is the older completed-entry timestamp (NB-074); allergies is real
  * (patient_allergies, NB-107/108); chronicConditions is real (chronic_conditions, NB-077).
  *
  * outstandingBalance is null (omitted from the JSON entirely — NB-052 requires the field be
  * absent, not merely zeroed or hidden client-side) unless the caller's field grants include
- * "financial" or carry no custom restriction at all. Still a stub value (0.0) when present —
- * Billing dues aggregation doesn't exist yet — NB-052 governs whether it's visible, not its
- * accuracy.
+ * "financial" or carry no custom restriction at all. When present it is still 0.0: this response does
+ * not aggregate the patient's billing dues. NB-052 governs whether it's visible, not its accuracy.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PatientDetailResponse(UUID id, String mrn, String name, String phone, LocalDate dob,

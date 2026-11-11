@@ -32,12 +32,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
@@ -88,11 +86,13 @@ public class PrescriptionService {
 
     private final ActorDirectory actors;
     private final DrugCoding coding;
+    private final RxSafetyService safety;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
                          SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors,
-                         DrugCoding coding) {
+                         DrugCoding coding, RxSafetyService safety) {
+        this.safety = safety;
         this.actors = actors;
         this.coding = coding;
         this.dictionaries = dictionaries;
@@ -137,7 +137,7 @@ public class PrescriptionService {
     @Transactional
     public Map<String, Object> signingAuthority(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove) {
         tenantContext.set(tenantId);
-        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         String reason = clinicalAuthority.refusal(tenantId, owner.doctorId(), callerStaffId, callerCanApprove);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("canSign", reason == null);
@@ -148,7 +148,7 @@ public class PrescriptionService {
     @Transactional
     public PrescriptionResponse get(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
+        return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound));
     }
 
     @Transactional
@@ -161,7 +161,7 @@ public class PrescriptionService {
     public PrescriptionResponse upsert(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
                                         String ipAddress, List<PrescriptionItemRequest> items) {
         tenantContext.set(tenantId);
-        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         boolean mayDecide = mayDecide(owner, callerStaffId, callerCanApprove);
 
         // V1-004: serialise against sign() and against allergy-register writes for this patient. Lock order is
@@ -169,7 +169,7 @@ public class PrescriptionService {
         // "already signed" check and the allergy snapshot can no longer go stale before the items are replaced.
         allergyRepo.lockRegister(tenantId, owner.patientId());
         UUID prescriptionId = repo.ensureDraft(tenantId, queueEntryId, owner.patientId(), owner.doctorId());
-        PrescriptionRow current = repo.lockByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        PrescriptionRow current = repo.lockByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         if ("signed".equals(current.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "prescription-signed", "Prescription already signed",
                     "This prescription is signed and can no longer be edited.");
@@ -180,7 +180,7 @@ public class PrescriptionService {
         SafetyDictionary dict = dictionaryFor(tenantId);
         LocalDate today = clock.today(tenantId);
         List<PrescriptionItemRow> existing = repo.findItems(tenantId, prescriptionId);
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
 
         List<PrescriptionItemRow> rows = new ArrayList<>();
         List<StoredDecision> kept = new ArrayList<>();
@@ -189,7 +189,7 @@ public class PrescriptionService {
             // CLN-021: a drug master id must exist (404 DRUG_NOT_FOUND); its ingredients and classes join the text checks.
             String drugId = blankToNull(item.drugId());
             DrugCoding.Codes codes = drugId == null ? null : coding.resolve(drugId).codes();
-            for (Detected d : detectLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today)) {
+            for (RxSafetyService.Finding d : safety.checkLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today)) {
                 if (!d.requiresDecision()) {
                     continue;
                 }
@@ -237,7 +237,7 @@ public class PrescriptionService {
         }
 
         repo.replaceItems(tenantId, prescriptionId, rows);
-        return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
+        return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound));
     }
 
     /** NB-114 / DOC-035: a doctor's saved combo of drugs. scope "mine" (default) is private, "shared" is visible to the
@@ -257,11 +257,11 @@ public class PrescriptionService {
         UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
         // DOC-R2: creation is audited like update and delete (same before/after shape).
-        ActorDirectory.Actor actor = actors.findActor(tenantId, doctorId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, doctorId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", doctorId, actor.name(), actor.role(), ipAddress, "rx_set.created", "rx_set", setId,
                 null, Map.of("name", req.name().trim(), "shared", "shared".equals(scope), "standard", "standard".equals(scope),
                         "itemCount", req.items().size()));
-        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), doctorId, callerCanApprove,
+        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(ApiException::notFound), doctorId, callerCanApprove,
                 repo.activePharmacyNames(tenantId));
     }
 
@@ -277,7 +277,7 @@ public class PrescriptionService {
     public FavouriteRxSetResponse updateSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress,
                                              FavouriteRxSetUpdateRequest req) {
         tenantContext.set(tenantId);
-        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(ApiException::notFound);
         requireVisible(set, callerStaffId);
         requireCanManage(set, callerStaffId, callerCanApprove, "change");
         if (req.items() != null && req.items().isEmpty()) {
@@ -311,21 +311,21 @@ public class PrescriptionService {
             repo.deleteSetItems(tenantId, setId);
             repo.insertSetItems(tenantId, setId, req.items());
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.updated", "rx_set", setId,
                 Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null),
                 Map.of("name", name, "shared", shared, "standard", owner == null, "itemsReplaced", req.items() != null));
-        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), callerStaffId, callerCanApprove,
+        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(ApiException::notFound), callerStaffId, callerCanApprove,
                 repo.activePharmacyNames(tenantId));
     }
 
     @Transactional
     public void deleteSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
-        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(ApiException::notFound);
         requireVisible(set, callerStaffId);
         requireCanManage(set, callerStaffId, callerCanApprove, "delete");
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         repo.deleteSet(tenantId, setId); // items go with it (ON DELETE CASCADE); prescriptions already built from it are unaffected
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.deleted", "rx_set", setId,
                 Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null), null);
@@ -335,7 +335,7 @@ public class PrescriptionService {
     public PrescriptionResponse applySet(UUID tenantId, UUID queueEntryId, UUID setId, UUID callerStaffId,
                                           boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
-        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(ApiException::notFound);
         requireVisible(set, callerStaffId);
         // Brand, sig, route and quantity travel with the line: upsert() runs the allergy/pregnancy/controlled checks on
         // drug AND brand exactly as for hand-typed lines, so a brand that carries an allergen is flagged on apply.
@@ -356,7 +356,7 @@ public class PrescriptionService {
     public PrescriptionResponse repeatLast(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
                                             String ipAddress) {
         tenantContext.set(tenantId);
-        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         PrescriptionRow last = repo.findSignedByPatient(tenantId, owner.patientId()).stream()
                 .filter(p -> !p.queueEntryId().equals(queueEntryId))
                 .findFirst()
@@ -367,7 +367,7 @@ public class PrescriptionService {
                         i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(), i.drugId()))
                 .toList();
         PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "prescription.repeated_last",
                 "prescription", result.id(), null, Map.of("queueEntryId", queueEntryId.toString(),
                         "sourcePrescriptionId", last.id().toString(), "itemCount", items.size()));
@@ -378,7 +378,7 @@ public class PrescriptionService {
      * clinical:approve only reaches shared and standard sets. */
     private void requireVisible(FavouriteSetRow set, UUID callerStaffId) {
         if (set.doctorId() != null && !set.shared() && !set.doctorId().equals(callerStaffId)) {
-            throw notFound();
+            throw ApiException.notFound();
         }
     }
 
@@ -426,7 +426,7 @@ public class PrescriptionService {
     public PrescriptionResponse sign(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
                                       String ipAddress) {
         tenantContext.set(tenantId);
-        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         // V1-007 + CLN-005: the visit's doctor or a clinical:approve holder, who is also a registered clinician with an
         // in-date licence and clinical:edit (ClinicalAuthority). Checked before anything else, including "already signed".
         ClinicalAuthority.Licence licence = clinicalAuthority.require(tenantId, owner.doctorId(), callerStaffId, callerCanApprove,
@@ -434,7 +434,7 @@ public class PrescriptionService {
         // V1-004: same lock order as upsert (register, then the prescription row). Warnings are evaluated and the
         // status flipped while holding the row lock, so a concurrent save cannot slip an unresolved line in between.
         allergyRepo.lockRegister(tenantId, owner.patientId());
-        PrescriptionRow row = repo.lockByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        PrescriptionRow row = repo.lockByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         if ("signed".equals(row.status())) {
             return toResponse(tenantId, row); // idempotent: already signed, nothing more to record
         }
@@ -459,9 +459,9 @@ public class PrescriptionService {
         StoredAllergySnapshot snapshot = captureAllergySnapshot(tenantId, owner.patientId());
         if (repo.sign(tenantId, row.id(), toJson(snapshot), dict.label(), callerStaffId, licence.registrationNo()) == 0) {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
-            return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
+            return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound));
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         List<Map<String, Object>> finalItems = current.items().stream().map(i -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("drugName", i.drugName());
@@ -491,7 +491,7 @@ public class PrescriptionService {
         eventPublisher.publish(tenantId, SIGNED_EVENT, event);
         eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.RX_SIGNED, row.id(), Map.of("prescriptionId", row.id(),
                 "queueEntryId", queueEntryId, "signedBy", callerStaffId, "status", "signed")); // OPS-015; SIGNED_EVENT above is deprecated
-        return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
+        return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound));
     }
 
     /** V1-007: the visit's own doctor, or someone holding the explicit clinical:approve grant. Draft editing stays
@@ -534,9 +534,9 @@ public class PrescriptionService {
                     String pregnancyWarning = null;
                     String controlledWarning = null;
                     DrugCoding.Codes codes = coding.codes(i.drugId()).orElse(null);
-                    for (Detected d : detectLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today)) {
+                    for (RxSafetyService.Finding d : safety.checkLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today)) {
                         StoredDecision held = !d.requiresDecision() ? null : stored.stream()
-                                .filter(s -> s.kind().equals(d.kind()) && sameMatch(s.matched(), d.matched())
+                                .filter(s -> s.kind().equals(d.kind()) && RxSafetyService.sameMatch(s.matched(), d.matched())
                                         && RxSafetyChecks.reasonLabel(d.kind(), s.reasonCode()) != null)
                                 .findFirst().orElse(null);
                         boolean resolved = !d.requiresDecision() || held != null;
@@ -615,9 +615,6 @@ public class PrescriptionService {
 
     // ── warning detection and stored decisions ───────────────────────────
 
-    private record Detected(String kind, String severity, String message, String matched, boolean requiresDecision) {
-    }
-
     /** Decision as stored in prescription_items.overrides (by/at are stamped by the server, never by the client). */
     record StoredDecision(String kind, String reasonCode, String note, String matched, String severity, String by,
                            String byName, String at) {
@@ -625,53 +622,6 @@ public class PrescriptionService {
 
     private static final TypeReference<List<StoredDecision>> DECISIONS = new TypeReference<>() {
     };
-
-    private List<Detected> detect(String drugName, List<AllergyRow> allergies, PrescriptionRepository.PatientProfile profile,
-                                  SafetyDictionary dict, LocalDate today) {
-        List<Detected> found = new ArrayList<>();
-        findMatch(dict, allergies, drugName).ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
-                a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
-        String preg = profile == null ? null : RxSafetyChecks.pregnancyWarning(dict, drugName, profile.gender(), profile.dob(), today);
-        // DOC-021: a recorded pregnant/lactating status escalates (severity, wording and a fresh decision: `matched`
-        // differs from the generic one, so an earlier generic override does not carry over). Never weakens: any other
-        // status falls through to the unchanged rule above.
-        String recorded = profile == null ? null : RxSafetyChecks.recordedStatusWarning(dict, drugName, profile.pregnancyStatus());
-        if (recorded != null) {
-            found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "severe", recorded, profile.pregnancyStatus(), true));
-        } else if (preg != null) {
-            found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "caution", preg, "pregnancy/lactation", true));
-        }
-        String controlled = RxSafetyChecks.controlledSubstanceWarning(dict, drugName);
-        if (controlled != null) {
-            found.add(new Detected(RxSafetyChecks.KIND_CONTROLLED, "caution", controlled, "controlled substance", true));
-        }
-        return found;
-    }
-
-    /** DOC-033: the safety checks run on the generic text AND the brand text. A brand can never hide a conflict the
-     * generic would show, nor the other way round. A finding already raised by the generic is not duplicated. */
-    private List<Detected> detectLine(String drugName, String brandName, DrugCoding.Codes codes, List<AllergyRow> allergies,
-                                      PrescriptionRepository.PatientProfile profile, SafetyDictionary dict, LocalDate today) {
-        List<Detected> found = new ArrayList<>(detect(drugName, allergies, profile, dict, today));
-        // CLN-021: a coded allergy (ingredient or class id) matches a coded line by id, even when no dictionary text knows the brand.
-        if (codes != null) {
-            allergies.stream().filter(a -> (a.allergenIngredientId() != null && codes.ingredientIds().contains(a.allergenIngredientId()))
-                            || (a.allergenClassId() != null && codes.classIds().contains(a.allergenClassId())))
-                    .min(Comparator.comparingInt(a -> "severe".equals(a.severity()) ? 0 : "moderate".equals(a.severity()) ? 1 : 2))
-                    .filter(a -> found.stream().noneMatch(f -> RxSafetyChecks.KIND_ALLERGY.equals(f.kind()) && sameMatch(f.matched(), a.substance())))
-                    .ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
-                            a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
-        }
-        if (brandName != null && !brandName.isBlank() && !brandName.trim().equalsIgnoreCase(drugName.trim())) {
-            for (Detected d : detect(brandName, allergies, profile, dict, today)) {
-                boolean dup = found.stream().anyMatch(f -> f.kind().equals(d.kind()) && sameMatch(f.matched(), d.matched()));
-                if (!dup) {
-                    found.add(d);
-                }
-            }
-        }
-        return found;
-    }
 
     private static String blankToNull(String s) {
         return s == null || s.isBlank() ? null : s.trim();
@@ -681,24 +631,10 @@ public class PrescriptionService {
         items.stream().map(i -> blankToNull(i.drugId())).filter(Objects::nonNull).distinct().forEach(coding::resolve);
     }
 
-    /** The most severe matching allergy wins (severe, then moderate, then mild). */
-    private Optional<AllergyRow> findMatch(SafetyDictionary dict, List<AllergyRow> allergies, String drugName) {
-        return allergies.stream().filter(a -> RxSafetyChecks.allergyMatches(dict, drugName, a.substance()))
-                .min(Comparator.comparingInt(a -> switch (a.severity()) {
-                    case "severe" -> 0;
-                    case "moderate" -> 1;
-                    default -> 2;
-                }));
-    }
-
-    private static boolean sameMatch(String a, String b) {
-        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
-    }
-
     private StoredDecision findStored(List<PrescriptionItemRow> existing, String drugName, String kind, String matched) {
         return existing.stream().filter(r -> r.drugName().trim().equalsIgnoreCase(drugName.trim()))
                 .flatMap(r -> parseDecisions(r.overridesJson()).stream())
-                .filter(d -> d.kind().equals(kind) && sameMatch(d.matched(), matched)
+                .filter(d -> d.kind().equals(kind) && RxSafetyService.sameMatch(d.matched(), matched)
                         && RxSafetyChecks.reasonLabel(kind, d.reasonCode()) != null)
                 .findFirst().orElse(null);
     }
@@ -765,9 +701,5 @@ public class PrescriptionService {
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, "prescription.warning_decision_withdrawn",
                 "prescription", prescriptionId, Map.of("drugName", drugName, "warningKind", d.kind(), "reasonCode", d.reasonCode(),
                         "decidedBy", String.valueOf(d.by()), "decidedAt", String.valueOf(d.at())), null);
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

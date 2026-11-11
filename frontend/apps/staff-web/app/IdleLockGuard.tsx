@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { lockedMessage } from "./lib/pinPolicy";
 import { refreshSession, unlockMessage } from "./lib/apiClient";
 import { signOut as endSession } from "./lib/session";
@@ -15,6 +16,7 @@ import { clampIdleMinutes, idlePhase, IDLE_POLICY_KEY, onLockMessage, persistLoc
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function IdleLockGuard({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("shell.idleLock");
   const router = useRouter();
   const [booted, setBooted] = useState(false);
   const [released, setReleased] = useState(false); // false = opened locked: render no page until unlocked
@@ -153,7 +155,7 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
           background: "var(--nb-surface-1)", color: "var(--nb-text-primary)", border: "1px solid var(--nb-border-default)",
           borderRadius: "var(--nb-radius-lg)", padding: "12px 16px", fontSize: 13,
         }}>
-          Screen locks in {warn} s. Press any key to stay signed in.
+          {t("warning", { seconds: warn })}
         </div>
       )}
       {locked && (
@@ -165,10 +167,10 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
             inlineSize: 320, maxInlineSize: "calc(100vw - 32px)", background: "var(--nb-surface-1)", border: "1px solid var(--nb-border-default)",
             borderRadius: "var(--nb-radius-lg)", padding: 24,
           }}>
-            <h2 id="lock-title" style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: "var(--nb-text-primary)" }}>Screen locked</h2>
-            <p style={{ fontSize: 13, color: "var(--nb-text-secondary)", margin: "0 0 16px" }}>Enter your PIN to continue where you left off.</p>
+            <h2 id="lock-title" style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: "var(--nb-text-primary)" }}>{t("title")}</h2>
+            <p style={{ fontSize: 13, color: "var(--nb-text-secondary)", margin: "0 0 16px" }}>{t("hint")}</p>
             {error && <div role="alert" aria-live="assertive" style={{ background: "var(--nb-danger-tint)", color: "var(--nb-danger-500)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBlockEnd: 12 }}>{error}</div>}
-            <label htmlFor="lock-pin" style={{ display: "block", fontSize: 13, color: "var(--nb-text-secondary)", marginBlockEnd: 4 }}>PIN</label>
+            <label htmlFor="lock-pin" style={{ display: "block", fontSize: 13, color: "var(--nb-text-secondary)", marginBlockEnd: 4 }}>{t("pin")}</label>
             <input
               id="lock-pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} autoFocus required autoComplete="off"
               value={pin} onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ""))}
@@ -181,13 +183,13 @@ export default function IdleLockGuard({ children }: { children: React.ReactNode 
               inlineSize: "100%", blockSize: 44, border: "none", borderRadius: 8, background: "var(--nb-accent-gradient)",
               color: "var(--nb-on-accent)", fontWeight: 600, fontSize: 13, cursor: "pointer",
             }}>
-              {checking ? "Checking…" : "Unlock"}
+              {checking ? t("checking") : t("unlock")}
             </button>
             <button type="button" onClick={signOut} disabled={signingOut} style={{
               inlineSize: "100%", blockSize: 44, marginBlockStart: 8, border: "none", background: "transparent",
               color: "var(--nb-text-secondary)", fontSize: 13, cursor: "pointer", textDecoration: "underline",
             }}>
-              {signingOut ? "Signing out…" : "Not you? Sign out"}
+              {signingOut ? t("signingOut") : t("notYou")}
             </button>
           </form>
         </div>

@@ -54,7 +54,7 @@ public class SafetyDictionaryController {
 
     @PostMapping("/internal/v1/safety-dictionaries/{region}/versions")
     @PreAuthorize("hasAuthority('safety_content:edit')")
-    public ResponseEntity<Map<String, Object>> uploadSafetyDictionaryVersion(@PathVariable String region, @RequestBody SafetyDictionaryBundle bundle,
+    public ResponseEntity<Map<String, Object>> uploadSafetyDictionaryVersion(@PathVariable String region, @Valid @RequestBody SafetyDictionaryBundle bundle,
                                                       @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.upload(region, bundle, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http)));

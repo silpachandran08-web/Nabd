@@ -83,9 +83,12 @@ export type CallNextResponse = { entry?: QueueEntryResponse; reason?: string; };
 export type CallbackEntryResponse = { appointmentId?: string; doctorId?: string; patientId?: string; patientName?: string; startTime?: string; status?: string; };
 export type CancelReasonRow = { code?: string; count?: number; label?: string; };
 export type CancelRequest = { note?: string; reason?: string; reasonCode?: string; };
+export type CareRecipient = { channel?: string; recipientRef?: string; relation?: string; };
 export type Cell = { bookings?: Array<Booking>; doctorId?: string; kind?: string; slotStart?: string; };
 export type ChangeOfferAccept = { slotStart: string; };
 export type ChangeOfferRequest = { slots?: Array<string>; };
+export type ChangeRequest = { confirmClinicName?: string; effective: string; targetPlanCode: string; };
+export type ChangeResult = { changeId?: string; currency?: string; direction?: string; effectiveAt?: string; modulesTurningReadOnly?: Array<string>; prorationMinor?: number; status?: string; };
 export type ChargeHeadResponse = { active?: boolean; baseAmount?: number; category?: string; code?: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom?: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; id?: string; name?: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeHeadWriteRequest = { active?: boolean; baseAmount: number; category: string; code: string; displayOrder?: number; doctorOverride?: boolean; effectiveFrom: string; effectiveTo?: string; emergencyAmount?: number; followUpAmount?: number; name: string; taxCode?: string; taxRatePercent?: number; };
 export type ChargeResponse = { baseAmount?: number; category?: string; code?: string; followUpAmount?: number; id?: string; isRx?: boolean; name?: string; stockQty?: number; taxRatePercent?: number; };
@@ -146,8 +149,11 @@ export type DailySummaryPreviewResponse = { date?: string; params?: Array<string
 export type DailySummaryRecipient = { staffId?: string; };
 export type DailySummarySettingsRequest = { combined?: boolean; enabled?: boolean; recipients: Array<DailySummaryRecipient>; sendAt?: string; };
 export type DailySummarySettingsResponse = { branches?: number; candidates?: Array<DailySummaryCandidate>; combined?: boolean; enabled?: boolean; recipients?: Array<DailySummaryRecipient>; sendAt?: string; };
+export type DataExportDownloadRequest = { otp: string; };
+export type DataExportRequest = { branchIds?: Array<string>; datasets?: Array<string>; format: string; scope?: string; };
 export type DataQualityItem = { displayName?: string; patientId?: string; rawPhone?: string; };
 export type DataQualityPage = { items?: Array<DataQualityItem>; nextCursor?: string; };
+export type DatasetProgress = { name?: string; rows?: number; status?: string; };
 export type Day = { date?: string; holiday?: string; sessions?: Array<SessionCount>; };
 export type DayClose = { closed?: boolean; pendingCheckouts?: number; unbilledConsultations?: number; };
 export type DayCloseHistoryItem = { action?: string; actorName?: string; at?: string; countedCash?: number; date?: string; expectedCash?: number; id?: string; note?: string; variance?: number; };
@@ -231,7 +237,6 @@ export type EtaItem = { appointmentId?: string; p50At?: string; p80At?: string; 
 export type EtaResponse = { items?: Array<EtaItem>; v?: number; };
 export type ExpiredWithValue = { expiredOn?: string; instanceId?: string; packageName?: string; patientName?: string; remainingValue?: number; };
 export type ExpiringSoonResponse = { alertTier?: number; expiresOn?: string; instanceId?: string; packageName?: string; patientName?: string; quantityConsumed?: number; quantityTotal?: number; reminderSentForTier?: boolean; valueLeft?: number; };
-export type ExportJobRequest = { exportType: string; };
 export type ExportJobResponse = { createdAt?: string; errorMessage?: string; exportType?: string; id?: string; resultUrl?: string; status?: string; };
 export type ExtendRequest = { newValidityEnd: string; reason: string; };
 export type FacilityCheckInConfig = { checkinCode?: string; geofenceRadiusM?: number; geofenceRequired?: boolean; lat?: number; lng?: number; walkinAllowed?: boolean; whatsappNumber?: string; };
@@ -275,7 +280,7 @@ export type GrantResponse = { active?: boolean; declineNote?: string; expiresAt?
 export type Granted = { caregiverFirstName?: string; id?: string; relation?: string; scope?: string; status?: string; };
 export type GuardianConsent = { channel?: string; confirmed?: boolean; };
 export type GuardianReviewDecisionRequest = { decision: string; };
-export type GuardianReviewResponse = { dob?: string; guardianId?: string; guardianName?: string; mrn?: string; patientId?: string; patientName?: string; };
+export type GuardianReviewResponse = { claimExpiresAt?: string; claimSentAt?: string; dob?: string; guardianId?: string; guardianName?: string; handoverDate?: string; mrn?: string; patientId?: string; patientName?: string; status?: string; };
 export type HolidayEffectRequest = { effect: string; hours?: Array<HolidayWindow>; };
 export type HolidayTemplateResponse = { code?: string; name?: string; source?: string; year?: number; };
 export type HolidayWindow = { from?: string; to?: string; };
@@ -310,13 +315,16 @@ export type InternalVisitStatus = { appointmentId?: string; leaveHomeAlert?: boo
 export type InternalVisitStatusList = { items?: Array<InternalVisitStatus>; };
 export type InviteResendResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; };
 export type InviteView = { caregiverFirstName?: string; clinicName?: string; expiresAt?: string; relation?: string; };
+export type InvoiceItem = { amountMinor?: number; currency?: string; id?: string; issuedAt?: string; kind?: string; number?: string; pdfUrl?: string; period?: string; periodEnd?: string; periodStart?: string; status?: string; };
 export type InvoiceListItem = { balanceDue?: number; createdAt?: string; doctorId?: string; id?: string; invoiceNumber?: string; paid?: number; patientId?: string; patientName?: string; status?: string; total?: number; writtenOff?: number; };
 export type InvoiceListResponse = { items?: Array<InvoiceListItem>; nextCursor?: string; };
+export type InvoicePage = { items?: Array<InvoiceItem>; nextCursor?: string; };
 export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
 export type InvoiceSeriesResponse = { fiscalYear?: string; fyStartMonth?: number; id?: string; kind?: string; nextNumber?: number; pad?: number; prefix?: string; prefixPattern?: string; taxRegistrationId?: string; };
 export type Item = { classId?: string; lang?: string; matchKind?: string; value?: string; };
+export type Job = { archiveSha256?: string; bytes?: number; completedAt?: string; createdAt?: string; datasets?: Array<DatasetProgress>; format?: string; id?: string; linkExpiresAt?: string; linkSent?: boolean; status?: string; };
 export type JsonNode = Record<string, unknown>;
 export type Keys = { keyId?: string; keySecret?: string; };
 export type KillRequest = { active?: boolean; reason: string; };
@@ -338,6 +346,7 @@ export type LineItemRequest = { category?: string; chargeCode: string; chargeNam
 export type LineItemResponse = { category?: string; chargeCode?: string; chargeName?: string; id?: string; lineTotal?: number; listUnitPrice?: number; overrideReason?: string; quantity?: number; taxRatePercent?: number; taxableMinor?: number; taxes?: Array<TaxPart>; tier?: string; unitPrice?: number; };
 export type LinkOpenItem = { at?: string; deviceFamily?: string; id?: number; ip?: string; linkId?: string; outcome?: string; patientId?: string; resourceId?: string; resourceType?: string; };
 export type LinkOpensResponse = { items?: Array<LinkOpenItem>; };
+export type LinkView = { clinicName?: string; downloadsLeft?: number; expiresAt?: string; };
 export type LoginRequest = { email: string; pin: string; tenantSlug: string; };
 export type MeEntitlements = { killedFeatures?: Array<string>; modules?: Array<ModuleState>; seatLimit?: number; };
 export type Member = { age?: number; displayName?: string; guardianId?: string; lastVisitAt?: string; patientId?: string; relation?: string; sex?: string; };
@@ -355,6 +364,7 @@ export type MfaVerifyRequest = { challengeId: string; code: string; target?: str
 export type ModuleGrant = { approve?: boolean; breakGlass?: boolean; create?: boolean; delete?: boolean; edit?: boolean; export?: boolean; module?: string; refundDiscount?: boolean; view?: boolean; };
 export type ModuleState = { code?: string; enabled?: boolean; };
 export type MoneyResponse = { billsRaised?: number; bookings?: number; collected?: number; currency?: string; from?: string; includesToday?: boolean; noShows?: number; taxCollected?: number; taxLabel?: string; tender?: Array<Tender>; to?: string; topServices?: Array<Service>; waitingNow?: number; };
+export type NextInvoice = { amountMinor?: number; currency?: string; };
 export type NoShowRequest = { reasonCode?: string; };
 export type NoShowRiskResponse = { entries?: Array<Entry>; rule?: string; };
 export type NoShowWeekRow = { bookings?: number; doctorId?: string; doctorName?: string; noShowPct?: number; noShows?: number; weekStart?: string; };
@@ -410,6 +420,7 @@ export type PaymentRequest = { actedByPatientId?: string; actedByRelation?: stri
 export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: string; method?: string; recordedAt?: string; };
 export type PaymentSplit = { amount?: number; method?: string; };
 export type PayrollExportRowResponse = { days?: number; hours?: number; notes?: string; role?: string; salary?: number; staffId?: string; staffName?: string; };
+export type PendingChange = { direction?: string; effectiveAt?: string; id?: string; toPlanCode?: string; };
 export type PharmacyCapabilitiesResponse = { features?: Array<string>; mode?: string; };
 export type PharmacyItemResponse = { active?: boolean; code?: string; coldChain?: boolean; drugId?: string; genericName?: string; hsnCode?: string; id?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name?: string; packSize?: number; price?: number; priceInclusiveOfTax?: boolean; register?: string; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
 export type PharmacyItemStatusRequest = { active: boolean; reason?: string; };
@@ -432,6 +443,7 @@ export type PinResetConfirmRequest = { mobilePhone: string; newPin: string; tena
 export type PinResetRequestRequest = { mobilePhone: string; tenantSlug: string; };
 export type PlanCatalogueEntry = { code?: string; currency?: string; limits?: Limits; modules?: Array<string>; name?: string; priceMinor?: number; pricingBasis?: string; };
 export type PlanMixResponse = { planCode?: string; tenantCount?: number; };
+export type PlanOption = { branchLimit?: number; code?: string; modules?: Array<string>; monthlyMinor?: number; name?: string; pricingBasis?: string; seatLimit?: number; version?: number; };
 export type PlanResponse = { active?: boolean; branchLimit?: number; code?: string; createdAt?: string; currency?: string; id?: string; market?: string; modules?: Array<string>; monthlyPriceCents?: number; name?: string; onTrialExpiry?: string; pricingBasis?: string; seatLimit?: number; version?: number; visitsPerMonth?: number; };
 export type PlanVersionResponse = { branchLimit?: number; modules?: Array<string>; monthlyPriceCents?: number; publishedAt?: string; seatLimit?: number; subscriptions?: number; version?: number; visitsPerMonth?: number; };
 export type PlanWriteRequest = { active?: boolean; code: string; currency: string; limits?: Limits; market?: string; modules?: Array<string>; monthlyPriceCents: number; name: string; onTrialExpiry?: string; pricingBasis?: string; seatLimit?: number; };
@@ -464,6 +476,8 @@ export type ProcedureNotesRequest = { consentNote?: string; prepNotes?: string; 
 export type ProcedureOrderRequest = { chargeCode: string; consentNote?: string; prepNotes?: string; queueEntryId: string; };
 export type ProcedureOrderResponse = { baseAmount?: number; billed?: boolean; chargeCode?: string; chargeName?: string; completedAt?: string; completedByName?: string; consentNote?: string; consentRecordedByName?: string; consentSignedAt?: string; consentSignedName?: string; createdAt?: string; id?: string; orderedByName?: string; patientId?: string; patientName?: string; prepNotes?: string; queueEntryId?: string; status?: string; taxRatePercent?: number; };
 export type ProcedureStatusRequest = { status?: string; };
+export type ProfileClaimRequest = { keepGuardianScope?: string; otp: string; };
+export type ProfileClaimed = { claimed?: boolean; keptScope?: string; };
 export type ProvisioningJobResponse = { approvedAt?: string; createdTenantId?: string; id?: string; ownerAccountInviteToken?: string; ownerInviteToken?: string; path?: string; region?: string; status?: string; steps?: Array<ProvisioningStepResponse>; tenantName?: string; tenantSlug?: string; };
 export type ProvisioningStepResponse = { completedAt?: string; errorDetail?: string; startedAt?: string; status?: string; stepName?: string; stepOrder?: number; };
 export type ProxyInviteAcceptRequest = { otp: string; scope: string; };
@@ -584,6 +598,7 @@ export type StaffShiftWriteRequest = { effectiveFrom: string; effectiveTo?: stri
 export type StaffSummary = { active?: number; invited?: number; roles?: number; suspended?: number; };
 export type StaffSummaryResponse = { id?: string; name?: string; roleName?: string; };
 export type StartRequest = { clinicName?: string; consentToContact?: boolean; market?: string; mobile?: string; specialty?: string; };
+export type Started = { estimateMinutes?: number; id?: string; status?: string; };
 export type StepUpTokenResponse = { expiresIn?: number; stepUpToken?: string; };
 export type StockAdjustmentLine = { batchId?: string; delta?: number; itemId?: string; qtyAfter?: number; qtyBefore?: number; reasonCode?: string; };
 export type StockBatch = { batchId?: string; batchNo?: string; expiryDate?: string; expiryUnknown?: boolean; location?: string; mrp?: number; purchaseRate?: number; qtyOnHand?: number; status?: string; };
@@ -603,7 +618,7 @@ export type StockTakeStarted = { lineCount?: number; stockTakeId?: string; };
 export type StockTakeSummary = { approvedByName?: string; countedCount?: number; createdByName?: string; lineCount?: number; postedAt?: string; postedByName?: string; scope?: string; scopeValue?: string; snapshotAt?: string; status?: string; stockTakeId?: string; };
 export type SubscriptionPage = { data?: Array<SubscriptionResponse>; page?: PageMeta; };
 export type SubscriptionResponse = { createdAt?: string; currency?: string; id?: string; mrrCents?: number; planCode?: string; planId?: string; planName?: string; region?: string; renewalDate?: string; seatLimit?: number; seatsUsed?: number; tenantId?: string; tenantName?: string; tenantSlug?: string; tenantStatus?: string; };
-export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; branchesLimit?: number; branchesUsed?: number; killedFeatures?: Array<string>; modules?: Array<ModuleState>; plan?: string; seatsLimit?: number; seatsUsed?: number; status?: string; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
+export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; availablePlans?: Array<PlanOption>; branchesLimit?: number; branchesUsed?: number; currency?: string; killedFeatures?: Array<string>; modules?: Array<ModuleState>; nextInvoice?: NextInvoice; paymentMethod?: string; pendingChange?: PendingChange; plan?: string; planCode?: string; renewalDate?: string; seatsLimit?: number; seatsUsed?: number; status?: string; usage?: Usage; version?: number; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
 export type SubscriptionTransitionRequest = { reason: string; toStatus: string; };
 export type SubscriptionUpsertRequest = { mrrCents?: number; planId: string; renewalDate: string; startTrial?: boolean; };
 export type SuggestedLine = { chargeCode?: string; emergencyAmount?: number; followUpAmount?: number; name?: string; normalAmount?: number; reason?: string; tier?: string; unitPrice?: number; };
@@ -647,9 +662,11 @@ export type UiPreferencesWrite = { digitStyle?: string; uiLocale?: string; uiThe
 export type Unbilled = { doctorName?: string; endedAt?: string; patientName?: string; queueEntryId?: string; token?: number; };
 export type UnlockRequest = { pin: string; };
 export type UpdateRequest = { assessment?: string; favourite?: boolean; name?: string; objective?: string; plan?: string; subjective?: string; tags?: Array<string>; };
+export type Usage = { aiChecks?: number; branchesLimit?: number; branchesUsed?: number; seatsLimit?: number; seatsUsed?: number; whatsappPassThroughMinor?: number; whatsappUtilityMessages?: number; };
 export type VaccineRecordRequest = { dose: string; expiryDate?: string; lotNumber?: string; notes?: string; patientId: string; queueEntryId?: string; route: string; site?: string; vaccineName: string; };
 export type VaccineRecordResponse = { administeredAt?: string; dose?: string; expiryDate?: string; id?: string; lotNumber?: string; notes?: string; patientId?: string; patientName?: string; queueEntryId?: string; recordedByName?: string; route?: string; site?: string; vaccineName?: string; };
 export type VerifyRequest = { otp?: string; };
+export type View = { clinicName?: string; expiresAt?: string; firstName?: string; guardianFirstName?: string; opensOn?: string; ownPhone?: boolean; };
 export type VisitAttachmentItem = { attachmentId?: string; contentType?: string; createdAt?: string; fileId?: string; kind?: string; note?: string; patientId?: string; };
 export type VisitAttachmentList = { items?: Array<VisitAttachmentItem>; };
 export type VisitSummaryAllergy = { reaction?: string; severity?: string; substance?: string; };
@@ -692,6 +709,7 @@ export type Operations = {
   DrugMasterImportController_status: { method: "get"; path: "/internal/v1/drug-master/imports/{importId}"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
   DrugMasterImportController_activate: { method: "post"; path: "/internal/v1/drug-master/imports/{importId}/activate"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: DrugMasterActivateRequest; response: Record<string, Record<string, unknown>> };
   NotificationClaimController_claim: { method: "get"; path: "/internal/v1/notification-requests/{id}"; permission: "public"; pathParams: { id: string; }; query: never; body: never; response: NotificationClaim };
+  InternalRecipientsController_recipients: { method: "get"; path: "/internal/v1/patients/{ref}/recipients"; permission: "public"; pathParams: { ref: string; }; query: { tenantId: string; class: string; }; body: never; response: Array<CareRecipient> };
   SafetyDictionaryController_listSafetyDictionaryVersions: { method: "get"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: never; response: Array<Record<string, Record<string, unknown>>> };
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: SafetyDictionaryBundle; response: Record<string, Record<string, unknown>> };
   SafetyDictionaryController_activateSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate"; permission: "safety_content:edit"; pathParams: { region: string; versionId: string; }; query: never; body: ActivateRequest; response: Record<string, Record<string, unknown>> };
@@ -909,6 +927,9 @@ export type Operations = {
   MeEntitlementsController_get: { method: "get"; path: "/v1/me/entitlements"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MeEntitlements };
   MePreferencesController_get: { method: "get"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: never; response: UiPreferencesRead };
   MePreferencesController_put: { method: "put"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: UiPreferencesWrite; response: UiPreferences };
+  ProfileClaimController_view: { method: "get"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: View };
+  ProfileClaimController_claim: { method: "post"; path: "/v1/me/profile-claims/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: ProfileClaimRequest; response: ProfileClaimed };
+  ProfileClaimController_otp: { method: "post"; path: "/v1/me/profile-claims/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
   OwnerMessagingController_quality: { method: "get"; path: "/v1/messaging/quality"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: Record<string, string> };
   NursingController_activityToday: { method: "get"; path: "/v1/nursing/activity/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<ActivityEntryResponse> };
   NursingController_orderAdministration: { method: "post"; path: "/v1/nursing/administration-orders"; permission: "nursing:create"; pathParams: never; query: never; body: AdministrationOrderRequest; response: AdministrationOrderResponse };
@@ -963,7 +984,7 @@ export type Operations = {
   PatientController_dataQuality: { method: "get"; path: "/v1/patients/data-quality"; permission: "patients:edit"; pathParams: never; query: { issue: string; limit?: number; cursor?: string; }; body: never; response: DataQualityPage };
   PatientController_duplicateSuggestions: { method: "get"; path: "/v1/patients/duplicate-suggestions"; permission: "patients:delete"; pathParams: never; query: { cursor?: string; }; body: never; response: DuplicateSuggestionPage };
   PatientController_dismissSuggestion: { method: "post"; path: "/v1/patients/duplicate-suggestions/{id}/dismiss"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: never; response: void };
-  PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: never; body: never; response: Array<GuardianReviewResponse> };
+  PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: { status?: string; }; body: never; response: Array<GuardianReviewResponse> };
   PatientController_recentMerges: { method: "get"; path: "/v1/patients/merges"; permission: "patients:delete"; pathParams: never; query: never; body: never; response: RecentMerges };
   PatientController_undoMerge: { method: "post"; path: "/v1/patients/merges/{mergeId}/undo"; permission: "patients:delete"; pathParams: { mergeId: string; }; query: never; body: never; response: void };
   PatientController_registry: { method: "get"; path: "/v1/patients/registry"; permission: "patients:view"; pathParams: never; query: { q?: string; filter?: string; limit?: number; cursor?: string; }; body: never; response: PatientRegistryResponse };
@@ -977,6 +998,8 @@ export type Operations = {
   PatientController_revokeGuardian: { method: "delete"; path: "/v1/patients/{id}/guardian"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   PatientController_keepGuardian: { method: "post"; path: "/v1/patients/{id}/guardian/review"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: GuardianReviewDecisionRequest; response: PatientDetailResponse };
   PatientController_merge: { method: "post"; path: "/v1/patients/{id}/merge"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: MergeRequest; response: PatientDetailResponse };
+  ProfileClaimController_deskClaim: { method: "post"; path: "/v1/patients/{id}/profile-claim"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: ProfileClaimRequest; response: ProfileClaimed };
+  ProfileClaimController_deskOtp: { method: "post"; path: "/v1/patients/{id}/profile-claim/otp"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: never; response: Record<string, boolean> };
   ProxyRevokeController_revoke: { method: "post"; path: "/v1/patients/{id}/proxies/{proxyId}/revoke"; permission: "patients:edit"; pathParams: { id: string; proxyId: string; }; query: never; body: ProxyRevokeRequest; response: void };
   PatientMessagesController_messages: { method: "get"; path: "/v1/patients/{patientId}/messages"; permission: "patients:view"; pathParams: { patientId: string; }; query: { cursor?: string; limit?: number; }; body: never; response: Page };
   NoticeController_status: { method: "get"; path: "/v1/patients/{patientId}/privacy-notice"; permission: "patients:view"; pathParams: { patientId: string; }; query: never; body: never; response: PrivacyNoticeStatus };
@@ -1066,6 +1089,9 @@ export type Operations = {
   ProxyInviteController_view: { method: "get"; path: "/v1/proxy-invites/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: InviteView };
   ProxyInviteController_accept: { method: "post"; path: "/v1/proxy-invites/{token}/accept"; permission: "public"; pathParams: { token: string; }; query: never; body: ProxyInviteAcceptRequest; response: ProxyInviteAccepted };
   ProxyInviteController_otp: { method: "post"; path: "/v1/proxy-invites/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
+  DataExportController_view: { method: "get"; path: "/v1/public/exports/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: LinkView };
+  DataExportController_download: { method: "post"; path: "/v1/public/exports/{token}/download"; permission: "public"; pathParams: { token: string; }; query: never; body: DataExportDownloadRequest; response: string };
+  DataExportController_otp: { method: "post"; path: "/v1/public/exports/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
   PublicSecureLinkController_open: { method: "post"; path: "/v1/public/links/{token}/open"; permission: "public"; pathParams: { token: string; }; query: never; body: SecureLinkOpenRequest; response: SecureLinkOpenResponse };
   PublicSecureLinkController_otp: { method: "post"; path: "/v1/public/links/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: void };
   PublicNoticeController_page: { method: "get"; path: "/v1/public/notices/{tenantSlug}/{version}"; permission: "public"; pathParams: { tenantSlug: string; version: string; }; query: { lang?: string; }; body: never; response: string };
@@ -1145,7 +1171,8 @@ export type Operations = {
   DpaController_pdf: { method: "get"; path: "/v1/setup/dpa/acceptances/{id}/pdf"; permission: "setup:view"; pathParams: { id: string; }; query: never; body: never; response: string };
   DpaController_requestOtp: { method: "post"; path: "/v1/setup/dpa/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };
   SetupController_exportJobs: { method: "get"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ExportJobResponse> };
-  SetupController_createExportJob: { method: "post"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: ExportJobRequest; response: ExportJobResponse };
+  DataExportController_start: { method: "post"; path: "/v1/setup/export-jobs"; permission: "setup:export"; pathParams: never; query: never; body: DataExportRequest; response: Started };
+  DataExportController_get: { method: "get"; path: "/v1/setup/export-jobs/{id}"; permission: "setup:export"; pathParams: { id: string; }; query: never; body: never; response: Job };
   GoLiveController_goLive: { method: "post"; path: "/v1/setup/go-live"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: GoLiveResponse };
   GoLiveController_checks: { method: "get"; path: "/v1/setup/go-live/checks"; permission: "setup:view"; pathParams: never; query: never; body: never; response: GoLiveChecksResponse };
   GoLiveController_poster: { method: "get"; path: "/v1/setup/go-live/poster"; permission: "setup:view"; pathParams: never; query: never; body: never; response: string };
@@ -1176,6 +1203,10 @@ export type Operations = {
   SetupController_addShift: { method: "post"; path: "/v1/setup/shifts"; permission: "setup:edit"; pathParams: never; query: never; body: StaffShiftWriteRequest; response: StaffShiftResponse };
   SetupController_staff: { method: "get"; path: "/v1/setup/staff"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<StaffSummaryResponse> };
   SetupController_subscription: { method: "get"; path: "/v1/setup/subscription"; permission: "setup:view"; pathParams: never; query: never; body: never; response: SubscriptionSummaryResponse };
+  OwnerPlanController_change: { method: "post"; path: "/v1/setup/subscription/change"; permission: "setup:edit"; pathParams: never; query: never; body: ChangeRequest; response: ChangeResult };
+  OwnerPlanController_preview: { method: "get"; path: "/v1/setup/subscription/change-preview"; permission: "setup:view"; pathParams: never; query: { targetPlanCode: string; effective?: string; }; body: never; response: Preview };
+  OwnerPlanController_invoices: { method: "get"; path: "/v1/setup/subscription/invoices"; permission: "setup:view"; pathParams: never; query: { cursor?: string; limit?: number; }; body: never; response: InvoicePage };
+  OwnerPlanController_invoice: { method: "get"; path: "/v1/setup/subscription/invoices/{id}"; permission: "setup:view"; pathParams: { id: string; }; query: never; body: never; response: InvoiceItem };
   ClinicTrialController_status: { method: "get"; path: "/v1/setup/trial"; permission: "setup:view"; pathParams: never; query: never; body: never; response: TrialStatusResponse };
   ClinicTrialController_convert: { method: "post"; path: "/v1/setup/trial/convert"; permission: "setup:edit"; pathParams: never; query: never; body: TrialConvertRequest; response: TrialConvertResponse };
   ClinicTrialController_requestOtp: { method: "post"; path: "/v1/setup/trial/convert/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };
@@ -1264,6 +1295,7 @@ export type Permission =
   | "reports:view"
   | "safety_content:edit"
   | "setup:edit"
+  | "setup:export"
   | "setup:view"
   | "specialty_dental:edit"
   | "specialty_dental:view"

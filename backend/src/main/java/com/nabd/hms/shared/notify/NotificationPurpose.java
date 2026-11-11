@@ -25,6 +25,14 @@ public enum NotificationPurpose {
     PROFILE_COMPLETION("profile_completion", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** IDC-009: consent link to an adult family member's own number (no names in the body; the link is the only parameter). */
     PROXY_INVITE("proxy_invite", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** IDC-014: "your visit instructions are ready" to the patient and record-scope caregivers; 1 param: the patient's first name (no clinical text). */
+    VISIT_INSTRUCTIONS("visit_instructions", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** IDC-014 (CGV-09): an elderly member missed a booked visit; to caregivers only; 1 param: the member's first name. */
+    MISSED_VISIT_ALERT("missed_visit_alert", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** IDC-012: age-18 claim invitation to the guardian and the young adult's own number; 2 params: the dependant's first name, the link. */
+    PROFILE_CLAIM_INVITE("profile_claim_invite", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-015: the owner's data export is ready (staff recipient, no patient consent); 1 param: the download link (OTP-protected). */
+    EXPORT_READY("export_ready", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** FIN-020: UPI payment link; slots are clinic name, amount and link only (no line items, no diagnosis). */
     PAYMENT_LINK("payment_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),

@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
@@ -51,9 +53,9 @@ public class PrescriptionController {
 
     @PatchMapping("/prescriptions/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public PrescriptionResponse upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+    public PrescriptionResponse upsert(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                         @Valid @RequestBody PrescriptionUpsertRequest req, HttpServletRequest http) {
-        return service.upsert(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req.items());
+        return service.upsert(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http), req.items());
     }
 
     @com.nabd.hms.shared.Idempotent
@@ -61,19 +63,19 @@ public class PrescriptionController {
     // CLN-005: callers without clinical:edit (the Owner preset has view only) reach the service so they get
     // not-licensed-clinician / not-prescriber, not a bare 403; ClinicalAuthority still requires clinical:edit to sign.
     @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve', 'clinical:view')")
-    public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
-        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
+    public PrescriptionResponse sign(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
+        return service.sign(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
     }
 
     /** CLN-005: whether the caller may sign this visit's prescription; reason is the 403 code sign would return. */
     @GetMapping("/prescriptions/{queueEntryId}/signing-authority")
     @PreAuthorize("hasAuthority('clinical:view')")
-    public java.util.Map<String, Object> signingAuthority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
+    public java.util.Map<String, Object> signingAuthority(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
         scopes.requireVisit(scopes.resolve(jwt), queueEntryId);
         if (jwt.hasClaim("bg")) {
             return java.util.Map.of("canSign", false, "reason", ClinicalAuthority.BREAK_GLASS);
         }
-        return service.signingAuthority(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
+        return service.signingAuthority(tenantId, queueEntryId, staffId, canApprove(jwt));
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -99,49 +101,45 @@ public class PrescriptionController {
 
     @PostMapping("/rx-sets")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public FavouriteRxSetResponse createSet(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FavouriteRxSetRequest req,
+    public FavouriteRxSetResponse createSet(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FavouriteRxSetRequest req,
                                              HttpServletRequest http) {
-        return service.createSet(tenantId(jwt), staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req);
+        return service.createSet(tenantId, staffId, canApprove(jwt), RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/rx-sets")
     @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view')")
-    public List<FavouriteRxSetResponse> listSets(@AuthenticationPrincipal Jwt jwt) {
-        return service.listSets(tenantId(jwt), staffId(jwt), canApprove(jwt));
+    public List<FavouriteRxSetResponse> listSets(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt) {
+        return service.listSets(tenantId, staffId, canApprove(jwt));
     }
 
     /** DOC-035: owner of the set, or clinical:approve (clinic standards). */
     @PatchMapping("/rx-sets/{setId}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public FavouriteRxSetResponse updateSet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID setId,
+    public FavouriteRxSetResponse updateSet(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID setId,
                                              @Valid @RequestBody FavouriteRxSetUpdateRequest req, HttpServletRequest http) {
-        return service.updateSet(tenantId(jwt), setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req);
+        return service.updateSet(tenantId, setId, staffId, canApprove(jwt), RequestMeta.clientIp(http), req);
     }
 
     @DeleteMapping("/rx-sets/{setId}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public ResponseEntity<Void> deleteSet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID setId, HttpServletRequest http) {
-        service.deleteSet(tenantId(jwt), setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
+    public ResponseEntity<Void> deleteSet(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID setId, HttpServletRequest http) {
+        service.deleteSet(tenantId, setId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/prescriptions/{queueEntryId}/apply-set/{setId}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public PrescriptionResponse applySet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+    public PrescriptionResponse applySet(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                           @PathVariable UUID setId, HttpServletRequest http) {
-        return service.applySet(tenantId(jwt), queueEntryId, setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
+        return service.applySet(tenantId, queueEntryId, setId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
     }
 
     /** DOC-035 / DOC-R2: "Repeat last prescription" (the patient's most recent signed Rx from another visit). */
     @PostMapping("/prescriptions/{queueEntryId}/repeat-last")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public PrescriptionResponse repeatLast(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
-        return service.repeatLast(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
+    public PrescriptionResponse repeatLast(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
+        return service.repeatLast(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
     }
 
     /** V1-007: the explicit permission that lets someone other than the visit's doctor record a warning decision
@@ -150,9 +148,5 @@ public class PrescriptionController {
     private static boolean canApprove(Jwt jwt) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
         return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

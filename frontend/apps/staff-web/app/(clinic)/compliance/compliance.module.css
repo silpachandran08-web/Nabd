@@ -8,7 +8,7 @@
 .actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; }
 .input { min-block-size: 44px; padding-inline: var(--nb-space-12); flex: 1 1 200px; border: 1px solid var(--nb-border-default); border-radius: 8px; background: transparent; color: inherit; }
 .primary, .secondary { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-16); border-radius: 8px; border: 1px solid var(--nb-border-default); cursor: pointer; font: inherit; color: inherit; background: transparent; }
-.primary { background: var(--nb-accent-500); border-color: transparent; color: #fff; }
+.primary { background: var(--nb-accent-fill); border-color: transparent; color: var(--nb-on-accent); }
 .history { list-style: none; margin: var(--nb-space-16) 0 0; padding: 0; display: grid; gap: var(--nb-space-12); }
 .error { padding: var(--nb-space-12); border-radius: 8px; border: 1px solid var(--nb-danger-500); margin-block-end: var(--nb-space-16); }
 @media (max-width: 480px) { .page { padding: var(--nb-space-16); } .card { padding: var(--nb-space-16); } }

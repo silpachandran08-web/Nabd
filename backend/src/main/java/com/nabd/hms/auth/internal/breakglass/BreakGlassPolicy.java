@@ -1,0 +1,15 @@
+package com.nabd.hms.auth.internal.breakglass;
+
+import java.util.List;
+
+/** PLT-012: what an emergency token can do. Fixed on purpose; v2 (per-patient Cedar context, ADR-08) replaces it. */
+public final class BreakGlassPolicy {
+    private BreakGlassPolicy() {
+    }
+
+    /** Added to the caller's own grants. No create/edit/delete/approve/staff: break-glass is never Owner rights. */
+    public static final List<String> BREAK_GLASS_GRANTS = List.of("clinical:view", "patients:view");
+    public static final int MINUTES = 30;
+    public static final String ACTIVATED_EVENT = "iam.break_glass.activated.v1";
+    public static final String OWNER_WHATSAPP_EVENT = "iam.break_glass.owner_whatsapp.v1";
+}

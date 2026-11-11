@@ -1,5 +1,6 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
 import com.nabd.hms.auth.dto.MfaConfirmResponse;
@@ -82,24 +83,24 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt) {
-        authService.logout(tenantId(jwt), sessionId(jwt));
+    public ResponseEntity<Void> logout(@CurrentTenant UUID tenantId, @AuthenticationPrincipal Jwt jwt) {
+        authService.logout(tenantId, sessionId(jwt));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sessions")
-    public List<SessionResponse> listSessions(@AuthenticationPrincipal Jwt jwt) {
-        return authService.listSessions(tenantId(jwt), UUID.fromString(jwt.getSubject()), sessionId(jwt));
+    public List<SessionResponse> listSessions(@CurrentTenant UUID tenantId, @AuthenticationPrincipal Jwt jwt) {
+        return authService.listSessions(tenantId, UUID.fromString(jwt.getSubject()), sessionId(jwt));
     }
 
     @DeleteMapping("/sessions/{id}")
-    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        authService.revokeSession(tenantId(jwt), UUID.fromString(jwt.getSubject()), id);
+    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, @CurrentTenant UUID tenantId, @AuthenticationPrincipal Jwt jwt) {
+        authService.revokeSession(tenantId, UUID.fromString(jwt.getSubject()), id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @PostMapping("/mfa/enroll")
-    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt, @RequestBody(required = false) MfaEnrollRequest req,
+    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody(required = false) MfaEnrollRequest req,
                                         @org.springframework.web.bind.annotation.RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
         return authService.enrollMfa(mfaCaller.resolve(jwt, req == null ? null : req.setupToken()),
                 req == null ? null : req.currentCode(), stepUpToken);
@@ -143,10 +144,6 @@ public class AuthController {
     public ResponseEntity<Void> unlock(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UnlockRequest req) {
         authService.unlock(jwt, req);
         return ResponseEntity.noContent().build();
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
     }
 
     private UUID sessionId(Jwt jwt) {

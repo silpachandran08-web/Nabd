@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical.dental;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.ClinicalReadScope;
 import com.nabd.hms.clinical.ReadScope;
 import com.nabd.hms.clinical.dental.dto.SupernumeraryToothRequest;
@@ -50,36 +52,36 @@ public class DentalController {
 
     @PatchMapping("/{toothNumber}")
     @PreAuthorize("hasAuthority('specialty_dental:edit')")
-    public ToothResponse upsertTooth(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public ToothResponse upsertTooth(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                       @PathVariable int toothNumber, @Valid @RequestBody ToothWriteRequest req,
                                       HttpServletRequest http) {
-        return service.upsertTooth(tenantId(jwt), patientId, toothNumber, staffId(jwt), RequestMeta.clientIp(http),
+        return service.upsertTooth(tenantId, patientId, toothNumber, staffId, RequestMeta.clientIp(http),
                 req.status(), req.note());
     }
 
     @PostMapping("/supernumerary")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('specialty_dental:edit')")
-    public ToothResponse addSupernumerary(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public ToothResponse addSupernumerary(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                            @Valid @RequestBody SupernumeraryToothRequest req, HttpServletRequest http) {
-        return service.addSupernumerary(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http),
+        return service.addSupernumerary(tenantId, patientId, staffId, RequestMeta.clientIp(http),
                 req.nearToothNumber(), req.status(), req.note());
     }
 
     @PatchMapping("/supernumerary/{id}")
     @PreAuthorize("hasAuthority('specialty_dental:edit')")
-    public ToothResponse updateSupernumerary(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public ToothResponse updateSupernumerary(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                               @PathVariable UUID id, @Valid @RequestBody ToothWriteRequest req,
                                               HttpServletRequest http) {
-        return service.updateSupernumerary(tenantId(jwt), patientId, id, staffId(jwt), RequestMeta.clientIp(http),
+        return service.updateSupernumerary(tenantId, patientId, id, staffId, RequestMeta.clientIp(http),
                 req.status(), req.note());
     }
 
     @DeleteMapping("/supernumerary/{id}")
     @PreAuthorize("hasAuthority('specialty_dental:edit')")
-    public void removeSupernumerary(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public void removeSupernumerary(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                      @PathVariable UUID id, HttpServletRequest http) {
-        service.removeSupernumerary(tenantId(jwt), patientId, id, staffId(jwt), RequestMeta.clientIp(http));
+        service.removeSupernumerary(tenantId, patientId, id, staffId, RequestMeta.clientIp(http));
     }
 
     @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
@@ -91,13 +93,5 @@ public class DentalController {
         ReadScope scope = scopes.resolve(jwt);
         scopes.requirePatient(scope, patientId);
         return service.history(scope.tenantId(), patientId, id);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

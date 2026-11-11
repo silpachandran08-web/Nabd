@@ -1,5 +1,6 @@
 package com.nabd.hms.messaging;
 
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotBlank;
@@ -45,7 +46,7 @@ class TemplateLintController {
 
     @PostMapping("/v1/setup/whatsapp-templates:lint")
     @PreAuthorize("hasAuthority('setup:edit')")
-    LintResponse dryRun(@RequestBody LintRequest req) {
+    LintResponse dryRun(@Valid @RequestBody LintRequest req) {
         List<TemplateLint.Finding> findings = lint.lint(req.body(), req.slots());
         return new LintResponse(findings.isEmpty(), findings);
     }

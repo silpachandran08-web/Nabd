@@ -182,7 +182,7 @@ class BookingRequestService {
     @Transactional
     public Map<String, Object> accept(UUID staffId, UUID id, Instant slotStart) {
         UUID tid = tenantContext.current();
-        Req r = repo.find(tid, id).orElseThrow(BookingRequestService::notFound);
+        Req r = repo.find(tid, id).orElseThrow(ApiException::notFound);
         if (!"requested".equals(r.status())) throw alreadyDecided();
         Instant now = clock.now();
         boolean moved = slotStart != null && !slotStart.equals(r.start());
@@ -215,7 +215,7 @@ class BookingRequestService {
         if (slots == null || slots.isEmpty() || slots.size() > 3 || slots.stream().anyMatch(java.util.Objects::isNull) || slots.stream().distinct().count() != slots.size()) {
             throw invalid("slots: one to three different times.");
         }
-        Req r = repo.find(tid, id).orElseThrow(BookingRequestService::notFound);
+        Req r = repo.find(tid, id).orElseThrow(ApiException::notFound);
         if (!"requested".equals(r.status())) throw alreadyDecided();
         Instant now = clock.now();
         for (Instant s : slots) {
@@ -240,7 +240,7 @@ class BookingRequestService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
                     "reasonCode is required to decline (lower-case letters, digits and _, 3 to 40 characters).", Map.of("code", "REASON_REQUIRED"));
         }
-        Req r = repo.find(tid, id).orElseThrow(BookingRequestService::notFound);
+        Req r = repo.find(tid, id).orElseThrow(ApiException::notFound);
         if (!"requested".equals(r.status())) throw alreadyDecided();
         if (repo.decide(tid, id, "declined", r.start(), r.end(), staffId, clock.now()) == 0) throw alreadyDecided();
         repo.recordDecline(tid, id, reasonCode);
@@ -257,8 +257,8 @@ class BookingRequestService {
     Map<String, Object> choose(UUID tid, ServiceIdentity edge, UUID offerId, String patientRef, Instant slotStart) {
         return tenantScope.run(tid, () -> {
             UUID patientId = patientRefs.patientIdFor(patientRef).orElseThrow(BookingRequestService::notOwner);
-            BookingRequestRepository.Offer offer = repo.findOffer(tid, offerId).orElseThrow(BookingRequestService::notFound);
-            Req r = repo.find(tid, offer.appointmentId()).orElseThrow(BookingRequestService::notFound);
+            BookingRequestRepository.Offer offer = repo.findOffer(tid, offerId).orElseThrow(ApiException::notFound);
+            Req r = repo.find(tid, offer.appointmentId()).orElseThrow(ApiException::notFound);
             if (!r.patientId().equals(patientId)) throw notOwner();
             Instant now = clock.now();
             if (!"open".equals(offer.status()) || !"requested".equals(r.status()) || !offer.expiresAt().isAfter(now)) throw alreadyDecided();
@@ -367,10 +367,6 @@ class BookingRequestService {
 
     private static ApiException alreadyDecided() {
         return new ApiException(HttpStatus.CONFLICT, "already-decided", "Already decided", "This request was already decided.", Map.of("code", "ALREADY_DECIDED"));
-    }
-
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private static ApiException notOwner() {

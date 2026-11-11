@@ -13,7 +13,7 @@ import java.util.UUID;
 class NotificationRequestRepository {
 
     record Row(UUID id, UUID tenantId, String purpose, UUID recipientPatientId, byte[] paramsEnc, String language,
-               String channelPolicy, Instant notBefore, Instant notAfter, String status) {
+               String channelPolicy, Instant notBefore, Instant notAfter, String status, String subjectType, UUID subjectId) {
     }
 
     private final JdbcTemplate jdbc;
@@ -79,7 +79,7 @@ class NotificationRequestRepository {
     }
 
     private static final String SELECT = """
-            SELECT id, tenant_id, purpose, recipient_patient_id, params_enc, language, channel_policy, not_before, not_after, status
+            SELECT id, tenant_id, purpose, recipient_patient_id, params_enc, language, channel_policy, not_before, not_after, status, subject_type, subject_id
             FROM notification_requests\s""";
 
     private static final org.springframework.jdbc.core.RowMapper<Row> MAPPER = (rs, i) -> new Row(
@@ -87,5 +87,6 @@ class NotificationRequestRepository {
             rs.getObject("recipient_patient_id", UUID.class), rs.getBytes("params_enc"), rs.getString("language"),
             rs.getString("channel_policy"),
             rs.getTimestamp("not_before") == null ? null : rs.getTimestamp("not_before").toInstant(),
-            rs.getTimestamp("not_after") == null ? null : rs.getTimestamp("not_after").toInstant(), rs.getString("status"));
+            rs.getTimestamp("not_after") == null ? null : rs.getTimestamp("not_after").toInstant(), rs.getString("status"),
+            rs.getString("subject_type"), rs.getObject("subject_id", UUID.class));
 }

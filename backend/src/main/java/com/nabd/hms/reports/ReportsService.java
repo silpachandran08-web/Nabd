@@ -296,7 +296,7 @@ public class ReportsService {
                     "reportType must be 'sources' or 'staff-performance'.");
         }
 
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "report.export", "report", null, null, Map.of("reportType", reportType, "rowCount", rowCount));
         return csv;
@@ -309,9 +309,5 @@ public class ReportsService {
 
     private double round1(double v) {
         return Math.round(v * 10) / 10.0;
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

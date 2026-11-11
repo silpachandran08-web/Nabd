@@ -263,9 +263,10 @@ class SetupApiTest extends ApiTestBase {
         assertThat(importResp.getBody().get("status")).isEqualTo("pending");
 
         ResponseEntity<Map> exportResp = exchange("/v1/setup/export-jobs", HttpMethod.POST,
-                authedJsonBody(token, Map.of("exportType", "full_tenant")), Map.class);
-        assertThat(exportResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(exportResp.getBody().get("exportType")).isEqualTo("full_tenant");
+                authedJsonBody(token, Map.of("scope", "full_tenant", "format", "csv")), Map.class);
+        // ADM-015: a full export needs a step-up (Adm015DataExportApiTest covers the started job)
+        assertThat(exportResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exportResp.getBody().get("code")).isEqualTo("STEP_UP_REQUIRED");
     }
 
     @Test

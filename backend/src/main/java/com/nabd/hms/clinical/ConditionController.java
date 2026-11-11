@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import com.nabd.hms.clinical.dto.ConditionResponse;
 import com.nabd.hms.clinical.dto.ConditionWriteRequest;
 import com.nabd.hms.clinical.dto.DueConditionResponse;
@@ -45,15 +47,15 @@ public class ConditionController {
     @PostMapping("/patients/{patientId}/conditions")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public ConditionResponse add(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+    public ConditionResponse add(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID patientId,
                                   @Valid @RequestBody ConditionWriteRequest req) {
-        return service.add(tenantId(jwt), patientId, staffId(jwt), req);
+        return service.add(tenantId, patientId, staffId, req);
     }
 
     @PatchMapping("/conditions/{id}/resolve")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public void resolve(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        service.resolve(tenantId(jwt), id);
+    public void resolve(@CurrentTenant UUID tenantId, @PathVariable UUID id) {
+        service.resolve(tenantId, id);
     }
 
     /** NB-077's clinic-wide "chronic review due" list — derived from review_due_date, not a manual flag. */
@@ -63,13 +65,5 @@ public class ConditionController {
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<DueConditionResponse> due(@AuthenticationPrincipal Jwt jwt) {
         return service.due(scopes.resolve(jwt));
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
     }
 }

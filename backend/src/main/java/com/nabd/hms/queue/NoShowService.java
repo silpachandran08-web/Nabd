@@ -81,7 +81,7 @@ class NoShowService {
     @Transactional
     public AppointmentResponse mark(UUID staffId, UUID id, String reasonCode) {
         UUID tenant = tenantContext.current();
-        AppointmentRow a = repo.findById(tenant, id).orElseThrow(NoShowService::notFound);
+        AppointmentRow a = repo.findById(tenant, id).orElseThrow(ApiException::notFound);
         if (reasonCode != null) {
             reasons.requireKnown("no_show", reasonCode);
         }
@@ -114,7 +114,7 @@ class NoShowService {
     @Transactional
     public AppointmentResponse undo(UUID staffId, UUID id) {
         UUID tenant = tenantContext.current();
-        AppointmentRow a = repo.findById(tenant, id).orElseThrow(NoShowService::notFound);
+        AppointmentRow a = repo.findById(tenant, id).orElseThrow(ApiException::notFound);
         if (!"no_show".equals(a.status()) || a.noShowAt() == null) {
             throw conflict("not-no-show", "Not a marked no-show", "Only an appointment marked as a no-show can be undone.", "NOT_NO_SHOW");
         }
@@ -144,7 +144,7 @@ class NoShowService {
     @Transactional
     public QueueEntryResponse lateArrival(UUID staffId, UUID appointmentId) {
         UUID tenant = tenantContext.current();
-        AppointmentRow a = repo.findById(tenant, appointmentId).orElseThrow(NoShowService::notFound);
+        AppointmentRow a = repo.findById(tenant, appointmentId).orElseThrow(ApiException::notFound);
         if (!"no_show".equals(a.status())) {
             throw conflict("not-no-show", "Not a no-show", "Late arrival applies only to an appointment marked as a no-show.", "NOT_NO_SHOW");
         }
@@ -198,10 +198,6 @@ class NoShowService {
 
     private void askEta(UUID tenant, AppointmentRow a) {
         eta.afterCommit(tenant, a.doctorId(), a.startTime().atZone(clock.zone(tenant)).toLocalDate());
-    }
-
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private static ApiException conflict(String slug, String title, String detail, String code) {

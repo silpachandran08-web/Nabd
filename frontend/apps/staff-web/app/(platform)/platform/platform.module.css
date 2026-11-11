@@ -246,7 +246,7 @@
   min-width: 18px;
   padding: 0 var(--nb-space-4);
   border-radius: 9px;
-  background: var(--nb-accent-500);
+  background: var(--nb-accent-fill);
   color: var(--nb-on-accent);
   font-size: var(--nb-fs-xs);
   font-weight: 700;

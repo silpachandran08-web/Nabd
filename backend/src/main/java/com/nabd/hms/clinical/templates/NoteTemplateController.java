@@ -1,9 +1,10 @@
 package com.nabd.hms.clinical.templates;
 
+import jakarta.validation.Valid;
+import com.nabd.hms.common.CurrentStaff;
+import com.nabd.hms.common.CurrentTenant;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -35,35 +36,27 @@ public class NoteTemplateController {
     @GetMapping
     @com.nabd.hms.clinical.ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view')")
-    public List<TemplateResponse> list(@AuthenticationPrincipal Jwt jwt) {
-        return service.list(tenantId(jwt), staffId(jwt));
+    public List<TemplateResponse> list(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId) {
+        return service.list(tenantId, staffId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public TemplateResponse create(@AuthenticationPrincipal Jwt jwt, @RequestBody CreateRequest req) {
-        return service.create(tenantId(jwt), staffId(jwt), req);
+    public TemplateResponse create(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody CreateRequest req) {
+        return service.create(tenantId, staffId, req);
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public TemplateResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @RequestBody UpdateRequest req) {
-        return service.update(tenantId(jwt), staffId(jwt), id, req);
+    public TemplateResponse update(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody UpdateRequest req) {
+        return service.update(tenantId, staffId, id, req);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        service.delete(tenantId(jwt), staffId(jwt), id);
-    }
-
-    private UUID tenantId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("tenantId"));
-    }
-
-    private UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    public void delete(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id) {
+        service.delete(tenantId, staffId, id);
     }
 }

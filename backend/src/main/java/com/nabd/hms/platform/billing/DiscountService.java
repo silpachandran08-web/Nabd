@@ -33,6 +33,8 @@ import static com.nabd.hms.platform.billing.BillingModels.SubscriptionRow;
 @Service
 public class DiscountService {
 
+    private static final String NOT_FOUND = "The requested discount request was not found.";
+
     private static final Logger log = LoggerFactory.getLogger(DiscountService.class);
     private static final BigDecimal AUTO_APPROVE_CAP_PERCENT = new BigDecimal("15");
 
@@ -97,7 +99,7 @@ public class DiscountService {
     }
 
     private void audit(UUID operatorId, String ipAddress, String action, DiscountRow d) {
-        BillingModels.OperatorInfo operator = repo.findOperatorInfo(operatorId).orElseThrow(this::notFound);
+        BillingModels.OperatorInfo operator = repo.findOperatorInfo(operatorId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("discountId", d.id().toString());
         after.put("percent", d.percent());
@@ -145,7 +147,7 @@ public class DiscountService {
     }
 
     private DiscountRow pendingOrThrow(UUID id) {
-        DiscountRow row = repo.findDiscountById(id).orElseThrow(this::notFound);
+        DiscountRow row = repo.findDiscountById(id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if (!"pending".equals(row.status())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "discount-not-pending", "Discount not pending",
                     "This discount request has already been " + row.status() + ".");
@@ -156,10 +158,6 @@ public class DiscountService {
     private DiscountResponse toResponse(DiscountRow d) {
         return new DiscountResponse(d.id(), d.tenantId(), d.tenantName(), d.requestedBy(), d.requestedByName(),
                 d.percent(), d.reason(), d.status(), d.reviewedBy(), d.reviewedByName(), d.reviewedAt(), d.createdAt());
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested discount request was not found.");
     }
 
     private ApiException noSubscription() {

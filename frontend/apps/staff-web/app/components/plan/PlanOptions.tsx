@@ -42,7 +42,7 @@ export default function PlanOptions() {
               </li>
             ))}
           </ul>
-          <p className={styles.muted}>To add a module, contact Nabd support.</p>
+          <p className={styles.muted}>To add a module, change your plan below.</p>
         </section>
       )}
       <Link href="/setup?tab=subscription" className={styles.link}>View the plan catalogue</Link>

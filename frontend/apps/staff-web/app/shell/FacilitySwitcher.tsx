@@ -3,6 +3,7 @@
 // token) and enters the picked one (POST /owners/workspaces/select), exactly as /owner/workspaces does. The new clinic token IS the
 // persisted choice: every screen reads it, so a reload re-scopes all of them. Without a valid pending token the old sign-in-again path stays.
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "../clinicNav.module.css";
@@ -21,6 +22,7 @@ const pending = () => sessionStorage.getItem("nabd_owner_pending_token");
 export default function FacilitySwitcher({ name, region, tenantId, branchLocked, onSignInAgain, signingOut }: {
   name: string; region: string; tenantId: string | null; branchLocked: boolean; onSignInAgain: () => void; signingOut: boolean;
 }) {
+  const tf = useTranslations("shell.facility");
   const [open, setOpen] = useState(false);
   const scope = useFacilityScope();
   const router = useRouter();
@@ -72,54 +74,54 @@ export default function FacilitySwitcher({ name, region, tenantId, branchLocked,
   const all = (brands ?? []).flatMap((b) => b.clinics.map((c) => ({ ...c, brand: b.name })));
   return (
     <div className={styles.clinicWrap}>
-      <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu" aria-expanded={open} aria-label={scope === "all" ? "Clinic: All facilities" : `Clinic: ${name}`} onClick={() => void toggle()}>
+      <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu" aria-expanded={open} aria-label={scope === "all" ? tf("clinicAll") : tf("clinicNamed", { name })} onClick={() => void toggle()}>
         <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
-        <div className={styles.clinicText}><div className={styles.clinicName}>{scope === "all" ? "All facilities" : <bdi>{name}</bdi>}</div></div>
+        <div className={styles.clinicText}><div className={styles.clinicName}>{scope === "all" ? tf("allFacilities") : <bdi>{name}</bdi>}</div></div>
         <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
       </button>
       {open && (
         <>
           <div className={styles.menuBackdrop} onClick={() => setOpen(false)} />
-          <div className={styles.clinicMenu} role="menu" aria-label="Clinic & branch">
-            <div className={styles.menuHeader}>Clinic &amp; branch</div>
-            {canList && !brands && !error && <div className={styles.clinicRowSub} role="status">Loading your clinics…</div>}
+          <div className={styles.clinicMenu} role="menu" aria-label={tf("menu")}>
+            <div className={styles.menuHeader}>{tf("menu")}</div>
+            {canList && !brands && !error && <div className={styles.clinicRowSub} role="status">{tf("loading")}</div>}
             {all.length > 1 && (
               <button type="button" role="menuitemradio" aria-checked={scope === "all"} className={styles.clinicSwitch}
                 onClick={() => { setFacilityScope(scope === "all" ? "one" : "all"); setOpen(false); router.push("/overview"); }}>
-                All facilities
-                <span className={styles.clinicRowSub}>{scope === "all" ? "Showing all · read-only" : "Read-only aggregate"}</span>
+                {tf("allFacilities")}
+                <span className={styles.clinicRowSub}>{scope === "all" ? tf("showingAll") : tf("readOnlyAggregate")}</span>
               </button>
             )}
             {all.length === 0 && (
               <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
                 <Icon name="building" size={14} />
                 <span className={styles.clinicRowText}><span><bdi>{name}</bdi></span>{region && <span className={styles.clinicRowSub}>{regionLabel(region)}</span>}</span>
-                <span className={styles.clinicRowTag}>Current</span>
+                <span className={styles.clinicRowTag}>{tf("current")}</span>
               </div>
             )}
             {all.map((c) => c.id === tenantId ? (
               <div key={c.id} className={styles.clinicCurrent} role="menuitem" aria-current="true">
                 <Icon name="building" size={14} />
-                <span className={styles.clinicRowText}><span><bdi>{c.name}</bdi></span><span className={styles.clinicRowSub}>{c.brand} · {regionLabel(c.region)}</span></span>
-                <span className={styles.clinicRowTag}>Current</span>
+                <span className={styles.clinicRowText}><span><bdi>{c.name}</bdi></span><span className={styles.clinicRowSub}>{tf("brandRegion", { brand: c.brand, region: regionLabel(c.region) })}</span></span>
+                <span className={styles.clinicRowTag}>{tf("current")}</span>
               </div>
             ) : (
               <button key={c.id} type="button" role="menuitem" className={styles.clinicSwitch} disabled={busy !== null} onClick={() => void enter(c.id)}>
                 <bdi>{c.name}</bdi>
-                <span className={styles.clinicRowSub}>{busy === c.id ? "Entering…" : `${c.brand} · ${regionLabel(c.region)}`}</span>
+                <span className={styles.clinicRowSub}>{busy === c.id ? tf("entering") : tf("brandRegion", { brand: c.brand, region: regionLabel(c.region) })}</span>
               </button>
             ))}
             {error && <div className={styles.clinicRowSub} role="alert">{error}</div>}
             {branchLocked && (
               <Link href="/setup?tab=subscription" role="menuitem" className={styles.clinicLocked} onClick={() => setOpen(false)}>
                 <Icon name="lock" size={14} />
-                <span className={styles.clinicRowText}><span>More branches</span><span className={styles.clinicRowSub}>Locked: needs Multi-branch module</span></span>
+                <span className={styles.clinicRowText}><span>{tf("moreBranches")}</span><span className={styles.clinicRowSub}>{tf("locked")}</span></span>
               </Link>
             )}
             {!canList && (
               <button type="button" role="menuitem" className={styles.clinicSwitch} onClick={onSignInAgain} disabled={signingOut}>
-                {signingOut ? "Signing out…" : "Switch clinic"}
-                <span className={styles.clinicRowSub}>Signs you out here; sign in again to pick a clinic.</span>
+                {signingOut ? tf("signingOut") : tf("switchClinic")}
+                <span className={styles.clinicRowSub}>{tf("signsOut")}</span>
               </button>
             )}
           </div>

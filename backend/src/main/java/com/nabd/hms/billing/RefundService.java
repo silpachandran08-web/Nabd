@@ -73,7 +73,7 @@ public class RefundService {
     @Transactional
     public RefundRequestResponse request(UUID invoiceId, UUID staffId, String ip, RefundRequestRequest req) {
         UUID tenantId = tenantContext.current();
-        var invoice = repo.lockInvoice(tenantId, invoiceId).orElseThrow(() -> notFound("Invoice not found."));
+        var invoice = repo.lockInvoice(tenantId, invoiceId).orElseThrow(() -> ApiException.notFound("Invoice not found."));
         if (InvoiceStatus.CLOSED.contains(invoice.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-not-refundable", "Invoice can't be refunded", "This invoice is " + invoice.status() + ".");
         }
@@ -115,14 +115,14 @@ public class RefundService {
     @Transactional
     public RefundDecisionRequests.Approved approve(UUID requestId, UUID staffId, String ip, BigDecimal expectedAmount) {
         UUID tenantId = tenantContext.current();
-        var req = repo.findRequest(tenantId, requestId).orElseThrow(() -> notFound("Refund request not found."));
+        var req = repo.findRequest(tenantId, requestId).orElseThrow(() -> ApiException.notFound("Refund request not found."));
         if (req.requestedBy().equals(staffId)) { // NB-056 maker-checker
             throw new ApiException(HttpStatus.FORBIDDEN, "same-user", "Self-approval blocked",
                     "A refund must be approved by someone other than whoever requested it.", Map.of("code", "SAME_USER"));
         }
         dayClose.requireTodayOpen(tenantId); // the credit note and the cash-out land on today; today's close must not change
-        var invoice = repo.lockInvoice(tenantId, req.invoiceId()).orElseThrow(() -> notFound("Invoice not found."));
-        req = repo.findRequest(tenantId, requestId).orElseThrow(() -> notFound("Refund request not found.")); // re-read under the lock
+        var invoice = repo.lockInvoice(tenantId, req.invoiceId()).orElseThrow(() -> ApiException.notFound("Invoice not found."));
+        req = repo.findRequest(tenantId, requestId).orElseThrow(() -> ApiException.notFound("Refund request not found.")); // re-read under the lock
         if (!"pending".equals(req.status())) throw alreadyDecided();
         if (req.amountMinor() > thresholdMinor(tenantId, req.currency())) {
             String role = actors.findActor(tenantId, staffId).map(ActorDirectory.Actor::role).orElse("");
@@ -191,7 +191,7 @@ public class RefundService {
     @Transactional
     public RefundRequestResponse reject(UUID requestId, UUID staffId, String ip, String reason) {
         UUID tenantId = tenantContext.current();
-        var req = repo.findRequest(tenantId, requestId).orElseThrow(() -> notFound("Refund request not found."));
+        var req = repo.findRequest(tenantId, requestId).orElseThrow(() -> ApiException.notFound("Refund request not found."));
         repo.lockInvoice(tenantId, req.invoiceId());
         if (repo.decide(tenantId, requestId, "rejected", staffId, reason.trim()) != 1) throw alreadyDecided();
         record(tenantId, staffId, ip, "billing.refund_rejected", requestId, Map.of("status", "pending"), Map.of("status", "rejected"));
@@ -334,10 +334,6 @@ public class RefundService {
     static ApiException returnNotAllowed(UUID lineId, String reason) {
         return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "return-not-allowed", "Return not allowed", reason,
                 Map.of("code", "RETURN_NOT_ALLOWED", "invoiceLineId", lineId, "reason", reason));
-    }
-
-    private static ApiException notFound(String detail) {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", detail);
     }
 
     private static ApiException alreadyDecided() {

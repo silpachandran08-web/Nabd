@@ -417,6 +417,49 @@ paths:
       tags:
       - messaging
       x-required-permission: public
+  /internal/v1/patients/{ref}/recipients:
+    get:
+      operationId: InternalRecipientsController_recipients
+      parameters:
+      - in: path
+        name: ref
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: tenantId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: class
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: X-Internal-Token
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CareRecipient"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
   /internal/v1/safety-dictionaries/{region}/versions:
     get:
       operationId: SafetyDictionaryController_listSafetyDictionaryVersions
@@ -9013,6 +9056,88 @@ paths:
       tags:
       - staff
       x-required-permission: authenticated
+  /v1/me/profile-claims/{token}:
+    get:
+      operationId: ProfileClaimController_view
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/View"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
+    post:
+      operationId: ProfileClaimController_claim
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileClaimRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProfileClaimed"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
+  /v1/me/profile-claims/{token}/otp:
+    post:
+      operationId: ProfileClaimController_otp
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+          description: Accepted
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
   /v1/messaging/quality:
     get:
       operationId: OwnerMessagingController_quality
@@ -10983,6 +11108,12 @@ paths:
   /v1/patients/guardian-reviews-due:
     get:
       operationId: PatientController_guardianReviewsDue
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -11549,6 +11680,90 @@ paths:
       tags:
       - patient
       x-required-permission: patients:delete
+  /v1/patients/{id}/profile-claim:
+    post:
+      operationId: ProfileClaimController_deskClaim
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileClaimRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ProfileClaimed"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
+  /v1/patients/{id}/profile-claim/otp:
+    post:
+      operationId: ProfileClaimController_deskOtp
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/patients/{id}/proxies/{proxyId}/revoke:
     post:
       operationId: ProxyRevokeController_revoke
@@ -14992,6 +15207,90 @@ paths:
       tags:
       - patient
       x-required-permission: public
+  /v1/public/exports/{token}:
+    get:
+      operationId: DataExportController_view
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LinkView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: public
+  /v1/public/exports/{token}/download:
+    post:
+      operationId: DataExportController_download
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataExportDownloadRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: public
+  /v1/public/exports/{token}/otp:
+    post:
+      operationId: DataExportController_otp
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+          description: Accepted
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: public
   /v1/public/links/{token}/open:
     post:
       operationId: PublicSecureLinkController_open
@@ -18052,19 +18351,63 @@ paths:
       - organization
       x-required-permission: setup:view
     post:
-      operationId: SetupController_createExportJob
+      operationId: DataExportController_start
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ExportJobRequest"
+              $ref: "#/components/schemas/DataExportRequest"
         required: true
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Started"
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:export
+  /v1/setup/export-jobs/{id}:
+    get:
+      operationId: DataExportController_get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         "200":
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/ExportJobResponse"
+                $ref: "#/components/schemas/Job"
           description: OK
         "401":
           content:
@@ -18086,7 +18429,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - organization
-      x-required-permission: setup:view
+      x-required-permission: setup:export
   /v1/setup/go-live:
     post:
       operationId: GoLiveController_goLive
@@ -19232,6 +19575,174 @@ paths:
           description: Error (RFC 7807)
       tags:
       - organization
+      x-required-permission: setup:view
+  /v1/setup/subscription/change:
+    post:
+      operationId: OwnerPlanController_change
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ChangeResult"
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: setup:edit
+  /v1/setup/subscription/change-preview:
+    get:
+      operationId: OwnerPlanController_preview
+      parameters:
+      - in: query
+        name: targetPlanCode
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: effective
+        required: false
+        schema:
+          type: string
+          default: now
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Preview"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: setup:view
+  /v1/setup/subscription/invoices:
+    get:
+      operationId: OwnerPlanController_invoices
+      parameters:
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InvoicePage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: setup:view
+  /v1/setup/subscription/invoices/{id}:
+    get:
+      operationId: OwnerPlanController_invoice
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InvoiceItem"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
       x-required-permission: setup:view
   /v1/setup/trial:
     get:
@@ -21920,6 +22431,15 @@ components:
           deprecated: true
         reasonCode:
           type: string
+    CareRecipient:
+      type: object
+      properties:
+        channel:
+          type: string
+        recipientRef:
+          type: string
+        relation:
+          type: string
     Cell:
       type: object
       properties:
@@ -21951,6 +22471,46 @@ components:
           items:
             type: string
             format: date-time
+    ChangeRequest:
+      type: object
+      properties:
+        confirmClinicName:
+          type: string
+          maxLength: 200
+          minLength: 0
+        effective:
+          type: string
+          minLength: 1
+          pattern: now|renewal
+        targetPlanCode:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - effective
+      - targetPlanCode
+    ChangeResult:
+      type: object
+      properties:
+        changeId:
+          type: string
+          format: uuid
+        currency:
+          type: string
+        direction:
+          type: string
+        effectiveAt:
+          type: string
+          format: date-time
+        modulesTurningReadOnly:
+          type: array
+          items:
+            type: string
+        prorationMinor:
+          type: integer
+          format: int64
+        status:
+          type: string
     ChargeHeadResponse:
       type: object
       properties:
@@ -22935,6 +23495,41 @@ components:
             $ref: "#/components/schemas/DailySummaryRecipient"
         sendAt:
           type: string
+    DataExportDownloadRequest:
+      type: object
+      properties:
+        otp:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{6}$"
+      required:
+      - otp
+    DataExportRequest:
+      type: object
+      properties:
+        branchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 20
+          minItems: 0
+        datasets:
+          type: array
+          items:
+            type: string
+            pattern: "[a-z_]{2,20}"
+          maxItems: 20
+          minItems: 0
+        format:
+          type: string
+          minLength: 1
+          pattern: xlsx|csv|fhir_ndjson|pdf_per_patient
+        scope:
+          type: string
+          pattern: full_tenant
+      required:
+      - format
     DataQualityItem:
       type: object
       properties:
@@ -22953,6 +23548,16 @@ components:
           items:
             $ref: "#/components/schemas/DataQualityItem"
         nextCursor:
+          type: string
+    DatasetProgress:
+      type: object
+      properties:
+        name:
+          type: string
+        rows:
+          type: integer
+          format: int64
+        status:
           type: string
     Day:
       type: object
@@ -24339,15 +24944,6 @@ components:
           type: boolean
         valueLeft:
           type: number
-    ExportJobRequest:
-      type: object
-      properties:
-        exportType:
-          type: string
-          minLength: 1
-          pattern: full_tenant|patients|invoices|charges
-      required:
-      - exportType
     ExportJobResponse:
       type: object
       properties:
@@ -25025,6 +25621,12 @@ components:
     GuardianReviewResponse:
       type: object
       properties:
+        claimExpiresAt:
+          type: string
+          format: date-time
+        claimSentAt:
+          type: string
+          format: date-time
         dob:
           type: string
           format: date
@@ -25033,12 +25635,17 @@ components:
           format: uuid
         guardianName:
           type: string
+        handoverDate:
+          type: string
+          format: date
         mrn:
           type: string
         patientId:
           type: string
           format: uuid
         patientName:
+          type: string
+        status:
           type: string
     HolidayEffectRequest:
       type: object
@@ -25531,6 +26138,36 @@ components:
           format: date-time
         relation:
           type: string
+    InvoiceItem:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        id:
+          type: string
+          format: uuid
+        issuedAt:
+          type: string
+          format: date-time
+        kind:
+          type: string
+        number:
+          type: string
+        pdfUrl:
+          type: string
+        period:
+          type: string
+        periodEnd:
+          type: string
+          format: date
+        periodStart:
+          type: string
+          format: date
+        status:
+          type: string
     InvoiceListItem:
       type: object
       properties:
@@ -25567,6 +26204,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/InvoiceListItem"
+        nextCursor:
+          type: string
+    InvoicePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceItem"
         nextCursor:
           type: string
     InvoiceResponse:
@@ -25683,6 +26329,36 @@ components:
         matchKind:
           type: string
         value:
+          type: string
+    Job:
+      type: object
+      properties:
+        archiveSha256:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+        completedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        datasets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatasetProgress"
+        format:
+          type: string
+        id:
+          type: string
+          format: uuid
+        linkExpiresAt:
+          type: string
+          format: date-time
+        linkSent:
+          type: boolean
+        status:
           type: string
     JsonNode:
       type: object
@@ -26075,6 +26751,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LinkOpenItem"
+    LinkView:
+      type: object
+      properties:
+        clinicName:
+          type: string
+        downloadsLeft:
+          type: integer
+          format: int32
+        expiresAt:
+          type: string
+          format: date-time
     LoginRequest:
       type: object
       properties:
@@ -26345,6 +27032,14 @@ components:
         waitingNow:
           type: integer
           format: int32
+    NextInvoice:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        currency:
+          type: string
     NoShowRequest:
       type: object
       properties:
@@ -27337,6 +28032,19 @@ components:
           type: string
         staffName:
           type: string
+    PendingChange:
+      type: object
+      properties:
+        direction:
+          type: string
+        effectiveAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        toPlanCode:
+          type: string
     PharmacyCapabilitiesResponse:
       type: object
       properties:
@@ -27781,6 +28489,31 @@ components:
         tenantCount:
           type: integer
           format: int64
+    PlanOption:
+      type: object
+      properties:
+        branchLimit:
+          type: integer
+          format: int32
+        code:
+          type: string
+        modules:
+          type: array
+          items:
+            type: string
+        monthlyMinor:
+          type: integer
+          format: int64
+        name:
+          type: string
+        pricingBasis:
+          type: string
+        seatLimit:
+          type: integer
+          format: int32
+        version:
+          type: integer
+          format: int32
     PlanResponse:
       type: object
       properties:
@@ -28458,6 +29191,25 @@ components:
         status:
           type: string
           pattern: prepped|completed|cancelled
+    ProfileClaimRequest:
+      type: object
+      properties:
+        keepGuardianScope:
+          type: string
+          pattern: NONE|BOOK_ONLY|BOOK_AND_RECORDS
+        otp:
+          type: string
+          minLength: 1
+          pattern: "^[0-9]{6}$"
+      required:
+      - otp
+    ProfileClaimed:
+      type: object
+      properties:
+        claimed:
+          type: boolean
+        keptScope:
+          type: string
     ProvisioningJobResponse:
       type: object
       properties:
@@ -30325,6 +31077,17 @@ components:
           type: string
         specialty:
           type: string
+    Started:
+      type: object
+      properties:
+        estimateMinutes:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
     StepUpTokenResponse:
       type: object
       properties:
@@ -30689,12 +31452,18 @@ components:
         activePatientsUsed:
           type: integer
           format: int64
+        availablePlans:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanOption"
         branchesLimit:
           type: integer
           format: int64
         branchesUsed:
           type: integer
           format: int64
+        currency:
+          type: string
         killedFeatures:
           type: array
           items:
@@ -30703,8 +31472,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModuleState"
+        nextInvoice:
+          $ref: "#/components/schemas/NextInvoice"
+        paymentMethod:
+          type: string
+        pendingChange:
+          $ref: "#/components/schemas/PendingChange"
         plan:
           type: string
+        planCode:
+          type: string
+        renewalDate:
+          type: string
+          format: date
         seatsLimit:
           type: integer
           format: int64
@@ -30713,6 +31493,11 @@ components:
           format: int64
         status:
           type: string
+        usage:
+          $ref: "#/components/schemas/Usage"
+        version:
+          type: integer
+          format: int32
         whatsappMessagesLimit:
           type: integer
           format: int64
@@ -31356,6 +32141,30 @@ components:
           type: array
           items:
             type: string
+    Usage:
+      type: object
+      properties:
+        aiChecks:
+          type: integer
+          format: int64
+        branchesLimit:
+          type: integer
+          format: int64
+        branchesUsed:
+          type: integer
+          format: int64
+        seatsLimit:
+          type: integer
+          format: int64
+        seatsUsed:
+          type: integer
+          format: int64
+        whatsappPassThroughMinor:
+          type: integer
+          format: int64
+        whatsappUtilityMessages:
+          type: integer
+          format: int64
     VaccineRecordRequest:
       type: object
       properties:
@@ -31435,6 +32244,23 @@ components:
       properties:
         otp:
           type: string
+    View:
+      type: object
+      properties:
+        clinicName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        firstName:
+          type: string
+        guardianFirstName:
+          type: string
+        opensOn:
+          type: string
+          format: date
+        ownPhone:
+          type: boolean
     VisitAttachmentItem:
       type: object
       properties:

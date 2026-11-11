@@ -1,5 +1,6 @@
 package com.nabd.hms.billing.gateway;
 
+import jakarta.validation.Valid;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.shared.Idempotent;
@@ -43,7 +44,7 @@ public class GatewayAccountController {
     @PostMapping
     @PreAuthorize("hasAuthority('setup:edit')")
     @ResponseStatus(HttpStatus.CREATED)
-    public GatewayAccountService.AccountView connect(@AuthenticationPrincipal Jwt jwt, @RequestBody GatewayAccountService.ConnectRequest req,
+    public GatewayAccountService.AccountView connect(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody GatewayAccountService.ConnectRequest req,
                                                      HttpServletRequest http, @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
         UUID staff = UUID.fromString(jwt.getSubject());
         stepUp.require(stepUpToken, staff);

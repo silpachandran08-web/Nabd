@@ -190,6 +190,7 @@ owner,GET /v1/setup/consent-contact,setup:view,allow
 owner,GET /v1/setup/dpa,setup:view,allow
 owner,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,allow
 owner,GET /v1/setup/export-jobs,setup:view,allow
+owner,GET /v1/setup/export-jobs/{id},setup:export,allow
 owner,GET /v1/setup/go-live/checks,setup:view,allow
 owner,GET /v1/setup/go-live/poster,setup:view,allow
 owner,GET /v1/setup/holidays,setup:view,allow
@@ -205,6 +206,9 @@ owner,GET /v1/setup/profile,setup:view,allow
 owner,GET /v1/setup/shifts,setup:view,allow
 owner,GET /v1/setup/staff,setup:view,allow
 owner,GET /v1/setup/subscription,setup:view,allow
+owner,GET /v1/setup/subscription/change-preview,setup:view,allow
+owner,GET /v1/setup/subscription/invoices,setup:view,allow
+owner,GET /v1/setup/subscription/invoices/{id},setup:view,allow
 owner,GET /v1/setup/trial,setup:view,allow
 owner,GET /v1/setup/whatsapp-templates,setup:view,allow
 owner,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
@@ -340,6 +344,8 @@ owner,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner,POST /v1/patients/{id}/consents,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner,POST /v1/patients/{id}/merge,patients:delete,allow
+owner,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+owner,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 owner,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 owner,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 owner,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,allow
@@ -388,7 +394,7 @@ owner,POST /v1/setup/checklist/{step}/complete,setup:edit,allow
 owner,POST /v1/setup/checklist/{step}/skip,setup:edit,allow
 owner,POST /v1/setup/dpa/accept,setup:edit,allow
 owner,POST /v1/setup/dpa/otp,setup:edit,allow
-owner,POST /v1/setup/export-jobs,setup:view,allow
+owner,POST /v1/setup/export-jobs,setup:export,allow
 owner,POST /v1/setup/go-live,setup:edit,allow
 owner,POST /v1/setup/holidays,setup:edit,allow
 owner,POST /v1/setup/import-jobs,setup:edit,allow
@@ -397,6 +403,7 @@ owner,POST /v1/setup/import-uploads,setup:edit,allow
 owner,POST /v1/setup/licences,setup:edit,allow
 owner,POST /v1/setup/licences/{id}/override,setup:edit,allow
 owner,POST /v1/setup/shifts,setup:edit,allow
+owner,POST /v1/setup/subscription/change,setup:edit,allow
 owner,POST /v1/setup/trial/convert,setup:edit,allow
 owner,POST /v1/setup/trial/convert/otp,setup:edit,allow
 owner,POST /v1/setup/whatsapp-templates,setup:edit,allow
@@ -623,6 +630,7 @@ owner_doctor,GET /v1/setup/consent-contact,setup:view,allow
 owner_doctor,GET /v1/setup/dpa,setup:view,allow
 owner_doctor,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,allow
 owner_doctor,GET /v1/setup/export-jobs,setup:view,allow
+owner_doctor,GET /v1/setup/export-jobs/{id},setup:export,allow
 owner_doctor,GET /v1/setup/go-live/checks,setup:view,allow
 owner_doctor,GET /v1/setup/go-live/poster,setup:view,allow
 owner_doctor,GET /v1/setup/holidays,setup:view,allow
@@ -638,6 +646,9 @@ owner_doctor,GET /v1/setup/profile,setup:view,allow
 owner_doctor,GET /v1/setup/shifts,setup:view,allow
 owner_doctor,GET /v1/setup/staff,setup:view,allow
 owner_doctor,GET /v1/setup/subscription,setup:view,allow
+owner_doctor,GET /v1/setup/subscription/change-preview,setup:view,allow
+owner_doctor,GET /v1/setup/subscription/invoices,setup:view,allow
+owner_doctor,GET /v1/setup/subscription/invoices/{id},setup:view,allow
 owner_doctor,GET /v1/setup/trial,setup:view,allow
 owner_doctor,GET /v1/setup/whatsapp-templates,setup:view,allow
 owner_doctor,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
@@ -773,6 +784,8 @@ owner_doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/merge,patients:delete,allow
+owner_doctor,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+owner_doctor,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 owner_doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 owner_doctor,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,allow
@@ -821,7 +834,7 @@ owner_doctor,POST /v1/setup/checklist/{step}/complete,setup:edit,allow
 owner_doctor,POST /v1/setup/checklist/{step}/skip,setup:edit,allow
 owner_doctor,POST /v1/setup/dpa/accept,setup:edit,allow
 owner_doctor,POST /v1/setup/dpa/otp,setup:edit,allow
-owner_doctor,POST /v1/setup/export-jobs,setup:view,allow
+owner_doctor,POST /v1/setup/export-jobs,setup:export,allow
 owner_doctor,POST /v1/setup/go-live,setup:edit,allow
 owner_doctor,POST /v1/setup/holidays,setup:edit,allow
 owner_doctor,POST /v1/setup/import-jobs,setup:edit,allow
@@ -830,6 +843,7 @@ owner_doctor,POST /v1/setup/import-uploads,setup:edit,allow
 owner_doctor,POST /v1/setup/licences,setup:edit,allow
 owner_doctor,POST /v1/setup/licences/{id}/override,setup:edit,allow
 owner_doctor,POST /v1/setup/shifts,setup:edit,allow
+owner_doctor,POST /v1/setup/subscription/change,setup:edit,allow
 owner_doctor,POST /v1/setup/trial/convert,setup:edit,allow
 owner_doctor,POST /v1/setup/trial/convert/otp,setup:edit,allow
 owner_doctor,POST /v1/setup/whatsapp-templates,setup:edit,allow
@@ -1056,6 +1070,7 @@ doctor,GET /v1/setup/consent-contact,setup:view,deny-403
 doctor,GET /v1/setup/dpa,setup:view,deny-403
 doctor,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-403
 doctor,GET /v1/setup/export-jobs,setup:view,deny-403
+doctor,GET /v1/setup/export-jobs/{id},setup:export,deny-403
 doctor,GET /v1/setup/go-live/checks,setup:view,deny-403
 doctor,GET /v1/setup/go-live/poster,setup:view,deny-403
 doctor,GET /v1/setup/holidays,setup:view,deny-403
@@ -1071,6 +1086,9 @@ doctor,GET /v1/setup/profile,setup:view,deny-403
 doctor,GET /v1/setup/shifts,setup:view,deny-403
 doctor,GET /v1/setup/staff,setup:view,deny-403
 doctor,GET /v1/setup/subscription,setup:view,deny-403
+doctor,GET /v1/setup/subscription/change-preview,setup:view,deny-403
+doctor,GET /v1/setup/subscription/invoices,setup:view,deny-403
+doctor,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 doctor,GET /v1/setup/trial,setup:view,deny-403
 doctor,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 doctor,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
@@ -1206,6 +1224,8 @@ doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 doctor,POST /v1/patients/{id}/consents,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 doctor,POST /v1/patients/{id}/merge,patients:delete,deny-403
+doctor,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+doctor,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 doctor,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 doctor,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -1254,7 +1274,7 @@ doctor,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 doctor,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 doctor,POST /v1/setup/dpa/accept,setup:edit,deny-403
 doctor,POST /v1/setup/dpa/otp,setup:edit,deny-403
-doctor,POST /v1/setup/export-jobs,setup:view,deny-403
+doctor,POST /v1/setup/export-jobs,setup:export,deny-403
 doctor,POST /v1/setup/go-live,setup:edit,deny-403
 doctor,POST /v1/setup/holidays,setup:edit,deny-403
 doctor,POST /v1/setup/import-jobs,setup:edit,deny-403
@@ -1263,6 +1283,7 @@ doctor,POST /v1/setup/import-uploads,setup:edit,deny-403
 doctor,POST /v1/setup/licences,setup:edit,deny-403
 doctor,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 doctor,POST /v1/setup/shifts,setup:edit,deny-403
+doctor,POST /v1/setup/subscription/change,setup:edit,deny-403
 doctor,POST /v1/setup/trial/convert,setup:edit,deny-403
 doctor,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 doctor,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
@@ -1489,6 +1510,7 @@ nurse,GET /v1/setup/consent-contact,setup:view,deny-403
 nurse,GET /v1/setup/dpa,setup:view,deny-403
 nurse,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-403
 nurse,GET /v1/setup/export-jobs,setup:view,deny-403
+nurse,GET /v1/setup/export-jobs/{id},setup:export,deny-403
 nurse,GET /v1/setup/go-live/checks,setup:view,deny-403
 nurse,GET /v1/setup/go-live/poster,setup:view,deny-403
 nurse,GET /v1/setup/holidays,setup:view,deny-403
@@ -1504,6 +1526,9 @@ nurse,GET /v1/setup/profile,setup:view,deny-403
 nurse,GET /v1/setup/shifts,setup:view,deny-403
 nurse,GET /v1/setup/staff,setup:view,deny-403
 nurse,GET /v1/setup/subscription,setup:view,deny-403
+nurse,GET /v1/setup/subscription/change-preview,setup:view,deny-403
+nurse,GET /v1/setup/subscription/invoices,setup:view,deny-403
+nurse,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 nurse,GET /v1/setup/trial,setup:view,deny-403
 nurse,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 nurse,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
@@ -1639,6 +1664,8 @@ nurse,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 nurse,POST /v1/patients/{id}/consents,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 nurse,POST /v1/patients/{id}/merge,patients:delete,deny-403
+nurse,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+nurse,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 nurse,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 nurse,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 nurse,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -1687,7 +1714,7 @@ nurse,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 nurse,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 nurse,POST /v1/setup/dpa/accept,setup:edit,deny-403
 nurse,POST /v1/setup/dpa/otp,setup:edit,deny-403
-nurse,POST /v1/setup/export-jobs,setup:view,deny-403
+nurse,POST /v1/setup/export-jobs,setup:export,deny-403
 nurse,POST /v1/setup/go-live,setup:edit,deny-403
 nurse,POST /v1/setup/holidays,setup:edit,deny-403
 nurse,POST /v1/setup/import-jobs,setup:edit,deny-403
@@ -1696,6 +1723,7 @@ nurse,POST /v1/setup/import-uploads,setup:edit,deny-403
 nurse,POST /v1/setup/licences,setup:edit,deny-403
 nurse,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 nurse,POST /v1/setup/shifts,setup:edit,deny-403
+nurse,POST /v1/setup/subscription/change,setup:edit,deny-403
 nurse,POST /v1/setup/trial/convert,setup:edit,deny-403
 nurse,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 nurse,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
@@ -1922,6 +1950,7 @@ receptionist,GET /v1/setup/consent-contact,setup:view,deny-403
 receptionist,GET /v1/setup/dpa,setup:view,deny-403
 receptionist,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-403
 receptionist,GET /v1/setup/export-jobs,setup:view,deny-403
+receptionist,GET /v1/setup/export-jobs/{id},setup:export,deny-403
 receptionist,GET /v1/setup/go-live/checks,setup:view,deny-403
 receptionist,GET /v1/setup/go-live/poster,setup:view,deny-403
 receptionist,GET /v1/setup/holidays,setup:view,deny-403
@@ -1937,6 +1966,9 @@ receptionist,GET /v1/setup/profile,setup:view,deny-403
 receptionist,GET /v1/setup/shifts,setup:view,deny-403
 receptionist,GET /v1/setup/staff,setup:view,deny-403
 receptionist,GET /v1/setup/subscription,setup:view,deny-403
+receptionist,GET /v1/setup/subscription/change-preview,setup:view,deny-403
+receptionist,GET /v1/setup/subscription/invoices,setup:view,deny-403
+receptionist,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 receptionist,GET /v1/setup/trial,setup:view,deny-403
 receptionist,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 receptionist,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-403
@@ -2072,6 +2104,8 @@ receptionist,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 receptionist,POST /v1/patients/{id}/consents,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 receptionist,POST /v1/patients/{id}/merge,patients:delete,deny-403
+receptionist,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+receptionist,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 receptionist,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 receptionist,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 receptionist,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -2120,7 +2154,7 @@ receptionist,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 receptionist,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 receptionist,POST /v1/setup/dpa/accept,setup:edit,deny-403
 receptionist,POST /v1/setup/dpa/otp,setup:edit,deny-403
-receptionist,POST /v1/setup/export-jobs,setup:view,deny-403
+receptionist,POST /v1/setup/export-jobs,setup:export,deny-403
 receptionist,POST /v1/setup/go-live,setup:edit,deny-403
 receptionist,POST /v1/setup/holidays,setup:edit,deny-403
 receptionist,POST /v1/setup/import-jobs,setup:edit,deny-403
@@ -2129,6 +2163,7 @@ receptionist,POST /v1/setup/import-uploads,setup:edit,deny-403
 receptionist,POST /v1/setup/licences,setup:edit,deny-403
 receptionist,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 receptionist,POST /v1/setup/shifts,setup:edit,deny-403
+receptionist,POST /v1/setup/subscription/change,setup:edit,deny-403
 receptionist,POST /v1/setup/trial/convert,setup:edit,deny-403
 receptionist,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 receptionist,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
@@ -2355,6 +2390,7 @@ frontdesk_vitals,GET /v1/setup/consent-contact,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/dpa,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/dpa/acceptances/{id}/pdf,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/export-jobs,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/export-jobs/{id},setup:export,deny-403
 frontdesk_vitals,GET /v1/setup/go-live/checks,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/go-live/poster,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/holidays,setup:view,deny-403
@@ -2370,6 +2406,9 @@ frontdesk_vitals,GET /v1/setup/profile,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/shifts,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/staff,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/subscription,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/subscription/change-preview,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/subscription/invoices,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/subscription/invoices/{id},setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/trial,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 frontdesk_vitals,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-403
@@ -2505,6 +2544,8 @@ frontdesk_vitals,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/consents,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/merge,patients:delete,deny-403
+frontdesk_vitals,POST /v1/patients/{id}/profile-claim,patients:edit,allow
+frontdesk_vitals,POST /v1/patients/{id}/profile-claim/otp,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/proxies/{proxyId}/revoke,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 frontdesk_vitals,POST /v1/pharmacy/batches/{id}/adjustments,pharmacy:edit,deny-403
@@ -2553,7 +2594,7 @@ frontdesk_vitals,POST /v1/setup/checklist/{step}/complete,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/checklist/{step}/skip,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/dpa/accept,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/dpa/otp,setup:edit,deny-403
-frontdesk_vitals,POST /v1/setup/export-jobs,setup:view,deny-403
+frontdesk_vitals,POST /v1/setup/export-jobs,setup:export,deny-403
 frontdesk_vitals,POST /v1/setup/go-live,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/holidays,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/import-jobs,setup:edit,deny-403
@@ -2562,6 +2603,7 @@ frontdesk_vitals,POST /v1/setup/import-uploads,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/licences,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/licences/{id}/override,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/shifts,setup:edit,deny-403
+frontdesk_vitals,POST /v1/setup/subscription/change,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/trial/convert,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/trial/convert/otp,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/whatsapp-templates,setup:edit,deny-403

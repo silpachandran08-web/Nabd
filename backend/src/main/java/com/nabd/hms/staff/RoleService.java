@@ -76,7 +76,7 @@ public class RoleService {
     @Transactional
     public RoleResponse get(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
-        return repo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.findById(tenantId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
@@ -109,7 +109,7 @@ public class RoleService {
     @Transactional
     public RoleResponse update(UUID tenantId, UUID callerStaffId, UUID id, RoleWriteRequest req) {
         tenantContext.set(tenantId);
-        RoleRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        RoleRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         if (current.builtIn()) {
             throw builtInImmutable();
         }
@@ -131,7 +131,7 @@ public class RoleService {
         if (!repo.isOwner(tenantId, callerStaffId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "owner-only", "OWNER_ONLY", "Only the Owner can reset a role to its preset.");
         }
-        RoleRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        RoleRow current = repo.findById(tenantId, id).orElseThrow(ApiException::notFound);
         RolePresets.Preset preset = Optional.ofNullable(current.presetCode()).flatMap(RolePresets::byCode)
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "not-a-preset", "NOT_A_PRESET",
                         "This is a custom role; only preset roles can be reset."));
@@ -139,7 +139,7 @@ public class RoleService {
         roleChanged(tenantId, id, "reset_to_preset");
         sessionsRevoked(tenantId, repo.revokeHolderSessions(tenantId, id));
         RoleRow after = repo.findById(tenantId, id).orElseThrow();
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,
                 Map.of("presetVersion", String.valueOf(current.presetVersion()), "grants", readGrants(current.grantsJson())),
                 Map.of("presetVersion", String.valueOf(after.presetVersion()), "grants", readGrants(after.grantsJson())));
@@ -176,7 +176,7 @@ public class RoleService {
     @Transactional
     public DelegationResponse createDelegation(UUID tenantId, UUID callerStaffId, DelegationRequest req, String stepUpToken) {
         tenantContext.set(tenantId);
-        RoleRow delegatedRole = repo.findById(tenantId, req.delegatedRoleId()).orElseThrow(this::notFound);
+        RoleRow delegatedRole = repo.findById(tenantId, req.delegatedRoleId()).orElseThrow(ApiException::notFound);
         if (req.expiresAt().isAfter(Instant.now(clock).plus(MAX_DELEGATION_WINDOW))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "delegation-window-too-long", "Window too long",
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
@@ -201,7 +201,7 @@ public class RoleService {
     @Transactional
     public void revokeDelegation(UUID tenantId, UUID callerStaffId, UUID id) {
         tenantContext.set(tenantId);
-        DelegationRow row = repo.findDelegation(tenantId, id).orElseThrow(this::notFound);
+        DelegationRow row = repo.findDelegation(tenantId, id).orElseThrow(ApiException::notFound);
         repo.revokeDelegation(tenantId, id);
         audit(tenantId, callerStaffId, "role.delegation_revoked", id, auditView(row), null);
         changed(tenantId, row, "revoked");
@@ -225,7 +225,7 @@ public class RoleService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "role_delegation", entityId, before, after);
     }
@@ -251,11 +251,6 @@ public class RoleService {
         } catch (JacksonException e) {
             throw new IllegalStateException("failed to serialize grants", e);
         }
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                "The requested resource was not found.");
     }
 
     private ApiException builtInImmutable() {

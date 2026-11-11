@@ -1,5 +1,6 @@
 package com.nabd.hms.platform.trial;
 
+import jakarta.validation.Valid;
 import com.nabd.hms.common.RequestMeta;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
@@ -40,14 +41,14 @@ class TrialController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
-    Map<String, Object> start(@RequestBody StartRequest req, HttpServletRequest http) {
+    Map<String, Object> start(@Valid @RequestBody StartRequest req, HttpServletRequest http) {
         var s = service.start(req.clinicName(), req.specialty(), req.mobile(), req.market(), req.consentToContact(), RequestMeta.clientIp(http));
         return Map.of("signupId", s.signupId(), "otpChannel", s.otpChannel());
     }
 
     @PostMapping("/{signupId}/verify")
     @ResponseStatus(HttpStatus.CREATED)
-    Map<String, Object> verify(@PathVariable UUID signupId, @RequestBody VerifyRequest req) {
+    Map<String, Object> verify(@PathVariable UUID signupId, @Valid @RequestBody VerifyRequest req) {
         var v = service.verify(signupId, req.otp());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("signupId", v.signupId());

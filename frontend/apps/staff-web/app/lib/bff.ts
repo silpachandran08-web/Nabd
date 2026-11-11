@@ -67,6 +67,18 @@ export function preferenceCookies(j: Record<string, unknown>, withClinic: boolea
     ...(withClinic ? [lax("nabd_clinic_locale", str(j.clinicDefaultLocale))] : [])];
 }
 
+/** FEF-025: a sign-in on a new machine gets the user's theme/locale cookies with the session, so the first page after it
+ * already renders in the saved theme. Best effort: no cookie change when Core cannot answer (the defaults apply). */
+async function signInPreferenceCookies(accessToken: string, deps: Deps, reqId: string): Promise<string[]> {
+  try {
+    const r = await deps.fetch(`${deps.core}/me/preferences`, { headers: { authorization: `Bearer ${accessToken}`, "x-request-id": reqId } });
+    const j = r.ok && (r.headers.get("content-type") ?? "").includes("json") ? ((await r.json()) as Record<string, unknown>) : null;
+    return signInCookiesFrom(j);
+  } catch { return []; }
+}
+/** The sign-in cookies for a /me/preferences answer; none until the user has saved a theme. Also used by bearer-mode sign-in. */
+export const signInCookiesFrom = (j: Record<string, unknown> | null) => (j && typeof j.uiTheme === "string" ? preferenceCookies(j, true) : []);
+
 // ---- claims --------------------------------------------------------------------------------------
 const payload = (token: string | undefined) => (token ? decodeJwtPayload<Record<string, unknown>>(token) : null);
 export const claimsToken = (accessToken: string) => `${CLAIMS_HEAD}.${accessToken.split(".")[1] ?? ""}.`;
@@ -189,7 +201,7 @@ export async function proxy(req: Request, corePath: string, deps: Deps = default
     if (j && typeof j.accessToken === "string" && typeof j.refreshToken === "string") {
       const pair = j as unknown as Pair;
       cookies.length = 0;
-      cookies.push(...sessionCookies(pair, undefined));
+      cookies.push(...sessionCookies(pair, undefined), ...(await signInPreferenceCookies(pair.accessToken, deps, reqId)));
       const { accessToken: _a, refreshToken: _r, ...rest } = j;
       void _a; void _r;
       body = JSON.stringify({ ...rest, ...sessionBody(pair.accessToken) });

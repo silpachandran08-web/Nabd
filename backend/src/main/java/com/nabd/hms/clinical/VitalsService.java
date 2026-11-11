@@ -57,7 +57,7 @@ public class VitalsService {
     @Transactional
     public VitalsResponse get(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         return toResponse(tenantId, row);
     }
 
@@ -88,7 +88,7 @@ public class VitalsService {
     public VitalsHistoryResponse previous(UUID tenantId, UUID patientId, int limit) {
         tenantContext.set(tenantId);
         if (!repo.patientExists(tenantId, patientId)) {
-            throw notFound();
+            throw ApiException.notFound();
         }
         int ageYears = repo.findPatientDob(tenantId, patientId).map(dob -> ageInYears(dob, clock.today(tenantId))).orElse(30);
         return new VitalsHistoryResponse(repo.findByPatient(tenantId, patientId, limit).stream()
@@ -99,7 +99,7 @@ public class VitalsService {
     public VitalsResponse record(UUID tenantId, UUID callerStaffId, UUID queueEntryId, VitalsWriteRequest req,
                                  boolean canCorrect) {
         tenantContext.set(tenantId);
-        QueueEntrySnapshot snapshot = repo.findQueueEntrySnapshot(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntrySnapshot snapshot = repo.findQueueEntrySnapshot(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
 
         // An empty save must never move the visit on to the doctor with no vitals, and BP is a pair.
         if (req.heightCm() == null && req.weightKg() == null && req.bpSystolic() == null && req.bpDiastolic() == null
@@ -129,7 +129,7 @@ public class VitalsService {
         if ("vitals_pending".equals(snapshot.status())) {
             queueService.updateStatus(tenantId, callerStaffId, queueEntryId, new QueueStatusUpdateRequest("vitals_done"));
         }
-        VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         auditCorrection(tenantId, callerStaffId, queueEntryId, previous, row);
         return toResponse(tenantId, row);
     }
@@ -156,7 +156,7 @@ public class VitalsService {
         if (now.isEmpty()) {
             return;
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
         now.put("queueEntryId", queueEntryId.toString());
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null, "vitals.corrected", "vitals",
                 after.id(), was, now);
@@ -203,9 +203,5 @@ public class VitalsService {
 
     private static int ageInYears(LocalDate dob, LocalDate today) {
         return Period.between(dob, today).getYears();
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

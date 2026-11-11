@@ -234,6 +234,7 @@
               <targetClasses>
                 <param>com.nabd.hms.clinical.RxSafetyChecks*</param>
                 <param>com.nabd.hms.clinical.AllergyDrugClasses*</param>
+                <param>com.nabd.hms.clinical.LocalRulesRxSafetyService*</param>
                 <param>com.nabd.hms.clinical.PrescriptionService*</param>
                 <param>com.nabd.hms.billing.CheckoutService*</param>
                 <!-- FIN-010: the pure tax rules (engine, jurisdiction adapters, credit-note arithmetic); gate: >= 85% per class in ci/quality-gates.json -->

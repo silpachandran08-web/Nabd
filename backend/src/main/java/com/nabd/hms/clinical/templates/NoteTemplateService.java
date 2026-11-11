@@ -53,13 +53,13 @@ public class NoteTemplateService {
                     "You can keep at most " + NoteTemplateRules.MAX_TEMPLATES_PER_DOCTOR + " templates. Delete one first.");
         }
         UUID id = repo.insert(tenantId, doctorId, name, s, o, a, p, toJson(tags), Boolean.TRUE.equals(req.favourite()));
-        return repo.find(tenantId, doctorId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.find(tenantId, doctorId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public TemplateResponse update(UUID tenantId, UUID doctorId, UUID id, UpdateRequest req) {
         tenantContext.set(tenantId);
-        TemplateRow cur = repo.find(tenantId, doctorId, id).orElseThrow(this::notFound);
+        TemplateRow cur = repo.find(tenantId, doctorId, id).orElseThrow(ApiException::notFound);
         String name = req.name() == null ? cur.name() : NoteTemplateRules.name(req.name());
         String s = req.subjective() == null ? cur.subjective() : NoteTemplateRules.section("subjective", req.subjective());
         String o = req.objective() == null ? cur.objective() : NoteTemplateRules.section("objective", req.objective());
@@ -68,16 +68,16 @@ public class NoteTemplateService {
         String tagsJson = req.tags() == null ? cur.tagsJson() : toJson(NoteTemplateRules.tags(req.tags()));
         boolean fav = req.favourite() == null ? cur.favourite() : req.favourite();
         if (repo.update(tenantId, doctorId, id, name, s, o, a, p, tagsJson, fav) == 0) {
-            throw notFound();
+            throw ApiException.notFound();
         }
-        return repo.find(tenantId, doctorId, id).map(this::toResponse).orElseThrow(this::notFound);
+        return repo.find(tenantId, doctorId, id).map(this::toResponse).orElseThrow(ApiException::notFound);
     }
 
     @Transactional
     public void delete(UUID tenantId, UUID doctorId, UUID id) {
         tenantContext.set(tenantId);
         if (repo.delete(tenantId, doctorId, id) == 0) {
-            throw notFound();
+            throw ApiException.notFound();
         }
     }
 
@@ -98,10 +98,5 @@ public class NoteTemplateService {
         } catch (JacksonException e) {
             throw new IllegalStateException("could not serialise note template json", e);
         }
-    }
-
-    /** Also returned for another doctor's template: existence is not disclosed. */
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

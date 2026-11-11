@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.common.CurrentStaff;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.pharmacy.dto.StockTakeDtos;
 import jakarta.servlet.http.HttpServletRequest;
@@ -7,8 +8,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,9 +35,9 @@ public class StockTakeController {
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public ResponseEntity<StockTakeDtos.StartResponse> start(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody StockTakeDtos.StartRequest req,
+    public ResponseEntity<StockTakeDtos.StartResponse> start(@CurrentStaff UUID staffId, @Valid @RequestBody StockTakeDtos.StartRequest req,
                                                              HttpServletRequest http) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.start(staffId(jwt), RequestMeta.clientIp(http), req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.start(staffId, RequestMeta.clientIp(http), req));
     }
 
     @GetMapping("/stock-takes")
@@ -59,8 +58,8 @@ public class StockTakeController {
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public StockTakeDtos.CountsResponse counts(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody StockTakeDtos.CountsRequest req) {
-        return service.counts(staffId(jwt), id, req);
+    public StockTakeDtos.CountsResponse counts(@CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody StockTakeDtos.CountsRequest req) {
+        return service.counts(staffId, id, req);
     }
 
     /** Idempotent: a posted session answers with what it wrote. A controlled variance needs approverStaffId + approverPin. */
@@ -69,16 +68,16 @@ public class StockTakeController {
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public StockTakeDtos.PostResponse post(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public StockTakeDtos.PostResponse post(@CurrentStaff UUID staffId, @PathVariable UUID id,
                                            @Valid @RequestBody(required = false) StockTakeDtos.PostRequest req, HttpServletRequest http) {
-        return service.post(staffId(jwt), RequestMeta.clientIp(http), id, req);
+        return service.post(staffId, RequestMeta.clientIp(http), id, req);
     }
 
     @PostMapping("/stock-takes/{id}/cancel")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public StockTakeDtos.Summary cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http) {
-        return service.cancel(staffId(jwt), RequestMeta.clientIp(http), id);
+    public StockTakeDtos.Summary cancel(@CurrentStaff UUID staffId, @PathVariable UUID id, HttpServletRequest http) {
+        return service.cancel(staffId, RequestMeta.clientIp(http), id);
     }
 
     /** One batch: delta or counted total, a reason code from the fixed list, and the second signer for a controlled drug. */
@@ -87,20 +86,16 @@ public class StockTakeController {
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public StockTakeDtos.BatchAdjustResponse adjust(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+    public StockTakeDtos.BatchAdjustResponse adjust(@CurrentStaff UUID staffId, @PathVariable UUID id,
                                                     @Valid @RequestBody StockTakeDtos.BatchAdjustRequest req, HttpServletRequest http) {
-        return service.adjust(staffId(jwt), RequestMeta.clientIp(http), id, req);
+        return service.adjust(staffId, RequestMeta.clientIp(http), id, req);
     }
 
     /** Who can give the second sign-off (holders of pharmacy:adjust_approve other than the caller), for the approver picker. */
     @GetMapping("/adjustment-approvers")
     @RequiresPharmacyMode(PharmacyMode.HYBRID)
     @PreAuthorize("hasAuthority('pharmacy:edit')")
-    public List<StockTakeDtos.Approver> approvers(@AuthenticationPrincipal Jwt jwt) {
-        return service.approvers(staffId(jwt));
-    }
-
-    private static UUID staffId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+    public List<StockTakeDtos.Approver> approvers(@CurrentStaff UUID staffId) {
+        return service.approvers(staffId);
     }
 }

@@ -486,6 +486,7 @@ class BookingFlow {
         try {
             b = book(c, key, ctx.get("who"), doctor, slot, flags);
         } catch (CoreClient.SlotTaken e) {
+            meters.counter("edge_book_conflict_total").increment(); // ACC-045: the 409-rate panel
             holds.release(c.tenantId(), c.id());
             return alternatives(c, ctx, slot);
         } catch (Http.UpstreamStatusException e) {

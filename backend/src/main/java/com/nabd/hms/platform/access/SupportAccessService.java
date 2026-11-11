@@ -146,10 +146,10 @@ public class SupportAccessService {
     public DecisionResponse decide(UUID id, UUID staffId, DecisionRequest req, String ipAddress) {
         UUID tenantId = tenantContext.current();
         boolean approve = "approve".equals(req.decision());
-        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(SupportAccessService::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
         Optional<Grant> decided = repo.decide(id, tenantId, approve, staffId, approve ? null : req.note());
         if (decided.isEmpty()) {
-            Grant current = repo.findForTenant(id, tenantId).orElseThrow(SupportAccessService::notFound); // another clinic's id is a 404
+            Grant current = repo.findForTenant(id, tenantId).orElseThrow(ApiException::notFound); // another clinic's id is a 404
             if ("requested".equals(current.status()) || "expired".equals(current.status())) {
                 throw new ApiException(HttpStatus.GONE, "expired", "Request expired",
                         "This access request was not answered in time and has lapsed.", Map.of("code", "EXPIRED"));
@@ -177,7 +177,7 @@ public class SupportAccessService {
 
     @Transactional
     public void revoke(UUID grantId, UUID callerOperatorId, String ipAddress) {
-        Grant grant = repo.findById(grantId).orElseThrow(SupportAccessService::notFound);
+        Grant grant = repo.findById(grantId).orElseThrow(ApiException::notFound);
         if (repo.revoke(grantId) == 0) {
             throw new ApiException(HttpStatus.CONFLICT, "already-revoked", "Already revoked",
                     "This support access grant was already revoked or is over.");
@@ -198,7 +198,7 @@ public class SupportAccessService {
      * own operator may use it, and only while the owner-approved window is open. */
     @Transactional
     public PatientViewResponse viewPatient(UUID grantId, UUID patientId, UUID callerOperatorId, String ipAddress) {
-        Grant grant = repo.findById(grantId).orElseThrow(SupportAccessService::notFound);
+        Grant grant = repo.findById(grantId).orElseThrow(ApiException::notFound);
         if (!grant.operatorId().equals(callerOperatorId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "not-your-grant", "Not your grant",
                     "This support access grant belongs to a different operator.");
@@ -237,7 +237,7 @@ public class SupportAccessService {
     /** Sweep job, step 2 (inside TenantScope for the grant's clinic): closes one grant and tells the owner's audit log. */
     @Transactional
     public void expire(UUID grantId) {
-        Grant g = repo.findById(grantId).orElseThrow(SupportAccessService::notFound);
+        Grant g = repo.findById(grantId).orElseThrow(ApiException::notFound);
         Optional<String> was = repo.expire(grantId);
         if (was.isEmpty()) {
             return; // somebody else closed it first
@@ -251,7 +251,7 @@ public class SupportAccessService {
     }
 
     private OperatorInfo operatorInfo(UUID operatorId) {
-        return repo.findOperatorInfo(operatorId).orElseThrow(SupportAccessService::notFound);
+        return repo.findOperatorInfo(operatorId).orElseThrow(ApiException::notFound);
     }
 
     private GrantResponse toResponse(Grant g, OperatorInfo operator) {
@@ -259,9 +259,5 @@ public class SupportAccessService {
         return new GrantResponse(g.id(), g.tenantId(), g.ticketId(), g.scope(), g.operatorId(), operator.name(), operator.role(),
                 g.reason(), g.grantedAt(), g.expiresAt(), g.revokedAt(), g.isActive(now), g.effectiveStatus(now), g.minutes(),
                 g.windowStartedAt(), g.windowEndsAt(), g.declineNote());
-    }
-
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 }

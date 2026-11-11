@@ -11,5 +11,17 @@
     "amountPositive": "Enter an amount above 0.",
     "discountReason": "Pick a reason for the discount.",
     "discountTooBig": "The discount cannot be more than the subtotal."
+  },
+  "paymentMethod": {
+    "cash": "Cash",
+    "card": "Card",
+    "upi": "UPI",
+    "mada": "Mada & digital",
+    "other": "Other"
+  },
+  "stock": {
+    "in": "In stock · {qty}",
+    "low": "Low · {qty}",
+    "out": "Out of stock"
   }
 }

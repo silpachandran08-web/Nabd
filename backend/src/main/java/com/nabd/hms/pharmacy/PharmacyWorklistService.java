@@ -40,6 +40,8 @@ import java.util.UUID;
 @Transactional
 public class PharmacyWorklistService implements RxValidity {
 
+    private static final String NOT_FOUND = "The requested worklist entry was not found.";
+
     static final Set<String> STATUSES = Set.of("new", "in_progress", "partially_dispensed", "dispensed", "cancelled", "expired");
 
     private final PharmacyWorklistRepository repo;
@@ -150,13 +152,13 @@ public class PharmacyWorklistService implements RxValidity {
     public WorklistDtos.Entry claim(UUID id, UUID staffId, String ip) {
         UUID t = tenant.current();
         if (repo.claim(t, id, staffId)) {
-            ActorDirectory.Actor actor = actors.findActor(t, staffId).orElseThrow(this::notFound);
+            ActorDirectory.Actor actor = actors.findActor(t, staffId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
             audit.record(t, "staff", staffId, actor.name(), actor.role(), ip, "pharmacy.worklist_claimed", "pharmacy_worklist_entry", id,
                     Map.of("status", "new"), Map.of("status", "in_progress"));
             changed(t, id, "in_progress");
             return entry(t, id);
         }
-        PharmacyWorklistRepository.EntryRow e = repo.find(t, id).orElseThrow(this::notFound);
+        PharmacyWorklistRepository.EntryRow e = repo.find(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         if ("in_progress".equals(e.status()) && staffId.equals(e.claimedBy())) {
             return view(t, List.of(e)).get(0);
         }
@@ -206,7 +208,7 @@ public class PharmacyWorklistService implements RxValidity {
     }
 
     private WorklistDtos.Entry entry(UUID t, UUID id) {
-        return view(t, List.of(repo.find(t, id).orElseThrow(this::notFound))).get(0);
+        return view(t, List.of(repo.find(t, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)))).get(0);
     }
 
     private List<WorklistDtos.Entry> view(UUID t, List<PharmacyWorklistRepository.EntryRow> rows) {
@@ -231,10 +233,6 @@ public class PharmacyWorklistService implements RxValidity {
     static ApiException expired() {
         return new ApiException(HttpStatus.CONFLICT, "rx-expired", "Prescription expired",
                 "This prescription has passed its validity date and can no longer be dispensed.");
-    }
-
-    private ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested worklist entry was not found.");
     }
 
     private static String norm(String s) {

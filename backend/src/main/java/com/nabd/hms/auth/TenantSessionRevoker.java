@@ -1,5 +1,6 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.auth.internal.store.AuthSessionRepository;
 import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.SessionRevocation;
@@ -19,12 +20,12 @@ class TenantSessionRevoker implements SessionRevocation.TenantRevoker {
 
     private static final Logger log = LoggerFactory.getLogger(TenantSessionRevoker.class);
 
-    private final AuthRepository repo;
+    private final AuthSessionRepository sessionRepo;
     private final TenantScope tenantScope;
     private final EventPublisher events;
 
-    TenantSessionRevoker(AuthRepository repo, TenantScope tenantScope, EventPublisher events) {
-        this.repo = repo;
+    TenantSessionRevoker(AuthSessionRepository sessionRepo, TenantScope tenantScope, EventPublisher events) {
+        this.sessionRepo = sessionRepo;
         this.tenantScope = tenantScope;
         this.events = events;
     }
@@ -32,7 +33,7 @@ class TenantSessionRevoker implements SessionRevocation.TenantRevoker {
     @Override
     public int revokeAll(UUID tenantId, String reason) {
         return tenantScope.run(tenantId, () -> { // joins the lifecycle transaction (PLT-019: binds or checks the tenant)
-            List<UUID> staffIds = repo.revokeAllForTenant(tenantId, reason);
+            List<UUID> staffIds = sessionRepo.revokeAllForTenant(tenantId, reason);
             // OPS-015 schema api/events/iam.session.revoked.v1: one event per staff member, as StaffService publishes
             for (UUID staffId : new LinkedHashSet<>(staffIds)) {
                 events.publish(tenantId, DomainEventType.SESSION_REVOKED, staffId,

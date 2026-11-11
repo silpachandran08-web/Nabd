@@ -80,7 +80,7 @@ public class FileService implements FileStore {
     @Transactional
     public UUID complete(UUID id, String clientSha256) {
         UUID tenantId = tenantContext.current();
-        FileRepository.Row f = repo.find(tenantId, id).orElseThrow(FileService::notFound);
+        FileRepository.Row f = repo.find(tenantId, id).orElseThrow(ApiException::notFound);
         if (!"awaiting_upload".equals(f.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_COMPLETED", "Already completed", "This upload was already completed.");
         }
@@ -158,12 +158,8 @@ public class FileService implements FileStore {
     @Transactional(readOnly = true)
     public SignedUrl downloadUrl(UUID fileId, Duration ttl) {
         Duration t = ttl.compareTo(DOWNLOAD_TTL) > 0 ? DOWNLOAD_TTL : ttl;
-        FileRepository.Row f = repo.find(tenantContext.current(), fileId).filter(r -> "available".equals(r.status())).orElseThrow(FileService::notFound);
+        FileRepository.Row f = repo.find(tenantContext.current(), fileId).filter(r -> "available".equals(r.status())).orElseThrow(ApiException::notFound);
         return new SignedUrl(storage.presign(false, ObjectStorage.Bucket.CLEAN, f.storageKey(), t, 0), clock.instant().plus(t));
-    }
-
-    static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private static byte[] sha256(byte[] d) {

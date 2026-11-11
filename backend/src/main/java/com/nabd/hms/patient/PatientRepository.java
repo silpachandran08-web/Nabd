@@ -490,10 +490,23 @@ class PatientRepository {
     /** NB-082: patients whose guardian link is still set despite having turned 18 — the "automatic"
      * review task is this computed worklist, not a background job (none exists yet, NB-308). */
     List<PatientRow> findGuardianReviewsDue(UUID tenantId) {
+        return findGuardianReviews(tenantId, false);
+    }
+
+    /** IDC-012: due = turns 18 within the next 14 days (still a minor); overdue = already 18 (the NB-082 list). */
+    List<PatientRow> findGuardianReviews(UUID tenantId, boolean due) {
+        String age = due ? "AND dob > ?::date - INTERVAL '18 years' AND dob <= ?::date + 14 - INTERVAL '18 years' " : "AND dob <= ?::date - INTERVAL '18 years' ";
+        java.sql.Date today = java.sql.Date.valueOf(clock.today(tenantId));
+        Object[] args = due ? new Object[] {tenantId, today, today} : new Object[] {tenantId, today};
         return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND status = 'active' " +
-                        "AND guardian_id IS NOT NULL AND guardian_review_kept_at IS NULL AND dob <= ?::date - INTERVAL '18 years' " +
-                        "ORDER BY dob",
-                patientMapper(), tenantId, java.sql.Date.valueOf(clock.today(tenantId)));
+                        "AND guardian_id IS NOT NULL AND guardian_review_kept_at IS NULL " + age + "ORDER BY dob",
+                patientMapper(), args);
+    }
+
+    /** IDC-012: the open claim invitation of a patient, if any: [sent_at, expires_at]. */
+    Optional<java.time.Instant[]> findOpenProfileClaim(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT sent_at, expires_at FROM profile_claims WHERE tenant_id = ? AND patient_id = ? AND outcome IS NULL ORDER BY sent_at DESC LIMIT 1",
+                (rs, i) -> new java.time.Instant[] {rs.getTimestamp(1).toInstant(), rs.getTimestamp(2).toInstant()}, tenantId, patientId).stream().findFirst();
     }
 
     Optional<java.time.Instant> findGuardianReviewKeptAt(UUID tenantId, UUID id) {

@@ -14,7 +14,7 @@
 .notice { padding: var(--nb-space-8) var(--nb-space-12); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); background: var(--nb-surface-1); font-size: 13px; }
 .noticeWarn { border-color: var(--nb-accent-500); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
-.primary { display: inline-flex; align-items: center; justify-content: center; min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-16); border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--nb-accent-500); background: var(--nb-accent-500); color: var(--nb-on-accent); }
+.primary { display: inline-flex; align-items: center; justify-content: center; min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-16); border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--nb-accent-fill); background: var(--nb-accent-fill); color: var(--nb-on-accent); }
 .primary:disabled { opacity: 0.6; cursor: default; }
 .linkBtn { min-inline-size: 44px; min-block-size: 44px; border: 0; background: none; color: inherit; cursor: pointer; text-decoration: underline; font: inherit; }
 .open { min-block-size: 44px; padding: 0; border: 0; background: none; color: var(--nb-text-primary); font: inherit; font-weight: 600; text-align: start; text-decoration: underline; cursor: pointer; }

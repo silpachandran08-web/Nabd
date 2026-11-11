@@ -23,7 +23,7 @@ class ProxyInviteSecurityConfig {
     SecurityFilterChain proxyInviteChain(HttpSecurity http, RateLimitFilter rateLimit,
             org.springframework.security.oauth2.jwt.JwtDecoder staffDecoder,
             org.springframework.core.convert.converter.Converter<org.springframework.security.oauth2.jwt.Jwt, org.springframework.security.authentication.AbstractAuthenticationToken> converter) throws Exception {
-        http.securityMatcher("/v1/proxy-invites/**")
+        http.securityMatcher("/v1/proxy-invites/**", "/v1/me/profile-claims/**", "/v1/public/exports/**") // IDC-012: the age-18 claim link, same model
                 .addFilterAfter(rateLimit, AnonymousAuthenticationFilter.class)
                 .csrf(c -> c.disable()) // no cookies: the token is in the path
                 .cors(Customizer.withDefaults())

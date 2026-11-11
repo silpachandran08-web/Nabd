@@ -132,7 +132,7 @@ public class DrugMasterImportService {
     }
 
     public Map<String, Object> status(UUID importId) {
-        DrugMasterRepository.ImportRow r = tx.execute(x -> repo.findImport(importId)).orElseThrow(DrugMasterImportService::notFound);
+        DrugMasterRepository.ImportRow r = tx.execute(x -> repo.findImport(importId)).orElseThrow(DrugMasterImportService::importNotFound);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("importId", r.id());
         out.put("region", r.region());
@@ -149,7 +149,7 @@ public class DrugMasterImportService {
 
     /** Version switch. Idempotent: activating the already-active import returns its version again. */
     public Map<String, Object> activate(UUID importId, String csoAckRef, UUID operatorId, String ip) {
-        DrugMasterRepository.ImportRow r = tx.execute(x -> repo.findImport(importId)).orElseThrow(DrugMasterImportService::notFound);
+        DrugMasterRepository.ImportRow r = tx.execute(x -> repo.findImport(importId)).orElseThrow(DrugMasterImportService::importNotFound);
         DrugMasterRepository.Activated a = tx.execute(x -> repo.activate(importId, csoAckRef));
         switch (a.outcome()) {
             case "activated" -> { }
@@ -158,7 +158,7 @@ public class DrugMasterImportService {
             }
             case "cso_required" -> throw new ApiException(HttpStatus.CONFLICT, "CSO_ACK_REQUIRED", "CSO acknowledgement required",
                     "This import changes schedule, pregnancy category or ingredients of existing products; send csoAckRef.");
-            case "not_found" -> throw notFound();
+            case "not_found" -> throw importNotFound();
             default -> throw new ApiException(HttpStatus.CONFLICT, "IMPORT_INVALID", "Import cannot be activated",
                     "Only a validated, non-dry-run import based on the current active version can be activated (" + a.outcome() + ").");
         }
@@ -221,7 +221,7 @@ public class DrugMasterImportService {
         return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, slug, "Feed invalid", detail);
     }
 
-    private static ApiException notFound() {
+    private static ApiException importNotFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "IMPORT_NOT_FOUND", "Import not found", "No such drug master import.");
     }
 }

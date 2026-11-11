@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
-import { formatMoney, PAYMENT_METHODS, paymentMethodLabel } from "@nabd/domain";
+import { formatMoney, PAYMENT_METHODS, taxRegime } from "@nabd/domain";
+import { useTranslations } from "next-intl";
+import { usePaymentMethodLabel } from "../../../lib/paymentMethodText";
 import { can } from "../../../lib/permissions";
 import { getIdentity } from "../../../lib/session";
 import AccessGate from "../../../components/ui/AccessGate";
@@ -32,14 +34,18 @@ function round2(n: number): number {
 // so the whole route is gated on that grant, matching the Arrivals entry button (PHA-016). The gate
 // also keeps can() below out of the server render.
 export default function OtcCheckoutPage() {
+  const tr = useTranslations("checkout.otc");
   return (
-    <AccessGate permission="billing:create" surface="Counter sale">
+    <AccessGate permission="billing:create" surface={tr("surface")}>
       <OtcCheckoutInner />
     </AccessGate>
   );
 }
 
 function OtcCheckoutInner() {
+  const tr = useTranslations("checkout.otc");
+  const tv = useTranslations("checkout.visit");
+  const methodLabel = usePaymentMethodLabel();
   const router = useRouter();
   const region = getIdentity()?.tenantRegion;
   const canCheckout = can("billing:create"); // the API requires billing:create; absent otherwise
@@ -88,12 +94,12 @@ function OtcCheckoutInner() {
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setForbidden(true);
       // PHA-010: 409 otc-not-available (pharmacy mode is external) - show the server detail.
-      else if (e instanceof ApiError && e.status === 409) setError(e.detail || "Counter sales aren't available for this pharmacy mode.");
-      else setError(e instanceof ApiError ? "Couldn't load charges. Try again." : "Couldn't reach the server. Check your connection and try again.");
+      else if (e instanceof ApiError && e.status === 409) setError(e.detail || tr("modeUnavailable"));
+      else setError(e instanceof ApiError ? tr("loadFailed") : tv("unreachable"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tr, tv]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -140,11 +146,11 @@ function OtcCheckoutInner() {
   async function submitCheckout() {
     setCreateError(null);
     if (items.length === 0) {
-      setCreateError("Add at least one charge.");
+      setCreateError(tv("addOneCharge"));
       return;
     }
     if (discountNum > 0 && !discountReason) {
-      setCreateError("Pick a reason for the discount.");
+      setCreateError(tr("discountReasonMissing"));
       return;
     }
     setCreating(true);
@@ -168,7 +174,7 @@ function OtcCheckoutInner() {
         keys.current.done("approval");
       }
     } catch (e) {
-      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : errorText(e, ""));
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || tv("invoiceFailed")) : errorText(e, ""));
     } finally {
       setCreating(false);
     }
@@ -179,7 +185,7 @@ function OtcCheckoutInner() {
     setPaymentError(null);
     const amt = Number(amount);
     if (!invoice || !amt || amt <= 0) {
-      setPaymentError("Enter a valid amount.");
+      setPaymentError(tr("validAmount"));
       return;
     }
     setRecording(true);
@@ -189,16 +195,17 @@ function OtcCheckoutInner() {
       keys.current.done(`pay:${invoice.id}`);
       setAmount("");
     } catch (e) {
-      setPaymentError(e instanceof ApiError ? e.detail || "Couldn't record payment." : errorText(e, ""));
+      setPaymentError(e instanceof ApiError ? e.detail || tv("paymentFailed") : errorText(e, ""));
     } finally {
       setRecording(false);
     }
   }
 
-  if (loading) return <main className={styles.page}><div className={styles.state}>Loading…</div></main>;
-  if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to checkout & billing.</div></main>;
-  if (error || !context) return <main className={styles.page}><div className={styles.errorState}>{error ?? "Something went wrong."}</div></main>;
+  if (loading) return <main className={styles.page}><div className={styles.state}>{tv("loading")}</div></main>;
+  if (forbidden) return <main className={styles.page}><div className={styles.state}>{tv("noAccess")}</div></main>;
+  if (error || !context) return <main className={styles.page}><div className={styles.errorState}>{error ?? tv("somethingWrong")}</div></main>;
 
+  const taxName = taxRegime(getIdentity()?.tenantRegion).label; // FEF-040: GST or VAT from the market
   const categories = ["All", ...Array.from(new Set(context.charges.map((c) => c.category)))];
   const visibleCharges = category === "All" ? context.charges : context.charges.filter((c) => c.category === category);
 
@@ -206,13 +213,13 @@ function OtcCheckoutInner() {
     <main className={styles.page}>
       <div className={styles.strip}>
         <div className={styles.stripIdentity}>
-          <button className={styles.backBtn} onClick={() => router.push("/arrivals")}>← Arrivals</button>
-          <span className={styles.stripName}>Counter sale</span>
-          <span className={styles.stripMeta}>Walk-in · no patient record, no queue token</span>
+          <button className={styles.backBtn} onClick={() => router.push("/arrivals")}>{tv("backArrivals")}</button>
+          <span className={styles.stripName}>{tr("title")}</span>
+          <span className={styles.stripMeta}>{tr("meta")}</span>
         </div>
         <div className={styles.stripIdentity}>
           {invoice && <BillingStatePill state={invoice.status} />}
-          {canReturn && <button type="button" className={returnStyles.btn} onClick={() => setReturning(true)}>Customer return</button>}
+          {canReturn && <button type="button" className={returnStyles.btn} onClick={() => setReturning(true)}>{tr("customerReturn")}</button>}
         </div>
       </div>
       {returning && <ReturnDialog initialNumber={invoice?.status === "paid" ? invoice.invoiceNumber : undefined} onClose={() => setReturning(false)} />}
@@ -228,7 +235,7 @@ function OtcCheckoutInner() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>{invoice.invoiceNumber}</h2>
             <table className={styles.table}>
-              <thead><tr><th scope="col">Charge</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax %</th><th scope="col">Line total</th></tr></thead>
+              <thead><tr><th scope="col">{tv("colCharge")}</th><th scope="col">{tv("colQty")}</th><th scope="col">{tv("colUnitPrice")}</th><th scope="col">{tv("colTaxPct", { tax: taxName })}</th><th scope="col">{tv("colLineTotal")}</th></tr></thead>
               <tbody>
                 {invoice.lineItems.map((li) => (
                   <tr key={li.chargeCode}>
@@ -243,10 +250,10 @@ function OtcCheckoutInner() {
             </table>
             {invoice.payments.length > 0 && (
               <>
-                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Payments</h2>
+                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>{tv("payments")}</h2>
                 {invoice.payments.map((p) => (
                   <div key={p.id} className={styles.paymentRow}>
-                    <span>{paymentMethodLabel(p.method, region)}</span>
+                    <span>{methodLabel(p.method, region)}</span>
                     <span>{formatMoney(p.amount, invoice.currency)}</span>
                   </div>
                 ))}
@@ -256,33 +263,33 @@ function OtcCheckoutInner() {
 
           <div className={styles.card}>
             <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(invoice.subtotal, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Discount</span><span>−{formatMoney(invoice.discount, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(invoice.tax, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{invoice.roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(invoice.roundOff), invoice.currency)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(invoice.total, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Paid</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Balance due</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("subtotal")}</span><span>{formatMoney(invoice.subtotal, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("discount")}</span><span>−{formatMoney(invoice.discount, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("taxRow", { tax: taxName })}</span><span>{formatMoney(invoice.tax, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("roundOff")}</span><span>{invoice.roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(invoice.roundOff), invoice.currency)}</span></div>
+              <div className={styles.totalsRowMain}><span>{tv("total")}</span><span>{formatMoney(invoice.total, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("paid")}</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("balanceDue")}</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
             </div>
 
             {invoice.status !== "paid" && canPay && (
               <form onSubmit={submitPayment}>
-                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Record payment</h2>
+                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>{tr("recordPayment")}</h2>
                 <div className={styles.paymentMethods}>
                   {PAYMENT_METHODS.map((m) => (
-                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{paymentMethodLabel(m, region)}</button>
+                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{methodLabel(m, region)}</button>
                   ))}
                 </div>
                 <input className={styles.discountInput} style={{ width: "100%", marginBottom: "8px" }} type="number" step="0.01"
-                  placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  placeholder={tr("amount")} value={amount} onChange={(e) => setAmount(e.target.value)} />
                 {paymentError && <div className={styles.errorState}>{paymentError}</div>}
-                <button className={styles.recordBtn} type="submit" disabled={recording}>{recording ? "Recording…" : "Record payment"}</button>
+                <button className={styles.recordBtn} type="submit" disabled={recording}>{recording ? tv("recording") : tr("recordPayment")}</button>
               </form>
             )}
 
             {invoice.status === "paid" && (
               <button className={styles.checkoutBtn} style={{ marginTop: "16px" }} onClick={() => router.push("/checkout/otc")}>
-                New counter sale
+                {tr("newSale")}
               </button>
             )}
           </div>
@@ -290,16 +297,16 @@ function OtcCheckoutInner() {
       ) : (
         <div className={styles.layout}>
           <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Charges</h2>
+            <h2 className={styles.cardTitle}>{tv("charges")}</h2>
             <div className={styles.categoryTabs}>
               {categories.map((c) => (
-                <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c}</button>
+                <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c === "All" ? tv("all") : c}</button>
               ))}
             </div>
             {visibleCharges.map((c) => {
               const body = (
                 <>
-                  <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" icon="alert" label="Rx" />} <StockPill qty={c.stockQty} /></span>
+                  <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" icon="alert" label={tv("rx")} />} <StockPill qty={c.stockQty} /></span>
                   <span className={styles.chargePrice}>{formatMoney(c.baseAmount, context.currency)}</span>
                 </>
               );
@@ -311,12 +318,12 @@ function OtcCheckoutInner() {
           </div>
 
           <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Selected line items</h2>
+            <h2 className={styles.cardTitle}>{tv("selectedItems")}</h2>
             {items.length === 0 ? (
-              <div className={styles.muted}>Pick a charge from the list to add it.</div>
+              <div className={styles.muted}>{tv("pickHint")}</div>
             ) : (
               <table className={styles.table}>
-                <thead><tr><th scope="col">Charge</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">Line total</th><th scope="col"></th></tr></thead>
+                <thead><tr><th scope="col">{tv("colCharge")}</th><th scope="col">{tv("colQty")}</th><th scope="col">{tv("colUnitPrice")}</th><th scope="col">{tv("colTax", { tax: taxName })}</th><th scope="col">{tv("colLineTotal")}</th><th scope="col"></th></tr></thead>
                 <tbody>
                   {items.map((i) => (
                     <tr key={i.chargeCode}>
@@ -324,11 +331,11 @@ function OtcCheckoutInner() {
                         {i.chargeName}<div className={styles.muted}>{i.category}</div>
                         {links[i.chargeCode] && (
                           <div className={styles.muted} data-testid={`rx-linked-${i.chargeCode}`}>
-                            Rx: {links[i.chargeCode].drugName} · {links[i.chargeCode].patientName} · {links[i.chargeCode].remainingQty} left
+                            {tr("rxLinked", { drug: links[i.chargeCode].drugName, patient: links[i.chargeCode].patientName, left: links[i.chargeCode].remainingQty })}
                           </div>
                         )}
                         {waitingForRx.includes(i.chargeCode) && linking !== i.chargeCode && (
-                          <button type="button" className={styles.rxLinkBtn} onClick={() => setLinking(i.chargeCode)}>Link prescription</button>
+                          <button type="button" className={styles.rxLinkBtn} onClick={() => setLinking(i.chargeCode)}>{tr("linkRx")}</button>
                         )}
                         {linking === i.chargeCode && (
                           <RxLinkPicker itemName={i.chargeName} onPick={(l) => link(i.chargeCode, l)} onCancel={() => setLinking(null)} />
@@ -344,7 +351,7 @@ function OtcCheckoutInner() {
                       <td>{formatMoney(i.unitPrice, context.currency)}</td>
                       <td>{i.taxRatePercent}%</td>
                       <td>{formatMoney(i.unitPrice * i.quantity, context.currency)}</td>
-                      <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
+                      <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>{tv("remove")}</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -354,34 +361,34 @@ function OtcCheckoutInner() {
 
           <div className={styles.card}>
             <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(subtotal, context.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("subtotal")}</span><span>{formatMoney(subtotal, context.currency)}</span></div>
               {canDiscount && (
                 <div className={styles.totalsRow}>
-                  <span>Discount</span>
+                  <span>{tv("discount")}</span>
                   <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
                 </div>
               )}
               {canDiscount && discountNum > 0 && (
                 <div className={styles.totalsRow}>
-                  <span>Discount reason</span>
-                  <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
-                    <option value="">{reasons.error ? "Couldn't load reasons" : "Reason…"}</option>
+                  <span>{tv("discountReason")}</span>
+                  <select aria-label={tv("discountReason")} className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
+                    <option value="">{reasons.error ? tr("reasonsFailed") : tv("reasonPlaceholder")}</option>
                     {reasons.items.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
                   </select>
                 </div>
               )}
-              <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("taxRow", { tax: taxName })}</span><span>{formatMoney(tax, context.currency)}</span></div>
+              <div className={styles.totalsRow}><span>{tv("roundOff")}</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
+              <div className={styles.totalsRowMain}><span>{tv("total")}</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
             </div>
-            <p className={styles.muted}>No patient record or queue token is created for a counter sale.</p>
+            <p className={styles.muted}>{tr("noRecord")}</p>
             {waitingForRx.length > 0 && (
-              <div className={styles.errorState} data-testid="rx-wait">Link a signed prescription to every Rx item before checkout.</div>
+              <div className={styles.errorState} data-testid="rx-wait">{tr("rxWait")}</div>
             )}
             {createError && <div className={styles.errorState} role="alert">{createError}</div>}
             {canCheckout && (
               <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0 || waitingForRx.length > 0}>
-                {creating ? "Generating…" : "Checkout"}
+                {creating ? tr("generating") : tv("checkout")}
               </button>
             )}
           </div>

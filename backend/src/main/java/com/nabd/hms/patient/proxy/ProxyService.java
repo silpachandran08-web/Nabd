@@ -146,9 +146,9 @@ class ProxyService implements ProxyAccess {
     public void resend(String caregiverRef, String memberRef, String serviceId) {
         UUID tenant = tenantContext.current();
         UUID caregiver = adultCaregiver(caregiverRef);
-        UUID subject = refs.patientIdFor(memberRef).orElseThrow(ProxyService::notFound);
+        UUID subject = refs.patientIdFor(memberRef).orElseThrow(ApiException::notFound);
         Map<String, Object> p = jdbc.queryForList("SELECT id FROM patient_proxies WHERE proxy_patient_id = ? AND subject_patient_id = ? AND status = 'pending'", caregiver, subject)
-                .stream().findFirst().orElseThrow(ProxyService::notFound);
+                .stream().findFirst().orElseThrow(ApiException::notFound);
         jdbc.update("UPDATE proxy_invites SET used_at = now() WHERE proxy_id = ? AND used_at IS NULL", p.get("id"));
         invite(tenant, (UUID) p.get("id"), subject);
         audit.record(tenant, "system", null, "patient via edge", serviceId, null, "patient.proxy_invite_resent", "patient_proxy", (UUID) p.get("id"), null, Map.of("status", "pending"));
@@ -164,6 +164,9 @@ class ProxyService implements ProxyAccess {
         for (Map<String, Object> r : jdbc.queryForList("SELECT id, split_part(name, ' ', 1) AS first_name FROM patients WHERE guardian_id = ? AND status = 'active' ORDER BY created_at", caregiver)) {
             out.add(new Member(refs.refFor((UUID) r.get("id")), (String) r.get("first_name"), "guardian", "guardian"));
         }
+        for (UUID id : endedAt18(caregiver, null)) { // IDC-012: shown for 90 days as "access ended at 18"
+            out.add(new Member(refs.refFor(id), jdbc.queryForObject("SELECT split_part(name, ' ', 1) FROM patients WHERE id = ?", String.class, id), "guardian", "ended_at_18"));
+        }
         return out;
     }
 
@@ -171,18 +174,30 @@ class ProxyService implements ProxyAccess {
     public Access access(String caregiverRef, String memberRef, boolean records) {
         UUID caregiver = refs.patientIdFor(caregiverRef).orElseThrow(ProxyService::notAProxy);
         UUID subject = refs.patientIdFor(memberRef).orElseThrow(ProxyService::notAProxy);
-        Acting a = relationFor(caregiver, subject).orElseThrow(ProxyService::notAProxy);
+        Acting a = relationFor(caregiver, subject).orElseThrow(() -> endedAt18(caregiver, subject).isEmpty() ? notAProxy()
+                : new ApiException(HttpStatus.FORBIDDEN, "access-ended-at-18", "Access ended at 18", "Access ended when they turned 18. They can give you access again from their own phone.",
+                        Map.of("code", "access-ended-at-18")));
         if (records) {
             requireRecords(caregiver, subject);
         }
         return new Access(a.relation(), a.scope(), a.status());
     }
 
+    /** IDC-012: members whose age-18 handover ended this caregiver's access (claimed keeping nothing, or 30 days with no claim) and who
+     * have not given a proxy since; subject null = all of them. */
+    private List<UUID> endedAt18(UUID caregiver, UUID subject) {
+        return jdbc.queryForList("SELECT DISTINCT c.patient_id FROM profile_claims c WHERE c.guardian_patient_id = ? AND (?::uuid IS NULL OR c.patient_id = ?) "
+                        + "AND (c.outcome = 'expired' OR c.kept_scope = 'NONE') AND coalesce(c.claimed_at, c.expires_at) > now() - interval '90 days' "
+                        + "AND NOT EXISTS (SELECT 1 FROM patients p WHERE p.id = c.patient_id AND p.guardian_id = c.guardian_patient_id) "
+                        + "AND NOT EXISTS (SELECT 1 FROM patient_proxies x WHERE x.proxy_patient_id = c.guardian_patient_id AND x.subject_patient_id = c.patient_id AND x.status <> 'revoked')",
+                UUID.class, caregiver, subject, subject);
+    }
+
     // ---- the subject side (IDC-013): the patient downgrades or removes a caregiver ----
 
     /** The people who may act for this patient (pending or active), oldest first. */
     public List<Granted> granted(String subjectRef) {
-        UUID subject = refs.patientIdFor(subjectRef).orElseThrow(ProxyService::notFound);
+        UUID subject = refs.patientIdFor(subjectRef).orElseThrow(ApiException::notFound);
         return jdbc.query("SELECT p.id, split_part(c.name, ' ', 1) AS first_name, p.relation, p.scope, p.status FROM patient_proxies p "
                         + "JOIN patients c ON c.id = p.proxy_patient_id WHERE p.subject_patient_id = ? AND p.status <> 'revoked' ORDER BY p.invited_at",
                 (rs, i) -> new Granted(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4) == null ? "BOOK_ONLY" : rs.getString(4), rs.getString(5)), subject);
@@ -190,13 +205,13 @@ class ProxyService implements ProxyAccess {
 
     /** Scope change or revoke by the patient (patient session / Edge on the verified phone). Idempotent: a revoked proxy revoked again stays revoked. 404 for someone else's proxy. */
     public Access change(String subjectRef, UUID proxyId, String scope, boolean revoke, String serviceId) {
-        UUID subject = refs.patientIdFor(subjectRef).orElseThrow(ProxyService::notFound);
+        UUID subject = refs.patientIdFor(subjectRef).orElseThrow(ApiException::notFound);
         Map<String, Object> p = lockedProxy(subject, proxyId);
         if ("revoked".equals(p.get("status"))) {
             if (revoke) {
                 return new Access((String) p.get("relation"), (String) p.get("scope"), "revoked");
             }
-            throw notFound();
+            throw ApiException.notFound();
         }
         if (revoke) {
             return revoke(p, "patient", "system", null, "patient", serviceId, null, Map.of());
@@ -221,14 +236,14 @@ class ProxyService implements ProxyAccess {
         if (jdbc.update("UPDATE patient_proxies SET revoke_step_up_id = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM patient_proxies WHERE revoke_step_up_id = ?)", stepUpId, proxyId, stepUpId) == 0) {
             throw new ApiException(HttpStatus.FORBIDDEN, "step-up-required", "Step-up verification required", "This confirmation was already used; confirm again.", Map.of("code", "STEP_UP_REQUIRED"));
         }
-        ActorDirectory.Actor actor = actors.findActor(tenantContext.current(), staffId).orElseThrow(ProxyService::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantContext.current(), staffId).orElseThrow(ApiException::notFound);
         revoke(p, "clinic", "staff", staffId, actor.name(), actor.role(), ip, Map.of("reason", reason, "stepUpId", stepUpId.toString()));
     }
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     Map<String, Object> lockedProxy(UUID subject, UUID proxyId) {
         return jdbc.queryForList("SELECT id, proxy_patient_id, subject_patient_id, relation, scope, status FROM patient_proxies WHERE id = ? AND subject_patient_id = ? FOR UPDATE",
-                proxyId, subject).stream().findFirst().orElseThrow(ProxyService::notFound);
+                proxyId, subject).stream().findFirst().orElseThrow(ApiException::notFound);
     }
 
     private Access revoke(Map<String, Object> p, String revokedBy, String actorType, UUID actorId, String actorName, String actorRole, String ip, Map<String, String> extra) {
@@ -418,10 +433,6 @@ class ProxyService implements ProxyAccess {
 
     private static ApiException unprocessable(String slug, String title, String detail) {
         return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, slug, title, detail, Map.of("code", slug));
-    }
-
-    private static ApiException notFound() {
-        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     private static ApiException notAProxy() { // unknown and foreign references answer alike: nothing to probe

@@ -1,5 +1,10 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
+import com.nabd.hms.auth.internal.store.CredentialRepository;
+import com.nabd.hms.auth.internal.guard.OtpSendLimiter;
+import com.nabd.hms.auth.internal.guard.OtpOutbox;
+import com.nabd.hms.auth.internal.store.AuthModels;
 import com.nabd.hms.auth.api.StepUpOtp;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.OpaqueTokens;
@@ -20,7 +25,8 @@ class StepUpOtpService implements StepUpOtp {
 
     private static final int MAX_ATTEMPTS = 5;
 
-    private final AuthRepository repo;
+    private final CredentialRepository credentials;
+    private final StaffDirectoryRepository staffDir;
     private final OtpOutbox outbox;
     private final OtpSendLimiter limiter;
     private final TenantContext tenantContext;
@@ -28,8 +34,8 @@ class StepUpOtpService implements StepUpOtp {
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
-    StepUpOtpService(AuthRepository repo, OtpOutbox outbox, OtpSendLimiter limiter, TenantContext tenantContext, JdbcTemplate jdbc, Clock clock) {
-        this.repo = repo;
+    StepUpOtpService(CredentialRepository credentials, StaffDirectoryRepository staffDir, OtpOutbox outbox, OtpSendLimiter limiter, TenantContext tenantContext, JdbcTemplate jdbc, Clock clock) {
+        this.credentials = credentials; this.staffDir = staffDir;
         this.outbox = outbox;
         this.limiter = limiter;
         this.tenantContext = tenantContext;
@@ -40,7 +46,7 @@ class StepUpOtpService implements StepUpOtp {
     @Override
     public Challenge issue(UUID staffId, String purpose) {
         UUID tenantId = tenantContext.current();
-        AuthModels.Staff staff = repo.findStaffById(staffId).orElseThrow();
+        AuthModels.Staff staff = staffDir.findStaffById(staffId).orElseThrow();
         if (staff.mobilePhone() == null || staff.mobilePhone().isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "NO_MOBILE", "No mobile number", "Add a mobile number to your profile first.");
         }
@@ -49,7 +55,7 @@ class StepUpOtpService implements StepUpOtp {
         }
         String code = String.format("%06d", random.nextInt(1_000_000));
         Instant expiresAt = Instant.now(clock).plus(5, ChronoUnit.MINUTES);
-        repo.setWhatsAppOtp(staffId, OpaqueTokens.sha256Hex(code), expiresAt);
+        credentials.setWhatsAppOtp(staffId, OpaqueTokens.sha256Hex(code), expiresAt);
         return new Challenge(outbox.queue(tenantId, staffId, purpose, code, expiresAt), expiresAt);
     }
 
@@ -58,6 +64,6 @@ class StepUpOtpService implements StepUpOtp {
         // the attempt is counted first and in the same statement that checks the challenge, so a wrong code always costs one
         int open = jdbc.update("UPDATE otp_requests SET attempts = attempts + 1 WHERE id = ? AND staff_id = ? AND purpose = ? " +
                 "AND expires_at > now() AND attempts < ?", challengeId, staffId, purpose, MAX_ATTEMPTS);
-        return open == 1 && code != null && repo.consumeWhatsAppOtp(staffId, OpaqueTokens.sha256Hex(code));
+        return open == 1 && code != null && credentials.consumeWhatsAppOtp(staffId, OpaqueTokens.sha256Hex(code));
     }
 }

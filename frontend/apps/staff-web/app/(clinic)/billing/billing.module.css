@@ -72,7 +72,7 @@
 .state { color: var(--nb-text-secondary); font-size: 14px; }
 .error { background: var(--nb-danger-tint); color: var(--nb-danger-500); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); font-size: 13px; margin-bottom: var(--nb-space-12); }
 
-.overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; z-index: var(--z-modal); padding: var(--nb-space-16); }
+.overlay { position: fixed; inset: 0; background: var(--nb-scrim); display: flex; align-items: center; justify-content: center; z-index: var(--z-modal); padding: var(--nb-space-16); }
 .dialog { width: 480px; max-width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; background: var(--nb-surface-1); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-lg); padding: var(--nb-space-24); }
 .dialogTitle { font-size: 18px; font-weight: 600; margin: 0 0 var(--nb-space-4); }
 .dialogSub { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-16); }
