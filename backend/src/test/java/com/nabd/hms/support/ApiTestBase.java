@@ -157,6 +157,9 @@ public abstract class ApiTestBase {
     @BeforeEach
     void useJdkHttpClientRequestFactory() {
         http.getRestTemplate().setRequestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory());
+        // OPS-025: the test driver is not one of the app's clients; observed, its literal paths (/v1/queue/<uuid>/status) land in
+        // the shared context's /actuator/prometheus as http_client_requests uri labels.
+        http.getRestTemplate().setObservationRegistry(io.micrometer.observation.ObservationRegistry.NOOP);
     }
 
     /** Tests call OutboxDispatcher.poll() (one batch, oldest first) and no background poll runs, so rows

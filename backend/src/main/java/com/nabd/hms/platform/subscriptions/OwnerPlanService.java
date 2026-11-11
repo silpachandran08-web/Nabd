@@ -206,6 +206,7 @@ public class OwnerPlanService implements PlanAccount {
     public int applyDue() {
         int applied = 0;
         for (OwnerPlanRepository.Change c : repo.claimDue(clock.instant())) {
+            boolean moved = false;
             try {
                 tenantScope.run(c.tenantId(), () -> {
                     OwnerPlanRepository.Plan to = repo.plan(c.toPlanId()).orElseThrow();
@@ -214,13 +215,23 @@ public class OwnerPlanService implements PlanAccount {
                     audit.record(c.tenantId(), "system", null, "System", "System", null, "setup.plan_changed", "subscription_change", c.id(), null,
                             Map.of("planCode", c.toPlanCode(), "effective", "renewal", "monthlyMinor", monthly));
                 });
+                moved = true;
                 entitlementEvents.changed(c.tenantId(), List.of("plan"));
                 applied++;
             } catch (RuntimeException e) {
                 log.warn("plan change {} for tenant {} not applied: {}", c.id(), c.tenantId(), e.getClass().getSimpleName());
+                if (!moved) unclaim(c); // the claim committed 'applied'; the move rolled back, so the next run must retry it
             }
         }
         return applied;
+    }
+
+    private void unclaim(OwnerPlanRepository.Change c) {
+        try {
+            tenantScope.run(c.tenantId(), () -> repo.unclaim(c.tenantId(), c.id()));
+        } catch (RuntimeException e) {
+            log.warn("plan change {} for tenant {} not put back to scheduled: {}", c.id(), c.tenantId(), e.getClass().getSimpleName());
+        }
     }
 
     // ---- shared -------------------------------------------------------------------------------------------------------

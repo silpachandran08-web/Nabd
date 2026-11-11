@@ -10,7 +10,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** ADM-037: master (control-plane) reads and writes for the owner's plan page. No RLS on master: every query filters by tenant_id. */
+/** ADM-037: master (control-plane) reads and writes for the owner's plan page. subscription_changes and platform_invoices are under
+ * forced tenant RLS (V3061): call these in the clinic's tenant transaction; the queries still filter by tenant_id. */
 @Repository
 class OwnerPlanRepository {
 
@@ -110,14 +111,16 @@ class OwnerPlanRepository {
                 planId, version, Math.toIntExact(mrrMinor), tenantId);
     }
 
-    /** Scheduled changes whose renewal date has come, claimed once (another replica skips locked rows; ShedLock is the outer guard). */
+    /** Scheduled changes whose renewal date has come, across clinics, claimed once (another replica skips locked rows; ShedLock is
+     * the outer guard). Runs outside any tenant scope, so through the claim_due_plan_changes definer (V3061). */
     List<Change> claimDue(Instant now) {
-        return jdbc.query("""
-                WITH due AS (SELECT id FROM master.subscription_changes WHERE status = 'scheduled' AND effective_at <= ? FOR UPDATE SKIP LOCKED)
-                UPDATE master.subscription_changes c SET status = 'applied', applied_at = now() FROM due, master.plans p
-                WHERE c.id = due.id AND p.id = c.to_plan_id
-                RETURNING c.id, c.tenant_id, c.to_plan_id, c.to_plan_version, p.code, c.direction, c.effective, c.effective_at, c.proration_minor,
-                          c.currency, c.status""", (rs, i) -> change(rs), Timestamp.from(now));
+        return jdbc.query("SELECT * FROM claim_due_plan_changes(?)", (rs, i) -> change(rs), Timestamp.from(now));
+    }
+
+    /** A claimed change whose apply failed goes back to 'scheduled' (the next run retries it). Clinic's tenant transaction. */
+    void unclaim(UUID tenantId, UUID id) {
+        jdbc.update("UPDATE master.subscription_changes SET status = 'scheduled', applied_at = NULL WHERE tenant_id = ? AND id = ? AND status = 'applied'",
+                tenantId, id);
     }
 
     UUID insertInvoice(UUID tenantId, String kind, LocalDate from, LocalDate to, long amountMinor, String currency, UUID changeId) {
