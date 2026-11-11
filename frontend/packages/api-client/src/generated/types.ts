@@ -48,6 +48,8 @@ export type AuditLogPage = { data?: Array<AuditEntryResponse>; page?: PageMeta; 
 export type BatchAdjustmentRequest = { approverPin?: string; approverStaffId?: string; delta?: number; note?: string; reasonCode: string; setTo?: number; };
 export type BatchAdjustmentResponse = { approverName?: string; batchId?: string; delta?: number; itemId?: string; makerName?: string; qtyAfter?: number; qtyBefore?: number; reasonCode?: string; };
 export type BillingLeakageResponse = { entries?: Array<Entry>; rule?: string; thresholdAmount?: number; };
+export type BookRequest = { notes?: string; preferredSlots: Array<string>; };
+export type Booked = { engagementId?: string; fee?: Fee; paymentLink?: string; waiverReason?: string; };
 export type Booking = { actedByRelation?: string; appointmentId?: string; patientId?: string; patientName?: string; queueEntryId?: string; status?: string; time?: string; token?: number; visitType?: string; };
 export type BookingPolicyChange = { after?: Record<string, unknown>; before?: Record<string, unknown>; pointer?: string; };
 export type BookingPolicyCurrent = { draft?: BookingPolicyDraft; published?: BookingPolicyPublished; };
@@ -123,6 +125,7 @@ export type ClinicProfileWriteRequest = { name: string; specialties?: Array<stri
 export type ClinicSummaryResponse = { id?: string; name?: string; region?: string; slug?: string; status?: string; };
 export type ClinicianReviewEntry = { clinician?: boolean; name?: string; reason?: string; roleName?: string; staffId?: string; };
 export type Close = { closeCount?: number; closedAt?: string; closedByName?: string; countedCash?: number; expectedCash?: number; note?: string; reopenReason?: string; reopenedAt?: string; reopenedByName?: string; status?: string; variance?: number; };
+export type CohortView = { medianHoursToLive?: number; signups?: number; steps?: Array<StepCount>; week?: string; };
 export type Collections = { collected?: number; invoices?: number; pendingInvoices?: number; };
 export type ComplianceHealthResponse = { items?: Array<Item>; licences?: Licences; };
 export type Component = { amountMinor?: number; ratePercent?: number; taxableMinor?: number; type?: string; };
@@ -230,6 +233,7 @@ export type EncounterListItem = { amendmentCount?: number; documentsDraft?: numb
 export type EncounterListPage = { data?: Array<EncounterListItem>; page?: PageMeta; };
 export type EncounterPage = { data?: Array<EncounterResponse>; page?: PageMeta; };
 export type EncounterResponse = { assessment?: string; diagnosis?: string; doctorId?: string; medications?: string; occurredAt?: string; queueEntryId?: string; };
+export type Engagement = { closedAt?: string; coveredSteps?: Array<string>; createdAt?: string; fee?: Fee; id?: string; preferredSlots?: Array<string>; slotAt?: string; status?: string; waiverReason?: string; };
 export type Entry = { patientId?: string; patientName?: string; priorNoShowCount?: number; };
 export type EtaAccuracyItem = { clinicDate?: string; doctorId?: string; lowConfidence?: boolean; maeMin?: number; n?: number; p80HitRate?: number; within10Pct?: number; };
 export type EtaAccuracyResponse = { items?: Array<EtaAccuracyItem>; };
@@ -250,6 +254,7 @@ export type FavouriteRxSetItemResponse = { brandName?: string; codeSuggestion?: 
 export type FavouriteRxSetRequest = { items: Array<PrescriptionItemRequest>; name: string; scope?: string; };
 export type FavouriteRxSetResponse = { canEdit?: boolean; createdAt?: string; doctorId?: string; id?: string; items?: Array<FavouriteRxSetItemResponse>; lastUsedAt?: string; name?: string; ownerName?: string; scope?: string; shared?: boolean; staleCheckAvailable?: boolean; staleItemCount?: number; updatedAt?: string; };
 export type FavouriteRxSetUpdateRequest = { items?: Array<PrescriptionItemRequest>; name?: string; scope?: string; };
+export type Fee = { amountMinor?: number; currency?: string; status?: string; };
 export type FefoPickEntry = { batchId?: string; expiryDate?: string; qty?: number; warning?: string; };
 export type FefoPickLine = { itemId?: string; picks?: Array<FefoPickEntry>; };
 export type FefoPickLineRequest = { courseDays?: number; itemId: string; qty?: number; };
@@ -268,6 +273,7 @@ export type FleetSummaryResponse = { byStatus?: Record<string, number>; live?: n
 export type FlowStepResponse = { stepType?: string; };
 export type FollowUpItem = { appointmentId?: string; cancelReason?: string; patientId?: string; patientMrn?: string; patientName?: string; startTime?: string; status?: string; };
 export type FollowUpPage = { data?: Array<FollowUpItem>; page?: PageMeta; };
+export type Funnel = { cohorts?: Array<CohortView>; };
 export type GoLiveBlocker = { code?: string; fixUrl?: string; ok?: boolean; };
 export type GoLiveChecksResponse = { blockers?: Array<GoLiveBlocker>; niceToHave?: Array<GoLiveNiceToHave>; };
 export type GoLiveNiceToHave = { code?: string; note?: string; ok?: boolean; };
@@ -374,6 +380,7 @@ export type NoteResponse = { assessment?: string; diagnosis?: string; doctorId?:
 export type NoteUpsertRequest = { assessment?: string; diagnosis?: string; objective?: string; plan?: string; subjective?: string; };
 export type NotificationClaim = { consentClass?: string; language?: string; notAfter?: string; notBefore?: string; params?: Array<string>; purpose?: string; recipient?: NotificationClaimRecipient; requestId?: string; templateKey?: string; tenantId?: string; };
 export type NotificationClaimRecipient = { patientId?: string; phoneE164?: string; };
+export type Offer = { currency?: string; feeMinor?: number; feeStatus?: string; waiverReason?: string; };
 export type OperatorLoginRequest = { email: string; pin: string; };
 export type OperatorProfileResponse = { email?: string; id?: string; name?: string; permissions?: Array<string>; role?: string; };
 export type OtcChargesResponse = { charges?: Array<ChargeResponse>; currency?: string; };
@@ -391,6 +398,7 @@ export type OwnerMfaConfirmResponse = { expiresIn?: number; recoveryCodes?: Arra
 export type OwnerMfaEnrollRequest = { setupToken: string; };
 export type OwnerMfaVerifyRequest = { challengeToken: string; code: string; };
 export type OwnerRequestResponse = { items?: Array<SupportAccessRequestItem>; };
+export type OwnerView = { engagement?: Engagement; offer?: Offer; };
 export type OwnerWorkspaceTokenResponse = { expiresIn?: number; remainingRecoveryCodes?: number; workspaceToken?: string; };
 export type PackageItemInput = { itemType?: string; name: string; quantity?: number; taxRatePercent?: number; unitListPrice: number; };
 export type PackageItemResponse = { id?: string; itemType?: string; listValue?: number; name?: string; quantity?: number; taxRatePercent?: number; unitListPrice?: number; };
@@ -489,6 +497,7 @@ export type QueueBoardDoctor = { delayMinutes?: number; doctorId?: string; entri
 export type QueueBoardEntry = { allergyFlag?: boolean; displayName?: string; flags?: Array<string>; id?: string; mrn?: string; p50At?: string; p80At?: string; patientId?: string; position?: number; previousToken?: number; priority?: boolean; stage?: string; token?: number; vitalsRecorded?: boolean; };
 export type QueueEntryResponse = { ageYears?: number; appointmentId?: string; appointmentStatus?: string; createdAt?: string; currentStage?: string; departmentId?: string; doctorId?: string; doctorName?: string; encounterClass?: string; encounterId?: string; expectedRange?: string; gender?: string; id?: string; orderReason?: string; parentQueueEntryId?: string; patientId?: string; paymentMode?: string; position?: number; presentingComplaint?: string; priority?: boolean; priorityAcknowledgedAt?: string; priorityAcknowledgedBy?: string; priorityFlaggedAt?: string; priorityFlaggedBy?: string; priorityReason?: string; queueDate?: string; source?: string; status?: string; tokenNumber?: number; transferReason?: string; transferReasonNote?: string; visitType?: string; waitMinutes?: number; workflowDefinitionId?: string; };
 export type QueueFacilitySettingsRequest = { etaDisplayMode: string; };
+export type QueueItem = { closedAt?: string; coveredSteps?: Array<string>; createdAt?: string; fee?: Fee; id?: string; notes?: string; operatorId?: string; preferredSlots?: Array<string>; slotAt?: string; status?: string; tenantId?: string; tenantName?: string; ticketId?: string; waiverReason?: string; };
 export type QueueReassignRequest = { expectedStatus: string; reasonCode: string; toDoctorId: string; };
 export type QueueReassignResponse = { entry?: QueueEntryResponse; previousToken?: number; };
 export type QueueReorderRequest = { priority: boolean; reason?: string; };
@@ -599,6 +608,7 @@ export type StaffSummary = { active?: number; invited?: number; roles?: number; 
 export type StaffSummaryResponse = { id?: string; name?: string; roleName?: string; };
 export type StartRequest = { clinicName?: string; consentToContact?: boolean; market?: string; mobile?: string; specialty?: string; };
 export type Started = { estimateMinutes?: number; id?: string; status?: string; };
+export type StepCount = { completed?: number; reached?: number; step?: string; };
 export type StepUpTokenResponse = { expiresIn?: number; stepUpToken?: string; };
 export type StockAdjustmentLine = { batchId?: string; delta?: number; itemId?: string; qtyAfter?: number; qtyBefore?: number; reasonCode?: string; };
 export type StockBatch = { batchId?: string; batchNo?: string; expiryDate?: string; expiryUnknown?: boolean; location?: string; mrp?: number; purchaseRate?: number; qtyOnHand?: number; status?: string; };
@@ -616,6 +626,8 @@ export type StockTakeSheet = { lines?: Array<StockTakeLine>; summary?: StockTake
 export type StockTakeStartRequest = { location?: string; scheduleClass?: string; scope: string; };
 export type StockTakeStarted = { lineCount?: number; stockTakeId?: string; };
 export type StockTakeSummary = { approvedByName?: string; countedCount?: number; createdByName?: string; lineCount?: number; postedAt?: string; postedByName?: string; scope?: string; scopeValue?: string; snapshotAt?: string; status?: string; stockTakeId?: string; };
+export type StuckItem = { nudgesSent?: number; since?: string; step?: string; tenantId?: string; };
+export type StuckPage = { items?: Array<StuckItem>; nextCursor?: string; };
 export type SubscriptionPage = { data?: Array<SubscriptionResponse>; page?: PageMeta; };
 export type SubscriptionResponse = { createdAt?: string; currency?: string; id?: string; mrrCents?: number; planCode?: string; planId?: string; planName?: string; region?: string; renewalDate?: string; seatLimit?: number; seatsUsed?: number; tenantId?: string; tenantName?: string; tenantSlug?: string; tenantStatus?: string; };
 export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; availablePlans?: Array<PlanOption>; branchesLimit?: number; branchesUsed?: number; currency?: string; killedFeatures?: Array<string>; modules?: Array<ModuleState>; nextInvoice?: NextInvoice; paymentMethod?: string; pendingChange?: PendingChange; plan?: string; planCode?: string; renewalDate?: string; seatsLimit?: number; seatsUsed?: number; status?: string; usage?: Usage; version?: number; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
@@ -651,7 +663,8 @@ export type TransferGraphRequest = { edges: Array<TransferEdge>; };
 export type TransferRequest = { doctorId: string; reason?: string; reasonNote?: string; toDepartmentId: string; };
 export type TransferResponse = { closedLeg?: QueueEntryResponse; newLeg?: QueueEntryResponse; };
 export type TransferTargetResponse = { departmentId?: string; departmentName?: string; doctors?: Array<StaffRosterEntry>; };
-export type TransitionRequest = { reason: string; toStatus: string; };
+export type TransitionRequest = { coveredSteps?: Array<string>; slotAt?: string; toStatus: string; };
+export type Transitioned = { id?: string; status?: string; summarySent?: boolean; };
 export type TrialConversion = { jobId?: string; status?: string; syntheticRowsDeleted?: number; };
 export type TrialConvertRequest = { confirm: boolean; otp: string; otpChallengeId: string; };
 export type TrialConvertResponse = { conversionJobId?: string; };
@@ -1041,6 +1054,8 @@ export type Operations = {
   PhiReadAlertController_phiReadAlerts: { method: "get"; path: "/v1/phi-read/alerts"; permission: "authenticated"; pathParams: never; query: never; body: never; response: AlertsResponse };
   LinkOpenController_linkOpens: { method: "get"; path: "/v1/phi-read/link-opens"; permission: "authenticated"; pathParams: never; query: { patientId?: string; limit?: number; }; body: never; response: LinkOpensResponse };
   PlanCatalogueController_catalogue: { method: "get"; path: "/v1/plans/catalogue"; permission: "public"; pathParams: never; query: { market?: string; }; body: never; response: Array<PlanCatalogueEntry> };
+  ActivationController_funnel: { method: "get"; path: "/v1/platform/activation/funnel"; permission: "onboarding:view"; pathParams: never; query: { from?: string; to?: string; market?: string; specialty?: string; }; body: never; response: Funnel };
+  ActivationController_stuck: { method: "get"; path: "/v1/platform/activation/stuck"; permission: "onboarding:view"; pathParams: never; query: { hours?: number; cursor?: string; limit?: number; }; body: never; response: StuckPage };
   AuditSearchController_search: { method: "get"; path: "/v1/platform/audit-log"; permission: "audit_compliance:view"; pathParams: never; query: { tenantId?: string; action?: string; entityType?: string; createdAfter?: string; createdBefore?: string; actorId?: string; actorType?: string; actorRole?: string; actorName?: string; limit?: number; cursor?: string; includeValues?: boolean; reason?: string; }; body: never; response: AuditLogPage };
   AuditSearchController_export: { method: "get"; path: "/v1/platform/audit-log/export"; permission: "audit_compliance:view"; pathParams: never; query: { tenantId?: string; action?: string; entityType?: string; createdAfter?: string; createdBefore?: string; actorId?: string; actorType?: string; actorRole?: string; actorName?: string; includeValues?: boolean; reason?: string; }; body: never; response: string };
   PlatformAuthController_login: { method: "post"; path: "/v1/platform/auth/login"; permission: "public"; pathParams: never; query: never; body: OperatorLoginRequest; response: Record<string, unknown> };
@@ -1086,6 +1101,8 @@ export type Operations = {
   TenantRegionController_change: { method: "patch"; path: "/v1/platform/tenants/{tenantId}/region"; permission: "tenant_detail:edit"; pathParams: { tenantId: string; }; query: never; body: RegionChangeRequest; response: TenantRegionResponse };
   TemplateLintController_createWithOverride: { method: "post"; path: "/v1/platform/tenants/{tenantId}/whatsapp-templates"; permission: "messaging_operations:override"; pathParams: { tenantId: string; }; query: never; body: TemplateOverrideRequest; response: TemplateResponse };
   TerritoryController_list: { method: "get"; path: "/v1/platform/territories"; permission: "territories:view"; pathParams: never; query: never; body: never; response: Array<RegionSummaryResponse> };
+  WhiteGloveAdminController_queue: { method: "get"; path: "/v1/platform/white-glove"; permission: "onboarding:view"; pathParams: never; query: { includeClosed?: boolean; }; body: never; response: Array<QueueItem> };
+  WhiteGloveAdminController_transition: { method: "post"; path: "/v1/platform/white-glove/{id}/transitions"; permission: "onboarding:edit"; pathParams: { id: string; }; query: never; body: TransitionRequest; response: Transitioned };
   ProxyInviteController_view: { method: "get"; path: "/v1/proxy-invites/{token}"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: InviteView };
   ProxyInviteController_accept: { method: "post"; path: "/v1/proxy-invites/{token}/accept"; permission: "public"; pathParams: { token: string; }; query: never; body: ProxyInviteAcceptRequest; response: ProxyInviteAccepted };
   ProxyInviteController_otp: { method: "post"; path: "/v1/proxy-invites/{token}/otp"; permission: "public"; pathParams: { token: string; }; query: never; body: never; response: Record<string, boolean> };
@@ -1214,6 +1231,8 @@ export type Operations = {
   WhatsAppTemplateController_create: { method: "post"; path: "/v1/setup/whatsapp-templates"; permission: "setup:edit"; pathParams: never; query: never; body: TemplateRequest; response: TemplateResponse };
   WhatsAppTemplateController_resubmit: { method: "patch"; path: "/v1/setup/whatsapp-templates/{id}"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: TemplateRequest; response: TemplateResponse };
   TemplateLintController_dryRun: { method: "post"; path: "/v1/setup/whatsapp-templates:lint"; permission: "setup:edit"; pathParams: never; query: never; body: TemplateLintRequest; response: TemplateLintResponse };
+  WhiteGloveController_view: { method: "get"; path: "/v1/setup/white-glove"; permission: "setup:view"; pathParams: never; query: never; body: never; response: OwnerView };
+  WhiteGloveController_book: { method: "post"; path: "/v1/setup/white-glove"; permission: "setup:edit"; pathParams: never; query: never; body: BookRequest; response: Booked };
   DentalController_chart: { method: "get"; path: "/v1/specialty/dental/patients/{patientId}/chart"; permission: "specialty_dental:view"; pathParams: { patientId: string; }; query: never; body: never; response: Array<ToothResponse> };
   DentalController_history: { method: "get"; path: "/v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history"; permission: "specialty_dental:view"; pathParams: { patientId: string; id: string; }; query: never; body: never; response: Array<ToothHistoryEntryResponse> };
   DentalController_addSupernumerary: { method: "post"; path: "/v1/specialty/dental/patients/{patientId}/chart/supernumerary"; permission: "specialty_dental:edit"; pathParams: { patientId: string; }; query: never; body: SupernumeraryToothRequest; response: ToothResponse };
@@ -1275,6 +1294,8 @@ export type Permission =
   | "nursing:create"
   | "nursing:edit"
   | "nursing:view"
+  | "onboarding:edit"
+  | "onboarding:view"
   | "onboarding_provisioning:view"
   | "packages:approve"
   | "packages:create"

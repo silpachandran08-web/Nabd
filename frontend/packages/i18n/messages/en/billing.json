@@ -234,7 +234,8 @@
     "noInvoices": "No invoices yet.",
     "kind": {
       "proration": "Plan change",
-      "renewal": "Monthly"
+      "renewal": "Monthly",
+      "white_glove": "White-glove setup"
     },
     "status": {
       "due": "due",
@@ -280,5 +281,36 @@
       "patient_app": "Patient app",
       "ai_safety": "AI safety checks"
     }
+  },
+  "whiteGlove": {
+    "title": "Have us set it up",
+    "lead": "Book a call and Nabd sets up prices, timings, WhatsApp verification, patient import and staff for you.",
+    "loading": "Loading the setup offer",
+    "loadFailed": "Couldn't load the setup offer.",
+    "notOffered": "Assisted setup is not offered on your plan.",
+    "fee": "One-time fee {amount}",
+    "waived": "Free on your annual plan",
+    "slots": "Preferred call times (up to 3)",
+    "slot": "Call time {n}",
+    "notes": "Anything we should know (optional)",
+    "mfaCode": "6-digit code from your authenticator app",
+    "book": "Book the setup call",
+    "booking": "Booking…",
+    "bookFailed": "Couldn't book the setup. Try again.",
+    "booked": "Setup booked. Nabd's onboarding team will confirm a call time.",
+    "paymentLink": "Pay the setup fee",
+    "paymentPending": "The fee is added to your Nabd invoices; the payment link is sent separately.",
+    "ownerOnly": "Only the clinic owner can book the setup.",
+    "status": {
+      "requested": "Requested",
+      "scheduled": "Call scheduled",
+      "in_progress": "In progress",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "statusLine": "Your setup: {status}",
+    "slotAt": "Call at {time}",
+    "covered": "Set up for you: {steps}",
+    "grantNote": "Nabd works inside your clinic only after you approve a time-limited support access request."
   }
 }

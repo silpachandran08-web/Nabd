@@ -12,6 +12,7 @@ import { api, ApiError, reasonText } from "../../../lib/api";
 import DpaPanel from "../../../components/setup/DpaPanel";
 import GoLivePanel from "../../../components/setup/GoLivePanel";
 import PriceTemplateStep from "../../../components/setup/PriceTemplateStep";
+import WhiteGloveCard from "../../../components/setup/WhiteGloveCard";
 
 // ADM-007: nine steps; progress and drafts live on the server, so a phone and a laptop show the same wizard.
 type ChecklistItem = { step: string; status: "pending" | "current" | "skipped" | "done"; draft?: Record<string, unknown>; version?: number };
@@ -249,6 +250,9 @@ function SetupWizard() {
         <h1 className={styles.title}>Clinic setup wizard</h1>
         <p className={styles.subtitle}>Step {stepIndex + 1} of {STEPS.length}: {STEPS[stepIndex].title}{minutesLeft > 0 ? ` · about ${minutesLeft} minutes left` : ""}</p>
       </div>
+
+      {/* ADM-006: "Have us set it up" (white-glove booking) */}
+      <WhiteGloveCard />
 
       <div className={styles.steps}>
         {STEPS.map((s, i) => {

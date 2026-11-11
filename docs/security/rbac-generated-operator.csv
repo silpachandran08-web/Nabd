@@ -134,6 +134,8 @@ super_admin,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+super_admin,GET /v1/platform/activation/funnel,onboarding:view,allow
+super_admin,GET /v1/platform/activation/stuck,onboarding:view,allow
 super_admin,GET /v1/platform/audit-log,audit_compliance:view,allow
 super_admin,GET /v1/platform/audit-log/export,audit_compliance:view,allow
 super_admin,GET /v1/platform/billing/discounts,billing_revenue:view,allow
@@ -151,6 +153,7 @@ super_admin,GET /v1/platform/tenants/summary,clinics_fleet:view,allow
 super_admin,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,allow
 super_admin,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 super_admin,GET /v1/platform/territories,territories:view,allow
+super_admin,GET /v1/platform/white-glove,onboarding:view,allow
 super_admin,GET /v1/queue,queue:view,deny-401
 super_admin,GET /v1/queue/board,queue:view,deny-401
 super_admin,GET /v1/queue/eta,queue:view,deny-401
@@ -211,6 +214,7 @@ super_admin,GET /v1/setup/subscription/invoices,setup:view,deny-401
 super_admin,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 super_admin,GET /v1/setup/trial,setup:view,deny-401
 super_admin,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+super_admin,GET /v1/setup/white-glove,setup:view,deny-401
 super_admin,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 super_admin,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 super_admin,GET /v1/staff,staff:view,deny-401
@@ -374,6 +378,7 @@ super_admin,POST /v1/platform/support-access/grants/{id}/revoke,support_access:v
 super_admin,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,allow
 super_admin,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,allow
 super_admin,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,allow
+super_admin,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,allow
 super_admin,POST /v1/queue/check-in,queue:create,deny-401
 super_admin,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 super_admin,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -408,6 +413,7 @@ super_admin,POST /v1/setup/trial/convert,setup:edit,deny-401
 super_admin,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 super_admin,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 super_admin,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+super_admin,POST /v1/setup/white-glove,setup:edit,deny-401
 super_admin,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 super_admin,POST /v1/staff,staff:create,deny-401
 super_admin,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
@@ -574,6 +580,8 @@ implementation,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+implementation,GET /v1/platform/activation/funnel,onboarding:view,allow
+implementation,GET /v1/platform/activation/stuck,onboarding:view,allow
 implementation,GET /v1/platform/audit-log,audit_compliance:view,deny-403
 implementation,GET /v1/platform/audit-log/export,audit_compliance:view,deny-403
 implementation,GET /v1/platform/billing/discounts,billing_revenue:view,deny-403
@@ -591,6 +599,7 @@ implementation,GET /v1/platform/tenants/summary,clinics_fleet:view,allow
 implementation,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,allow
 implementation,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 implementation,GET /v1/platform/territories,territories:view,deny-403
+implementation,GET /v1/platform/white-glove,onboarding:view,allow
 implementation,GET /v1/queue,queue:view,deny-401
 implementation,GET /v1/queue/board,queue:view,deny-401
 implementation,GET /v1/queue/eta,queue:view,deny-401
@@ -651,6 +660,7 @@ implementation,GET /v1/setup/subscription/invoices,setup:view,deny-401
 implementation,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 implementation,GET /v1/setup/trial,setup:view,deny-401
 implementation,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+implementation,GET /v1/setup/white-glove,setup:view,deny-401
 implementation,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 implementation,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 implementation,GET /v1/staff,staff:view,deny-401
@@ -814,6 +824,7 @@ implementation,POST /v1/platform/support-access/grants/{id}/revoke,support_acces
 implementation,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,allow
 implementation,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-403
 implementation,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-403
+implementation,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,allow
 implementation,POST /v1/queue/check-in,queue:create,deny-401
 implementation,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 implementation,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -848,6 +859,7 @@ implementation,POST /v1/setup/trial/convert,setup:edit,deny-401
 implementation,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 implementation,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 implementation,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+implementation,POST /v1/setup/white-glove,setup:edit,deny-401
 implementation,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 implementation,POST /v1/staff,staff:create,deny-401
 implementation,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
@@ -1014,6 +1026,8 @@ support_engineer,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+support_engineer,GET /v1/platform/activation/funnel,onboarding:view,deny-403
+support_engineer,GET /v1/platform/activation/stuck,onboarding:view,deny-403
 support_engineer,GET /v1/platform/audit-log,audit_compliance:view,deny-403
 support_engineer,GET /v1/platform/audit-log/export,audit_compliance:view,deny-403
 support_engineer,GET /v1/platform/billing/discounts,billing_revenue:view,deny-403
@@ -1031,6 +1045,7 @@ support_engineer,GET /v1/platform/tenants/summary,clinics_fleet:view,allow
 support_engineer,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,allow
 support_engineer,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 support_engineer,GET /v1/platform/territories,territories:view,deny-403
+support_engineer,GET /v1/platform/white-glove,onboarding:view,deny-403
 support_engineer,GET /v1/queue,queue:view,deny-401
 support_engineer,GET /v1/queue/board,queue:view,deny-401
 support_engineer,GET /v1/queue/eta,queue:view,deny-401
@@ -1091,6 +1106,7 @@ support_engineer,GET /v1/setup/subscription/invoices,setup:view,deny-401
 support_engineer,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 support_engineer,GET /v1/setup/trial,setup:view,deny-401
 support_engineer,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+support_engineer,GET /v1/setup/white-glove,setup:view,deny-401
 support_engineer,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 support_engineer,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 support_engineer,GET /v1/staff,staff:view,deny-401
@@ -1254,6 +1270,7 @@ support_engineer,POST /v1/platform/support-access/grants/{id}/revoke,support_acc
 support_engineer,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,allow
 support_engineer,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-403
 support_engineer,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-403
+support_engineer,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-403
 support_engineer,POST /v1/queue/check-in,queue:create,deny-401
 support_engineer,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 support_engineer,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -1288,6 +1305,7 @@ support_engineer,POST /v1/setup/trial/convert,setup:edit,deny-401
 support_engineer,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 support_engineer,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 support_engineer,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+support_engineer,POST /v1/setup/white-glove,setup:edit,deny-401
 support_engineer,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 support_engineer,POST /v1/staff,staff:create,deny-401
 support_engineer,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
@@ -1454,6 +1472,8 @@ billing,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 billing,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+billing,GET /v1/platform/activation/funnel,onboarding:view,deny-403
+billing,GET /v1/platform/activation/stuck,onboarding:view,deny-403
 billing,GET /v1/platform/audit-log,audit_compliance:view,deny-403
 billing,GET /v1/platform/audit-log/export,audit_compliance:view,deny-403
 billing,GET /v1/platform/billing/discounts,billing_revenue:view,allow
@@ -1471,6 +1491,7 @@ billing,GET /v1/platform/tenants/summary,clinics_fleet:view,allow
 billing,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 billing,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 billing,GET /v1/platform/territories,territories:view,deny-403
+billing,GET /v1/platform/white-glove,onboarding:view,deny-403
 billing,GET /v1/queue,queue:view,deny-401
 billing,GET /v1/queue/board,queue:view,deny-401
 billing,GET /v1/queue/eta,queue:view,deny-401
@@ -1531,6 +1552,7 @@ billing,GET /v1/setup/subscription/invoices,setup:view,deny-401
 billing,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 billing,GET /v1/setup/trial,setup:view,deny-401
 billing,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+billing,GET /v1/setup/white-glove,setup:view,deny-401
 billing,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 billing,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 billing,GET /v1/staff,staff:view,deny-401
@@ -1694,6 +1716,7 @@ billing,POST /v1/platform/support-access/grants/{id}/revoke,support_access:view,
 billing,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-403
 billing,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-403
 billing,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-403
+billing,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-403
 billing,POST /v1/queue/check-in,queue:create,deny-401
 billing,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 billing,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -1728,6 +1751,7 @@ billing,POST /v1/setup/trial/convert,setup:edit,deny-401
 billing,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 billing,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 billing,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+billing,POST /v1/setup/white-glove,setup:edit,deny-401
 billing,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 billing,POST /v1/staff,staff:create,deny-401
 billing,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
@@ -1894,6 +1918,8 @@ sre,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 sre,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+sre,GET /v1/platform/activation/funnel,onboarding:view,deny-403
+sre,GET /v1/platform/activation/stuck,onboarding:view,deny-403
 sre,GET /v1/platform/audit-log,audit_compliance:view,deny-403
 sre,GET /v1/platform/audit-log/export,audit_compliance:view,deny-403
 sre,GET /v1/platform/billing/discounts,billing_revenue:view,deny-403
@@ -1911,6 +1937,7 @@ sre,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-403
 sre,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 sre,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 sre,GET /v1/platform/territories,territories:view,allow
+sre,GET /v1/platform/white-glove,onboarding:view,deny-403
 sre,GET /v1/queue,queue:view,deny-401
 sre,GET /v1/queue/board,queue:view,deny-401
 sre,GET /v1/queue/eta,queue:view,deny-401
@@ -1971,6 +1998,7 @@ sre,GET /v1/setup/subscription/invoices,setup:view,deny-401
 sre,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 sre,GET /v1/setup/trial,setup:view,deny-401
 sre,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+sre,GET /v1/setup/white-glove,setup:view,deny-401
 sre,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 sre,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 sre,GET /v1/staff,staff:view,deny-401
@@ -2134,6 +2162,7 @@ sre,POST /v1/platform/support-access/grants/{id}/revoke,support_access:view,deny
 sre,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-403
 sre,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-403
 sre,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-403
+sre,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-403
 sre,POST /v1/queue/check-in,queue:create,deny-401
 sre,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 sre,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -2168,6 +2197,7 @@ sre,POST /v1/setup/trial/convert,setup:edit,deny-401
 sre,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 sre,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 sre,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+sre,POST /v1/setup/white-glove,setup:edit,deny-401
 sre,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 sre,POST /v1/staff,staff:create,deny-401
 sre,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
@@ -2334,6 +2364,8 @@ commercial,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+commercial,GET /v1/platform/activation/funnel,onboarding:view,deny-403
+commercial,GET /v1/platform/activation/stuck,onboarding:view,deny-403
 commercial,GET /v1/platform/audit-log,audit_compliance:view,deny-403
 commercial,GET /v1/platform/audit-log/export,audit_compliance:view,deny-403
 commercial,GET /v1/platform/billing/discounts,billing_revenue:view,allow
@@ -2351,6 +2383,7 @@ commercial,GET /v1/platform/tenants/summary,clinics_fleet:view,allow
 commercial,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 commercial,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 commercial,GET /v1/platform/territories,territories:view,allow
+commercial,GET /v1/platform/white-glove,onboarding:view,deny-403
 commercial,GET /v1/queue,queue:view,deny-401
 commercial,GET /v1/queue/board,queue:view,deny-401
 commercial,GET /v1/queue/eta,queue:view,deny-401
@@ -2411,6 +2444,7 @@ commercial,GET /v1/setup/subscription/invoices,setup:view,deny-401
 commercial,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 commercial,GET /v1/setup/trial,setup:view,deny-401
 commercial,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+commercial,GET /v1/setup/white-glove,setup:view,deny-401
 commercial,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 commercial,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 commercial,GET /v1/staff,staff:view,deny-401
@@ -2574,6 +2608,7 @@ commercial,POST /v1/platform/support-access/grants/{id}/revoke,support_access:vi
 commercial,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-403
 commercial,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-403
 commercial,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-403
+commercial,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-403
 commercial,POST /v1/queue/check-in,queue:create,deny-401
 commercial,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 commercial,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -2608,6 +2643,7 @@ commercial,POST /v1/setup/trial/convert,setup:edit,deny-401
 commercial,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 commercial,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 commercial,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+commercial,POST /v1/setup/white-glove,setup:edit,deny-401
 commercial,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 commercial,POST /v1/staff,staff:create,deny-401
 commercial,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
@@ -2774,6 +2810,8 @@ compliance_dpo,GET /v1/pharmacy/stock,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/stock-takes,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/stock-takes/{id},pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/worklist,pharmacy:dispense,deny-401
+compliance_dpo,GET /v1/platform/activation/funnel,onboarding:view,deny-403
+compliance_dpo,GET /v1/platform/activation/stuck,onboarding:view,deny-403
 compliance_dpo,GET /v1/platform/audit-log,audit_compliance:view,allow
 compliance_dpo,GET /v1/platform/audit-log/export,audit_compliance:view,allow
 compliance_dpo,GET /v1/platform/billing/discounts,billing_revenue:view,deny-403
@@ -2791,6 +2829,7 @@ compliance_dpo,GET /v1/platform/tenants/summary,clinics_fleet:view,allow
 compliance_dpo,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,allow
 compliance_dpo,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 compliance_dpo,GET /v1/platform/territories,territories:view,allow
+compliance_dpo,GET /v1/platform/white-glove,onboarding:view,deny-403
 compliance_dpo,GET /v1/queue,queue:view,deny-401
 compliance_dpo,GET /v1/queue/board,queue:view,deny-401
 compliance_dpo,GET /v1/queue/eta,queue:view,deny-401
@@ -2851,6 +2890,7 @@ compliance_dpo,GET /v1/setup/subscription/invoices,setup:view,deny-401
 compliance_dpo,GET /v1/setup/subscription/invoices/{id},setup:view,deny-401
 compliance_dpo,GET /v1/setup/trial,setup:view,deny-401
 compliance_dpo,GET /v1/setup/whatsapp-templates,setup:view,deny-401
+compliance_dpo,GET /v1/setup/white-glove,setup:view,deny-401
 compliance_dpo,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-401
 compliance_dpo,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 compliance_dpo,GET /v1/staff,staff:view,deny-401
@@ -3014,6 +3054,7 @@ compliance_dpo,POST /v1/platform/support-access/grants/{id}/revoke,support_acces
 compliance_dpo,POST /v1/platform/support/tickets/{id}/transitions,support_tickets:view,deny-403
 compliance_dpo,POST /v1/platform/tenants/{tenantId}/lifecycle/transitions,tenant_detail:edit,deny-403
 compliance_dpo,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations:override,deny-403
+compliance_dpo,POST /v1/platform/white-glove/{id}/transitions,onboarding:edit,deny-403
 compliance_dpo,POST /v1/queue/check-in,queue:create,deny-401
 compliance_dpo,POST /v1/queue/doctors/{doctorId}/call-next,queue:edit,deny-401
 compliance_dpo,POST /v1/queue/late-arrival,queue:create,deny-401
@@ -3048,6 +3089,7 @@ compliance_dpo,POST /v1/setup/trial/convert,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/trial/convert/otp,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/whatsapp-templates,setup:edit,deny-401
 compliance_dpo,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-401
+compliance_dpo,POST /v1/setup/white-glove,setup:edit,deny-401
 compliance_dpo,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 compliance_dpo,POST /v1/staff,staff:create,deny-401
 compliance_dpo,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
