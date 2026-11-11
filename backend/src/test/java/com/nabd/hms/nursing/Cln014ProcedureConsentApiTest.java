@@ -22,7 +22,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** CLN-014: consent forms, signed consent PDF + hash, guardian rule, completion gate, withdrawal. */
 class Cln014ProcedureConsentApiTest extends ApiTestBase {
 
-    private static final String SIG = "<svg viewBox=\"0 0 600 200\"><path d=\"M10 10 L100 50 L200 80\"/><path d=\"M300 20 L320 40\"/></svg>";
+    private static final String SIG = "<svg viewBox=\"0 0 600 200\"><path d=\"M10 10 L40 30 L70 50 L100 50 L130 60 L160 70 L200 80\"/>"
+            + "<path d=\"M300 20 L310 30 L320 40 L330 45\"/></svg>";
 
     @Autowired
     ObjectStorage storage;
@@ -274,5 +275,54 @@ class Cln014ProcedureConsentApiTest extends ApiTestBase {
         Integer rows = inTenantTx(c.tenant().id(), () -> jdbc.queryForObject(
                 "SELECT count(*) FROM procedure_consents WHERE procedure_order_id = ?::uuid", Integer.class, orderId));
         assertThat(rows).isEqualTo(1);
+    }
+
+
+    @Test
+    void aDotOrAShortTapIsNotASignature() {
+        Clinic c = clinic("09");
+        Map<?, ?> t = addTemplate(c, "en", "<p>Risks</p>").getBody();
+        String orderId = order(c, patient(c, "Adult", "+919999141010", "1990-01-01", null));
+        for (String svg : List.of("<svg><path d=\"M0 0\"/></svg>", "<svg><path d=\"M100 100 L102 101 L103 101\"/></svg>",
+                "<svg><path d=\"M100 100 L101 100 L102 100 L103 100 L104 100 L105 100 L106 100 L107 100 L108 100 L109 100 L110 100\"/></svg>")) {
+            Map<String, Object> body = new HashMap<>(signed(t, "patient", null, "Adult", c.staff().id()));
+            body.put("signatureSvg", svg);
+            ResponseEntity<Map> r = capture(c, orderId, body);
+            assertThat(r.getStatusCode()).as(svg).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(r.getBody().get("type")).asString().contains("SIGNATURE_REQUIRED");
+        }
+        assertThat(capture(c, orderId, signed(t, "patient", null, "Adult", c.staff().id())).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void theOrderTellsTheDialogTheMinorAndGuardianAndTheGuardianIdMayBeOmitted() {
+        Clinic c = clinic("10");
+        Map<?, ?> t = addTemplate(c, "en", "<p>Risks</p>").getBody();
+        String guardian = patient(c, "Parent Ten", "+919999141011", "1980-01-01", null);
+        String child = patient(c, "Teen Ten", "+919999141012", LocalDate.now().minusYears(15).toString(), guardian);
+        String childOrder = order(c, child);
+        String adultOrder = order(c, patient(c, "Adult Ten", "+919999141013", "1990-01-01", null));
+        ResponseEntity<List> today = exchange("/v1/nursing/procedure-orders/today", HttpMethod.GET, authed(c.token()), List.class);
+        Map<?, ?> childRow = row(today, childOrder);
+        Map<?, ?> adultRow = row(today, adultOrder);
+        assertThat(childRow.get("patientMinor")).isEqualTo(true);
+        assertThat(childRow.get("guardianName")).isEqualTo("Parent Ten");
+        assertThat(adultRow.get("patientMinor")).isEqualTo(false);
+        assertThat(adultRow.get("guardianName")).isNull();
+
+        // a nurse who cannot read the patient record signs as "guardian" without a guardianId: the linked guardian is used
+        ResponseEntity<Map> ok = capture(c, childOrder, signed(t, "guardian", null, "Parent Ten", c.staff().id()));
+        assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String stored = inTenantTx(c.tenant().id(), () -> jdbc.queryForObject(
+                "SELECT guardian_id::text FROM procedure_consents WHERE procedure_order_id = ?::uuid", String.class, childOrder));
+        assertThat(stored).isEqualTo(guardian);
+        // no linked guardian: still 409
+        ResponseEntity<Map> none = capture(c, adultOrder, signed(t, "guardian", null, "Someone", c.staff().id()));
+        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(none.getBody().get("type")).asString().contains("GUARDIAN_REQUIRED");
+    }
+
+    private static Map<?, ?> row(ResponseEntity<List> list, String id) {
+        return (Map<?, ?>) list.getBody().stream().filter(o -> id.equals(((Map<?, ?>) o).get("id"))).findFirst().orElseThrow();
     }
 }

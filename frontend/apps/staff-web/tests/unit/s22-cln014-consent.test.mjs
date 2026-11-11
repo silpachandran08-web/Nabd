@@ -22,3 +22,24 @@ test("placeholders are never signable; the patient's language wins, then English
   assert.equal(pickLang([t("te")], null), "te");
   assert.equal(pickLang([t("en", true)], "en"), null);
 });
+
+test("QA N-2: a dot or a short tap is not enough ink; ten points spanning 40 pad units is", async () => {
+  const { enoughInk } = await import("../../app/components/ui/consent/consentModel.ts");
+  assert.equal(enoughInk([]), false);
+  assert.equal(enoughInk([[[0, 0]]]), false);
+  assert.equal(enoughInk([Array.from({ length: 11 }, (_, i) => [i, 0])]), false); // 11 points, 10 wide
+  assert.equal(enoughInk([Array.from({ length: 5 }, (_, i) => [i * 5, i]), Array.from({ length: 5 }, (_, i) => [25 + i * 5, 5 + i])]), true);
+});
+
+test("QA N-3: who signs comes from the order; an unknown age asks for the guardian first", async () => {
+  const { signerPlan } = await import("../../app/components/ui/consent/consentModel.ts");
+  assert.deepEqual(signerPlan({ patientMinor: true, guardianName: "Parent" }), { age: "minor", kinds: ["guardian"], defaultKind: "guardian", guardianName: "Parent" });
+  assert.deepEqual(signerPlan({ patientMinor: false, guardianName: null }), { age: "adult", kinds: ["patient"], defaultKind: "patient", guardianName: null });
+  assert.deepEqual(signerPlan({ patientMinor: false, guardianName: "Carer" }).kinds, ["patient", "guardian"]);
+  for (const unknown of [{ patientMinor: null }, {}]) {
+    const p = signerPlan({ ...unknown, guardianName: "Parent" });
+    assert.equal(p.age, "unknown");
+    assert.equal(p.defaultKind, "guardian");
+    assert.deepEqual(p.kinds, ["guardian", "patient"]);
+  }
+});
