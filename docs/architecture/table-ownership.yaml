@@ -34,8 +34,8 @@ modules:
     owns: [comms_cutover_flags, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands
   nursing:
-    owns: [administration_orders, administration_records, procedure_orders, vaccine_records]
-    reads: []
+    owns: [administration_orders, administration_records, consent_templates, procedure_consents, procedure_orders, vaccine_records]
+    reads: [patients, tenants]  # CLN-014: the consent PDF names the patient and clinic; the age-18 guardian rule reads the patient's dob
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.

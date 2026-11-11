@@ -9,7 +9,8 @@ import StatusPill from "../ui/StatusPill";
 import { Skeleton } from "../ui/StateViews";
 import { adminStatus, hasConsent, procStatusLabel, ROUTES, type AdminOrder, type ChargeHead, type ProcOrder } from "./doctorOrders";
 import { AdminForm, ProcForm } from "./orders/OrderForms";
-import ProcedureConsent from "./ProcedureConsent";
+import ProcedureConsent from "../ui/consent/ProcedureConsent";
+import { openConsentPdf } from "../ui/consent/consentPdf";
 import type { AuthedFetch, Problem } from "./shared";
 import s from "./consultParts.module.css";
 
@@ -125,11 +126,18 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
                 <strong>{o.chargeName}</strong>
                 <StatusPill tone={o.status === "completed" ? "ok" : o.status === "cancelled" ? "neutral" : o.status === "prepped" ? "info" : "warn"} label={procStatusLabel(o.status)} />
               </div>
-              {o.status !== "cancelled" && (hasConsent(o)
+              {o.status !== "cancelled" && (o.consentWithdrawnAt
+                ? <StatusPill tone="danger" label={tx("consentWithdrawn")} />
+                : hasConsent(o)
                 ? <StatusPill tone="ok" label={o.consentSignedName ? tx("consentRecordedBy", { name: o.consentSignedName }) : tx("consentRecorded")} />
                 : <StatusPill tone="danger" label={tx("consentRequiredBeforePerformance")} />)}
+              {o.consentWithdrawnAt && o.consentWithdrawReason && <span className={s.muted}>{o.consentWithdrawReason}</span>}
               {hasConsent(o) && o.consentRecordedByName && <span className={s.muted}>{tx("recordedBy", { consentRecordedByName: o.consentRecordedByName })}</span>}
-              {o.status === "ordered" && !hasConsent(o) && (
+              {o.consentId && (
+                <div><button type="button" className={s.linkBtn} onClick={() => void openConsentPdf(o.consentId!).then((ok) => { if (!ok) setRowError(tx("couldNotOpenConsentPdf")); })}>
+                  <Icon name="scroll" size={14} /> {tx("signedConsentPdf")}</button></div>
+              )}
+              {o.status === "ordered" && !hasConsent(o) && !o.consentWithdrawnAt && (
                 mayEdit
                   ? <div><button type="button" className={s.btn} onClick={() => setConsentFor(o)}>{tx("recordConsent")}</button></div>
                   : <span className={s.muted}>{tx("consentIsRecordedByNursing")}</span>
@@ -158,8 +166,8 @@ export default function DoctorOrders({ authedFetch, queueEntryId }: { authedFetc
           onCreated={(o) => { setForm(null); setProcs((c) => [...(c ?? []), o]); if (mayList) void load(); }} />
       )}
       {consentFor && (
-        <ProcedureConsent authedFetch={authedFetch} order={consentFor} onClose={() => setConsentFor(null)}
-          onRecorded={(o) => { setConsentFor(null); replaceProc(o); }} />
+        <ProcedureConsent order={consentFor} onClose={() => setConsentFor(null)}
+          onRecorded={() => { setConsentFor(null); void load(); }} />
       )}
     </section>
   );

@@ -19,7 +19,6 @@
   "app/components/consult/PackageSessionCard.tsx",
   "app/components/consult/PreConsultDialog.tsx",
   "app/components/consult/PregnancyChip.tsx",
-  "app/components/consult/ProcedureConsent.tsx",
   "app/components/consult/RxPad.tsx",
   "app/components/consult/RxPrint.tsx",
   "app/components/consult/SafetyStrip.tsx",

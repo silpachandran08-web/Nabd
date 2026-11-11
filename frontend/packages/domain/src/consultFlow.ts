@@ -100,6 +100,8 @@ export type TimelineInput = {
   signedAt: string | null;
   noteSigned: boolean;
   amendments: { id: string; createdAt: string; reason: string }[];
+  /** CLN-014: procedure consents of this visit (signed and/or withdrawn), from the procedure orders. */
+  consents?: { id: string; procedure: string; signedAt: string | null; withdrawnAt: string | null; reason: string | null }[];
 };
 
 const AFTER_CONSULT = ["checkout_pending", "completed", "transferred_out"];
@@ -117,5 +119,9 @@ export function buildTimeline(i: TimelineInput): TimelineEvent[] {
   if (i.status === "checkout_pending" || i.status === "completed") out.push({ id: "checkout", label: i.status === "completed" ? "Visit completed" : "Sent to checkout", kind: "ok" });
   if (i.status === "transferred_out") out.push({ id: "transfer", label: "Transferred to another department", kind: "info" });
   for (const a of i.amendments) out.push({ id: `am-${a.id}`, label: "Amendment added", sub: a.reason, at: a.createdAt, kind: "info" });
+  for (const c of i.consents ?? []) {
+    if (c.signedAt) out.push({ id: `cs-${c.id}`, label: "Consent signed", sub: c.procedure, at: c.signedAt, kind: "ok" });
+    if (c.withdrawnAt) out.push({ id: `cw-${c.id}`, label: "Consent withdrawn", sub: c.reason ? `${c.procedure} · ${c.reason}` : c.procedure, at: c.withdrawnAt, kind: "warn" });
+  }
   return out;
 }
