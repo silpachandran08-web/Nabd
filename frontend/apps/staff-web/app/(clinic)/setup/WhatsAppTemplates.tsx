@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./setup.module.css";
 import { BottomSheet, ErrorState, Skeleton } from "@nabd/ui";
 import { api, reasonText } from "../../lib/api";
-import { attention, inReview, pendingChange, reasonHelp, type TemplateVersion } from "./templateStatus";
+import { can } from "../../lib/permissions";
+import { useHasMounted } from "../../lib/useHasMounted";
+import { attention, editLabel, pendingChange, reasonHelp, type TemplateVersion } from "./templateStatus";
 
 type Status = "submitting" | "queued" | "pending" | "approved" | "flagged" | "paused" | "disabled" | "rejected";
 type Template = {
@@ -58,6 +60,11 @@ export default function WhatsAppTemplates() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Restricted controls are absent, not disabled: without setup:edit there is no create form and no Edit (T1-BUG-1).
+  const mounted = useHasMounted();
+  const canEdit = mounted && can("setup:edit");
+  // COM-013 (T1-BUG-2): one Idempotency-Key per edit, so a retry of the same PATCH is answered once and makes no new version.
+  const editKey = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try { setTemplates(await api.get<Template[]>("/setup/whatsapp-templates")); setLoadFailed(false); } catch { setLoadFailed(true); /* the list keeps what it had */ }
@@ -72,6 +79,7 @@ export default function WhatsAppTemplates() {
   };
 
   const startFix = (t: Template) => {
+    editKey.current = crypto.randomUUID();
     setEditingId(t.id);
     setError(null);
     setDraft({ name: t.name, language: t.language, category: t.category as Draft["category"], body: t.body, examples: Array(t.paramCount).fill("") });
@@ -79,7 +87,7 @@ export default function WhatsAppTemplates() {
 
   const alerts = templates === null ? [] : attention(templates, label);
 
-  const cancel = () => { setEditingId(null); setDraft(EMPTY); setError(null); };
+  const cancel = () => { setEditingId(null); setDraft(EMPTY); setError(null); editKey.current = null; };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +95,7 @@ export default function WhatsAppTemplates() {
     setError(null);
     try {
       await api.request(editingId ? "PATCH" : "POST", editingId ? `/setup/whatsapp-templates/${editingId}` : "/setup/whatsapp-templates",
-        { body: editingId ? { body: draft.body, examples: draft.examples } : draft });
+        editingId ? { body: { body: draft.body, examples: draft.examples }, idempotencyKey: editKey.current ?? undefined } : { body: draft });
     } catch (err) {
       setError(reasonText(err, "Couldn't submit the template."));
       return;
@@ -106,6 +114,7 @@ export default function WhatsAppTemplates() {
         usually within minutes, sometimes up to a day. Your clinic name is added as the heading of every message.
       </p>
 
+      {canEdit && (
       <form onSubmit={submit}>
         <div className={styles.row}>
           <div className={styles.field}>
@@ -160,6 +169,7 @@ export default function WhatsAppTemplates() {
         </div>
         {editingId && <p className={styles.label}>The approved version keeps sending while Meta reviews this one, and is replaced as soon as Meta approves it.</p>}
       </form>
+      )}
 
       {templates !== null && alerts.length > 0 && (
         <div role="status" className={styles.errorState} style={{ marginBlock: 16 }}>
@@ -169,7 +179,7 @@ export default function WhatsAppTemplates() {
       )}
 
       {templates === null ? (loadFailed ? <ErrorState message="Couldn't load your WhatsApp templates." onRetry={load} /> : <Skeleton rows={4} label="Loading templates" />) : templates.length === 0 ? (
-        <p className={styles.empty}>No templates yet. Add your first one above — an appointment reminder is a good start.</p>
+        <p className={styles.empty}>{canEdit ? "No templates yet. Add your first one above — an appointment reminder is a good start." : "No templates yet."}</p>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -179,7 +189,7 @@ export default function WhatsAppTemplates() {
             <tbody>
               {templates.map((t) => {
                 const change = pendingChange(t);
-                const reviewing = inReview(t.status) || (change !== null && inReview(change.status));
+                const edit = editLabel(t, canEdit);
                 return (
                 <tr key={t.id}>
                   <td>{label(t)}<br /><span className={styles.label}>{t.source === "catalogue" ? "Starter template" : t.category === "MARKETING" ? "Marketing" : "Utility"}</span></td>
@@ -197,7 +207,7 @@ export default function WhatsAppTemplates() {
                   </td>
                   <td>{t.qualityRating === "UNKNOWN" ? "—" : t.qualityRating.toLowerCase()}</td>
                   <td>
-                    {t.source === "custom" && !reviewing && <button className={styles.smallBtn} onClick={() => startFix(t)}>{t.status === "rejected" || change?.status === "rejected" ? "Fix & resubmit" : "Edit"}</button>}
+                    {edit && <button className={styles.smallBtn} onClick={() => startFix(t)}>{edit}</button>}
                     {t.versions.length > 1 && <button className={styles.smallBtn} onClick={() => setHistory(t)}>History ({t.versions.length})</button>}
                   </td>
                 </tr>

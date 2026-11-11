@@ -44,9 +44,11 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
     static final class FakeMeta extends LoggingWhatsAppClient {
         volatile String createStatus = "approved";
         final List<String> sent = new CopyOnWriteArrayList<>();
+        final List<String> created = new CopyOnWriteArrayList<>();
 
         @Override
         public Submission createTemplate(String metaName, String language, String category, String headerText, String body, List<String> examples) {
+            created.add(metaName);
             return new Submission("meta." + UUID.randomUUID(), createStatus);
         }
 
@@ -98,8 +100,7 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
 
         // sends keep using the approved v1, also one queued now
         UUID before = queue(tenant.id(), "visit_note", List.of("Asha", "10:00"), null);
-        dispatcher.poll();
-        assertThat(messageStatus(tenant.id(), before)).isEqualTo("sent");
+        assertThat(settled(tenant.id(), before)).isEqualTo("sent");
         assertThat(META.sent).contains(v1Meta).doesNotContain(v1Meta + "_v2"); // the dispatcher may also drain other classes' sends
         Map<String, Object> listed = listed(token, "visit_note");
         assertThat(listed).containsEntry("id", v1).containsEntry("activeVersion", 1);
@@ -110,8 +111,7 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
         String v2MetaId = metaId(tenant.id(), v2);
         postWebhook(statusChange(v2MetaId, "APPROVED", null));
         assertThat(listed(token, "visit_note")).containsEntry("id", v2).containsEntry("activeVersion", 2);
-        dispatcher.poll();
-        assertThat(messageStatus(tenant.id(), queuedBeforeApproval)).isEqualTo("sent");
+        assertThat(settled(tenant.id(), queuedBeforeApproval)).isEqualTo("sent");
         assertThat(META.sent).contains(v1Meta + "_v2");
         assertThat(inTenantTx(tenant.id(), () -> jdbc.queryForObject(
                 "SELECT superseded_by FROM whatsapp_templates WHERE id = ?::uuid", UUID.class, v1))).isEqualTo(UUID.fromString(v2));
@@ -135,6 +135,36 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
         assertThat((List<?>) listed.get("versions")).anySatisfy(v -> assertThat(asMap(v))
                 .containsEntry("version", 2).containsEntry("status", "rejected").containsEntry("rejectionReason", "PROMOTIONAL"));
         assertThat(patch(token, v1, "Hi {{1}}, see you at {{2}}.", List.of("Asha", "10:00")).getBody()).containsEntry("version", 3);
+    }
+
+    /** QA S22 T1-BUG-2: a client retry of the same edit (same Idempotency-Key, same body) after Meta approved at once is answered
+     * from the first result: no third version and no second Meta submission. A different body with that key is refused. */
+    @Test
+    void aRetriedEditWithTheSameIdempotencyKeyMakesNoSecondVersion() {
+        SeededTenant tenant = seedTenant();
+        String token = ownerToken(tenant);
+        String v1 = create(token, "visit_note", "UTILITY", "Hi {{1}}, your visit is at {{2}}.", List.of("Asha", "10:00"));
+        String key = UUID.randomUUID().toString();
+        Map<String, Object> body = Map.of("body", "Hello {{1}}, see you at {{2}}.", "examples", List.of("Asha", "10:00"));
+        ResponseEntity<Map> first = exchange("/v1/setup/whatsapp-templates/" + v1, HttpMethod.PATCH,
+                authedJsonBodyWithHeader(token, "Idempotency-Key", key, body), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(first.getBody()).containsEntry("version", 2).containsEntry("status", "approved"); // the stub approves at once
+        int submissions = META.created.size();
+
+        ResponseEntity<Map> retry = exchange("/v1/setup/whatsapp-templates/" + v1, HttpMethod.PATCH,
+                authedJsonBodyWithHeader(token, "Idempotency-Key", key, body), Map.class);
+        assertThat(retry.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(retry.getHeaders().getFirst("Idempotent-Replayed")).isEqualTo("true");
+        assertThat(retry.getBody()).containsEntry("id", first.getBody().get("id")).containsEntry("version", 2);
+        assertThat(META.created).hasSize(submissions);
+        assertThat(inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM whatsapp_templates WHERE tenant_id = ? AND name = 'visit_note'", Integer.class, tenant.id()))).isEqualTo(2);
+
+        ResponseEntity<Map> reused = exchange("/v1/setup/whatsapp-templates/" + v1, HttpMethod.PATCH,
+                authedJsonBodyWithHeader(token, "Idempotency-Key", key, Map.of("body", "Other {{1}} text {{2}} here.", "examples", List.of("a", "b"))), Map.class);
+        assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(reused.getBody()).containsEntry("code", "IDEMPOTENCY_KEY_REUSED");
     }
 
     // ---- 2. pause: hold within the window, expire when the window ends first ----
@@ -167,8 +197,7 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
         postWebhook(statusChange(metaId(tenant.id(), id), "REINSTATED", null));
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE outbox_events SET next_attempt_at = now() WHERE event_type = 'whatsapp.send' AND payload->>'messageId' = ?",
                 held.toString()));
-        dispatcher.poll();
-        assertThat(messageStatus(tenant.id(), held)).isEqualTo("sent");
+        assertThat(settled(tenant.id(), held)).isEqualTo("sent");
     }
 
     // ---- 3. Meta re-categorises a utility template as marketing ----
@@ -192,14 +221,12 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
         assertThat(templateEvents(tenant.id())).contains("approved>approved:MARKETING");
 
         UUID blocked = inTenantTx(tenant.id(), () -> messages.queueTemplate(patient, "+919000000000", "visit_note", "en", List.of("10:00")));
-        dispatcher.poll();
-        assertThat(messageStatus(tenant.id(), blocked)).isEqualTo("blocked");
+        assertThat(settled(tenant.id(), blocked)).isEqualTo("blocked");
 
         inTenantTx(tenant.id(), () -> jdbc.update(
                 "INSERT INTO consents (tenant_id, patient_id, consent_type) VALUES (?,?,'marketing')", tenant.id(), patient));
         UUID allowed = inTenantTx(tenant.id(), () -> messages.queueTemplate(patient, "+919000000000", "visit_note", "en", List.of("10:00")));
-        dispatcher.poll();
-        assertThat(messageStatus(tenant.id(), allowed)).isEqualTo("sent");
+        assertThat(settled(tenant.id(), allowed)).isEqualTo("sent");
     }
 
     // ---- 4. clinic rename resubmits every template with the new header as a new version ----
@@ -304,6 +331,24 @@ class Com013TemplateLifecycleApiTest extends ApiTestBase {
     private String versionId(UUID tenantId, String name, int version) {
         return inTenantTx(tenantId, () -> jdbc.queryForObject("SELECT id::text FROM whatsapp_templates WHERE tenant_id = ? AND name = ? AND version = ?",
                 String.class, tenantId, name, version));
+    }
+
+    /** Polls the outbox until the message leaves queued/sending: the background dispatcher of this shared context may hold the
+     * event's lease for a moment, or other classes' leftovers may fill one poll. */
+    private String settled(UUID tenantId, UUID id) {
+        String status = messageStatus(tenantId, id);
+        for (int i = 0; i < 40 && ("queued".equals(status) || "sending".equals(status)); i++) {
+            dispatcher.poll();
+            status = messageStatus(tenantId, id);
+            if ("queued".equals(status) || "sending".equals(status)) {
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        return status;
     }
 
     private String messageStatus(UUID tenantId, UUID id) {
