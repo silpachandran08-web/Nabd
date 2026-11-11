@@ -1,8 +1,9 @@
 # OPS-026/027: observability config checks (collector denylist and egress, retention, SLO rules, promtool unit tests, runbook links).
+# OPS-060: capacity review selftest and dashboard freshness.
 name: observability
 on:
   pull_request:
-    paths: ["infra/observability/**", "infra/terraform/modules/cell/aws/monitoring_slo_*", "infra/terraform/modules/cell/aws/variables_ops026.tf", "docs/runbooks/**", "scripts/ci/test_ops026_ops027.py", ".github/workflows/observability.yml"]
+    paths: ["infra/observability/**", "infra/terraform/modules/cell/aws/monitoring_slo_*", "infra/terraform/modules/cell/aws/variables_ops026.tf", "docs/runbooks/**", "scripts/ci/test_ops026_ops027.py", "scripts/ci/test_ops060_capacity.py", ".github/workflows/observability.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,4 +21,4 @@ jobs:
         run: |
           curl -sSL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" | tar -xz --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
           echo "PROMTOOL=$PWD/promtool" >> "$GITHUB_ENV"
-      - run: pip install python-hcl2 pyyaml && python3 -m unittest scripts.ci.test_ops026_ops027 && python3 infra/observability/verify_trace.py --selftest
+      - run: pip install python-hcl2 pyyaml && python3 -m unittest scripts.ci.test_ops026_ops027 && python3 infra/observability/verify_trace.py --selftest && python3 scripts/ci/test_ops060_capacity.py
