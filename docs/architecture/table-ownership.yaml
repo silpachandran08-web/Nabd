@@ -54,7 +54,7 @@ modules:
     owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
     reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
-    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.platform_invoices, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscription_changes, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, tenant_lifecycle_events, tenants]
+    owns: [brands, master.activation_steps, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.platform_invoices, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscription_changes, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, master.white_glove_engagements, tenant_lifecycle_events, tenants]
     reads: []
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
