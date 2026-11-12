@@ -36,7 +36,8 @@ ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-cp", "app.jar:lib/*", "com.nabd
 # API image: Flyway off (application.yml), actuator on 8081 (never routed by the ingress), OpenTelemetry agent for traces.
 # Keep the agent version equal to opentelemetry-instrumentation-annotations in backend/pom.xml.
 FROM base AS app
-ADD --chmod=444 --checksum=sha256:fa039f86082b559e53283a863e03de5df7db4bdb4840c5cbb8bf38f292987d5b \
+# --chmod also sets the mode of the /otel directory ADD creates: 555 keeps it enterable for the non-root user (444 broke startup)
+ADD --chmod=555 --checksum=sha256:fa039f86082b559e53283a863e03de5df7db4bdb4840c5cbb8bf38f292987d5b \
     https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.9.0/opentelemetry-javaagent.jar /otel/agent.jar
 # OTEL_EXPORTER_OTLP_ENDPOINT is set per environment; metrics go through Prometheus, so the agent exports traces only.
 ENV OTEL_SERVICE_NAME=hms-backend OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none
