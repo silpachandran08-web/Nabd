@@ -7,6 +7,10 @@ package com.nabd.hms.shared.notify;
  */
 public enum NotificationPurpose {
     APPT_REMINDER_24H("appt_reminder_24h", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-043: two hours before (first name, time); window 45 min. */
+    APPT_REMINDER_2H("appt_reminder_2h", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-043: no answer to the day-before reminder by the clinic cutoff (first name, date, time). */
+    APPT_NUDGE("appt_nudge", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
     RECALL_DUE("recall_due", ConsentClass.MESSAGING, Priority.BULK, ChannelPolicy.WHATSAPP_THEN_SMS),
     REVIEW_REQUEST("review_request", ConsentClass.MARKETING, Priority.BULK, ChannelPolicy.WHATSAPP_ONLY),
     SECURE_LINK("secure_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
@@ -45,7 +49,11 @@ public enum NotificationPurpose {
     /** ADM-004: the owner is told how many trial days are left (one param: the number; no clinical content). */
     TRIAL_EXPIRING("trial_expiring", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** ADM-043: the owner's end-of-day summary (staff recipient); 4 params: day, figures, attention items, overview link. Counts and amounts only. */
-    DAILY_SUMMARY("daily_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    DAILY_SUMMARY("daily_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-005: the owner is stuck on a setup step (staff recipient); 2 params: the step's name, the help link. REMINDER, so quiet hours apply. */
+    SETUP_NUDGE("setup_nudge", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-006: Nabd finished the white-glove setup (staff recipient); 1 param: the steps that were set up. */
+    WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;

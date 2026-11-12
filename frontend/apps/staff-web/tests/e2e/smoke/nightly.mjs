@@ -83,6 +83,8 @@ function vitalsMocks(t) {
     ['GET', /^\/staff\/roster/, { body: [{ id: 'd1', name: 'Dr Synthetic', departmentName: 'General' }] }],
     ['GET', /^\/clinical\/vitals\/patient\/p1\/previous/, { body: { items: [] } }],
     ['PATCH', /^\/clinical\/vitals\/e1$/, (r, req) => { st.saved = JSON.parse(req.postData()); st.status = 'vitals_done'; return json(r, 200, { abnormalFlags: [], recordedAt: new Date().toISOString() }); }],
+    // ACC-035 onboarding state (StaffOnboardingProgress) is an object: the catch-all's [] would take the shell down (T1-BUG-5)
+    ['GET', /^\/me\/onboarding$/, { body: { completed: ['tour.nurse'], competencyPassedAt: null } }],
     ['GET', /./, { body: [] }],
   ] };
 }

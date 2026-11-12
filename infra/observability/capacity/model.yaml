@@ -1,0 +1,101 @@
+# OPS-060: capacity model for the pilot capacity review (doc06 6.5 S8, DP section 6). One entry per resource:
+#   query      what the review pulls (daily maximum over the window) and what the Grafana dashboard draws: the same text, so the
+#              report is reproducible from Grafana. prometheus = the cell Prometheus (OPS-026); cloudwatch = AWS/RDS, AWS/ElastiCache,
+#              Nabd/PgBouncer (OPS-055) through Grafana's CloudWatch datasource. ${DB_INSTANCE} / ${VALKEY_CLUSTER} are the cell's ids.
+#   capacity   the limit the peak is compared with, and where the number comes from. verify: true = read the real value in the cell
+#              before trusting the headroom (it depends on how the cell was applied).
+#   scales     clinics = grows with the number of clinics (projected linearly per clinic); none = a latency/lag budget, not scaled.
+#   owner      who gets the action when headroom is below the bar (CODEOWNERS team handles; placeholders until the teams exist).
+# capacity_review.py reads this file; `capacity_review.py dashboard --check` fails CI when the dashboard is stale.
+headroom_min: 2.0          # every resource must absorb 2x the pilot peak before cohort B entry
+utilisation_alarm: 0.70    # "projected date to 70% utilisation"
+triggers:
+  read_replica_clinics: 100                   # DP section 6: add the Postgres read replica at ~100 clinics
+  realtime_extraction_connections: [2000, 3000]  # DP section 6: extract Realtime (SSE) from Core at ~2-3k concurrent connections
+cohorts:
+  cohort_b_new_clinics: 15  # doc06 6.5: cohort B adds 10-15 clinics; the review plans for the upper bound
+resources:
+  - id: postgres_cpu
+    title: Postgres CPU (India primary)
+    unit: percent
+    query: { datasource: cloudwatch, namespace: AWS/RDS, metric: CPUUtilization, dimensions: { DBInstanceIdentifier: "${DB_INSTANCE}" }, stat: Maximum }
+    capacity: { value: 100, source: "percent of the instance; DP section 6 plans < 30% at peak with the push architecture" }
+    scales: clinics
+    owner: "@nabd/db-owners"
+  - id: postgres_iops
+    title: Postgres read + write IOPS
+    unit: iops
+    query: { datasource: cloudwatch, namespace: AWS/RDS, metric: [ReadIOPS, WriteIOPS], sum: true, dimensions: { DBInstanceIdentifier: "${DB_INSTANCE}" }, stat: Maximum }
+    capacity: { value: 12000, verify: true, source: "gp3 baseline for >= 400 GB allocated (prod-in 500 GB, infra/terraform/cells/in/prod.tfvars); staging-in (50 GB) has 3000" }
+    scales: clinics
+    owner: "@nabd/db-owners"
+  - id: postgres_connections
+    title: Postgres connections
+    unit: connections
+    query: { datasource: cloudwatch, namespace: AWS/RDS, metric: DatabaseConnections, dimensions: { DBInstanceIdentifier: "${DB_INSTANCE}" }, stat: Maximum }
+    capacity: { value: 200, source: "max_connections (docs/runbooks/data-tier.md pool budget, db_max_connections)" }
+    scales: none   # bounded by the pool sizes, not by clinics: 56 pooled + 30 direct by design
+    owner: "@nabd/db-owners"
+  - id: pgbouncer_server_connections
+    title: PgBouncer server connections in use (per instance)
+    unit: connections
+    query: { datasource: cloudwatch, namespace: Nabd/PgBouncer, metric: SvActive, dimensions: { Instance: "*" }, stat: Maximum }
+    capacity: { value: 28, source: "pgbouncer_app_pool_size 24 + nabd_reports 4 per instance (variables_ops055.tf, data-tier.md)" }
+    scales: clinics
+    owner: "@nabd/platform-owners"
+  - id: pgbouncer_wait_ms
+    title: PgBouncer client wait (worst database)
+    unit: ms
+    query: { datasource: cloudwatch, namespace: Nabd/PgBouncer, metric: AvgWaitTimeMs, dimensions: { Instance: "*" }, stat: Maximum }
+    capacity: { value: 100, source: "alarm <cell>-pgbouncer-wait (AvgWaitTimeMs > 100 for 5 min, data-tier.md)" }
+    scales: none
+    owner: "@nabd/platform-owners"
+  - id: hikari_active
+    title: Hikari pool connections in use (worst pod)
+    unit: connections
+    query: { datasource: prometheus, expr: "max(hikaricp_connections_active)" }
+    capacity: { query: "max(hikaricp_connections_max)", value: 20, source: "spring.datasource.hikari.maximum-pool-size, DB_POOL_SIZE default 20 (application.yml); the live max wins when Prometheus has it" }
+    scales: clinics
+    owner: "@nabd/platform-owners"
+  - id: valkey_memory
+    title: Valkey memory used
+    unit: percent
+    query: { datasource: cloudwatch, namespace: AWS/ElastiCache, metric: DatabaseMemoryUsagePercentage, dimensions: { ReplicationGroupId: "${VALKEY_CLUSTER}" }, stat: Maximum }
+    capacity: { value: 100, source: "percent of maxmemory on the node type (valkey_node_type, default cache.m7g.large)" }
+    scales: clinics
+    owner: "@nabd/platform-owners"
+  - id: valkey_engine_cpu
+    title: Valkey engine CPU (ops saturation)
+    unit: percent
+    query: { datasource: cloudwatch, namespace: AWS/ElastiCache, metric: EngineCPUUtilization, dimensions: { ReplicationGroupId: "${VALKEY_CLUSTER}" }, stat: Maximum }
+    capacity: { value: 100, source: "percent of the single Valkey engine thread: the limit on ops/s" }
+    scales: clinics
+    owner: "@nabd/platform-owners"
+  - id: sse_connections_pod
+    title: SSE connections (worst pod)
+    unit: connections
+    query: { datasource: prometheus, expr: "max(realtime_sse_connections)" }
+    capacity: { value: 2000, source: "app.realtime.max-connections default 2000 per pod (RealtimeHub)" }
+    scales: clinics
+    owner: "@nabd/platform-owners"
+  - id: sse_connections_total
+    title: SSE connections (all pods)
+    unit: connections
+    query: { datasource: prometheus, expr: "sum(realtime_sse_connections)" }
+    capacity: { value: 2000, source: "Realtime extraction trigger, lower bound (DP section 6: ~2-3k)" }
+    scales: clinics
+    owner: "@nabd/platform-owners"
+  - id: outbox_lag_seconds
+    title: Outbox oldest pending event
+    unit: seconds
+    query: { datasource: prometheus, expr: "max(outbox_oldest_pending_age_seconds)" }
+    capacity: { value: 30, source: "alert NabdOutboxOldestPendingOver30s (outbox-relay.rules.yml)" }
+    scales: none
+    owner: "@nabd/platform-owners"
+  - id: checkin_rate
+    title: Check-ins per second (morning rush driver)
+    unit: req/s
+    query: { datasource: prometheus, expr: 'sum(rate(http_server_requests_seconds_count{uri="/v1/queue/check-in",method="POST"}[5m]))' }
+    capacity: { value: null, source: "the rate the last green k6 rush run sustained in staging-in (perf/run.sh rush drives 2 x PEAK_RPS); pass --proven-checkin-rps" }
+    scales: clinics
+    owner: "@nabd/platform-owners"

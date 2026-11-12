@@ -72,7 +72,7 @@ public class SenderHealthService {
                         instant(r.get("throttle_expires_at")), r.get("block_rate_24h") == null ? null : ((Number) r.get("block_rate_24h")).doubleValue(),
                         blockRate7d(id), THROTTLE_LINE, events(id)));
             }
-            List<Template> templates = jdbc.query("SELECT id, name, language, category, status, rejection_reason FROM whatsapp_templates WHERE tenant_id = ? ORDER BY name, language",
+            List<Template> templates = jdbc.query("SELECT id, name, language, category, status, rejection_reason FROM whatsapp_templates WHERE tenant_id = ? AND active ORDER BY name, language",
                     (rs, i) -> new Template(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6)), tenant);
             return new Health(senders, templates);
         });

@@ -46,6 +46,9 @@ final class WhatsAppInboundKeys {
                     case "message_template_status_update" -> out.add(item(
                             key("tpl:", value.path("message_template_id").asString("") + ":" + value.path("event").asString("") + ":" + ts, value),
                             field, number, "template", "value", value, mapper));
+                    case "template_category_update" -> out.add(item( // COM-013: Meta re-categorised a template
+                            key("tplc:", value.path("message_template_id").asString("") + ":" + value.path("new_category").asString("") + ":" + ts, value),
+                            field, number, "template", "value", value, mapper));
                     case "message_template_quality_update" -> out.add(item(
                             key("tplq:", value.path("message_template_id").asString("") + ":" + value.path("new_quality_score").asString("") + ":" + ts, value),
                             field, number, "template", "value", value, mapper));

@@ -16,10 +16,17 @@ class PatientConfirmationRepository {
         this.jdbc = jdbc;
     }
 
-    /** Idempotent: the first confirmation time stays; a second tap returns the same instant. */
-    Instant confirm(UUID tenantId, UUID appointmentId) {
-        return jdbc.queryForObject("UPDATE appointments SET patient_confirmed_at = COALESCE(patient_confirmed_at, now()) "
-                + "WHERE tenant_id = ? AND id = ? RETURNING patient_confirmed_at", java.sql.Timestamp.class, tenantId, appointmentId).toInstant();
+    record Confirmation(Instant at, boolean first) {
+    }
+
+    /** Idempotent: the first confirmation time stays; a second tap returns the same instant with first = false (decided by the
+     * conditional UPDATE, so two concurrent taps cannot both be first). COM-043: the reminder cascade stops. */
+    Confirmation confirm(UUID tenantId, UUID appointmentId) {
+        boolean first = jdbc.update("UPDATE appointments SET patient_confirmed_at = now(), confirmation_state = 'confirmed' "
+                + "WHERE tenant_id = ? AND id = ? AND patient_confirmed_at IS NULL", tenantId, appointmentId) == 1;
+        Instant at = jdbc.queryForObject("SELECT patient_confirmed_at FROM appointments WHERE tenant_id = ? AND id = ?",
+                java.sql.Timestamp.class, tenantId, appointmentId).toInstant();
+        return new Confirmation(at, first);
     }
 
     void callMe(UUID tenantId, UUID appointmentId) {

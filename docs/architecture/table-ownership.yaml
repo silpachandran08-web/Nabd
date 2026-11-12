@@ -11,8 +11,8 @@
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
-    owns: [billing_documents, charge_catalogue, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
-    reads: [charge_doctor_fees, patients, pharmacy_item_profiles, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout
+    owns: [billing_documents, charge_catalogue, claim_pack_formats, claim_packs, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
+    reads: [charge_doctor_fees, licence_registry, patients, pharmacy_item_profiles, staff, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout; FIN-035: the claim pack prints the doctor's registration number (staff) and the facility licence (licence_registry)
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, rx_coding_suggestions, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
@@ -28,14 +28,14 @@ modules:
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
     # (remaining direct staff reads elsewhere are baseline debt).
     packages: [iam, auth, staff]
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_preferences]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences]
     reads: []
   messaging:
     owns: [comms_cutover_flags, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands
   nursing:
-    owns: [administration_orders, administration_records, procedure_orders, vaccine_records]
-    reads: []
+    owns: [administration_orders, administration_records, consent_templates, procedure_consents, procedure_orders, vaccine_records]
+    reads: [patients, tenants]  # CLN-014: the consent PDF names the patient and clinic; the age-18 guardian rule reads the patient's dob
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.
@@ -54,7 +54,7 @@ modules:
     owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
     reads: [charge_catalogue, tenants]  # items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
-    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.platform_invoices, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscription_changes, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, tenant_lifecycle_events, tenants]
+    owns: [brands, master.activation_steps, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.platform_invoices, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscription_changes, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, master.white_glove_engagements, tenant_lifecycle_events, tenants]
     reads: []
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
@@ -63,8 +63,12 @@ modules:
     # (procedure_orders) and the brand's clinics for the combined message (tenants, brands)
     reads: [appointments, brands, day_closes, doctor_working_hours, invoice_payments, invoices, package_instances, procedure_orders, queue_entries, queue_entry_events, tenants]  # OPS-010: the recompute-from-source of one tenant-day
   queue:
-    owns: [appointment_change_offers, appointment_desk_exceptions, appointments, booking_request_details, booking_request_offers, booking_routing_settings, checkin_attempts, delay_broadcast_recipients, desk_exceptions, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_checkin_settings, facility_queue_settings, queue_entries, queue_entry_events, reason_code_catalogue, service_time_stats, session_reserved_slots, specialty_service_defaults, tenant_reason_codes, waitlist_entries]
+    owns: [appointment_change_offers, appointment_desk_exceptions, appointment_reminders, appointments, booking_request_details, booking_request_offers, booking_routing_settings, checkin_attempts, delay_broadcast_recipients, desk_exceptions, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_checkin_settings, facility_queue_settings, queue_entries, queue_entry_events, reason_code_catalogue, service_time_stats, session_reserved_slots, specialty_service_defaults, tenant_reason_codes, waitlist_entries]
     reads: [tenants]  # ACC-040: the clinic name shown on the WhatsApp booking card (no organization.api accessor yet)
+  realtime:
+    # FEF-048: Web Push subscriptions per staff and device; the queue module asks realtime.WebPushSender to send 'patient ready'
+    owns: [web_push_subscriptions]
+    reads: []
   shared:
     owns: [file_blocked_alerts, file_objects, idempotency_keys, projector_applied_events, shedlock]
     reads: [staff, roles]  # PLT-029: file_blocked_alerts fans out to the owner staff (built-in role); no owner API exists yet

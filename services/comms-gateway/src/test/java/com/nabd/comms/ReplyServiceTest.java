@@ -244,6 +244,22 @@ class ReplyServiceTest {
         assertThat(code(() -> replies.sendTemplate(other, otherThread, STAFF, tpl, List.of("a"), null))).as("another tenant's template is invisible").isEqualTo("422 TEMPLATE_NOT_SENDABLE");
     }
 
+    /** COM-013: two versions of one template can coexist (Core V3100); only the active one is offered or sent. */
+    @Test
+    void onlyTheActiveVersionOfATemplateIsOfferedOrSent() {
+        UUID tenant = UUID.randomUUID(), v1 = UUID.randomUUID(), v2 = UUID.randomUUID();
+        UUID closed = thread(tenant, "old", Duration.ofHours(30));
+        su.update("INSERT INTO whatsapp_templates (id, tenant_id, name, meta_name, language, category, header_text, body, param_count, status, version, active) "
+                + "VALUES (?,?,'visit','m_v1_' || ?::text,'en','UTILITY','h','Hello {{1}}',1,'approved',1,false)", v1, tenant, v1);
+        su.update("INSERT INTO whatsapp_templates (id, tenant_id, name, meta_name, language, category, header_text, body, param_count, status, version, active) "
+                + "VALUES (?,?,'visit','m_v2_' || ?::text,'en','UTILITY','h','Hi {{1}}',1,'approved',2,true)", v2, tenant, v2);
+        assertThat(replies.sendableTemplates(tenant, "en")).extracting(ReplyService.SendableTemplate::id).containsExactly(v2);
+        assertThat(code(() -> replies.sendTemplate(tenant, closed, STAFF, v1, List.of("Asha"), null))).as("superseded version").isEqualTo("422 TEMPLATE_NOT_SENDABLE");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> su.update("INSERT INTO whatsapp_templates (id, tenant_id, name, meta_name, language, category, header_text, body, param_count, status, version, active) "
+                + "VALUES (gen_random_uuid(),?,'visit','m_v3','en','UTILITY','h','Hey {{1}}',1,'pending',3,true)", tenant))
+                .as("one active row per name and language").isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+    }
+
     @Test
     void cannedRepliesArePerTenantAndPerLanguageAndNeverAutoSent() {
         UUID a = UUID.randomUUID(), b = UUID.randomUUID();

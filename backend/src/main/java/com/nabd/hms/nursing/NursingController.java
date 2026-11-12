@@ -7,7 +7,14 @@ import com.nabd.hms.nursing.dto.ActivityEntryResponse;
 import com.nabd.hms.nursing.dto.AdministerRequest;
 import com.nabd.hms.nursing.dto.AdministrationOrderRequest;
 import com.nabd.hms.nursing.dto.AdministrationOrderResponse;
+import com.nabd.hms.nursing.dto.ConsentCaptureResponse;
+import com.nabd.hms.nursing.dto.ConsentTemplateCreated;
+import com.nabd.hms.nursing.dto.ConsentTemplateList;
+import com.nabd.hms.nursing.dto.ConsentTemplateRequest;
+import com.nabd.hms.nursing.dto.ConsentWithdrawRequest;
+import com.nabd.hms.nursing.dto.ConsentWithdrawResponse;
 import com.nabd.hms.nursing.dto.ProcedureConsentRequest;
+import com.nabd.hms.shared.Idempotent;
 import com.nabd.hms.nursing.dto.ProcedureNotesRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderResponse;
@@ -17,7 +24,12 @@ import com.nabd.hms.nursing.dto.VaccineRecordRequest;
 import com.nabd.hms.nursing.dto.VaccineRecordResponse;
 import com.nabd.hms.nursing.dto.WorklistResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,6 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,9 +57,12 @@ public class NursingController {
     private final WorklistService worklistService;
 
     private final ClinicalReadScope scopes;
+    private final ConsentService consentService;
 
     NursingController(AdministrationService administrationService, ProcedureService procedureService, ActivityService activityService,
-                      VaccineRecordService vaccineRecordService, WorklistService worklistService, ClinicalReadScope scopes) {
+                      VaccineRecordService vaccineRecordService, WorklistService worklistService, ClinicalReadScope scopes,
+                      ConsentService consentService) {
+        this.consentService = consentService;
         this.scopes = scopes;
         this.worklistService = worklistService;
         this.vaccineRecordService = vaccineRecordService;
@@ -99,10 +115,45 @@ public class NursingController {
         return procedureService.updateStatus(tenantId, staffId, id, req);
     }
 
+    /** CLN-014: a signed consent form (PDF + SHA-256), or NB-119's typed name for a procedure the clinic has no form for. */
+    @Idempotent
     @PostMapping("/procedure-orders/{id}/consent")
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('nursing:edit')")
-    public ProcedureOrderResponse recordProcedureConsent(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody ProcedureConsentRequest req) {
-        return procedureService.recordConsent(tenantId, staffId, id, req);
+    public ConsentCaptureResponse recordProcedureConsent(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody ProcedureConsentRequest req) {
+        return consentService.capture(tenantId, staffId, id, req);
+    }
+
+    @PostMapping("/procedure-orders/{id}/consent/withdraw")
+    @PreAuthorize("hasAuthority('nursing:edit')")
+    public ConsentWithdrawResponse withdrawProcedureConsent(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID id, @Valid @RequestBody ConsentWithdrawRequest req) {
+        return consentService.withdraw(tenantId, staffId, id, req.reason());
+    }
+
+    @GetMapping("/consent-templates")
+    @PreAuthorize("hasAuthority('nursing:view')")
+    public ConsentTemplateList consentTemplates(@CurrentTenant UUID tenantId, @RequestParam String chargeCode,
+                                                @RequestParam(required = false) @jakarta.validation.constraints.Pattern(regexp = "en|hi|kn|te|ar") String lang) {
+        return consentService.templates(tenantId, chargeCode, lang);
+    }
+
+    @Idempotent
+    @PostMapping("/consent-templates")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('clinical:approve')")
+    public ConsentTemplateCreated addConsentTemplate(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @Valid @RequestBody ConsentTemplateRequest req) {
+        return consentService.addTemplate(tenantId, staffId, req);
+    }
+
+    /** The signed PDF; X-Content-SHA256 is the hash stored at signing, re-checked against the bytes on every download. */
+    @GetMapping(value = "/procedure-consents/{consentId}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('nursing:view')")
+    public ResponseEntity<byte[]> consentPdf(@CurrentTenant UUID tenantId, @PathVariable UUID consentId) {
+        ConsentService.Pdf pdf = consentService.pdf(tenantId, consentId);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore())
+                .header("X-Content-SHA256", pdf.sha256())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename("consent-" + consentId + ".pdf").build().toString())
+                .body(pdf.bytes());
     }
 
     @PatchMapping("/procedure-orders/{id}/notes")

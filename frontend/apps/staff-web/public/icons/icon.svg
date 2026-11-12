@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- FEF-048: placeholder app mark (a pulse line, "nabd") in the DESIGN.md tokens; Product & Design to replace with the final logo mark. -->
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#3EE0C4"/><stop offset="1" stop-color="#35C9E8"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="#06090C"/>
+  <path d="M96 272h76l36-92 56 176 40-120 22 36h90" fill="none" stroke="url(#g)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,57 +1,73 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./setup.module.css";
+import { BottomSheet, ErrorState, Skeleton } from "@nabd/ui";
 import { api, reasonText } from "../../lib/api";
+import { can } from "../../lib/permissions";
+import { useHasMounted } from "../../lib/useHasMounted";
+import { attention, editLabel, pendingChange, reasonHelp, type TemplateVersion } from "./templateStatus";
 
+type Status = "submitting" | "queued" | "pending" | "approved" | "flagged" | "paused" | "disabled" | "rejected";
 type Template = {
   id: string; name: string; language: string; category: "UTILITY" | "MARKETING" | "AUTHENTICATION"; headerText: string; body: string;
-  paramCount: number; key: string; source: "catalogue" | "custom"; status: "queued" | "pending" | "approved" | "flagged" | "paused" | "disabled" | "rejected";
+  paramCount: number; key: string; source: "catalogue" | "custom"; status: Status;
   rejectionReason: string | null; qualityRating: "GREEN" | "YELLOW" | "RED" | "UNKNOWN"; updatedAt: string;
+  // COM-013: versions (sends use the active one), Meta's re-categorisation and pause
+  version: number; active: boolean; activeVersion: number; requestedCategory: string; categoryChangedAt: string | null;
+  pausedUntil: string | null; versions: TemplateVersion[];
 };
 type Draft = { name: string; language: string; category: "UTILITY" | "MARKETING"; body: string; examples: string[] };
 
 const EMPTY: Draft = { name: "", language: "en", category: "UTILITY", body: "", examples: [] };
 
-// Readable labels for Meta's rejection reason codes; anything else is shown as Meta sent it.
-const REJECTION_HELP: Record<string, string> = {
-  INCORRECT_CATEGORY: "Meta thinks the category is wrong — offers and promotions must be Marketing.",
-  INVALID_FORMAT: "The wording or variables break Meta's formatting rules.",
-  ABUSIVE_CONTENT: "Meta flagged the wording as against its commerce policy.",
-  SCAM: "Meta flagged the wording as potentially misleading.",
-  TAG_CONTENT_MISMATCH: "The wording doesn't match the chosen category.",
-};
-
-const STATUS_PILL: Record<Template["status"], string> = {
-  queued: styles.pillPending, approved: styles.pillValid, flagged: styles.pillExpiring, pending: styles.pillPending,
+const STATUS_PILL: Record<Status, string> = {
+  submitting: styles.pillPending, queued: styles.pillPending, approved: styles.pillValid, flagged: styles.pillExpiring, pending: styles.pillPending,
   paused: styles.pillExpiring, disabled: styles.pillInactive, rejected: styles.pillExpired,
 };
 
 // COM-012: starter templates are named in plain words; owners only see their status (the platform team fixes rejections).
 const KEY_LABEL: Record<string, string> = {
-  appt_confirmed: "Appointment confirmed", appt_reminder_24h: "Reminder, 1 day before", appt_reminder_2h: "Reminder, 2 hours before",
+  appt_confirmed: "Appointment confirmed", appt_reminder_24h: "Reminder, 1 day before", appt_reminder_2h: "Reminder, 2 hours before", appt_nudge: "Please confirm (no answer yet)",
   appt_rescheduled: "Appointment moved", appt_cancelled_by_clinic: "Cancelled by the clinic", doctor_delay: "Doctor running late",
   queue_your_turn: "Your turn is next", leave_now: "Time to leave", secure_link_ready: "Secure message ready",
   recall_due: "Next visit due", review_request: "Review request", feedback_request: "Feedback request",
   package_card: "Package card", package_expiry: "Package expiring", optout_confirm: "Stopped messages", otp_login: "Sign-in code",
 };
-const STATUS_LABEL: Partial<Record<Template["status"], string>> = { queued: "waiting to send" };
+const STATUS_LABEL: Partial<Record<Status, string>> = { queued: "waiting to send", submitting: "sending to Meta", pending: "in review" };
 const LANGUAGE_LABEL: Record<string, string> = { en: "English", hi: "Hindi", kn: "Kannada", te: "Telugu", ar: "Arabic" };
 
 /** Number of {{n}} slots in the body — drives how many example inputs are shown. */
 const slotCount = (body: string) => (body.match(/\{\{\d+\}\}/g) ?? []).length;
 
+const label = (t: { source: string; key: string; name: string }) => (t.source === "catalogue" ? (KEY_LABEL[t.key] ?? t.key) : t.name);
+
+/** COM-013: Meta's reason in plain words with what to change. */
+function Reason({ code }: { code: string | null }) {
+  const help = reasonHelp(code);
+  if (!help) return null;
+  return <div className={styles.label}>{help.text} <strong>How to fix:</strong> {help.fix}</div>;
+}
+
 /** NB-190: the clinic's WhatsApp template library. Errors stay inline (unlike the page-level error
- * state) so a clinic fixing a rejected template keeps its text on screen. */
+ * state) so a clinic fixing a rejected template keeps its text on screen. COM-013: an edit is a new version; the approved
+ * one keeps sending until Meta approves the new one. */
 export default function WhatsAppTemplates() {
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<Template[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [history, setHistory] = useState<Template | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Restricted controls are absent, not disabled: without setup:edit there is no create form and no Edit (T1-BUG-1).
+  const mounted = useHasMounted();
+  const canEdit = mounted && can("setup:edit");
+  // COM-013 (T1-BUG-2): one Idempotency-Key per edit, so a retry of the same PATCH is answered once and makes no new version.
+  const editKey = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    try { setTemplates(await api.get<Template[]>("/setup/whatsapp-templates")); } catch { /* the list keeps what it had */ }
+    try { setTemplates(await api.get<Template[]>("/setup/whatsapp-templates")); setLoadFailed(false); } catch { setLoadFailed(true); /* the list keeps what it had */ }
   }, []);
 
   // Deferred to a microtask, same as the setup page's loadAll (react-hooks/set-state-in-effect).
@@ -63,19 +79,23 @@ export default function WhatsAppTemplates() {
   };
 
   const startFix = (t: Template) => {
+    editKey.current = crypto.randomUUID();
     setEditingId(t.id);
     setError(null);
     setDraft({ name: t.name, language: t.language, category: t.category as Draft["category"], body: t.body, examples: Array(t.paramCount).fill("") });
   };
 
-  const cancel = () => { setEditingId(null); setDraft(EMPTY); setError(null); };
+  const alerts = templates === null ? [] : attention(templates, label);
+
+  const cancel = () => { setEditingId(null); setDraft(EMPTY); setError(null); editKey.current = null; };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      await api.request(editingId ? "PATCH" : "POST", editingId ? `/setup/whatsapp-templates/${editingId}` : "/setup/whatsapp-templates", { body: draft });
+      await api.request(editingId ? "PATCH" : "POST", editingId ? `/setup/whatsapp-templates/${editingId}` : "/setup/whatsapp-templates",
+        editingId ? { body: { body: draft.body, examples: draft.examples }, idempotencyKey: editKey.current ?? undefined } : { body: draft });
     } catch (err) {
       setError(reasonText(err, "Couldn't submit the template."));
       return;
@@ -94,6 +114,7 @@ export default function WhatsAppTemplates() {
         usually within minutes, sometimes up to a day. Your clinic name is added as the heading of every message.
       </p>
 
+      {canEdit && (
       <form onSubmit={submit}>
         <div className={styles.row}>
           <div className={styles.field}>
@@ -143,13 +164,22 @@ export default function WhatsAppTemplates() {
         <div className={styles.actions}>
           {editingId && <button className={styles.btn} type="button" onClick={cancel}>Cancel</button>}
           <button className={styles.btnPrimary} type="submit" disabled={saving}>
-            {saving ? "Submitting…" : editingId ? "Resubmit for review" : "Submit for review"}
+            {saving ? "Submitting…" : editingId ? "Submit new version" : "Submit for review"}
           </button>
         </div>
+        {editingId && <p className={styles.label}>The approved version keeps sending while Meta reviews this one, and is replaced as soon as Meta approves it.</p>}
       </form>
+      )}
 
-      {templates.length === 0 ? (
-        <p className={styles.empty}>No templates yet. Add your first one above — an appointment reminder is a good start.</p>
+      {templates !== null && alerts.length > 0 && (
+        <div role="status" className={styles.errorState} style={{ marginBlock: 16 }}>
+          <strong>Needs your attention</strong>
+          <ul style={{ marginBlock: 4, paddingInlineStart: 20 }}>{alerts.map((a) => <li key={a.id}>{a.text}</li>)}</ul>
+        </div>
+      )}
+
+      {templates === null ? (loadFailed ? <ErrorState message="Couldn't load your WhatsApp templates." onRetry={load} /> : <Skeleton rows={4} label="Loading templates" />) : templates.length === 0 ? (
+        <p className={styles.empty}>{canEdit ? "No templates yet. Add your first one above — an appointment reminder is a good start." : "No templates yet."}</p>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -157,24 +187,52 @@ export default function WhatsAppTemplates() {
               <tr><th scope="col">Name</th><th scope="col">Language</th><th scope="col">Message</th><th scope="col">Status</th><th scope="col">Quality</th><th scope="col"></th></tr>
             </thead>
             <tbody>
-              {templates.map((t) => (
+              {templates.map((t) => {
+                const change = pendingChange(t);
+                const edit = editLabel(t, canEdit);
+                return (
                 <tr key={t.id}>
-                  <td>{t.source === "catalogue" ? (KEY_LABEL[t.key] ?? t.key) : t.name}<br /><span className={styles.label}>{t.source === "catalogue" ? "Starter template" : t.category === "MARKETING" ? "Marketing" : "Utility"}</span></td>
+                  <td>{label(t)}<br /><span className={styles.label}>{t.source === "catalogue" ? "Starter template" : t.category === "MARKETING" ? "Marketing" : "Utility"}</span></td>
                   <td>{LANGUAGE_LABEL[t.language] ?? t.language}</td>
                   <td><strong>{t.headerText}</strong><br />{t.body}</td>
                   <td>
-                    <span className={`${styles.pill} ${STATUS_PILL[t.status]}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
-                    {t.status === "rejected" && t.rejectionReason && (
-                      <div className={styles.label}>{REJECTION_HELP[t.rejectionReason] ?? t.rejectionReason}</div>
+                    <span className={`${styles.pill} ${STATUS_PILL[t.status] ?? styles.pillPending}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
+                    {t.status === "rejected" && <Reason code={t.rejectionReason} />}
+                    {change && (
+                      <div className={styles.label}>
+                        Version {change.version}: {STATUS_LABEL[change.status as Status] ?? change.status}
+                        {change.status === "rejected" && <Reason code={change.rejectionReason} />}
+                      </div>
                     )}
                   </td>
                   <td>{t.qualityRating === "UNKNOWN" ? "—" : t.qualityRating.toLowerCase()}</td>
-                  <td>{t.status === "rejected" && t.source === "custom" && <button className={styles.smallBtn} onClick={() => startFix(t)}>Fix &amp; resubmit</button>}</td>
+                  <td>
+                    {edit && <button className={styles.smallBtn} onClick={() => startFix(t)}>{edit}</button>}
+                    {t.versions.length > 1 && <button className={styles.smallBtn} onClick={() => setHistory(t)}>History ({t.versions.length})</button>}
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {history && (
+        <BottomSheet title={`Version history: ${label(history)}`} onClose={() => setHistory(null)}>
+          <ol style={{ paddingInlineStart: 20 }}>
+            {history.versions.map((v) => (
+              <li key={v.id} style={{ marginBlockEnd: 12 }}>
+                <strong>Version {v.version}</strong> <span className={`${styles.pill} ${STATUS_PILL[v.status as Status] ?? styles.pillPending}`}>{STATUS_LABEL[v.status as Status] ?? v.status}</span>
+                {v.active && <span className={styles.label}> sending now</span>}
+                <div className={styles.label}>{new Date(v.createdAt).toLocaleString()}</div>
+                <div><strong>{v.headerText}</strong><br />{v.body}</div>
+                {v.status === "rejected" && <Reason code={v.rejectionReason} />}
+              </li>
+            ))}
+          </ol>
+          <button className={styles.btn} type="button" onClick={() => setHistory(null)}>Close</button>
+        </BottomSheet>
       )}
     </div>
   );

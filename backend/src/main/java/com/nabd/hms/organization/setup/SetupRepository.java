@@ -84,11 +84,19 @@ class SetupRepository {
     /** Per-step upsert (not a single "seed if empty" guard) so a step added after a tenant already
      * had its checklist seeded — e.g. "departments" — still appears for it, without a one-off
      * migration-time backfill. UNIQUE(tenant_id, step) makes this a no-op for steps already there. */
-    private void ensureProgressSeeded(UUID tenantId) {
+    private boolean ensureProgressSeeded(UUID tenantId) {
+        boolean first = false;
         for (String step : SetupSteps.ALL) {
-            jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, ?, 'pending') " +
+            int n = jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, ?, 'pending') " +
                     "ON CONFLICT (tenant_id, step) DO NOTHING", tenantId, step);
+            first |= n == 1 && step.equals(SetupSteps.ALL.get(0));
         }
+        return first;
+    }
+
+    /** ADM-005: seeds the checklist; true only the first time (the first step's row was new), i.e. the clinic just reached it. */
+    boolean seedProgress(UUID tenantId) {
+        return ensureProgressSeeded(tenantId);
     }
 
     // ── Clinic profile ──

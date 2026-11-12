@@ -30,6 +30,13 @@ class FileRepository {
                 + "VALUES (?,?,?,?,?,?,?,?)", id, tenantId, purpose, storageKey, quarantineKey, declaredType, size, uploadedBy);
     }
 
+    void insertGenerated(UUID id, UUID tenantId, String purpose, String storageKey, String type, long size, byte[] sha256, UUID by,
+                         UUID patientId, UUID visitId, Instant at) {
+        jdbc.update("INSERT INTO file_objects (id, tenant_id, purpose, storage_key, declared_type, detected_type, size_bytes, sha256, status, "
+                + "scan_engine, scanned_at, uploaded_by, patient_id, visit_id) VALUES (?,?,?,?,?,?,?,?,'available','generated',?,?,?,?)",
+                id, tenantId, purpose, storageKey, type, type, size, sha256, Timestamp.from(at), by, patientId, visitId);
+    }
+
     Optional<Row> find(UUID tenantId, UUID id) {
         return jdbc.query("SELECT * FROM file_objects WHERE tenant_id = ? AND id = ?", (rs, i) -> new Row(
                 rs.getObject("id", UUID.class), rs.getObject("tenant_id", UUID.class), rs.getString("purpose"),

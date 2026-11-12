@@ -31,6 +31,7 @@ final class PlatformPermissions {
             Map.entry("clinics_fleet", Set.of("super_admin", "implementation", "support_engineer", "billing", "commercial", "compliance_dpo")),
             Map.entry("tenant_detail", Set.of("super_admin", "implementation", "support_engineer", "compliance_dpo")),
             Map.entry("onboarding_provisioning", Set.of("super_admin", "implementation")),
+            Map.entry("onboarding", Set.of("super_admin", "implementation")), // ADM-005/006: activation funnel, stuck clinics, white-glove queue
             Map.entry("provisioning_jobs", Set.of("super_admin", "implementation", "sre")),
             Map.entry("billing_revenue", Set.of("super_admin", "billing", "commercial")),
             Map.entry("support_tickets", Set.of("super_admin", "implementation", "support_engineer")),
@@ -52,6 +53,7 @@ final class PlatformPermissions {
             "safety_content:edit", Set.of("super_admin"), // CLN-004: upload / record CSO approval / activate the safety dictionary
             "kb_import:edit", Set.of("super_admin"), // CLN-019: import / activate a drug master KB feed
             "audit_compliance:values", Set.of("compliance_dpo"), // FEF-019: lets the console show the DPO-only before/after control from permissions; AuditSearchService still enforces the role
+            "onboarding:edit", Set.of("super_admin", "implementation"), // ADM-006: schedule / start / close / cancel a white-glove engagement
             "tenant_detail:edit", Set.of("super_admin") // V3-001: suspend / offboard / reactivate a clinic; shortcut: implementation excluded until the role spec says otherwise
     );
 

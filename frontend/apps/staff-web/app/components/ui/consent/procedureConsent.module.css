@@ -1,0 +1,22 @@
+/* CLN-014: tablet consent. Logical properties only (RTL), --nb-* tokens. */
+.form { max-block-size: 45vh; overflow-y: auto; padding: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-1); color: var(--nb-text-primary); white-space: pre-wrap; font-size: 16px; line-height: 1.6; }
+.pad { inline-size: 100%; max-inline-size: 600px; aspect-ratio: 3 / 1; border: 1px dashed var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-1); color: var(--nb-text-primary); touch-action: none; display: block; }
+.langs { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.lang { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; cursor: pointer; }
+.langOn { border-color: var(--nb-accent-500); color: var(--nb-accent-500); }
+.big { min-block-size: 44px; }
+/* shared consent dialog: same look as the consult parts it replaced */
+.stack { display: flex; flex-direction: column; gap: var(--nb-space-16); }
+.muted { color: var(--nb-text-secondary); font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 12px; color: var(--nb-text-secondary); min-width: 0; }
+.input { min-block-size: 44px; background: var(--nb-surface-3); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: 0 var(--nb-space-12); color: var(--nb-text-primary); font: inherit; font-size: 16px; }
+.check { display: flex; gap: var(--nb-space-8); align-items: flex-start; font-size: 14px; min-block-size: 24px; }
+.notice { display: flex; gap: var(--nb-space-8); align-items: flex-start; padding: var(--nb-space-12); border-radius: var(--nb-radius-md); font-size: 13px; }
+.noticeWarn { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
+.noticeDanger { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
+.noticeInfo { background: var(--nb-info-tint); color: var(--nb-info-500); }
+.dialogActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--nb-space-8); margin-block-start: var(--nb-space-16); }
+.btn { min-block-size: 44px; padding: 0 var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-8); }
+.btn:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
+.btnPrimary { min-block-size: 44px; padding: 0 var(--nb-space-16); border: none; border-radius: var(--nb-radius-md); background: var(--nb-accent-gradient); color: var(--nb-on-accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-8); }
+.btnPrimary:disabled { background: var(--nb-surface-3); color: var(--nb-text-disabled); cursor: not-allowed; }

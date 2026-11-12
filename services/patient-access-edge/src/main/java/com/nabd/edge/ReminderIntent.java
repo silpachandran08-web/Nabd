@@ -32,9 +32,13 @@ import java.util.UUID;
 @Component
 public class ReminderIntent implements Intent {
 
-    /** shortcut: ACC-007 owns the coded cancel-reason list (read through scheduling.api); these three stand in until it is merged. */
-    static final List<Button> REASONS = List.of(new Button("why:cant_make_it", "Can't make it"), new Button("why:feeling_better", "Feeling better"),
+    /** COM-043: the patient's one-tap reasons, codes from ACC-007's cancel list (reason_code_catalogue), sent as a list message.
+     * shortcut: English labels fixed here; the catalogue's localised labels come with the template languages (COM-020). */
+    static final List<Button> REASONS = List.of(new Button("why:schedule_clash", "Schedule clash"), new Button("why:illness", "Illness"),
+            new Button("why:cost", "Cost"), new Button("why:transport", "Transport"), new Button("why:clinic_initiated", "Clinic rescheduled"),
             new Button("why:other", "Other reason"));
+    /** ACC-007: 'other' needs a note; a button tap carries no text, so the note says where it came from. */
+    static final String OTHER_NOTE = "Cancelled from the WhatsApp reminder";
     private static final String TRAVEL_Q = "How long does it take you to get to the clinic? Tap 10, 20 or 30 minutes, or reply 45 or 60.";
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ENGLISH);
 
@@ -124,7 +128,8 @@ public class ReminderIntent implements Intent {
         if (id == null || ref == null || REASONS.stream().noneMatch(b -> b.action().equals("why:" + reason))) {
             return say(c, id, ref, "Please start again from your reminder message.");
         }
-        ActResult r = core.act(c.tenantId(), id, "cancel", ref, Map.of("reasonCode", reason), m.messageId());
+        ActResult r = core.act(c.tenantId(), id, "cancel", ref,
+                "other".equals(reason) ? Map.of("reasonCode", reason, "note", OTHER_NOTE) : Map.of("reasonCode", reason), m.messageId());
         return switch (r.outcome()) {
             case OK -> say(c, id, ref, "Your appointment is cancelled. We have released the slot. You can book again any time.");
             case INSIDE_WINDOW -> window(c, id, ref, r.windowHours());

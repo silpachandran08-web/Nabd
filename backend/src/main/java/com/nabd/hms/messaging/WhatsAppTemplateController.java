@@ -40,6 +40,8 @@ class WhatsAppTemplateController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req));
     }
 
+    /** COM-013: a retry with the same Idempotency-Key (UUID) and body is answered from the first result: no second version. */
+    @com.nabd.hms.shared.Idempotent
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('setup:edit')")
     WhatsAppTemplateService.TemplateResponse resubmit(@PathVariable UUID id,

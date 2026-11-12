@@ -24,6 +24,10 @@ export function buildCsp(nonce: string, opts: { dev?: boolean; connect?: string 
     "style-src-attr 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
+    // FEF-048: the service worker and the web manifest are same-origin files; without these the worker would fall back to
+    // script-src, whose 'strict-dynamic' ignores 'self'.
+    "worker-src 'self'",
+    "manifest-src 'self'",
     // shortcut: the API is still cross-origin (Render) until the FEF-009 BFF serves /api/v1; then drop the extra origin.
     `connect-src 'self'${opts.connect ? " " + opts.connect : ""}`,
     "frame-ancestors 'none'",

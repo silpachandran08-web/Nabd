@@ -175,18 +175,21 @@ class NursingRepository {
                 "SELECT p.id, p.queue_entry_id, p.patient_id, p.ordered_by, p.charge_code, p.charge_name, " +
                         "p.base_amount, p.tax_rate_percent, p.prep_notes, p.consent_note, p.status, p.billed, " +
                         "p.completed_by, p.completed_at, p.created_at, p.consent_signed_name, p.consent_recorded_by, " +
-                        "p.consent_signed_at " +
+                        "p.consent_signed_at, p.consent_withdrawn_at, p.consent_withdraw_reason, c.id AS consent_id, c.pdf_sha256 " +
                         "FROM procedure_orders p JOIN queue_entries q ON q.id = p.queue_entry_id " +
+                        "LEFT JOIN procedure_consents c ON c.tenant_id = p.tenant_id AND c.procedure_order_id = p.id " +
                         "WHERE p.tenant_id = ? AND q.queue_date = ? AND p.status != 'cancelled' ORDER BY p.created_at",
                 this::mapProcedure, tenantId, java.sql.Date.valueOf(day));
     }
 
     Optional<ProcedureOrderRow> findProcedureOrder(UUID tenantId, UUID id) {
         return jdbc.query(
-                "SELECT id, queue_entry_id, patient_id, ordered_by, charge_code, charge_name, base_amount, " +
-                        "tax_rate_percent, prep_notes, consent_note, status, billed, completed_by, completed_at, created_at, " +
-                        "consent_signed_name, consent_recorded_by, consent_signed_at " +
-                        "FROM procedure_orders WHERE tenant_id = ? AND id = ?",
+                "SELECT p.id, p.queue_entry_id, p.patient_id, p.ordered_by, p.charge_code, p.charge_name, p.base_amount, " +
+                        "p.tax_rate_percent, p.prep_notes, p.consent_note, p.status, p.billed, p.completed_by, p.completed_at, p.created_at, " +
+                        "p.consent_signed_name, p.consent_recorded_by, p.consent_signed_at, p.consent_withdrawn_at, p.consent_withdraw_reason, " +
+                        "c.id AS consent_id, c.pdf_sha256 " +
+                        "FROM procedure_orders p LEFT JOIN procedure_consents c ON c.tenant_id = p.tenant_id AND c.procedure_order_id = p.id " +
+                        "WHERE p.tenant_id = ? AND p.id = ?",
                 this::mapProcedure, tenantId, id).stream().findFirst();
     }
 
@@ -223,7 +226,25 @@ class NursingRepository {
                 rs.getString("status"), rs.getBoolean("billed"), completedBy == null ? null : UUID.fromString(completedBy),
                 completedAt == null ? null : completedAt.toInstant(), rs.getTimestamp("created_at").toInstant(),
                 rs.getString("consent_signed_name"), consentRecordedBy == null ? null : UUID.fromString(consentRecordedBy),
-                consentSignedAt == null ? null : consentSignedAt.toInstant());
+                consentSignedAt == null ? null : consentSignedAt.toInstant(),
+                rs.getTimestamp("consent_withdrawn_at") == null ? null : rs.getTimestamp("consent_withdrawn_at").toInstant(),
+                rs.getString("consent_withdraw_reason"), rs.getObject("consent_id", UUID.class), rs.getString("pdf_sha256"));
+    }
+
+    /** CLN-014: withdrawal is final for the order; true when this call recorded it. */
+    boolean withdrawConsent(UUID tenantId, UUID id, UUID staffId, String reason) {
+        return jdbc.update("UPDATE procedure_orders SET consent_withdrawn_at = now(), consent_withdrawn_by = ?, consent_withdraw_reason = ? " +
+                "WHERE tenant_id = ? AND id = ? AND consent_withdrawn_at IS NULL", staffId, reason, tenantId, id) == 1;
+    }
+
+    /** CLN-014: what the consent dialog needs about the patient (language, age, linked guardian's name), readable with nursing:view. */
+    record ConsentPatient(String language, LocalDate dob, String guardianName) {
+    }
+
+    Optional<ConsentPatient> findConsentPatient(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT p.preferred_language, p.dob, g.name AS guardian_name FROM patients p "
+                        + "LEFT JOIN patients g ON g.tenant_id = p.tenant_id AND g.id = p.guardian_id WHERE p.tenant_id = ? AND p.id = ?",
+                (rs, i) -> new ConsentPatient(rs.getString(1), rs.getObject(2, LocalDate.class), rs.getString(3)), tenantId, patientId).stream().findFirst();
     }
 
     // ── NB-148: completed activity — a read across three existing write paths, no new table ──

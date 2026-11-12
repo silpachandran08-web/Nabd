@@ -751,3 +751,9 @@ button.slot {
   font-size: 12px;
   color: var(--nb-text-secondary);
 }
+
+/* COM-043: reminder confirmation state on a booked cell */
+.confirmChip { display: inline-block; margin-block-start: 2px; padding-inline: 6px; border-radius: 999px; font-size: 11px; line-height: 18px; }
+.confirm_ok { background: var(--nb-ok-tint); color: var(--nb-ok-500); }
+.confirm_warn { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
+.confirm_danger { background: var(--nb-danger-tint); color: var(--nb-danger-500); }

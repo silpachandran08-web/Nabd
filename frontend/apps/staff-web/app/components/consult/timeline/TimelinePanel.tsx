@@ -1,6 +1,10 @@
 "use client";
 
 import { buildTimeline } from "@nabd/domain";
+import { useQuery } from "@tanstack/react-query";
+import { can } from "../../../lib/permissions";
+import { getter, key } from "../../../lib/query";
+import type { ProcOrder } from "../doctorOrders";
 import type { ClinicalContext } from "../clinical";
 import type { Row } from "../shared";
 import VisitTimeline from "../VisitTimeline";
@@ -14,6 +18,10 @@ type Props = {
 // FEF-030: the visit timeline (DOC-025), built from what the workspace already holds.
 export default function TimelinePanel({ entry, ctx, lastSavedAt, dirty, saveState, online, signedAt, noteSigned, amendments }: Props) {
   const vd = ctx.vitals.data;
+  // CLN-014: procedure consents signed / withdrawn on this visit (same cached list the nursing screen reads)
+  const procs = useQuery({ queryKey: key("nursing", { list: "procedure-orders" }), queryFn: getter<ProcOrder[]>("/nursing/procedure-orders/today"), enabled: can("nursing:view") });
+  const consents = (Array.isArray(procs.data) ? procs.data : []).filter((p) => p.queueEntryId === entry.id && (p.consentSignedAt || p.consentWithdrawnAt))
+    .map((p) => ({ id: p.id, procedure: p.chargeName, signedAt: p.consentSignedAt, withdrawnAt: p.consentWithdrawnAt ?? null, reason: p.consentWithdrawReason ?? null }));
   const events = buildTimeline({
     checkedInAt: entry.createdAt ?? null,
     vitals: {
@@ -30,6 +38,7 @@ export default function TimelinePanel({ entry, ctx, lastSavedAt, dirty, saveStat
     signedAt,
     noteSigned,
     amendments,
+    consents,
   });
   return <VisitTimeline events={events} />;
 }

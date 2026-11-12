@@ -11,6 +11,9 @@ export type ProcOrder = {
   prepNotes: string | null; consentNote: string | null; status: string; billed: boolean; completedByName: string | null;
   completedAt: string | null; createdAt: string; consentSignedName: string | null; consentRecordedByName: string | null;
   consentSignedAt: string | null;
+  // CLN-014: the signed form (null for a typed-name consent), a withdrawal, and the patient's language for the form
+  patientId?: string; consentId?: string | null; consentSha256?: string | null; consentWithdrawnAt?: string | null;
+  consentWithdrawReason?: string | null; patientLanguage?: string | null; patientMinor?: boolean | null; guardianName?: string | null;
 };
 // AdministrationOrderRequest.route pattern: IM|IV|SC|infusion|oral|topical (route is optional).
 export const ROUTES = ["IM", "IV", "SC", "infusion", "oral", "topical"] as const;
@@ -24,4 +27,4 @@ export function adminStatus(o: AdminOrder): { tone: "ok" | "warn" | "danger"; la
 export function procStatusLabel(status: string): string {
   return ({ ordered: "Ordered", prepped: "Ready", completed: "Completed", cancelled: "Cancelled" } as Record<string, string>)[status] ?? status;
 }
-export const hasConsent = (p: ProcOrder) => !!p.consentSignedAt;
+export const hasConsent = (p: ProcOrder) => !!p.consentSignedAt && !p.consentWithdrawnAt;

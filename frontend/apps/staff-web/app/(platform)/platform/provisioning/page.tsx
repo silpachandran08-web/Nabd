@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import styles from "./provisioning.module.css";
 import InviteLink from "./InviteLink";
 import Dialog from "../../../components/ui/Dialog";
@@ -208,6 +209,9 @@ export default function ProvisioningPage() {
           <p className={styles.subtitle}>Six-step job queue — create, migrate, seed, WhatsApp, verify &amp; invite, go live.</p>
         </div>
         <span className={styles.frd}>SSA-01 · region locks irreversibly on commit</span>
+        {access.profile?.permissions.includes("onboarding:view") && (
+          <Link className={styles.frd} href="/platform/provisioning/activation">Activation funnel &amp; white-glove queue</Link>
+        )}
       </div>
 
       {!forbidden && (

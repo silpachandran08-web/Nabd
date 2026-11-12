@@ -223,6 +223,14 @@ app:
       base-url: ${COMMS_GATEWAY_URL:}
       service-token: ${COMMS_GATEWAY_TOKEN:}
       otp-cutover: ${COMMS_OTP_CUTOVER:false} # true = no in-process fallback; 503 with a retry hint when the gateway is down
+  webpush:
+    # FEF-048: VAPID key pair (base64url: public = 65-byte P-256 point, private = 32-byte scalar) from the region's secret store.
+    # Blank = push off (subscriptions are still stored). The public key is also NEXT_PUBLIC_VAPID_PUBLIC_KEY in staff-web.
+    vapid-public-key: ${WEBPUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${WEBPUSH_VAPID_PRIVATE_KEY:}
+    subject: ${WEBPUSH_SUBJECT:mailto:push-ops@nabd.invalid}
+    # Endpoint hosts Core may POST to (suffix match): the browser push services. Anything else is 422 INVALID_SUBSCRIPTION.
+    allowed-hosts: ${WEBPUSH_ALLOWED_HOSTS:fcm.googleapis.com,push.apple.com,push.services.mozilla.com,notify.windows.com}
   crypto:
     # base64, 32 bytes (AES-256) each, no code defaults (FieldCipher refuses to boot without a key).
     # PLT-044: legacy key: reads pre-PLT-044 values and, outside prod with no keyring, doubles as kid 1.

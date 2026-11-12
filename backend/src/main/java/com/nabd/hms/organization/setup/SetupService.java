@@ -48,7 +48,7 @@ import static com.nabd.hms.organization.setup.SetupModels.StaffShiftRow;
 import static com.nabd.hms.organization.setup.SetupModels.TenantProfileRow;
 
 @Service
-public class SetupService implements com.nabd.hms.organization.api.ClinicPolicies {
+public class SetupService implements com.nabd.hms.organization.api.ClinicPolicies, com.nabd.hms.organization.api.SetupProgress {
 
     private static final Logger log = LoggerFactory.getLogger(SetupService.class);
 
@@ -67,13 +67,15 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final com.nabd.hms.organization.licence.LicenceLifecycleService licences;
     private final PriceChangeLog pricingLog;
     private final com.nabd.hms.organization.api.PlanAccount planAccount;
+    private final SetupStepEvents stepEvents;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
                  com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
                  CalendarService calendar,
                  com.nabd.hms.organization.licence.LicenceLifecycleService licences, PriceChangeLog pricingLog,
-                 com.nabd.hms.organization.api.PlanAccount planAccount) {
+                 com.nabd.hms.organization.api.PlanAccount planAccount, SetupStepEvents stepEvents) {
+        this.stepEvents = stepEvents;
         this.planAccount = planAccount;
         this.calendar = calendar;
         this.licences = licences;
@@ -91,9 +93,11 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional
     public List<SetupChecklistItemResponse> getChecklist(UUID tenantId) {
         tenantContext.set(tenantId);
+        boolean fresh = repo.seedProgress(tenantId);
         List<SetupProgressRow> rows = repo.listProgress(tenantId);
         // ADM-007: the first pending step is the one the owner is on
         String current = rows.stream().filter(r -> "pending".equals(r.status())).map(SetupProgressRow::step).findFirst().orElse(null);
+        if (fresh && current != null) stepEvents.changed(tenantId, current, "reached", null); // ADM-005: the clinic opened the wizard
         return rows.stream().map(r -> toChecklistItem(r, r.step().equals(current))).toList();
     }
 
@@ -115,7 +119,22 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         if ("go_live".equals(step) && "done".equals(status)) {
             repo.markSetupCompleted(tenantId);
         }
+        stepEvents.changed(tenantId, step, status, null); // ADM-005: the funnel learns the step left, and which step is now open
+        repo.listProgress(tenantId).stream().filter(r -> "pending".equals(r.status())).findFirst()
+                .ifPresent(next -> stepEvents.changed(tenantId, next.step(), "reached", null));
         log.info("setup progress {} marked {} for tenant {}", step, status, tenantId);
+    }
+
+    /** ADM-006: steps Nabd's onboarding team set up for the clinic (white-glove). The DPA and go-live stay the owner's own. */
+    @Override
+    @Transactional
+    public void markDone(UUID tenantId, List<String> steps) {
+        for (String step : steps) {
+            if (SetupSteps.DPA.equals(step) || "go_live".equals(step)) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "step-invalid", "STEP_INVALID", "Only the owner can sign the DPA or go live.");
+            }
+            updateProgress(tenantId, step, "done");
+        }
     }
 
     @Transactional

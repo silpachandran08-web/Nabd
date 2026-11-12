@@ -28,6 +28,8 @@
       "type": "string",
       "enum": [
         "appt_reminder_24h",
+        "appt_reminder_2h",
+        "appt_nudge",
         "recall_due",
         "review_request",
         "secure_link",

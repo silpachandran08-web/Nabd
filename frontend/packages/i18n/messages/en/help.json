@@ -116,5 +116,36 @@
       "s4": { "title": "Close the day", "body": "Start day close from the top bar once the last patient has checked out. It reconciles the day's collections." },
       "s5": { "title": "Help is one key away", "body": "Press F1 on any screen for help about it, ? for the keyboard shortcuts and Ctrl+K to find any screen or action by name." }
     }
+  },
+  "competency": {
+    "title": "Front-desk competency check",
+    "hint": "Do each task once with your trainer watching, then tick it. Finish all ten before you run the desk on your own.",
+    "progress": "{done} of {total} done",
+    "passed": "Passed on {date}",
+    "loading": "Loading your progress…",
+    "error": "Couldn't load your progress.",
+    "retry": "Try again",
+    "saveFailed": "Couldn't save that tick. Try again.",
+    "tasks": {
+      "walkin": "Register a walk-in patient (new and returning)",
+      "checkin": "Check in a booked patient with the right doctor and payment method",
+      "queue": "Move a patient to the next step in the queue",
+      "requests": "Accept or decline a booking request",
+      "delay": "Send a delay message to waiting patients",
+      "checkout": "Take payment at checkout and hand over the receipt",
+      "reschedule": "Reschedule and cancel an appointment",
+      "noshow": "Mark a patient as a no-show",
+      "search": "Find a patient by name or phone and open their record",
+      "offline": "Recognise when the app is offline, and that payments must wait"
+    }
+  },
+  "videos": {
+    "title": "2-minute videos for the top desk tasks",
+    "watch": "Watch ({lang})",
+    "missing": "{lang}: not available yet",
+    "lang": {
+      "en": "English",
+      "hi": "Hindi"
+    }
   }
 }
