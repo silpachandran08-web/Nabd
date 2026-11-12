@@ -1,12 +1,20 @@
-# OPS-025: layered, non-root, distroless. Tests are NOT run here: CI stages 2 and 3 run them, stage 6 packages the jar
-# once (mvn -f backend/pom.xml package) and this file only wraps it. Local: mvn -f backend/pom.xml package && docker build .
+# OPS-025: layered, non-root, distroless. Tests are NOT run here: CI stages 2 and 3 run them.
+# The jar is built inside the image so hosts that build straight from git (Render) work without a CI step.
 #   docker build .                  -> the API image (last stage, the default target)
 #   docker build --target migrate . -> the Flyway migrate job image
 ARG JAVA_RUNTIME=gcr.io/distroless/java21-debian12:nonroot
 
+FROM maven:3.9-eclipse-temurin-21-alpine AS build
+WORKDIR /src
+COPY backend/pom.xml backend/pom.xml
+COPY backend/src backend/src
+# pom.xml packs ../db/classification.yaml into the jar (OPS-020)
+COPY db/classification.yaml db/classification.yaml
+RUN mvn -B -q -f backend/pom.xml package -Dmaven.test.skip=true
+
 FROM eclipse-temurin:21-jre-alpine AS layers
 WORKDIR /build
-COPY backend/target/hms-backend-0.1.0.jar app.jar
+COPY --from=build /src/backend/target/hms-backend-0.1.0.jar app.jar
 RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
 # Shared by both images; dependencies change least, application most (cache order).
