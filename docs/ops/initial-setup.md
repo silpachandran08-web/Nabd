@@ -105,14 +105,14 @@ Do these in order; each is one line of work.
 
 ## After upgrading to Sprint 15 (S6) code
 
-- Migrations V2410-V2619 (see `db/migrations/VERSIONS`, including V2604 and V2619 clinic policy keys union) and Comms Gateway V6-V17. Flyway applies them on start; no manual step.
+- Migrations V2410-V2619 (see `db/migrations/VERSIONS`, including V2604 and V2619 clinic policy keys union) and Comms Gateway V6-V17. The API does not migrate on start (Flyway is off): run the Core migrate job (step 4 above) before the API rolls out. Comms Gateway and Edge also ship with Flyway off by default.
 - New env: `APP_TRIAL_HASH_PEPPER` (free-trial sign-up, set a random secret per environment). Other new keys are optional and blank by default.
 - Staff pages moved into the `(clinic)` route group; no URL changes.
 - Five browser scripts still need their own builds (cookie build, `NABD_CSP_MODE=enforce`, `NABD_PSEUDO=1`); the patient-links script needs a patient-web build.
 
 ## After upgrading to Sprint 16 (S7) code
 
-- Migrations V2710-V2909 in Core (see `db/migrations/VERSIONS`), Patient Access Edge V6-V17 and Comms Gateway V18-V23. Flyway applies them on start; no manual step.
+- Migrations V2710-V2909 in Core (see `db/migrations/VERSIONS`), Patient Access Edge V6-V17 and Comms Gateway V18-V23. The API does not migrate on start (Flyway is off): run the Core migrate job (step 4 above) before the API rolls out. Comms Gateway and Edge also ship with Flyway off by default.
 - New env: `PATIENT_WEB_BASE_URL` (where a family member opens the consent link; default `http://localhost:3810`). The Edge emergency phrase list is empty until the clinical lead signs a list; do not fill it in without that sign-off.
 - Clinic day now starts at the tenant's day-start offset (default 04:00) in queue, no-show and checkout code instead of local midnight.
 - Sprint 7 left unindexed foreign keys on `patients.guardian_id`, `patients.merged_into_id` and `queue_entries.patient_id`; a bulk delete or merge of patients scans the table once per row (see `kanban/DECISIONS_PENDING.md`).
