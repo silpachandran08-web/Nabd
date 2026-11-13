@@ -11,6 +11,10 @@ GRANT USAGE, CREATE ON SCHEMA public TO nabd_migrator, nabd_definer;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'master') THEN
     GRANT USAGE, CREATE ON SCHEMA master TO nabd_migrator, nabd_definer;
+    -- V7 created master as the old owner, so V210's GRANT USAGE ... TO nabd_app (run by nabd_migrator, not the schema
+    -- owner) granted nothing and the API could not read master tables. Grant it here and hand the schema over too.
+    GRANT USAGE ON SCHEMA master TO nabd_app;
+    ALTER SCHEMA master OWNER TO nabd_migrator;
   END IF;
 END $$;
 
