@@ -57,10 +57,12 @@ public class CalendarService implements QuietHours {
     private final HolidayBookings bookings;
     private final ClinicClock clock;
     private final SetupRepository setupRepo;
+    private final MessagingSettingsService messagingSettings;
 
     CalendarService(SetupRepository setupRepo, CalendarRepository repo, TenantContext tenantContext, TenantScope tenantScope, EventPublisher events,
-                    AuditService audit, ActorDirectory actors, HolidayBookings bookings, ClinicClock clock) {
+                    AuditService audit, ActorDirectory actors, HolidayBookings bookings, ClinicClock clock, MessagingSettingsService messagingSettings) {
         this.setupRepo = setupRepo;
+        this.messagingSettings = messagingSettings;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.tenantScope = tenantScope;
@@ -169,6 +171,7 @@ public class CalendarService implements QuietHours {
             throw invalid("Quiet hours must start and end at different times.");
         }
         repo.putQuiet(tenantId, req.enabled(), from, to);
+        messagingSettings.changed(tenantId); // COM-024: the Comms mirror follows
         audit(tenantId, callerStaffId, "calendar.quiet_hours_set", Map.of("enabled", req.enabled()));
         return quietHours();
     }

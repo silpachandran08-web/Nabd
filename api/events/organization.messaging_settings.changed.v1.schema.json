@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:organization.messaging_settings.changed.v1",
+  "title": "organization.messaging_settings.changed.v1",
+  "description": "COM-024: the clinic's messaging settings changed (quiet hours or prayer windows). Carries the whole settings and the clinic's time zone so the Comms Gateway mirror needs no call back; clinic location only, no patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "version", "timeZone", "quietHours", "prayerWindows"],
+  "properties": {
+    "tenantId": {"type": "string", "format": "uuid", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "version": {"type": "integer", "minimum": 1, "description": "Outbox id of this event: monotonic per aggregate (the tenant)."},
+    "timeZone": {"type": "string", "pattern": "^[A-Za-z_]+(/[A-Za-z0-9_+-]+){0,2}$", "maxLength": 64},
+    "quietHours": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "start", "end"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "start": {"type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"},
+        "end": {"type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+      }
+    },
+    "prayerWindows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "method", "bufferMinutes", "fridayBlock"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "method": {"type": "string", "enum": ["umm_al_qura", "qatar", "dubai", "mwl"]},
+        "bufferMinutes": {"type": "integer", "minimum": 0, "maximum": 60},
+        "fridayBlock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"},
+            "end": {"type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+          }
+        },
+        "latitude": {"type": "number", "minimum": -66, "maximum": 66},
+        "longitude": {"type": "number", "minimum": -180, "maximum": 180}
+      }
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "version": 1,
+      "timeZone": "Asia/Riyadh",
+      "quietHours": {"enabled": true, "start": "21:00", "end": "09:00"},
+      "prayerWindows": {"enabled": true, "method": "umm_al_qura", "bufferMinutes": 20, "fridayBlock": {"start": "11:30", "end": "13:30"},
+        "latitude": 24.7136, "longitude": 46.6753}
+    }
+  ]
+}

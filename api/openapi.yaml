@@ -2014,6 +2014,24 @@ paths:
         "200": { description: "Saved", content: { application/json: { schema: { $ref: "#/components/schemas/QuietHours" } } } }
         "422": { description: "Problem `out-of-range`: same start and end", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /setup/messaging-settings:
+    get:
+      tags: [Setup]
+      summary: "COM-024 - quiet hours (every clinic) and prayer windows (KSA default on, UAE/Qatar opt in; methods NEED LOCAL CHECK) for non-urgent patient messages, in the clinic clock"
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/MessagingSettings" } } } }
+    put:
+      tags: [Setup]
+      summary: "COM-024 - save quiet hours and prayer windows (audited). Publishes organization.messaging_settings.changed.v1; the Comms Gateway scheduler defers non-urgent sends to the next allowed minute, or expires them past notAfter. OTP, doctor delay and secure link never wait."
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MessagingSettings" } } }
+      responses:
+        "200": { description: "Saved", content: { application/json: { schema: { $ref: "#/components/schemas/MessagingSettings" } } } }
+        "422": { description: "Problem `invalid-window`, code INVALID_WINDOW: same quiet start and end, Friday block not start < end, unknown method, buffer outside 0-60, prayer windows on without the clinic's coordinates", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/holidays/{id}:
     patch:
       tags: [Setup]
@@ -8913,6 +8931,24 @@ components:
         name: { type: string }
         year: { type: integer }
         source: { type: string }
+    MessagingSettings:
+      type: object
+      required: [quietHours, prayerWindows]
+      properties:
+        quietHours:
+          type: object
+          required: [enabled, start, end]
+          properties: { enabled: { type: boolean }, start: { type: string, example: "21:00" }, end: { type: string, example: "09:00" } }
+        prayerWindows:
+          type: object
+          required: [enabled, method, bufferMinutes, fridayBlock]
+          properties:
+            enabled: { type: boolean }
+            method: { type: string, enum: [umm_al_qura, qatar, dubai, mwl] }
+            bufferMinutes: { type: integer, minimum: 0, maximum: 60, description: "minutes held after each adhan" }
+            fridayBlock: { type: object, required: [start, end], properties: { start: { type: string, example: "11:30" }, end: { type: string, example: "13:30" } } }
+            latitude: { type: number, nullable: true }
+            longitude: { type: number, nullable: true }
     QuietHours:
       type: object
       required: [enabled]
