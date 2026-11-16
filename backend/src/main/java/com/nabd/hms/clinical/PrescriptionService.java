@@ -351,14 +351,17 @@ public class PrescriptionService {
     /** DOC-035 / DOC-R2 "Repeat last prescription": replace the draft with the lines of this patient's most recent SIGNED
      * prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are NOT carried
      * over: upsert() re-runs every allergy, pregnancy and controlled-substance check against the current register, so a
-     * line that needs a decision needs a fresh one on this prescription. 404 no-previous-prescription when there is none. */
+     * line that needs a decision needs a fresh one on this prescription. 404 no-previous-prescription when there is none.
+     * CLN-022: sourcePrescriptionId (optional) pins the one the doctor previewed; it must be one of this patient's signed
+     * prescriptions from another visit, otherwise the same 404 (no probing of other patients' prescriptions). */
     @Transactional
     public PrescriptionResponse repeatLast(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
-                                            String ipAddress) {
+                                            String ipAddress, UUID sourcePrescriptionId) {
         tenantContext.set(tenantId);
         QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         PrescriptionRow last = repo.findSignedByPatient(tenantId, owner.patientId()).stream()
                 .filter(p -> !p.queueEntryId().equals(queueEntryId))
+                .filter(p -> sourcePrescriptionId == null || p.id().equals(sourcePrescriptionId))
                 .findFirst()
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no-previous-prescription", "No previous prescription",
                         "This patient has no signed prescription from an earlier visit to repeat."));
@@ -399,18 +402,47 @@ public class PrescriptionService {
 
     private FavouriteRxSetResponse toSetResponse(UUID tenantId, FavouriteSetRow s, UUID callerStaffId, boolean callerCanApprove,
                                                   java.util.Set<String> pharmacyMaster) {
-        boolean checkable = !pharmacyMaster.isEmpty();
-        List<FavouriteRxSetItemResponse> items = repo.findSetItems(tenantId, s.id()).stream()
-                .map(i -> new FavouriteRxSetItemResponse(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions(), i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(),
-                        checkable ? isStale(i, pharmacyMaster) : null, i.drugId(), i.genericName(),
-                        i.drugId() != null ? null : coding.suggest(i.drugName())
-                                .map(x -> new FavouriteRxSetItemResponse.CodeSuggestion(x.drugId(), x.display())).orElse(null)))
+        List<FavouriteSetItemRow> rows = repo.findSetItems(tenantId, s.id());
+        Map<String, Integer> stock = new java.util.HashMap<>(); // drugId -> in-house units, null value = not dispensed here
+        for (FavouriteSetItemRow r : rows) {
+            if (r.drugId() != null && !stock.containsKey(r.drugId())) {
+                stock.put(r.drugId(), repo.inHouseStock(tenantId, r.drugId()));
+            }
+        }
+        List<FavouriteRxSetItemResponse> items = rows.stream()
+                .map(i -> {
+                    String reason = staleReason(i, pharmacyMaster, stock);
+                    // a coded item is always judged (drug master + stock); an uncoded one only against a pharmacy master
+                    Boolean stale = i.drugId() != null || !pharmacyMaster.isEmpty() ? reason != null : null;
+                    FavouriteRxSetItemResponse.CodeSuggestion replacement = i.drugId() == null || reason == null ? null
+                            : coding.replacement(i.drugId()).map(x -> new FavouriteRxSetItemResponse.CodeSuggestion(x.drugId(), x.display())).orElse(null);
+                    return new FavouriteRxSetItemResponse(i.drugName(), i.dosage(), i.frequency(), i.duration(),
+                            i.instructions(), i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(),
+                            stale, i.drugId(), i.genericName(),
+                            i.drugId() != null ? null : coding.suggest(i.drugName())
+                                    .map(x -> new FavouriteRxSetItemResponse.CodeSuggestion(x.drugId(), x.display())).orElse(null),
+                            reason, replacement);
+                })
                 .toList();
         String scope = s.doctorId() == null ? "standard" : s.doctorId().equals(callerStaffId) ? "mine" : "shared";
         int stale = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.stale())).count();
+        boolean checkable = items.stream().allMatch(i -> i.stale() != null);
         return new FavouriteRxSetResponse(s.id(), s.doctorId(), s.name(), s.createdAt(), items, scope, s.shared(), s.ownerName(),
                 s.updatedAt(), s.lastUsedAt(), checkable, stale, canManage(s, callerStaffId, callerCanApprove));
+    }
+
+    /** CLN-022: why a saved item can no longer be prescribed as saved, null when it can (or when that is unknown). A coded
+     * item: "retired" when its product is retired (or no longer in this region's master), "out_of_stock" when the clinic
+     * dispenses it in-house and has none left. An uncoded item: "not_in_master" (DOC-035 name check against the pharmacy). */
+    private String staleReason(FavouriteSetItemRow i, java.util.Set<String> pharmacyMaster, Map<String, Integer> inHouseStock) {
+        if (i.drugId() != null) {
+            if (!"active".equals(coding.status(i.drugId()).orElse(null))) {
+                return "retired";
+            }
+            Integer units = inHouseStock.get(i.drugId());
+            return units != null && units <= 0 ? "out_of_stock" : null;
+        }
+        return !pharmacyMaster.isEmpty() && isStale(i, pharmacyMaster) ? "not_in_master" : null;
     }
 
     /** Stale = the tenant has an active pharmacy item master and neither the drug nor the brand text is in it. */
@@ -561,9 +593,10 @@ public class PrescriptionService {
                             i.quantity(), i.quantityUnit(), i.drugId(), i.drugId() != null, i.genericName());
                 })
                 .toList();
+        String signedByName = p.signedBy() == null ? null : actors.findActor(tenantId, p.signedBy()).map(ActorDirectory.Actor::name).orElse(null);
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
                 p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat,
-                p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo());
+                p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo(), signedByName);
     }
 
     // ── DOC-R3: allergy statement snapshotted at signing ─────────────────

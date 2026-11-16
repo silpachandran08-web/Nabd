@@ -14,6 +14,8 @@ import { age, type AuthedFetch, type PatientDetail, type Row } from "../shared";
 import type { ClinicalContext } from "../clinical";
 import DoseCalculator from "../DoseCalculator";
 import FavouriteRxSetsPanel from "../FavouriteRxSetsPanel";
+import { useRxSets } from "../../../lib/useRxSets";
+import RxQuickActions from "./RxQuickActions";
 import MedicinesList from "../MedicinesList";
 import RxPad from "../RxPad";
 import RxWarnings, { OverrideDialog, WARNING_TITLE_ID } from "../RxWarnings";
@@ -35,6 +37,7 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
   const { rxItems, rxStatus, rxSaving, rxError, rxDirty } = pad;
   const signed = rxStatus === "signed";
   const openWarnings = openWarningCount(rxItems);
+  const rxSets = useRxSets(authedFetch);
   // Advisory warnings (moderate/mild allergy) don't block but are acknowledged at signing; decisions already recorded are shown, not re-asked.
   const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
   const focusDrug = (index: number) => {
@@ -63,6 +66,11 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
             </div>
           )}
         </div>
+        {!signed && can("clinical:edit") && (
+          <RxQuickActions entryId={entry.id} prescriptions={ctx.prescriptions} sets={rxSets.sets}
+            filledCount={rxItems.filter((i) => i.drugName.trim() !== "").length}
+            onApplied={(rx) => { pad.applySaved(rx); pad.setRxError(null); }} onError={pad.setRxError} onSetUsed={() => void rxSets.reload()} />
+        )}
         {!signed && signBlocked && <p className={p.muted} role="status" data-testid="rx-sign-blocked">{tx(`signBlock.${signBlocked}`)}</p>}
         {!signed && <p className={p.muted}>{tx("theAllergyCheckMatchesDrug")}</p>}
         {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
@@ -99,7 +107,7 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
         <div className={styles.previousMeds}>
           <div className={`${styles.rxTitle} ${styles.rxTitleSm}`}>{tx("favouriteRxSets")}</div>
           <FavouriteRxSetsPanel
-            authedFetch={authedFetch} entryId={entry.id} locked={signed} items={rxItems}
+            authedFetch={authedFetch} entryId={entry.id} locked={signed} items={rxItems} rxSets={rxSets}
             onError={pad.setRxError}
             onApplied={(rx) => { pad.applySaved(rx); pad.setRxError(null); }}
           />

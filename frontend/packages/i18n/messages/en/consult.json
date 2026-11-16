@@ -952,5 +952,28 @@
     "retry": "Retry",
     "reminderNote": "The patient is due back on this date; booking the follow-up closes the recall.",
     "noReminderBooked": "The follow-up is booked, so no recall reminder is sent."
+  },
+  "rxQuickActions": {
+    "repeatLast": "Repeat last · {date}",
+    "repeatLastBy": "Repeat last · {date} · {doctor}",
+    "applySet": "Apply set {n}: {name}",
+    "applySetStale": "Apply set {n}: {name} ({count, plural, one {# stale item} other {# stale items}})",
+    "previewTitle": "Repeat last prescription",
+    "previewFrom": "Signed {date}. These lines will be copied:",
+    "previewFromBy": "Signed {date} by {doctor}. These lines will be copied:",
+    "checksRunAgain": "Allergy, pregnancy and controlled-substance checks run again against today's record. Earlier decisions are not carried over.",
+    "replacesPad": "This replaces the {count, plural, one {# medicine} other {# medicines}} now on the pad.",
+    "repeat": "Repeat",
+    "apply": "Apply",
+    "applyTitle": "Apply {name}?",
+    "cancel": "Cancel",
+    "replacement": "Suggested instead: {display}",
+    "couldntRepeat": "Couldn't repeat the last prescription.",
+    "couldntApply": "Couldn't apply set.",
+    "stale": {
+      "retired": "retired from the drug list",
+      "out_of_stock": "out of stock in the clinic pharmacy",
+      "not_in_master": "not in the active pharmacy list"
+    }
   }
 }

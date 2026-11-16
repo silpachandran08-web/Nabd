@@ -7,18 +7,19 @@ import { can } from "../../lib/permissions";
 import styles from "../ui/rxSets.module.css";
 import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "../ui/RxSetParts";
 import { toWriteItem, type RxSet, type RxSetScope } from "@nabd/domain";
-import { useRxSets } from "../../lib/useRxSets";
+import type { useRxSets } from "../../lib/useRxSets";
 import type { AuthedFetch, Prescription, PrescriptionItem, Problem } from "./shared";
 
 // DOC-035: the pad's "Favourite Rx sets" block. Applying a set goes through the server's apply-set endpoint, which keeps
 // brand/sig/route/quantity and re-runs the allergy, pregnancy and controlled checks on every applied line (drug AND
 // brand); the returned warnings land on the pad exactly as for typed lines and nothing is cleared here.
-export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, items, onApplied, onError }: {
-  authedFetch: AuthedFetch; entryId: string | null; locked: boolean; items: PrescriptionItem[];
+// CLN-022: the sets hook lives in RxPanel so the pad's set chips and this list share one fetch and one order.
+export default function FavouriteRxSetsPanel({ authedFetch, entryId, locked, items, rxSets, onApplied, onError }: {
+  authedFetch: AuthedFetch; entryId: string | null; locked: boolean; items: PrescriptionItem[]; rxSets: ReturnType<typeof useRxSets>;
   onApplied: (rx: Prescription) => void; onError: (message: string | null) => void;
 }) {
   const tx = useTranslations("consult.favouriteRxSetsPanel");
-  const { sets, error, reload, create, update, remove } = useRxSets(authedFetch);
+  const { sets, error, reload, create, update, remove } = rxSets;
   const [name, setName] = useState("");
   const [scope, setScope] = useState<RxSetScope>("mine");
   const [saveErr, setSaveErr] = useState<string | null>(null);

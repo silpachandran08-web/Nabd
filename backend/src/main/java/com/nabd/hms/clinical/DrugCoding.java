@@ -82,6 +82,21 @@ class DrugCoding {
         }
     }
 
+    /** CLN-022: lifecycle status of a product in this region's master ("active" | "retired"); empty for an unknown id. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Optional<String> status(String drugId) {
+        return masters.find(region(), drugId).map(DrugMasterRepository.Drug::status);
+    }
+
+    /** CLN-022: what to offer instead of a stale product: an active product of this region with exactly the same
+     * ingredients (the master's own data, nothing inferred). Never applied automatically. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Optional<Suggestion> replacement(String drugId) {
+        boolean first = genericFirst();
+        return masters.sameIngredients(region(), drugId, tenantContext.current()).map(s ->
+                new Suggestion(s.id(), DrugDisplay.display(DrugDisplay.generic(s.generic()), s.brand(), s.strength(), s.form(), first), 1.0));
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     Optional<Suggestion> suggest(String text) {
         String ts = DrugDisplay.tsQuery(text);

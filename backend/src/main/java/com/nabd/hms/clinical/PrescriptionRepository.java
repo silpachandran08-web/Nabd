@@ -218,9 +218,11 @@ class PrescriptionRepository {
 
     /** Sets visible to this doctor: their own, other doctors' shared sets, and every clinic standard (doctor_id is null). */
     List<FavouriteSetRow> listSets(UUID tenantId, UUID doctorId) {
+        // CLN-022: the caller's own sets first, then other doctors' shared sets, then clinic standards; each by last use.
         return jdbc.query(SET_SELECT + "WHERE s.tenant_id = ? AND (s.doctor_id = ? OR s.doctor_id IS NULL OR s.shared) " +
-                        "ORDER BY s.name, s.created_at",
-                (rs, i) -> mapSet(rs), tenantId, doctorId);
+                        "ORDER BY CASE WHEN s.doctor_id = ? THEN 0 WHEN s.doctor_id IS NOT NULL THEN 1 ELSE 2 END, " +
+                        "s.last_used_at DESC NULLS LAST, s.name, s.created_at",
+                (rs, i) -> mapSet(rs), tenantId, doctorId, doctorId);
     }
 
     Optional<FavouriteSetRow> findSet(UUID tenantId, UUID setId) {
@@ -244,6 +246,15 @@ class PrescriptionRepository {
         return new java.util.HashSet<>(jdbc.queryForList(
                 "SELECT lower(btrim(name)) FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL AND active",
                 String.class, tenantId));
+    }
+
+    /** CLN-022: units in stock across the tenant's active, stocked, in-house items coded to this drug (PHL-018's in-house
+     * rule); null when the clinic does not dispense it (it is bought outside, so stock says nothing). */
+    Integer inHouseStock(UUID tenantId, String drugId) {
+        return jdbc.queryForObject("SELECT sum(c.stock_qty)::int FROM charge_catalogue c " +
+                        "LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id " +
+                        "WHERE c.tenant_id = ? AND c.drug_id = ? AND c.active AND c.stock_qty IS NOT NULL AND COALESCE(p.in_house, true)",
+                Integer.class, tenantId, drugId);
     }
 
     private RowMapper<PrescriptionRow> prescriptionMapper() {
