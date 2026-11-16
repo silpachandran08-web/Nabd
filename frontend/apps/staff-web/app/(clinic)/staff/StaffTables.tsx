@@ -64,7 +64,7 @@ export function InvitesTab({ pending, roles, canInvite, rows }: { pending: Staff
 }
 
 /** The People card stays mounted (hidden) on the other tabs, as before the split. */
-export function PeopleCard({ d, hidden, g, rows, su, onRegEdit }: { d: Data; hidden: boolean; g: Grants; rows: Rows; su: ReturnType<typeof useStepUp>; onRegEdit: (s: Staff) => void }) {
+export function PeopleCard({ d, hidden, g, rows, su, onRegEdit, onSpecEdit }: { d: Data; hidden: boolean; g: Grants; rows: Rows; su: ReturnType<typeof useStepUp>; onRegEdit: (s: Staff) => void; onSpecEdit: (s: Staff) => void }) {
   const { staff, roles } = d;
   // Login column only when the backend reports it (BE2 OWN-034); an older backend shows no column.
   const showLogin = staff.some((s) => typeof s.loginMethod === "string");
@@ -115,6 +115,10 @@ export function PeopleCard({ d, hidden, g, rows, su, onRegEdit }: { d: Data; hid
                       <button className={styles.actionBtn} onClick={() => onRegEdit(s)}>
                         {s.professionalRegistrationNo ? "Reg. no. & clinician" : "Add reg. no. & clinician"}
                       </button>
+                    )}
+                    {/* CLN-042: primary/secondary specialty profile, limited to what the plan unlocks. */}
+                    {g.canEditRoles && s.status !== "suspended" && (
+                      <button className={styles.actionBtn} onClick={() => onSpecEdit(s)}>Specialty profile</button>
                     )}
                     {g.canResetMfa && needsMfaReminder(s) && (
                       <button className={styles.actionBtn} disabled={rows.busyId === s.id} onClick={() => rows.remindMfa(s)}>Send MFA reminder</button>

@@ -2182,6 +2182,18 @@ schemas:
       created_at: operational
       last_success_at: operational
       failure_count: operational
+    specialty_profiles:
+      code: operational
+      name: operational
+      config: operational
+      config_version: operational
+    staff_specialty_profiles:
+      tenant_id: operational
+      staff_id: operational
+      code: operational
+      is_primary: operational
+      assigned_by: operational
+      assigned_at: operational
     staff_onboarding_progress:
       tenant_id: operational
       staff_id: operational

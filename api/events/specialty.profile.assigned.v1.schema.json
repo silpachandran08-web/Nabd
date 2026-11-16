@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:specialty.profile.assigned.v1",
+  "title": "specialty.profile.assigned.v1",
+  "description": "A staff member's specialty profiles changed (CLN-042): primary and optional secondary profile code from the Nabd registry (specialty_profiles).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "staffId", "primary", "secondary", "version"],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "staffId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "primary": { "type": "string", "pattern": "^[A-Z]{2,8}$" },
+    "secondary": { "type": ["string", "null"], "pattern": "^[A-Z]{2,8}$" },
+    "version": { "type": "integer", "minimum": 1, "description": "Outbox id of this event: monotonic per aggregate." }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "staffId": "22222222-2222-4222-8222-222222222222",
+      "primary": "DERM",
+      "secondary": "GP",
+      "version": 1
+    }
+  ]
+}

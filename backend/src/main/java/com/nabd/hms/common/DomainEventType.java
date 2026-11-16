@@ -54,7 +54,8 @@ public enum DomainEventType {
     ORGANIZATION_EXPORT_READY("organization.export.ready.v1", "core/organization"),
     TEMPLATE_STATUS_CHANGED("comms.template.status_changed.v1", "core/messaging"),
     APPOINTMENT_CONFIRMED("scheduling.appointment.confirmed.v1", "core/scheduling"),
-    RECALL_CREATED("engagement.recall.created.v1", "core/engagement");
+    RECALL_CREATED("engagement.recall.created.v1", "core/engagement"),
+    SPECIALTY_PROFILE_ASSIGNED("specialty.profile.assigned.v1", "core/specialty");
 
     private final String type;
     private final String source;

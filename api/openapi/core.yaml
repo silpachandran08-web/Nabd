@@ -21204,6 +21204,68 @@ paths:
       tags:
       - clinical
       x-required-permission: specialty_dental:edit
+  /v1/specialty/me:
+    get:
+      operationId: SpecialtyController_me
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MySpecialtyProfile"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - specialty
+      x-required-permission: isAuthenticated()
+  /v1/specialty/profiles:
+    get:
+      operationId: SpecialtyController_profiles
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SpecialtyProfileList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - specialty
+      x-required-permission: staff:view
   /v1/staff:
     get:
       operationId: StaffController_list
@@ -21786,6 +21848,87 @@ paths:
       tags:
       - staff
       x-required-permission: staff:delete
+  /v1/staff/{staffId}/specialty-profiles:
+    get:
+      operationId: SpecialtyController_get
+      parameters:
+      - in: path
+        name: staffId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StaffSpecialtyProfiles"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - specialty
+      x-required-permission: staff:view
+    put:
+      operationId: SpecialtyController_put
+      parameters:
+      - in: path
+        name: staffId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StaffSpecialtyProfiles"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - specialty
+      x-required-permission: staff:edit
   /v1/support-access/requests:
     get:
       operationId: SupportAccessOwnerController_list
@@ -22817,6 +22960,17 @@ components:
       required:
       - approvedBy
       - csoApprovalRef
+    AssignRequest:
+      type: object
+      properties:
+        primary:
+          type: string
+          pattern: "^[A-Z]{2,8}$"
+        secondary:
+          type: string
+          pattern: "^[A-Z]{2,8}$"
+      required:
+      - primary
     AttachmentCreateRequest:
       type: object
       properties:
@@ -28199,6 +28353,37 @@ components:
         waitingNow:
           type: integer
           format: int32
+    MySpecialtyProfile:
+      type: object
+      properties:
+        config:
+          type: object
+          additionalProperties:
+            type: object
+            description: "widgets[], quickActions[], fieldSets[], templatePack"
+            nullable: true
+          description: "widgets[], quickActions[], fieldSets[], templatePack"
+          nullable: true
+        configVersion:
+          type: integer
+          format: int32
+          nullable: true
+        name:
+          type: object
+          additionalProperties:
+            type: string
+            nullable: true
+          nullable: true
+        primary:
+          type: string
+          nullable: true
+        secondary:
+          type: string
+          nullable: true
+        writable:
+          type: boolean
+      required:
+      - writable
     NextInvoice:
       type: object
       properties:
@@ -32231,6 +32416,34 @@ components:
         visitCount:
           type: integer
           format: int64
+    SpecialtyProfileItem:
+      type: object
+      properties:
+        code:
+          type: string
+        configVersion:
+          type: integer
+          format: int32
+        entitled:
+          type: boolean
+        name:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - code
+      - configVersion
+      - entitled
+      - name
+    SpecialtyProfileList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpecialtyProfileItem"
+      required:
+      - items
     SseEmitter:
       type: object
       properties:
@@ -32455,6 +32668,15 @@ components:
       - effectiveFrom
       - patternJson
       - staffId
+    StaffSpecialtyProfiles:
+      type: object
+      properties:
+        primary:
+          type: string
+          nullable: true
+        secondary:
+          type: string
+          nullable: true
     StaffSummary:
       type: object
       properties:
