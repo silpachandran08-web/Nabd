@@ -23,5 +23,44 @@
     "in": "In stock · {qty}",
     "low": "Low · {qty}",
     "out": "Out of stock"
+  },
+  "notifPrefs": {
+    "title": "Message preferences",
+    "language": "Message language",
+    "languageDefault": "Clinic default (English)",
+    "channel": "Preferred channel",
+    "channels": {
+      "whatsapp": "WhatsApp",
+      "sms": "SMS",
+      "email": "Email"
+    },
+    "receives": "Receives",
+    "categories": {
+      "careReminders": "Care reminders",
+      "recalls": "Recalls",
+      "feedback": "Feedback requests",
+      "reviews": "Review requests"
+    },
+    "quietHours": "Extra quiet hours",
+    "quietHoursOn": "Do not message this patient at night",
+    "quietFrom": "From",
+    "quietTo": "Until",
+    "caregivers": "Family who also get messages",
+    "caregiversEmpty": "No family member can receive this patient's messages yet. A guardian or linked family member with their own number and messaging consent appears here.",
+    "caregiversNone": "None",
+    "caregiverUnnamed": "Family member",
+    "caregiverCategories": {
+      "careReminders": "Care reminders",
+      "recalls": "Recalls"
+    },
+    "on": "On",
+    "off": "Off",
+    "saving": "Saving…",
+    "loadError": "Couldn't load the message preferences.",
+    "errors": {
+      "notAuthorised": "This family member can no longer receive the patient's messages. The list has been refreshed.",
+      "forbidden": "Your role can't change message preferences.",
+      "generic": "Couldn't save. The preferences shown are the ones saved."
+    }
   }
 }

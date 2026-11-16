@@ -77,6 +77,16 @@ public enum NotificationPurpose {
 
     public ChannelPolicy channelPolicy() { return channelPolicy; }
 
+    /** COM-025: the patient preference category that can switch this purpose off (and that caregivers may be copied on); null = never optional. */
+    public String preferenceCategory() {
+        return switch (this) {
+            case APPT_REMINDER_24H, APPT_REMINDER_2H, APPT_NUDGE -> "careReminders";
+            case RECALL_DUE -> "recalls";
+            case REVIEW_REQUEST -> "reviews";
+            default -> null;
+        };
+    }
+
     public static NotificationPurpose ofCode(String code) {
         for (NotificationPurpose p : values()) {
             if (p.code.equals(code)) {

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:patient.notification_preferences.changed.v1",
+  "title": "patient.notification_preferences.changed.v1",
+  "description": "A patient's notification preferences (language, channel, message categories, quiet hours, caregiver recipients) changed, at the desk or from the WhatsApp Settings menu (COM-025); subject = the patient. Ids and version only: a consumer reads the preferences from Core, never from the event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "patientId",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "patientId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "patientId": "22222222-2222-4222-8222-222222222222",
+      "version": 1
+    }
+  ]
+}

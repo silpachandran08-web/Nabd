@@ -2509,6 +2509,91 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /patients/{patientId}/notification-preferences:
+    get:
+      tags: [Patients]
+      summary: Message preferences (COM-025) - language, channel, message categories, extra quiet hours and caregiver recipients, plus the caregivers who may be added now (guardian or live proxy with their own number and messaging consent; first name and relation only). Defaults when never saved (version 0).
+      x-required-permission: patients:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: The preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  language: { type: string, nullable: true, enum: [en, hi, ar, kn, te], description: "null = the clinic default (English); a language with no approved template yet falls back to English at send time (logged)" }
+                  channel: { type: string, enum: [whatsapp, sms, email] }
+                  categories:
+                    type: object
+                    description: "true = receives it; omitted in a PUT = on"
+                    properties:
+                      careReminders: { type: boolean }
+                      recalls: { type: boolean }
+                      feedback: { type: boolean }
+                      reviews: { type: boolean }
+                  quietHours:
+                    type: object
+                    nullable: true
+                    properties:
+                      start: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                      end: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                  caregivers:
+                    type: array
+                    maxItems: 10
+                    items:
+                      type: object
+                      properties:
+                        personRef: { type: string, format: uuid, description: "caregiver patient id, one of eligibleCaregivers" }
+                        categories: { type: array, items: { type: string, enum: [careReminders, recalls] } }
+                  eligibleCaregivers: { type: array, items: { type: object, properties: { personRef: { type: string, format: uuid }, firstName: { type: string }, relation: { type: string } } } }
+                  version: { type: integer, format: int64 }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Patients]
+      summary: Replace the message preferences (COM-025). Idempotent (an unchanged set writes nothing); a change is audited and publishes patient.notification_preferences.changed.v1.
+      x-required-permission: patients:edit
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language: { type: string, nullable: true, enum: [en, hi, ar, kn, te], description: "null = the clinic default (English); a language with no approved template yet falls back to English at send time (logged)" }
+                channel: { type: string, enum: [whatsapp, sms, email] }
+                categories:
+                  type: object
+                  description: "true = receives it; omitted in a PUT = on"
+                  properties:
+                    careReminders: { type: boolean }
+                    recalls: { type: boolean }
+                    feedback: { type: boolean }
+                    reviews: { type: boolean }
+                quietHours:
+                  type: object
+                  nullable: true
+                  properties:
+                    start: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                    end: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                caregivers:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    properties:
+                      personRef: { type: string, format: uuid, description: "caregiver patient id, one of eligibleCaregivers" }
+                      categories: { type: array, items: { type: string, enum: [careReminders, recalls] } }
+      responses:
+        "200": { description: The saved preferences (same shape as GET) }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "CAREGIVER_NOT_AUTHORISED - the caregiver is not (or no longer) the patient's guardian or live proxy with messaging consent" }
+
   /patients/{id}/merge:
     post:
       tags: [Patients]

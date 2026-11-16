@@ -1,0 +1,42 @@
+/* COM-025: message preferences panel in the patient file. Logical properties only (RTL). */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nb-space-12);
+}
+.field { display: flex; flex-direction: column; gap: 4px; }
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  margin-block-start: var(--nb-space-8);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  min-block-size: 44px;
+  margin-inline-end: var(--nb-space-16);
+  font-size: 14px;
+  color: var(--nb-text-primary);
+  cursor: pointer;
+}
+.check input { inline-size: 20px; block-size: 20px; }
+.caregiver {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding-block: var(--nb-space-8);
+  border-block-end: 1px solid var(--nb-border-subtle);
+}
+.caregiver > span { min-inline-size: 160px; font-weight: 600; }
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px var(--nb-space-12);
+  margin: 0;
+  font-size: 14px;
+}
+.facts dt { color: var(--nb-text-secondary); }
+.facts dd { margin: 0; color: var(--nb-text-primary); }

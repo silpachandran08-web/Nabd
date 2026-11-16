@@ -352,4 +352,11 @@ public class CoreClient {
         return json.readTree(http.post(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash + "/reverification/check",
                 json.writeValueAsString(java.util.Map.of("dob", dob.toString())))).path("match").asBoolean(false);
     }
+
+    /** COM-025: the patient chose a message language in the Settings menu; Core sets it for everyone on the verified phone. Throws
+     * Http.UpstreamStatusException 404 when the phone has no patient record. Idempotent at Core (the same language changes nothing). */
+    public void saveLanguage(UUID tenantId, String phoneHash, String language, String idempotencyKey) {
+        http.patch(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash + "/notification-preferences",
+                json.writeValueAsString(java.util.Map.of("language", language)), idempotencyKey);
+    }
 }
