@@ -89,6 +89,7 @@ owner,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allo
 owner,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner,GET /v1/doctors/{id}/session,queue:view,allow
 owner,GET /v1/doctors/{id}/working-hours,queue:view,allow
+owner,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,allow
 owner,GET /v1/facility/checkin-attempts,queue:view,allow
 owner,GET /v1/facility/checkin-config,setup:edit,allow
 owner,GET /v1/facility/checkin-qr,setup:edit,allow
@@ -325,6 +326,7 @@ owner,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 owner,POST /v1/doctors/{id}/leave,queue:edit,allow
 owner,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,allow
 owner,POST /v1/doctors/{id}/working-hours,setup:edit,allow
+owner,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-403
 owner,POST /v1/files/uploads,clinical:create,deny-403
 owner,POST /v1/files/uploads/{id}/complete,clinical:create,deny-403
 owner,POST /v1/files/{id}/download-url,clinical:view,allow
@@ -544,6 +546,7 @@ owner_doctor,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:vi
 owner_doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/session,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
+owner_doctor,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,allow
 owner_doctor,GET /v1/facility/checkin-attempts,queue:view,allow
 owner_doctor,GET /v1/facility/checkin-config,setup:edit,allow
 owner_doctor,GET /v1/facility/checkin-qr,setup:edit,allow
@@ -780,6 +783,7 @@ owner_doctor,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 owner_doctor,POST /v1/doctors/{id}/leave,queue:edit,allow
 owner_doctor,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,allow
 owner_doctor,POST /v1/doctors/{id}/working-hours,setup:edit,allow
+owner_doctor,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,allow
 owner_doctor,POST /v1/files/uploads,clinical:create,allow
 owner_doctor,POST /v1/files/uploads/{id}/complete,clinical:create,allow
 owner_doctor,POST /v1/files/{id}/download-url,clinical:view,allow
@@ -999,6 +1003,7 @@ doctor,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,all
 doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 doctor,GET /v1/doctors/{id}/session,queue:view,allow
 doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
+doctor,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,allow
 doctor,GET /v1/facility/checkin-attempts,queue:view,allow
 doctor,GET /v1/facility/checkin-config,setup:edit,deny-403
 doctor,GET /v1/facility/checkin-qr,setup:edit,deny-403
@@ -1235,6 +1240,7 @@ doctor,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 doctor,POST /v1/doctors/{id}/leave,queue:edit,allow
 doctor,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 doctor,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+doctor,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,allow
 doctor,POST /v1/files/uploads,clinical:create,allow
 doctor,POST /v1/files/uploads/{id}/complete,clinical:create,allow
 doctor,POST /v1/files/{id}/download-url,clinical:view,allow
@@ -1454,6 +1460,7 @@ nurse,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,allo
 nurse,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 nurse,GET /v1/doctors/{id}/session,queue:view,allow
 nurse,GET /v1/doctors/{id}/working-hours,queue:view,allow
+nurse,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,allow
 nurse,GET /v1/facility/checkin-attempts,queue:view,allow
 nurse,GET /v1/facility/checkin-config,setup:edit,deny-403
 nurse,GET /v1/facility/checkin-qr,setup:edit,deny-403
@@ -1690,6 +1697,7 @@ nurse,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 nurse,POST /v1/doctors/{id}/leave,queue:edit,allow
 nurse,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 nurse,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+nurse,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,allow
 nurse,POST /v1/files/uploads,clinical:create,allow
 nurse,POST /v1/files/uploads/{id}/complete,clinical:create,allow
 nurse,POST /v1/files/{id}/download-url,clinical:view,allow
@@ -1909,6 +1917,7 @@ receptionist,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:vi
 receptionist,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 receptionist,GET /v1/doctors/{id}/session,queue:view,allow
 receptionist,GET /v1/doctors/{id}/working-hours,queue:view,allow
+receptionist,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-403
 receptionist,GET /v1/facility/checkin-attempts,queue:view,allow
 receptionist,GET /v1/facility/checkin-config,setup:edit,deny-403
 receptionist,GET /v1/facility/checkin-qr,setup:edit,deny-403
@@ -2145,6 +2154,7 @@ receptionist,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 receptionist,POST /v1/doctors/{id}/leave,queue:edit,allow
 receptionist,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 receptionist,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+receptionist,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-403
 receptionist,POST /v1/files/uploads,clinical:create,deny-403
 receptionist,POST /v1/files/uploads/{id}/complete,clinical:create,deny-403
 receptionist,POST /v1/files/{id}/download-url,clinical:view,deny-403
@@ -2364,6 +2374,7 @@ frontdesk_vitals,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queu
 frontdesk_vitals,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/session,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/working-hours,queue:view,allow
+frontdesk_vitals,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,allow
 frontdesk_vitals,GET /v1/facility/checkin-attempts,queue:view,allow
 frontdesk_vitals,GET /v1/facility/checkin-config,setup:edit,deny-403
 frontdesk_vitals,GET /v1/facility/checkin-qr,setup:edit,deny-403
@@ -2600,6 +2611,7 @@ frontdesk_vitals,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 frontdesk_vitals,POST /v1/doctors/{id}/leave,queue:edit,allow
 frontdesk_vitals,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-403
 frontdesk_vitals,POST /v1/doctors/{id}/working-hours,setup:edit,deny-403
+frontdesk_vitals,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/files/uploads,clinical:create,allow
 frontdesk_vitals,POST /v1/files/uploads/{id}/complete,clinical:create,allow
 frontdesk_vitals,POST /v1/files/{id}/download-url,clinical:view,allow

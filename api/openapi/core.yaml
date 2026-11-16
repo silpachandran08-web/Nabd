@@ -8731,6 +8731,89 @@ paths:
       - queue
       x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
         \ #id.toString()"
+  /v1/encounters/{encounterId}/recall-orders:
+    get:
+      operationId: RecallController_list
+      parameters:
+      - in: path
+        name: encounterId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecallOrderResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - engagement
+      x-required-permission: clinical:view
+    post:
+      operationId: RecallController_create
+      parameters:
+      - in: path
+        name: encounterId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecallOrderRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RecallOrderResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - engagement
+      x-required-permission: clinical:edit
   /v1/events:
     get:
       operationId: EventsController_stream
@@ -30767,6 +30850,37 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Item"
+    RecallOrderRequest:
+      type: object
+      properties:
+        intervalDays:
+          type: integer
+          format: int32
+        reasonCode:
+          type: string
+          pattern: "^[a-z0-9_.-]{1,64}$"
+        ruleId:
+          type: string
+          format: uuid
+    RecallOrderResponse:
+      type: object
+      properties:
+        bookedAppointmentId:
+          type: string
+          format: uuid
+        dueDate:
+          type: string
+          format: date
+        intervalDays:
+          type: integer
+          format: int32
+        reasonCode:
+          type: string
+        recallId:
+          type: string
+          format: uuid
+        status:
+          type: string
     RecentMerges:
       type: object
       properties:

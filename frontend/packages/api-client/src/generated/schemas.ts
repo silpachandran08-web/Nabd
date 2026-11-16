@@ -554,6 +554,8 @@ export const QuoteResponseSchema = z.object({ currency: z.string().optional(), d
 export const RaiseTicketRequestSchema = z.object({ description: z.string().min(0).max(4000), priority: z.string().optional(), subject: z.string().min(0).max(200) });
 export const ReasonCodeAddRequestSchema = z.object({ code: z.string().min(1), kind: z.string().min(1), labels: z.record(z.string(), z.string()) });
 export const ReasonCodeListSchema = z.object({ items: z.array(ItemSchema).optional() });
+export const RecallOrderRequestSchema = z.object({ intervalDays: z.number().int().optional(), reasonCode: z.string().optional(), ruleId: z.string().optional() });
+export const RecallOrderResponseSchema = z.object({ bookedAppointmentId: z.string().optional(), dueDate: z.string().optional(), intervalDays: z.number().int().optional(), reasonCode: z.string().optional(), recallId: z.string().optional(), status: z.string().optional() });
 export const RecentMergesSchema = z.object({ items: z.array(ItemSchema).optional() });
 export const RecoveryVerifyRequestSchema = z.object({ challengeToken: z.string().min(1), recoveryCode: z.string().min(0).max(32) });
 export const RecoveryVerifyResponseSchema = z.object({ accessToken: z.string().optional(), expiresIn: z.number().int().optional(), refreshToken: z.string().optional(), remainingCodes: z.number().int().optional() });
@@ -951,6 +953,8 @@ export const operationSchemas = {
   ScheduleController_addWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_updateWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_deleteWorkingHours: {  },
+  RecallController_list: { response: z.array(RecallOrderResponseSchema) },
+  RecallController_create: { body: RecallOrderRequestSchema, response: RecallOrderResponseSchema },
   EventsController_stream: { response: SseEmitterSchema },
   FacilityCheckInController_attempts: { response: z.array(AttemptSchema) },
   FacilityCheckInController_config: { response: FacilityCheckInConfigSchema },

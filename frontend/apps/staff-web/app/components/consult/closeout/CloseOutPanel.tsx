@@ -5,17 +5,18 @@ import Icon from "../../ui/Icon";
 import StatusPill from "../../ui/StatusPill";
 import type { AuthedFetch, PatientDetail, PrescriptionItem, Row } from "../shared";
 import VisitOutputs from "../VisitOutputs";
+import { recallLabel, type Recall } from "../recall";
 import type { CloseView } from "./closeLogic";
 import p from "../consultParts.module.css";
 
 type Props = {
   entry: Row; patient: PatientDetail | null; authedFetch: AuthedFetch; view: CloseView; noteSigned: boolean; diagnosis: string;
-  rxItems: PrescriptionItem[]; rxStatus: "draft" | "signed"; followUpLabel: string | null | undefined;
+  rxItems: PrescriptionItem[]; rxStatus: "draft" | "signed"; followUpLabel: string | null | undefined; recall?: Recall | null | undefined;
   closeAck: boolean; onAck: (v: boolean) => void; onGoToRx: () => void;
 };
 
 // FEF-030 (DOC-029): the Close step: what stays open after this visit.
-export default function CloseOutPanel({ entry, patient, authedFetch, view, noteSigned, diagnosis, rxItems, rxStatus, followUpLabel, closeAck, onAck, onGoToRx }: Props) {
+export default function CloseOutPanel({ entry, patient, authedFetch, view, noteSigned, diagnosis, rxItems, rxStatus, followUpLabel, recall, closeAck, onAck, onGoToRx }: Props) {
   const tx = useTranslations("consult.closeOutPanel");
   const g = useTranslations("glossary");
   const { hasDrugs, issues, handoffPending, closedOut } = view;
@@ -41,6 +42,12 @@ export default function CloseOutPanel({ entry, patient, authedFetch, view, noteS
             <strong>{tx("followUp")}</strong>
             {followUpLabel ? <StatusPill tone="ok" label={tx("followUpSet", { label: followUpLabel })} />
               : followUpLabel === null ? <StatusPill tone="neutral" icon="calendar" label={tx("notSet")} />
+              : <StatusPill tone="warn" icon="alert" label={tx("unknownCouldnTCheck")} />}
+          </li>
+          <li className={p.listRow}>
+            <strong>{tx("recall")}</strong>
+            {recall ? <StatusPill tone="ok" icon="calendar" label={tx(recall.status === "booked" ? "recallBooked" : "recallSet", { date: recallLabel(recall) ?? "" })} />
+              : recall === null ? <StatusPill tone="neutral" icon="calendar" label={tx("notSet")} />
               : <StatusPill tone="warn" icon="alert" label={tx("unknownCouldnTCheck")} />}
           </li>
           <li className={p.listRow}>

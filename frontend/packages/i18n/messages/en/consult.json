@@ -243,7 +243,6 @@
     "freeSlots": "Free slots",
     "booking": "Booking…",
     "bookFollowUp": "Book follow-up",
-    "reminderNotAvailableYetNo": "Reminder: not available yet. No WhatsApp reminder or booking link is sent; the follow-up appears on the schedule and in Follow-ups.",
     "interval": {
       "3d": "3 days",
       "1w": "1 week",
@@ -651,7 +650,10 @@
       "noDiagnosis": "No diagnosis is entered.",
       "noteEmpty": "The note is empty.",
       "rxUnsigned": "The prescription is not signed, so the patient would leave without it."
-    }
+    },
+    "recall": "Recall",
+    "recallSet": "Due {date}",
+    "recallBooked": "Due {date} · booked"
   },
   "noteBanners": {
     "youReOfflineTheNote": "You're offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect. Prescriptions, orders and follow-ups need a connection.",
@@ -926,5 +928,29 @@
     "decideLater": "Decide later",
     "keepServer": "Keep server",
     "keepMine": "Keep mine"
+  },
+  "recallChips": {
+    "recall": "Recall",
+    "reviewIn": "Review in",
+    "chip": {
+      "1w": "1 week",
+      "2w": "2 weeks",
+      "4w": "4 weeks",
+      "3m": "3 months",
+      "6m": "6 months"
+    },
+    "customDays": "Or in (days)",
+    "setCustom": "Set recall",
+    "notSet": "Not set",
+    "duePending": "Due {date}",
+    "dueBooked": "Due {date} · follow-up booked",
+    "loading": "Checking for a recall",
+    "saving": "Setting the recall…",
+    "couldNotLoad": "Couldn't check for a recall on this visit.",
+    "couldNotSet": "Couldn't set the recall. Try again.",
+    "outOfRange": "Enter a whole number of days from 1 to {max}.",
+    "retry": "Retry",
+    "reminderNote": "The patient is due back on this date; booking the follow-up closes the recall.",
+    "noReminderBooked": "The follow-up is booked, so no recall reminder is sent."
   }
 }

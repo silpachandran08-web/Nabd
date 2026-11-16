@@ -231,6 +231,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/doctors/:id/working-hours`, () => HttpResponse.json({"dayOfWeek":0,"effectiveFrom":"2026-01-01","endTime":"string","endsNextDay":false,"id":"00000000-0000-7000-8000-000000000000","label":"string","lateGraceMinutes":0,"maxPatients":0,"onlineCap":0,"reservedWalkInTimes":["string"],"sessionMode":"string","slotMinutes":0,"startTime":"string","walkInMode":"string","walkInRatio":0}, { status: 200 })), // ScheduleController_addWorkingHours
     http.put(`${baseUrl}/v1/doctors/:id/working-hours/:hoursId`, () => HttpResponse.json({"dayOfWeek":0,"effectiveFrom":"2026-01-01","endTime":"string","endsNextDay":false,"id":"00000000-0000-7000-8000-000000000000","label":"string","lateGraceMinutes":0,"maxPatients":0,"onlineCap":0,"reservedWalkInTimes":["string"],"sessionMode":"string","slotMinutes":0,"startTime":"string","walkInMode":"string","walkInRatio":0}, { status: 200 })), // ScheduleController_updateWorkingHours
     http.delete(`${baseUrl}/v1/doctors/:id/working-hours/:hoursId`, () => new HttpResponse(null, { status: 200 })), // ScheduleController_deleteWorkingHours
+    http.get(`${baseUrl}/v1/encounters/:encounterId/recall-orders`, () => HttpResponse.json([{"bookedAppointmentId":"00000000-0000-7000-8000-000000000000","dueDate":"2026-01-01","intervalDays":0,"reasonCode":"string","recallId":"00000000-0000-7000-8000-000000000000","status":"string"}], { status: 200 })), // RecallController_list
+    http.post(`${baseUrl}/v1/encounters/:encounterId/recall-orders`, () => HttpResponse.json({"bookedAppointmentId":"00000000-0000-7000-8000-000000000000","dueDate":"2026-01-01","intervalDays":0,"reasonCode":"string","recallId":"00000000-0000-7000-8000-000000000000","status":"string"}, { status: 201 })), // RecallController_create
     http.get(`${baseUrl}/v1/events`, () => HttpResponse.json({"timeout":0}, { status: 200 })), // EventsController_stream
     http.get(`${baseUrl}/v1/facility/checkin-attempts`, () => HttpResponse.json([{"appointmentId":"00000000-0000-7000-8000-000000000000","channel":"string","createdAt":"2026-01-01T00:00:00Z","distanceM":0,"id":"00000000-0000-7000-8000-000000000000","outcome":"string"}], { status: 200 })), // FacilityCheckInController_attempts
     http.get(`${baseUrl}/v1/facility/checkin-config`, () => HttpResponse.json({"checkinCode":"string","geofenceRadiusM":0,"geofenceRequired":false,"lat":0,"lng":0,"walkinAllowed":false,"whatsappNumber":"string"}, { status: 200 })), // FacilityCheckInController_config
@@ -580,4 +582,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 566;
+export const operationCount = 568;

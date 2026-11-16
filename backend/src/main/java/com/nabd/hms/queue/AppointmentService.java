@@ -51,12 +51,14 @@ public class AppointmentService {
     private final com.nabd.hms.queue.api.ReasonCodes reasons;
     private final AppointmentChangeNotifier changeNotifier;
     private final com.nabd.hms.patient.api.ProxyAccess proxy; // IDC-011
+    private final com.nabd.hms.engagement.api.RecallBookings recalls; // COM-052
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
                         SlotValidator slotValidator, EventPublisher events,
                         com.nabd.hms.shared.notify.NotificationPort notifications, com.nabd.hms.queue.api.ReasonCodes reasons, AppointmentChangeNotifier changeNotifier,
-                        com.nabd.hms.patient.api.ProxyAccess proxy) {
+                        com.nabd.hms.patient.api.ProxyAccess proxy, com.nabd.hms.engagement.api.RecallBookings recalls) {
+        this.recalls = recalls;
         this.reasons = reasons;
         this.changeNotifier = changeNotifier;
         this.proxy = proxy;
@@ -93,6 +95,7 @@ public class AppointmentService {
             log.info("appointment {} booked by {}: patient {} with doctor {} at {}",
                     id, callerStaffId, req.patientId(), req.doctorId(), req.startTime());
             actedBy(tenantId, id, by);
+            followUpBooked(tenantId, callerStaffId, req, id);
             published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), req.startTime(), "scheduled", by == null ? Map.of() : Map.of("actedByRef", by.ref()));
             return toResponse(repo.findById(tenantId, id).orElseThrow());
         } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
@@ -115,8 +118,17 @@ public class AppointmentService {
         UUID id = repo.insertToken(tenantId, req.patientId(), req.doctorId(), start, end, req.isFollowUpOrDefault(), block.id(), token);
         log.info("token booking {} by {}: doctor {} token {} on {}", id, callerStaffId, req.doctorId(), token, day); // log-phi-ok: token booking number, not a credential
         actedBy(tenantId, id, by);
+        followUpBooked(tenantId, callerStaffId, req, id);
         published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), start, "scheduled", by == null ? Map.of() : Map.of("actedByRef", by.ref()));
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** COM-052: a follow-up booking closes the patient's open recall with this doctor (marked 'booked', no reminder). */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the booking tx
+    private void followUpBooked(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req, UUID appointmentId) {
+        if (req.isFollowUpOrDefault()) {
+            recalls.followUpBooked(tenantId, callerStaffId, req.patientId(), req.doctorId(), appointmentId);
+        }
     }
 
     /** IDC-011: stores who booked on the patient's behalf and writes the proxy.acted audit row. */
