@@ -455,6 +455,10 @@ export type PharmacyStockMovementResponse = { actorId?: string; actorName?: stri
 export type PharmacyWorklistEntry = { claimedBy?: string; claimedByName?: string; doctorName?: string; id?: string; lines?: Array<PharmacyWorklistLine>; patientName?: string; prescriptionId?: string; queueEntryId?: string; signedAt?: string; status?: string; token?: number; validUntil?: string; };
 export type PharmacyWorklistLine = { drug?: string; inStock?: boolean; prescriptionItemId?: string; qtyDispensed?: number; qtyPrescribed?: number; };
 export type PharmacyWorklistPage = { items?: Array<PharmacyWorklistEntry>; nextCursor?: string; };
+export type PhoneReverificationState = { state?: string; };
+export type PhoneReverificationStep = { attempt?: number; lockedUntil?: string; method?: string; reason?: string; step: string; };
+export type PhoneSecondFactorRequest = { dob: string; };
+export type PhoneSecondFactorResponse = { match?: boolean; };
 export type Picker = { jurisdiction?: string; outcomes?: Array<Outcome>; questions?: Array<Question>; };
 export type PinAssertionRequest = { approvalId?: string; pin: string; };
 export type PinChangeRequest = { currentPin: string; newPin: string; };
@@ -765,6 +769,9 @@ export type Operations = {
   InternalFamilyController_change: { method: "patch"; path: "/internal/v1/tenants/{tid}/family/proxies/{id}"; permission: "authenticated"; pathParams: { tid: string; id: string; }; query: never; body: FamilyProxyChange; response: Access };
   InternalHouseholdController_household: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: Record<string, Array<HouseholdMember>> };
   InternalDependantController_add: { method: "post"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}/dependants"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: ChatDependantRequest; response: ChatDependantResponse };
+  InternalPhoneReverificationController_state: { method: "get"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}/reverification"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: PhoneReverificationState };
+  InternalPhoneReverificationController_report: { method: "post"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}/reverification"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: PhoneReverificationStep; response: void };
+  InternalPhoneReverificationController_check: { method: "post"; path: "/internal/v1/tenants/{tid}/households/{phoneHash}/reverification/check"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: PhoneSecondFactorRequest; response: PhoneSecondFactorResponse };
   ChatRegistrationController_create: { method: "post"; path: "/internal/v1/tenants/{tid}/patients"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatPatientCreate; response: ChatPatientRef };
   InternalChatConsentController_capture: { method: "post"; path: "/internal/v1/tenants/{tid}/patients/consents"; permission: "authenticated"; pathParams: { tid: string; }; query: never; body: ChatConsentRequest; response: ChatConsentResponse };
   ChatRegistrationController_pending: { method: "get"; path: "/internal/v1/tenants/{tid}/patients/pending-completion/{phoneHash}"; permission: "authenticated"; pathParams: { tid: string; phoneHash: string; }; query: never; body: never; response: ChatPendingCompletion };

@@ -60,7 +60,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     public record Issued(UUID linkId, Instant expiresAt) {
     }
 
-    public enum Refusal { EXPIRED, LOCKED, RATE_LIMITED, OTP_INVALID }
+    public enum Refusal { EXPIRED, LOCKED, RATE_LIMITED, OTP_INVALID, REVERIFY }
 
     public record Opened(String fileUrl, String mime, String title) {
     }
@@ -88,10 +88,13 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     private final AuditService audit;
     private final ActorDirectory actors;
     private final String baseUrl;
+    private final com.nabd.hms.patient.internal.PhoneReverificationService reverifications;
 
     SecureLinkService(JdbcTemplate jdbc, TenantContext tenantContext, Clock clock, FileStore files, NotificationPort notifications,
                       SecureLinkOtpDelivery otpSender, AuditService audit, ActorDirectory actors,
-                      @Value("${app.secure-links.base-url:http://localhost:3810}") String baseUrl) {
+                      @Value("${app.secure-links.base-url:http://localhost:3810}") String baseUrl,
+                      com.nabd.hms.patient.internal.PhoneReverificationService reverifications) {
+        this.reverifications = reverifications;
         this.jdbc = jdbc;
         this.tenantContext = tenantContext;
         this.clock = clock;
@@ -186,6 +189,10 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         if (l.lockedUntil() != null && l.lockedUntil().isAfter(now)) {
             return Result.no(Refusal.LOCKED);
         }
+        if (reverifications.held(tenant, l.recipientId())) { // COM-041: the recipient's number must re-verify in chat first
+            logOpen(tenant, l.id(), ip, userAgent, "locked");
+            return Result.no(Refusal.REVERIFY);
+        }
         Instant hourAgo = now.minus(Duration.ofHours(1));
         Integer perLink = jdbc.queryForObject("SELECT count(*) FROM secure_link_opens WHERE tenant_id = ? AND link_id = ? AND outcome = 'otp_sent' AND opened_at > ?",
                 Integer.class, tenant, l.id(), java.sql.Timestamp.from(hourAgo));
@@ -226,6 +233,10 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         if (l.lockedUntil() != null && l.lockedUntil().isAfter(now)) {
             logOpen(tenant, l.id(), ip, userAgent, "locked");
             return Result.no(Refusal.LOCKED);
+        }
+        if (reverifications.held(tenant, l.recipientId())) { // COM-041
+            logOpen(tenant, l.id(), ip, userAgent, "locked");
+            return Result.no(Refusal.REVERIFY);
         }
         boolean ok = l.otpHash() != null && l.otpExpiresAt() != null && l.otpExpiresAt().isAfter(now)
                 && MessageDigest.isEqual(l.otpHash().getBytes(StandardCharsets.US_ASCII), otpHash(l.id(), otp).getBytes(StandardCharsets.US_ASCII));

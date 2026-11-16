@@ -1716,6 +1716,13 @@ schemas:
       proxy_scope: operational
       proxy_status: operational
       created_at: operational
+    phone_reverifications:
+      tenant_id: operational
+      phone_hash: pii
+      state: operational
+      reason: operational
+      locked_until: operational
+      updated_at: operational
     patient_desk_tasks:
       id: operational
       tenant_id: operational

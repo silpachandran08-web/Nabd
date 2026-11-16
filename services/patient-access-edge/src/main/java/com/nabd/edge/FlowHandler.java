@@ -14,8 +14,10 @@ public interface FlowHandler {
     enum State { START, CHOOSING_DOCTOR, CHOOSING_SLOT, CONFIRMING, DONE, CONSENT_CARE, CONSENT_UPDATES, CHECKIN,
         /** ACC-040/042 booking flow */
         LANGUAGE, MENU, WHO, CHILD_NAME, CHILD_DOB, CHILD_SEX, CHOOSING_DAY, HANDOFF,
-        REG_NAME, REG_SEX, REG_DOB, COMPLETE_ADDRESS, COMPLETE_LANG,
-        MEMBER_RELATION, MEMBER_NAME, MEMBER_DOB, MEMBER_PHONE_CHOICE, MEMBER_PHONE, MEMBER_CONSENT, MEMBER_OTP } // ACC-043: registration and the desk's "complete in chat"
+        REG_NAME, REG_SEX, REG_DOB, COMPLETE_ADDRESS, COMPLETE_LANG, // ACC-043: registration and the desk's "complete in chat"
+        MEMBER_RELATION, MEMBER_NAME, MEMBER_DOB, MEMBER_PHONE_CHOICE, MEMBER_PHONE, MEMBER_CONSENT, MEMBER_OTP,
+        /** COM-041 re-verification of a changed number */
+        REVERIFY_OTP, REVERIFY_DOB }
 
     /** Context keys the Edge may keep: ids, first name, age. Anything else is refused (no clinical content in the Edge DB). */
     Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care", "cands", "ciChannel",

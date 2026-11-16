@@ -49,6 +49,12 @@ final class FakeUpstreams {
         boolean handle(com.sun.net.httpserver.HttpExchange ex) throws IOException;
     }
 
+    /** COM-041: Core's reverification state per phone hash (default verified), the steps the Edge reported ("hash|body") and the
+     * date of birth on file per phone hash (the check answers match only for it). */
+    final Map<String, String> reverifyState = new ConcurrentHashMap<>();
+    final List<String> reverifyReports = new CopyOnWriteArrayList<>();
+    final Map<String, String> dobOnFile = new ConcurrentHashMap<>();
+
     volatile Hook coreFirst;
     volatile Hook commsHook;
 
@@ -97,6 +103,19 @@ final class FakeUpstreams {
                 if (path0.endsWith("/booking-profile")) {
                     reply(ex, 200, profiles.getOrDefault(tenant, profiles.getOrDefault("*",
                             "{\"clinicName\":\"Test Clinic\",\"timeZone\":\"Asia/Kolkata\",\"doctors\":[]}")));
+                    return;
+                }
+                if (path0.contains("/households/") && path0.contains("/reverification")) {
+                    String hash = seg[6];
+                    String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    if (path0.endsWith("/check")) {
+                        reply(ex, 200, "{\"match\":" + body.contains("\"" + dobOnFile.getOrDefault(hash, "none") + "\"") + "}");
+                    } else if ("POST".equals(ex.getRequestMethod())) {
+                        reverifyReports.add(hash + "|" + body);
+                        reply(ex, 202, "{}");
+                    } else {
+                        reply(ex, 200, "{\"state\":\"" + reverifyState.getOrDefault(hash, "verified") + "\"}");
+                    }
                     return;
                 }
                 if (path0.contains("/households/")) {

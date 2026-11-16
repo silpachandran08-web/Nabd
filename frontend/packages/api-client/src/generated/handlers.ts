@@ -47,6 +47,9 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.patch(`${baseUrl}/internal/v1/tenants/:tid/family/proxies/:id`, () => HttpResponse.json({"relation":"string","scope":"string","status":"string"}, { status: 200 })), // InternalFamilyController_change
     http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash`, () => HttpResponse.json({}, { status: 200 })), // InternalHouseholdController_household
     http.post(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/dependants`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // InternalDependantController_add
+    http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/reverification`, () => HttpResponse.json({"state":"string"}, { status: 200 })), // InternalPhoneReverificationController_state
+    http.post(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/reverification`, () => new HttpResponse(null, { status: 204 })), // InternalPhoneReverificationController_report
+    http.post(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/reverification/check`, () => HttpResponse.json({"match":false}, { status: 200 })), // InternalPhoneReverificationController_check
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // ChatRegistrationController_create
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients/consents`, () => HttpResponse.json({"consentIds":["00000000-0000-7000-8000-000000000000"]}, { status: 201 })), // InternalChatConsentController_capture
     http.get(`${baseUrl}/internal/v1/tenants/:tid/patients/pending-completion/:phoneHash`, () => HttpResponse.json({"firstName":"string","patientRef":"string"}, { status: 200 })), // ChatRegistrationController_pending
@@ -580,4 +583,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 566;
+export const operationCount = 569;

@@ -1904,7 +1904,7 @@ paths:
       responses:
         "202": { description: "Code sent" }
         "410": { description: "link-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "423": { description: "link-locked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "423": { description: "link-locked, or phone-reverify-required while the recipient's number must re-verify in chat (COM-041) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "429": { description: "otp-rate-limited (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /public/links/{token}/open:
     post:
@@ -1922,7 +1922,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { description: "otp-invalid (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "410": { description: "link-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "423": { description: "link-locked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "423": { description: "link-locked, or phone-reverify-required while the recipient's number must re-verify in chat (COM-041) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /secure-links:
     post:
       tags: [Patients]
@@ -4197,6 +4197,49 @@ paths:
         "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "POSSIBLE_DUPLICATE { patientRef } (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/households/{phoneHash}/reverification:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Patients]
+      summary: "COM-041. Core's view of the phone's re-verification: verified (also when Core has no row), needs_reverify (the desk recorded a number change, or the Edge flagged it) or locked. A lock past its time reads as needs_reverify."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ state }", content: { application/json: { schema: { type: object, properties: { state: { type: string, enum: [verified, needs_reverify, locked] } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    post:
+      tags: [Patients]
+      summary: "COM-041. The Edge reports a re-verification step. flagged (reason) and verified (method) and locked (attempt, lockedUntil) update Core's state; every step is audited as phone.reverify.<step> by 'patient via edge'; locked opens a phone_reverify_locked desk task for the oldest patient on the phone. Secure links to a patient whose number is not verified are held (no code sent or accepted)."
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [step], properties: { step: { type: string, enum: [flagged, failed, locked, verified] }, reason: { type: string, enum: [changed_number, wa_id_changed, silence, desk_change] }, method: { type: string, enum: ["otp+dob"] }, attempt: { type: integer, minimum: 1 }, lockedUntil: { type: string, format: date-time } } } } }
+      responses:
+        "204": { description: "Recorded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/households/{phoneHash}/reverification/check:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    post:
+      tags: [Patients]
+      summary: "COM-041. Second factor: does the date of birth match an active patient registered on the phone? Answers yes or no only (no name, no record); false while the phone is locked. Audited as phone.reverify.second_factor with the outcome, never the date."
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [dob], properties: { dob: { type: string, format: date } } } } }
+      responses:
+        "200": { description: "{ match }", content: { application/json: { schema: { type: object, properties: { match: { type: boolean } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/booking-profile:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
