@@ -45,6 +45,8 @@ export type Prescription = {
   allergySnapshot?: PrescriptionAllergySnapshot | null;
   /** CLN-004: dictionary version active at signing; null for drafts and older prescriptions. */
   safetyDictionaryVersion?: string | null;
+  /** CLN-022: the visit it belongs to and the signer's name (the pad's "Repeat last (date, doctor)"). */
+  queueEntryId?: string; signedByName?: string | null;
 };
 
 export type Allergy = {

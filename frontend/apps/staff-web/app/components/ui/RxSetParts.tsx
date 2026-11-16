@@ -7,14 +7,19 @@ import { can } from "../../lib/permissions";
 import styles from "./rxSets.module.css";
 import {
   itemLine, lastUsedLabel, medCountLabel, SCOPE_LABEL, toWriteItem,
-  type RxSet, type RxSetResult, type RxSetScope, type RxSetWriteItem,
+  type RxSet, type RxSetResult, type RxStaleReason, type RxSetScope, type RxSetWriteItem,
 } from "@nabd/domain";
+
+const STALE_REASON: Record<RxStaleReason, string> = {
+  retired: "retired from the drug list", out_of_stock: "out of stock in the clinic pharmacy", not_in_master: "not in the active pharmacy list",
+};
 
 // DOC-035: one saved set, shared by the prescription pad panel and the Prescriptions & Templates screen.
 export function RxSetCard({ set, onApply, onEdit, onDelete, compact = false }: {
   set: RxSet; onApply?: () => void; onEdit?: () => void; onDelete?: () => void; compact?: boolean;
 }) {
-  const staleNames = set.items.filter((i) => i.stale === true).map(itemLine);
+  const staleItems = set.items.filter((i) => i.stale === true);
+  const staleNames = staleItems.map(itemLine);
   const scopeLabel = set.scope === "shared" && set.ownerName ? `${SCOPE_LABEL.shared} · ${set.ownerName}` : SCOPE_LABEL[set.scope];
   return (
     <li className={`${styles.card} ${compact ? styles.cardCompact : ""}`} data-testid="rx-set">
@@ -22,7 +27,7 @@ export function RxSetCard({ set, onApply, onEdit, onDelete, compact = false }: {
         <h3 className={styles.name}>{set.name}</h3>
         <StatusPill tone={set.scope === "standard" ? "info" : set.scope === "mine" ? "neutral" : "sync"} icon={set.scope === "standard" ? "shield" : set.scope === "mine" ? "user" : "users"}
           label={set.scope === "mine" && set.shared ? "Mine · shared with clinic" : scopeLabel} />
-        {staleNames.length > 0 && <StatusPill tone="warn" icon="alert" label={`${staleNames.length} not in active list`} />}
+        {staleNames.length > 0 && <StatusPill tone="warn" icon="alert" label={`${staleNames.length} stale`} />}
       </div>
       <div className={styles.meta}>
         <span>{medCountLabel(set.items.length)}</span>
@@ -34,9 +39,10 @@ export function RxSetCard({ set, onApply, onEdit, onDelete, compact = false }: {
           Code this: {set.items.filter((i) => i.codeSuggestion).map((i) => `${i.drugName} → ${i.codeSuggestion?.display}`).join("; ")}.
         </p>
       )}
-      {staleNames.length > 0 && (
-        <p className={styles.staleNote}>
-          Not in the current active pharmacy list: {staleNames.join(", ")}. Check before applying.
+      {staleItems.length > 0 && (
+        <p className={styles.staleNote} data-testid="rx-set-stale-note">
+          {/* CLN-022: why each item is stale, and the same-ingredient product the drug master offers instead (never auto-applied) */}
+          Stale: {staleItems.map((i) => `${itemLine(i)} (${STALE_REASON[i.staleReason ?? "not_in_master"]}${i.replacement ? `; suggested: ${i.replacement.display}` : ""})`).join(", ")}. Check before applying.
         </p>
       )}
       {(onApply || onEdit || onDelete) && (

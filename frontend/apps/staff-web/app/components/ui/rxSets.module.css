@@ -30,3 +30,12 @@
 .cardCompact { padding: var(--nb-space-8) var(--nb-space-12); gap: var(--nb-space-4); }
 .cardCompact .actions { margin-block-start: 0; }
 .cardCompact .btn { min-block-size: 32px; }
+/* CLN-022: Rx pad header quick actions (repeat last + set chips), 44 px touch targets */
+.quickRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); margin-block: var(--nb-space-8) var(--nb-space-12); }
+.chip { display: inline-flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; max-inline-size: 100%; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: 999px; background: var(--nb-surface-3); color: var(--nb-text-primary); font: inherit; font-size: 13px; cursor: pointer; overflow-wrap: anywhere; text-align: start; }
+.chip:hover { border-color: var(--nb-border-strong); }
+.chip:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 1px; }
+.chip:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
+.chipRepeat { border-color: var(--nb-accent-500); font-weight: 600; }
+.chipKey { display: inline-grid; place-items: center; min-inline-size: 20px; block-size: 20px; border-radius: var(--nb-radius-sm); background: var(--nb-surface-2); color: var(--nb-text-secondary); font-size: 11px; font-weight: 600; }
+.chipStale { color: var(--nb-warn-500); }
