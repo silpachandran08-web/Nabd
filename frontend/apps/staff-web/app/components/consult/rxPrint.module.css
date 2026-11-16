@@ -43,7 +43,7 @@
   font: inherit;
   font-size: 14px;
   cursor: pointer;
-  min-block-size: 40px;
+  min-block-size: 44px;
 }
 
 .btnPrimary {
@@ -229,3 +229,25 @@
 /* PHL-013: the verification QR on the signed sheet */
 .qr { margin: 0; display: flex; flex-direction: column; align-items: center; gap: var(--nb-space-4); }
 .qrImg { inline-size: 96px; block-size: 96px; }
+
+/* CLN-023: revoke dialog */
+.revokeForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-8);
+}
+
+.revokeInput {
+  font: inherit;
+  padding: var(--nb-space-8);
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-border-default);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  min-block-size: 44px;
+}
+
+.revokeError {
+  margin: 0;
+  color: var(--nb-danger-500);
+}
