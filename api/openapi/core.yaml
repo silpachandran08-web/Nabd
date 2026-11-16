@@ -6706,6 +6706,11 @@ paths:
         schema:
           type: string
           format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepeatLastRequest"
       responses:
         "200":
           content:
@@ -25976,12 +25981,16 @@ components:
           type: number
         quantityUnit:
           type: string
+        replacement:
+          $ref: "#/components/schemas/RxCodeSuggestion"
         route:
           type: string
         sigPattern:
           type: string
         stale:
           type: boolean
+        staleReason:
+          type: string
     FavouriteRxSetRequest:
       type: object
       properties:
@@ -29860,6 +29869,8 @@ components:
         signedBy:
           type: string
           format: uuid
+        signedByName:
+          type: string
         signedByRegistrationNo:
           type: string
         status:
@@ -31093,6 +31104,12 @@ components:
           minLength: 1
       required:
       - reason
+    RepeatLastRequest:
+      type: object
+      properties:
+        sourcePrescriptionId:
+          type: string
+          format: uuid
     Report:
       type: object
       properties:

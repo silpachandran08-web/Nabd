@@ -111,6 +111,22 @@ class DrugMasterRepository {
                 region, tsQuery, tsQuery, limit);
     }
 
+    /** CLN-022: an active product of the region with exactly the same ingredient set as drugId (itself excluded); the
+     * tenant's in-stock items first, then same strength, same form, then A-Z. */
+    Optional<Summary> sameIngredients(String region, String drugId, UUID tenantId) {
+        return jdbc.query("SELECT m.id, m.brand, m.strength, m.form, m.schedule, " +
+                        "(SELECT COALESCE(array_agg(g.name ORDER BY g.name), '{}') FROM drug_ingredients d JOIN ingredients g ON g.id = d.ingredient_id WHERE d.drug_id = m.id) AS generic " +
+                        "FROM drug_master o JOIN drug_master m ON m.region = o.region AND m.id <> o.id AND m.status = 'active' " +
+                        "WHERE o.region = ? AND o.id = ? " +
+                        "AND (SELECT array_agg(ingredient_id ORDER BY ingredient_id) FROM drug_ingredients WHERE drug_id = m.id) " +
+                        "  = (SELECT array_agg(ingredient_id ORDER BY ingredient_id) FROM drug_ingredients WHERE drug_id = o.id) " +
+                        "ORDER BY EXISTS (SELECT 1 FROM charge_catalogue c WHERE c.tenant_id = ? AND c.drug_id = m.id AND c.active AND c.stock_qty > 0) DESC, " +
+                        "(m.strength IS NOT DISTINCT FROM o.strength) DESC, (m.form IS NOT DISTINCT FROM o.form) DESC, m.brand, m.id LIMIT 1",
+                (rs, n) -> new Summary(rs.getString("id"), rs.getString("brand"), rs.getString("strength"), rs.getString("form"),
+                        strings(rs.getArray("generic")), strings(rs.getArray("schedule"))),
+                region, drugId, tenantId).stream().findFirst();
+    }
+
     // ── import side ──────────────────────────────────────────────────────
 
     Started start(String region, String kind, boolean dryRun, String checksum, String by) {

@@ -3973,7 +3973,7 @@ paths:
   /clinical/rx-sets:
     get:
       tags: [Clinical]
-      summary: "DOC-035. Favourite Rx sets visible to the caller: their own, other doctors' shared sets, and clinic standards. scope is relative to the caller. Each item carries stale (true = the tenant has an active pharmacy item master and neither drug nor brand is in it; null = no master to compare with, nothing guessed)."
+      summary: "DOC-035. Favourite Rx sets visible to the caller: their own, other doctors' shared sets, and clinic standards. scope is relative to the caller. Each item carries stale (true = the tenant has an active pharmacy item master and neither drug nor brand is in it; null = no master to compare with, nothing guessed). CLN-022 - a coded item (drugId) is stale when its drug master product is retired or when the clinic dispenses it in-house and has none in stock (staleReason retired | out_of_stock | not_in_master), with a replacement suggestion (same ingredients, active) that is never applied automatically. Order - the caller's own sets, then other doctors' shared sets, then clinic standards, each by lastUsedAt (most recent first, never-used last)."
       x-required-permission: clinical:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FavouriteRxSet" } } } } }
@@ -4040,9 +4040,19 @@ paths:
   /clinical/prescriptions/{queueEntryId}/repeat-last:
     post:
       tags: [Clinical]
-      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last)."
+      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last). CLN-022 - optional body sourcePrescriptionId pins the previewed prescription (must be this patient's signed Rx from another visit, else the same 404); needs an Idempotency-Key header (a retried tap runs once)."
       x-required-permission: clinical:edit
-      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourcePrescriptionId: { type: [string, "null"], format: uuid }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -6985,6 +6995,8 @@ components:
               drugId: { type: [string, "null"], description: "CLN-021. Drug master id when the item is coded." }
               genericName: { type: [string, "null"] }
               codeSuggestion: { type: [object, "null"], description: "CLN-021. Best drug master match for an uncoded item ('code this'); never applied automatically.", properties: { drugId: { type: string }, display: { type: string } } }
+              staleReason: { type: [string, "null"], enum: [retired, out_of_stock, not_in_master, null], description: "CLN-022. Why the item is stale; null when it is not." }
+              replacement: { type: [object, "null"], description: "CLN-022. For a stale coded item - an active product with exactly the same ingredients (in-house stock first, then same strength and form); never applied automatically.", properties: { drugId: { type: string }, display: { type: string } } }
     RxWarning:
       type: object
       properties:
@@ -7474,6 +7486,7 @@ components:
         signedAt: { type: [string, "null"], format: date-time }
         signedBy: { type: [string, "null"], format: uuid, description: "CLN-005: staff id of the signer; null on a draft" }
         signedByRegistrationNo: { type: [string, "null"], description: "CLN-005: the registration number the signer signed under" }
+        signedByName: { type: [string, "null"], description: "CLN-022: the signer's name (Repeat last preview); null on a draft" }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
         warnings:
