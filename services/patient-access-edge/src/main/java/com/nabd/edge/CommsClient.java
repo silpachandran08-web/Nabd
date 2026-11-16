@@ -12,8 +12,10 @@ import java.util.UUID;
 @Component
 public class CommsClient {
 
-    /** In-memory only. buttonPayload is the signed token (ButtonTokens), null for free text. */
-    public record Inbound(String kind, String text, String buttonPayload, String contactHash) {
+    /** In-memory only. buttonPayload is the signed token (ButtonTokens), null for free text. COM-041: for Meta's system messages kind is
+     * "system" and systemType Meta's type ("user_changed_number"); waIdHash is the SHA-256 of the sender's WhatsApp user id (null when
+     * Comms does not relay it). */
+    public record Inbound(String kind, String text, String buttonPayload, String contactHash, String systemType, String waIdHash) {
     }
 
     private final Http http;
@@ -29,8 +31,9 @@ public class CommsClient {
     public Inbound fetch(UUID tenantId, String messageId) {
         JsonNode n = json.readTree(http.get(base + "/internal/v1/tenants/" + tenantId + "/messages/" + messageId));
         String button = n.path("buttonPayload").asString("");
+        String system = n.path("systemType").asString(""), waId = n.path("waIdHash").asString("");
         return new Inbound(n.path("kind").asString("text"), n.path("text").asString(""), button.isEmpty() ? null : button,
-                n.path("contactHash").asString(""));
+                n.path("contactHash").asString(""), system.isEmpty() ? null : system, waId.isEmpty() ? null : waId);
     }
 
     /** An interactive reply button: id is the signed payload that comes back in Inbound.buttonPayload. */

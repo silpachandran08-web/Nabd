@@ -37,6 +37,7 @@ public class ConversationEngine {
     private final Map<State, FlowHandler> handlers = new EnumMap<>(State.class);
     private final java.util.List<Intent> intents;
     private final ClinicRollout rollout;
+    private final PhoneVerifications phones;
     /** The booking journey (ACC-040/042). Consent, registration and check-in keep their own outage handling (silent retry). */
     static final java.util.Set<State> BOOKING_STATES = java.util.EnumSet.of(State.START, State.LANGUAGE, State.MENU, State.WHO, State.CHILD_NAME,
             State.CHILD_DOB, State.CHILD_SEX, State.CHOOSING_DOCTOR, State.CHOOSING_DAY, State.CHOOSING_SLOT, State.CONFIRMING, State.DONE);
@@ -50,8 +51,10 @@ public class ConversationEngine {
             }));
 
     ConversationEngine(ConversationStore store, RateLimiter limiter, CommsClient comms, ButtonTokens buttons, MeterRegistry meters,
-                       ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents, ClinicRollout rollout) {
+                       ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents, ClinicRollout rollout,
+                       PhoneVerifications phones) {
         this.rollout = rollout;
+        this.phones = phones;
         this.store = store;
         this.limiter = limiter;
         this.comms = comms;
@@ -97,6 +100,10 @@ public class ConversationEngine {
         }
         if (in == null) {
             in = comms.fetch(tenantId, messageId);
+        }
+        if (phones.observe(tenantId, contact, in)) { // COM-041: Meta's changed-number notice only flags the phone; nobody wrote it
+            result("number_changed");
+            return;
         }
         String action = null;
         if (in.buttonPayload() != null) {

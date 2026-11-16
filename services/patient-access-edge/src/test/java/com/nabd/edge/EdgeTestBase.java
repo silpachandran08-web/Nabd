@@ -93,6 +93,9 @@ abstract class EdgeTestBase {
         UP.bookResults.clear();
         UP.bookMode = "confirmed";
         UP.dependantStatus = 201;
+        UP.reverifyState.clear();
+        UP.reverifyReports.clear();
+        UP.dobOnFile.clear();
         valkey.keys("edge:avail:*").forEach(valkey::delete);
     }
 

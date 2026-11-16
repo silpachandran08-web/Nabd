@@ -23,6 +23,7 @@ availability, tenant isolation.
 | T11 | Stale availability offering a booked slot | 30 s TTL plus invalidation on `scheduling.appointment.*` within 2 s; Core's constraint stays the final arbiter | `ProjectionTest#bookedEventInvalidatesTheDoctorWithinTwoSecondsAndPolicyEventTheTenant` |
 | T12 | Two chats offered the same slot | 5-minute soft hold, atomic upsert | `SlotHoldsTest#secondChatChoosingTheSameSlotIsOfferedADifferentOne` |
 | T13 | Valkey outage used to bypass limits or stall replies | Limits fail open with a metric and a page-level alert (same stance as Core); availability falls back to one Core call, under 3 s | `ProjectionTest#valkeyOutageStillAnswersFromCoreUnderThreeSecondsAndRecovers` |
+| T14 | A changed or recycled WhatsApp number reading another person's records (COM-041) | Meta's changed-number notice, a new WhatsApp user id, 180 days of silence or a desk-recorded change mark the phone `needs_reverify` (`phone_verifications`, RLS); records requests need the in-chat code plus the date of birth checked by Core (yes/no only); booking lists no family names meanwhile; 3 failures lock records for 24 h and Core audits every step and opens a desk task | `Com041ReverificationTest#whileReverificationIsPendingBookingWorksButNoFamilyMemberIsListedOrAdded` |
 
 Residual risks (not testable here): mTLS and the service identity towards Core and the Comms Gateway (ACC-038, PLT-009), the
 real WhatsApp webhook signature check (Comms Gateway), and per-IP trust of `X-Forwarded-For` behind the load balancer (the

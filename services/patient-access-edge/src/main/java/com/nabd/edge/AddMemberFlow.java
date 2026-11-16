@@ -138,7 +138,7 @@ public class AddMemberFlow {
         });
     }
 
-    private static String hash(String challenge, String code) {
+    static String hash(String challenge, String code) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((challenge + ":" + code).getBytes(StandardCharsets.UTF_8)));
         } catch (java.security.NoSuchAlgorithmException e) {
@@ -146,7 +146,7 @@ public class AddMemberFlow {
         }
     }
 
-    private static LocalDate parseDob(String text, LocalDate today) {
+    static LocalDate parseDob(String text, LocalDate today) {
         try {
             String[] p = text.trim().split("[-/. ]+");
             if (p.length != 3 || p[2].length() != 4) {
