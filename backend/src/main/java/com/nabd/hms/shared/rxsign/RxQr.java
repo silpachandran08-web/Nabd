@@ -35,15 +35,22 @@ public final class RxQr {
         return head + "." + B64.encodeToString(keys.sign(head.getBytes(StandardCharsets.UTF_8)));
     }
 
-    /** Empty when the text is not an Rx QR at all (wrong prefix, wrong field count, undecodable field). */
-    public static Optional<Parsed> decode(String payload, RxSigningKeys keys) {
-        if (payload == null) return Optional.empty();
-        String[] f = payload.trim().split("\\.", -1);
+    /** CLN-023: the printed QR is the public verify link {@code <patient-web>/rx/<token>}; the token is what follows the last slash. */
+    public static String tokenOf(String scanned) {
+        String t = scanned.trim();
+        return t.substring(t.lastIndexOf('/') + 1);
+    }
+
+    /** Empty when the text is not an Rx QR at all (wrong prefix, wrong field count, undecodable field). A verify link is accepted too. */
+    public static Optional<Parsed> decode(String scanned, RxSigningKeys keys) {
+        if (scanned == null) return Optional.empty();
+        String payload = tokenOf(scanned);
+        String[] f = payload.split("\\.", -1);
         if (f.length != 8 || !PREFIX.equals(f[0])) return Optional.empty();
         try {
             Claims c = new Claims(uuid(f[1]), uuid(f[2]), Instant.ofEpochSecond(Long.parseLong(f[3])),
                     f[4].isEmpty() ? null : Instant.ofEpochSecond(Long.parseLong(f[4])), textOrNull(f[5]), textOrNull(f[6]));
-            String head = payload.trim().substring(0, payload.trim().lastIndexOf('.'));
+            String head = payload.substring(0, payload.lastIndexOf('.'));
             return Optional.of(new Parsed(c, keys.verify(c.kid(), head.getBytes(StandardCharsets.UTF_8), B64D.decode(f[7]))));
         } catch (IllegalArgumentException | java.time.DateTimeException e) {
             return Optional.empty();

@@ -5,6 +5,8 @@ import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.pharmacy.dto.RxVerificationDtos.Dispense;
 import com.nabd.hms.pharmacy.dto.RxVerificationDtos.Line;
 import com.nabd.hms.pharmacy.dto.RxVerificationDtos.Prescriber;
+import com.nabd.hms.pharmacy.dto.RxVerificationDtos.PublicDoctor;
+import com.nabd.hms.pharmacy.dto.RxVerificationDtos.PublicVerification;
 import com.nabd.hms.pharmacy.dto.RxVerificationDtos.Response;
 import com.nabd.hms.shared.rxsign.RxQr;
 import com.nabd.hms.shared.rxsign.RxSigningKeys;
@@ -60,10 +62,12 @@ public class RxVerificationService {
         if (rx == null) {
             return invalid(t, c.prescriptionId(), "not-found", staffId);
         }
+        if (repo.revokedAt(t, rx.id()).isPresent()) {
+            return invalid(t, rx.id(), "revoked", staffId); // CLN-023: the prescriber withdrew it; never shown as dispensable
+        }
         List<Line> lines = repo.lines(t, rx.id()).stream().map(l -> new Line(l.prescriptionItemId(), l.drugName(), l.quantity(), l.dispensed(),
                 RxGate.remaining(l.quantity(), l.dispensed()))).toList();
-        List<Line> countable = lines.stream().filter(l -> l.qtyPrescribed() != null).toList();
-        boolean fullyDispensed = !countable.isEmpty() && countable.stream().allMatch(l -> l.remaining().signum() == 0);
+        boolean fullyDispensed = fullyDispensed(lines);
         Instant validUntil = worklist.validUntil(rx.id(), rx.queueEntryId());
         UUID entryId = repo.worklistEntry(t, rx.id()).orElse(null);
         Prescriber prescriber = new Prescriber(rx.signerName(), rx.signerRegistrationNo());
@@ -72,6 +76,30 @@ public class RxVerificationService {
         repo.record(t, rx.id(), status, null, staffId);
         return new Response(status, null, rx.id(), rx.queueEntryId(), entryId, prescriber, rx.signedAt(), validUntil, dispense,
                 lines.stream().filter(l -> l.remaining().signum() > 0 || l.qtyPrescribed() == null).toList());
+    }
+
+    /**
+     * CLN-023: the public answer for a verify link, in the token's clinic (TenantScope, after the signature checked out). Revoked first,
+     * then fully dispensed, then past validity, else valid. Doctor and counts only. Empty when no signed prescription matches.
+     */
+    public java.util.Optional<PublicVerification> verifyPublic(UUID prescriptionId) {
+        UUID t = tenant.current();
+        RxVerificationRepository.Rx rx = repo.find(t, prescriptionId).filter(r -> "signed".equals(r.status())).orElse(null);
+        if (rx == null) return java.util.Optional.empty();
+        List<Line> lines = repo.lines(t, rx.id()).stream().map(l -> new Line(l.prescriptionItemId(), null, l.quantity(), l.dispensed(),
+                RxGate.remaining(l.quantity(), l.dispensed()))).toList();
+        Instant validUntil = worklist.validUntil(rx.id(), rx.queueEntryId());
+        String status = repo.revokedAt(t, rx.id()).isPresent() ? "revoked" : fullyDispensed(lines) ? "dispensed"
+                : validUntil != null && !clock.instant().isBefore(validUntil) ? "expired" : "valid";
+        Instant dispensedAt = "dispensed".equals(status) ? repo.lastDispense(t, rx.id()).map(RxVerificationRepository.Dispense::at).orElse(null) : null;
+        return java.util.Optional.of(new PublicVerification(status, new PublicDoctor(rx.signerName(), rx.signerRegistrationNo(), rx.signerCouncil()),
+                rx.signedAt(), validUntil, lines.size(), dispensedAt));
+    }
+
+    /** Every line with a prescribed quantity has nothing left (a line without one has nothing to dispense against). */
+    private static boolean fullyDispensed(List<Line> lines) {
+        List<Line> countable = lines.stream().filter(l -> l.qtyPrescribed() != null).toList();
+        return !countable.isEmpty() && countable.stream().allMatch(l -> l.remaining().signum() == 0);
     }
 
     private Response invalid(UUID t, UUID prescriptionId, String reason, UUID staffId) {

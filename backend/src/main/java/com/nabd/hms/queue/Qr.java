@@ -10,15 +10,16 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * ACC-033: the door-poster QR code, with no library (none is on the build path). Byte mode, error correction M, versions 1 to 10
- * (up to 213 bytes: a wa.me link fits), mask 0 (any mask is valid; the penalty search only helps marginal scanners).
- * shortcut: no mask search and no versions above 10, upgrade if a longer payload is ever needed.
+ * ACC-033: the door-poster QR code, with no library (none is on the build path). Byte mode, error correction M, versions 1 to 14
+ * (up to 362 bytes: a wa.me link fits, so does CLN-023's Rx verify link with its signed token), mask 0 (any mask is valid; the
+ * penalty search only helps marginal scanners). shortcut: no mask search and no versions above 14, upgrade if a longer payload is ever needed.
  */
 public final class Qr {
 
-    private static final int[] ECC_PER_BLOCK = {10, 16, 26, 18, 24, 16, 18, 22, 22, 26}; // level M, versions 1..10
-    private static final int[] BLOCKS = {1, 1, 1, 2, 2, 4, 4, 4, 5, 5};
-    private static final int[][] ALIGN = {{}, {6, 18}, {6, 22}, {6, 26}, {6, 30}, {6, 34}, {6, 22, 38}, {6, 24, 42}, {6, 26, 46}, {6, 28, 50}};
+    private static final int[] ECC_PER_BLOCK = {10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24}; // level M, versions 1..14
+    private static final int[] BLOCKS = {1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9};
+    private static final int[][] ALIGN = {{}, {6, 18}, {6, 22}, {6, 26}, {6, 30}, {6, 34}, {6, 22, 38}, {6, 24, 42}, {6, 26, 46}, {6, 28, 50},
+            {6, 30, 54}, {6, 32, 58}, {6, 34, 62}, {6, 26, 46, 66}};
 
     private Qr() {
     }
@@ -26,8 +27,8 @@ public final class Qr {
     public static boolean[][] encode(String text) {
         byte[] data = text.getBytes(StandardCharsets.UTF_8);
         int ver = 1;
-        while (ver <= 10 && dataCodewords(ver) * 8 < 4 + (ver < 10 ? 8 : 16) + data.length * 8) ver++;
-        if (ver > 10) throw new IllegalArgumentException("QR payload too long");
+        while (ver <= 14 && dataCodewords(ver) * 8 < 4 + (ver < 10 ? 8 : 16) + data.length * 8) ver++;
+        if (ver > 14) throw new IllegalArgumentException("QR payload too long");
         int size = ver * 4 + 17;
         boolean[][] m = new boolean[size][size];
         boolean[][] fn = new boolean[size][size];

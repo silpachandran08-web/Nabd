@@ -954,6 +954,8 @@ paths:
               properties:
                 isClinician: { type: boolean }
                 licenceExpiresOn: { type: [string, "null"], format: date }
+                registrationCouncil: { type: [string, "null"], maxLength: 80, description: "CLN-023. Printed beside the registration number on the Rx PDF; null = unchanged, empty clears it." }
+                signatureFileId: { type: [string, "null"], format: uuid, description: "CLN-023. A scanned, available PNG/JPEG upload (purpose signature) belonging to no patient, printed on the Rx PDF; null = unchanged (400 signature-not-usable otherwise)." }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -4083,6 +4085,73 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PrescriptionPrintHeader" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Prescription not signed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/pdf:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "CLN-023. The signed Rx PDF (A4 or A5): clinic, doctor, registration number and council, signature image, patient name/age/sex, generic-first lines (CLN-021), allergies at signing, issue date, valid-until and the QR (the public verify link). Rendered and stored once per size (file store, SHA-256 recorded, audited prescription.pdf_stored); every later download is the same bytes, re-checked against the stored hash (409 PDF_INTEGRITY_FAILED otherwise). PHI read logged."
+      x-required-permission: clinical:view
+      parameters: [{ name: size, in: query, required: false, schema: { type: string, enum: [a4, a5], default: a4 } }]
+      responses:
+        "200": { description: "application/pdf; header X-Content-SHA256 = hex SHA-256 of the body", content: { application/pdf: { schema: { type: string, format: binary } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_SIGNED for a draft (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/pdf/send:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-023. Sends the stored A4 PDF to the patient as an IDC-015 OTP secure link (same recipient rules as POST /secure-links). 409 prescription-revoked once revoked. Audited (prescription.pdf_sent)."
+      x-required-permission: "hasAuthority('clinical:view') and hasAuthority('patients:edit')"
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { language: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$" } } } } }
+      responses:
+        "201": { description: "{ linkId, expiresAt }", content: { application/json: { schema: { type: object, properties: { linkId: { type: string, format: uuid }, expiresAt: { type: string, format: date-time } } } } } }
+        "403": { description: "Forbidden (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_SIGNED or prescription-revoked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/revoke:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-023. Revokes a signed prescription, once, with a reason (5-500 characters). Same authority as signing: the visit's doctor or a clinical:approve holder who is a licensed clinician (403 not-prescriber, not-licensed-clinician, licence-expired). The signed prescription is unchanged (V51); the verify page then answers revoked, the pharmacy scan invalid/revoked and checkout 422 rx-revoked. Audited (prescription.revoked, with the reason) and clinical.prescription.revoked.v1 (ids only)."
+      x-required-permission: "clinical:edit | clinical:approve"
+      x-permission-check: "visit doctor or clinical:approve, plus clinical:edit and CLN-005 licence"
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 5, maxLength: 500 } } } } }
+      responses:
+        "200": { description: "{ status: revoked, revokedAt }", content: { application/json: { schema: { type: object, properties: { status: { type: string, const: revoked }, revokedAt: { type: string, format: date-time } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_SIGNED or prescription-revoked (already revoked) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/rx/verify/{token}:
+    get:
+      tags: [Clinical]
+      summary: "CLN-023. Public verification of a scanned Rx QR (patient-web /rx/<token> renders it). Only a token signed by one of the Rx keys is looked up, in the clinic it names. Doctor, validity and counts only: no patient details, medicines or diagnosis. status valid | expired | dispensed | revoked (revoked first, then fully dispensed, then past validUntil). 30 calls a minute per IP (per replica). No cache."
+      security: []
+      x-required-permission: public
+      parameters: [{ name: token, in: path, required: true, schema: { type: string, maxLength: 1000 } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, required: [status, doctor, issuedAt, lineCount], properties: {
+          status: { type: string, enum: [valid, expired, dispensed, revoked] },
+          doctor: { type: object, properties: { name: { type: [string, "null"] }, registrationNo: { type: [string, "null"] }, council: { type: [string, "null"] } } },
+          issuedAt: { type: string, format: date-time }, validUntil: { type: [string, "null"], format: date-time }, lineCount: { type: integer },
+          dispensedAt: { type: [string, "null"], format: date-time } } } } } }
+        "404": { description: "UNKNOWN_TOKEN: malformed, altered, unknown key or no signed prescription (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "RATE_LIMITED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/rx/keys:
+    get:
+      tags: [Clinical]
+      summary: "CLN-023. The Rx signing keys' public JWKS (EC P-256, ES256, kid per key; every key verifies, the first signs) for offline verification. Cacheable 5 minutes."
+      security: []
+      x-required-permission: public
+      responses:
+        "200": { description: "{ keys: [{ kty: EC, crv: P-256, kid, x, y, use?, alg? }] }", content: { application/json: { schema: { type: object, properties: { keys: { type: array, items: { type: object } } } } } } }
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
@@ -7453,6 +7522,12 @@ components:
         prescriberName: { type: [string, "null"] }
         professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
         genericFirst: { type: boolean, description: "CLN-021. The region prints the generic (salt) name first, the brand in brackets only if one was chosen." }
+        qrPayload: { type: [string, "null"], description: "PHL-013/CLN-023. The prescription's one signed token (NRX1...), issued at sign" }
+        qrSvg: { type: [string, "null"], description: "CLN-023. QR of the public verify link <patient-web>/rx/<qrPayload>, as an SVG document" }
+        registrationCouncil: { type: [string, "null"] }
+        validUntil: { type: [string, "null"], format: date-time, description: "null = no expiry set" }
+        revokedAt: { type: [string, "null"], format: date-time }
+        revokeReason: { type: [string, "null"] }
     StaffClinicalLicence:
       type: object
       required: [staffId, isClinician, hasRegistrationNo]
@@ -7462,6 +7537,8 @@ components:
         hasRegistrationNo: { type: boolean }
         licenceExpiresOn: { type: [string, "null"], format: date }
         licenceOverrideUntil: { type: [string, "null"], format: date-time }
+        registrationCouncil: { type: [string, "null"] }
+        hasSignature: { type: boolean, description: "CLN-023. A signature image is on file for the Rx PDF" }
     Prescription:
       type: object
       properties:

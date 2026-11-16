@@ -14,7 +14,7 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 /**
  * IDC-003 / IDC-016: the two anonymous surfaces that are not on the staff API: the public privacy notice page (no PHI,
  * CDN-cacheable) and the ABDM gateway callbacks (authenticated by the gateway's signature in the controller, like the
- * WhatsApp webhook). A chain of their own, ahead of the main one, so the main chain's rules stay untouched. Per-IP rate
+ * WhatsApp webhook), and CLN-023's Rx verify link (doctor, validity and counts only). A chain of their own, ahead of the main one, so the main chain's rules stay untouched. Per-IP rate
  * limit (PLT-008) applies; the page sets its own CSP (inline style only) and leaves the cache headers to its controller.
  */
 @Configuration
@@ -25,7 +25,7 @@ class PublicEndpointsSecurityConfig {
     SecurityFilterChain publicEndpointsChain(HttpSecurity http, RateLimitFilter rateLimit,
             org.springframework.security.oauth2.jwt.JwtDecoder staffDecoder,
             org.springframework.core.convert.converter.Converter<org.springframework.security.oauth2.jwt.Jwt, org.springframework.security.authentication.AbstractAuthenticationToken> converter) throws Exception {
-        http.securityMatcher("/v1/public/notices/**", "/v1/public/links/**", "/v1/public/trials/**", "/abdm/v3/callbacks/**", "/abdm/v3/hip/**", "/v1/display/**")
+        http.securityMatcher("/v1/public/notices/**", "/v1/public/links/**", "/v1/public/rx/**", "/v1/public/trials/**", "/abdm/v3/callbacks/**", "/abdm/v3/hip/**", "/v1/display/**")
                 .addFilterAfter(rateLimit, AnonymousAuthenticationFilter.class)
                 .csrf(c -> c.disable()) // no cookies: the callbacks carry a gateway signature, the page is a GET
                 .cors(Customizer.withDefaults())

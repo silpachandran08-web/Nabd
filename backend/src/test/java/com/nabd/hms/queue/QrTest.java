@@ -35,8 +35,10 @@ class QrTest {
     void sameTextSameCodeDifferentTextDifferentCodeAndTooLongIsRefused() {
         assertThat(Qr.encode("CHECKIN ABC")).isDeepEqualTo(Qr.encode("CHECKIN ABC"));
         assertThat(Qr.encode("CHECKIN ABC")).isNotEqualTo(Qr.encode("CHECKIN ABD"));
-        assertThat(Qr.encode("x".repeat(213)).length).isEqualTo(57); // version 10, the largest supported
-        assertThatThrownBy(() -> Qr.encode("x".repeat(214))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(Qr.encode("x".repeat(213)).length).isEqualTo(57); // version 10
+        assertThat(Qr.encode("x".repeat(214)).length).isEqualTo(61); // CLN-023: version 11 and up for the Rx verify link
+        assertThat(Qr.encode("x".repeat(362)).length).isEqualTo(73); // version 14, the largest supported
+        assertThatThrownBy(() -> Qr.encode("x".repeat(363))).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

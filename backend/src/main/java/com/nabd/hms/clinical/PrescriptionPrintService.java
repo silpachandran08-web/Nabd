@@ -1,12 +1,9 @@
 package com.nabd.hms.clinical;
 
-import com.nabd.hms.clinical.api.RxValidity;
 import com.nabd.hms.clinical.dto.PrescriptionPrintHeaderResponse;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.Qr;
-import com.nabd.hms.shared.rxsign.RxQr;
-import com.nabd.hms.shared.rxsign.RxSigningKeys;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +17,13 @@ public class PrescriptionPrintService {
     private final PrescriptionPrintRepository repo;
     private final TenantContext tenantContext;
     private final DrugCoding coding;
-    private final RxValidity validity;
-    private final RxSigningKeys keys;
+    private final RxDocumentService rxDocuments;
 
-    PrescriptionPrintService(PrescriptionPrintRepository repo, TenantContext tenantContext, DrugCoding coding, RxValidity validity, RxSigningKeys keys) {
+    PrescriptionPrintService(PrescriptionPrintRepository repo, TenantContext tenantContext, DrugCoding coding, RxDocumentService rxDocuments) {
         this.coding = coding;
         this.repo = repo;
         this.tenantContext = tenantContext;
-        this.validity = validity;
-        this.keys = keys;
+        this.rxDocuments = rxDocuments;
     }
 
     @Transactional
@@ -44,16 +39,18 @@ public class PrescriptionPrintService {
         UUID prescriberId = h.signerId();
         PrescriptionPrintRepository.Person who = prescriberId == null ? null : repo.findPerson(tenantId, prescriberId).orElse(null);
         String reg = h.signerRegistrationNo() == null || h.signerRegistrationNo().isBlank() ? null : h.signerRegistrationNo();
-        // PHL-013: the signed QR payload the pharmacy scans; ids, times, the registration number and the signature only.
-        String qr = RxQr.encode(new RxQr.Claims(tenantId, h.prescriptionId(), h.signedAt(), validity.validUntil(h.prescriptionId(), queueEntryId),
-                keys.activeKid(), reg), keys);
+        // PHL-013 / CLN-023: the one stored signed token (ids, times, the registration number and the signature only), printed as the
+        // public verify link the pharmacy scanner and any phone read.
+        PrescriptionPrintRepository.Token token = rxDocuments.issue(tenantId, h, queueEntryId);
+        String qr = token.rxToken();
         String svg;
         try {
-            svg = Qr.svg(Qr.encode(qr));
+            svg = Qr.svg(Qr.encode(rxDocuments.verifyUrl(qr)));
         } catch (IllegalArgumentException e) {
-            qr = svg = null; // shortcut: a registration number too long for the encoder's 213 bytes prints without a QR, widen Qr if it happens
+            qr = svg = null; // the encoder takes 362 bytes; only an absurdly long registration number or base URL prints without a QR
         }
         return new PrescriptionPrintHeaderResponse(h.prescriptionId(), h.signedAt(), h.clinicName(), h.clinicRegion(),
-                h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg, coding.genericFirst(), qr, svg);
+                h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg, coding.genericFirst(), qr, svg,
+                who == null ? null : who.council(), token.validUntil(), token.revokedAt(), token.revokeReason());
     }
 }
