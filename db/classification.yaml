@@ -1610,6 +1610,21 @@ schemas:
       tenant_id: operational
       source: operational
       created_at: operational
+    prescription_rx_tokens:
+      prescription_id: operational
+      tenant_id: operational
+      rx_token: operational
+      payload_sha256: operational
+      signing_kid: operational
+      valid_until: operational
+      pdf_a4_file_id: operational
+      pdf_a4_sha256: operational
+      pdf_a5_file_id: operational
+      pdf_a5_sha256: operational
+      revoked_at: operational
+      revoke_reason: phi
+      revoked_by: operational
+      created_at: operational
     prescriptions:
       id: operational
       tenant_id: operational
@@ -2125,6 +2140,8 @@ schemas:
       licence_override_until: operational
       hpr_id: pii
       hpr_verified_at: operational
+      registration_council: operational
+      signature_file_id: operational
     staff_clinician_review:
       tenant_id: operational
       staff_id: operational

@@ -57,7 +57,8 @@ public enum DomainEventType {
     RECALL_CREATED("engagement.recall.created.v1", "core/engagement"),
     SPECIALTY_PROFILE_ASSIGNED("specialty.profile.assigned.v1", "core/specialty"),
     /** COM-025: a patient's notification preferences changed (desk PUT or the WhatsApp Settings menu). Ids and version only. */
-    PATIENT_NOTIFICATION_PREFERENCES_CHANGED("patient.notification_preferences.changed.v1", "core/patient");
+    PATIENT_NOTIFICATION_PREFERENCES_CHANGED("patient.notification_preferences.changed.v1", "core/patient"),
+    RX_REVOKED("clinical.prescription.revoked.v1", "core/clinical");
 
     private final String type;
     private final String source;

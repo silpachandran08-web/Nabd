@@ -12,6 +12,9 @@ import { PrintSheet } from "@nabd/ui";
 import { usePrintPaper } from "../../lib/usePrintPaper";
 import r from "./rxPrint.module.css";
 import { responseFetch } from "../../lib/responseFetch";
+import Dialog from "../ui/Dialog";
+import { errorText } from "../../lib/api";
+import { openRxPdf, revokeReasonOk, revokeRx, sendRxPdf, REVOKE_REASON_MAX, type PdfSize } from "./rxDocuments";
 
 // DOC-N1: printable SIGNED prescription. Data comes from GET /clinical/prescriptions/{queueEntryId},
 // GET /clinical/prescriptions/{queueEntryId}/print-header (clinic + prescriber of record + registration number),
@@ -26,6 +29,8 @@ type PrintHeader = {
   prescriberId: string | null; prescriberName: string | null; professionalRegistrationNo: string | null;
   genericFirst?: boolean; // CLN-021: print the generic (salt) first, the brand in brackets only if one was chosen
   qrPayload?: string | null; qrSvg?: string | null; // PHL-013: the signed Rx QR the pharmacy scans (server-rendered SVG)
+  // CLN-023: the QR is the public verify link; council beside the number, validity (null = none), revocation by the prescriber
+  registrationCouncil?: string | null; validUntil?: string | null; revokedAt?: string | null; revokeReason?: string | null;
 };
 type RxFull = Prescription & { patientId: string };
 type AllergyView =
@@ -68,6 +73,54 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
   const [tick, setTick] = useState(0);
   const allowed = mounted && can("clinical:view");
   const paper = usePrintPaper("rx"); // FEF-046: clinic default, no prompt
+  // CLN-023: restricted controls are absent; the server still checks the licensed prescriber (revoke) and the recipient (send)
+  const canSend = mounted && can("patients:edit");
+  const canRevoke = mounted && (can("clinical:edit") || can("clinical:approve"));
+  const [docMsg, setDocMsg] = useState<{ text: string; error: boolean } | null>(null);
+  const [docBusy, setDocBusy] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [reason, setReason] = useState("");
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+
+  async function pdf(size: PdfSize) {
+    setDocBusy(true);
+    setDocMsg(null);
+    if (!(await openRxPdf(queueEntryId, size))) setDocMsg({ text: tx("pdfFailed"), error: true });
+    setDocBusy(false);
+  }
+
+  async function send() {
+    setDocBusy(true);
+    setDocMsg(null);
+    try {
+      await sendRxPdf(queueEntryId);
+      setDocMsg({ text: tx("sentToPatient"), error: false });
+    } catch (e) {
+      setDocMsg({ text: errorText(e, tx("sendFailed")), error: true });
+    } finally {
+      setDocBusy(false);
+    }
+  }
+
+  async function revoke(e: React.FormEvent) {
+    e.preventDefault();
+    if (!revokeReasonOk(reason)) {
+      setRevokeError(tx("revokeReasonHint"));
+      return;
+    }
+    setDocBusy(true);
+    setRevokeError(null);
+    try {
+      await revokeRx(queueEntryId, reason);
+      setRevoking(false);
+      setReason("");
+      setTick((t) => t + 1); // reload: the header now carries the revocation
+    } catch (err) {
+      setRevokeError(errorText(err, tx("revokeFailed")));
+    } finally {
+      setDocBusy(false);
+    }
+  }
 
   const get = useCallback(async (path: string): Promise<Response> => {
     const res = await responseFetch(path);
@@ -157,8 +210,31 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         <div className={r.toolbarActions}>
           <button type="button" className={r.btn} onClick={() => router.back()}>{tx("back")}</button>
           <button type="button" className={`${r.btn} ${r.btnPrimary}`} onClick={() => window.print()}><Icon name="receipt" size={14} /> {" "}{tx("print")}</button>
+          <button type="button" className={r.btn} disabled={docBusy} onClick={() => void pdf("a4")}>{tx("pdfA4")}</button>
+          <button type="button" className={r.btn} disabled={docBusy} onClick={() => void pdf("a5")}>{tx("pdfA5")}</button>
+          {canSend && !header.revokedAt && <button type="button" className={r.btn} disabled={docBusy} onClick={() => void send()}>{tx("sendToPatient")}</button>}
+          {canRevoke && !header.revokedAt && <button type="button" className={r.btn} disabled={docBusy} onClick={() => { setRevokeError(null); setRevoking(true); }}>{tx("revoke")}</button>}
         </div>
       </div>
+      {docMsg && <div className={docMsg.error ? r.notice : `${r.notice} ${r.noticeInfo}`} role={docMsg.error ? "alert" : "status"}><span>{docMsg.text}</span></div>}
+      {header.revokedAt && (
+        <div className={r.notice} role="alert" data-testid="rx-revoked">
+          <Icon name="alert" size={16} />
+          <span>{tx("revokedOn", { date: when(header.revokedAt) })}{header.revokeReason ? ` ${tx("revokedReason", { reason: header.revokeReason })}` : ""}</span>
+        </div>
+      )}
+      {revoking && (
+        <Dialog title={tx("revokeTitle")} onClose={() => setRevoking(false)}>
+          <form className={r.revokeForm} onSubmit={revoke}>
+            <p className={r.muted}>{tx("revokeHint")}</p>
+            <label htmlFor="rx-revoke-reason">{tx("revokeReason")}</label>
+            <textarea id="rx-revoke-reason" className={r.revokeInput} value={reason} maxLength={REVOKE_REASON_MAX} rows={3} required
+              onChange={(e) => setReason(e.target.value)} />
+            {revokeError && <p className={r.revokeError} role="alert">{revokeError}</p>}
+            <button type="submit" className={`${r.btn} ${r.btnPrimary}`} disabled={docBusy}>{tx("revokeConfirm")}</button>
+          </form>
+        </Dialog>
+      )}
       {!header.professionalRegistrationNo && (
         <div className={r.notice} role="status">
           <Icon name="alert" size={16} />
@@ -180,6 +256,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
           <div className={r.prescriber}>
             <div className={r.prescriberName}><bdi>{header.prescriberName ?? tx("prescriber")}</bdi></div>
             {header.professionalRegistrationNo && <div>{tx("regNo", { professionalRegistrationNo: header.professionalRegistrationNo })}</div>}
+            {header.registrationCouncil && <div>{header.registrationCouncil}</div>}
           </div>
         </header>
 
@@ -188,6 +265,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
           <div className={r.metaItem}><span className={r.metaLabel}>{tx("mrn")}</span><span>{patient.mrn}</span></div>
           <div className={r.metaItem}><span className={r.metaLabel}>{tx("ageSex")}</span><span>{patient.dob ? `${age(patient.dob)} y` : "—"} · {patient.gender}</span></div>
           <div className={r.metaItem}><span className={r.metaLabel}>{tx("date")}</span><span>{signedDay}</span></div>
+          <div className={r.metaItem}><span className={r.metaLabel}>{tx("validUntil")}</span><span>{header.validUntil ? new Date(header.validUntil).toLocaleDateString(undefined, { dateStyle: "medium" }) : tx("noExpiry")}</span></div>
         </div>
 
         <section className={r.allergyBox} aria-label={g("allergy.plural")}>

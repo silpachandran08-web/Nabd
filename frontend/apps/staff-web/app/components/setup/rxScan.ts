@@ -40,7 +40,8 @@ function text(s: string): string | null {
 
 /** The claims, the signed text and the signature; null when the text is not an Rx QR. Nothing is verified here. */
 export function parseRxQr(raw: string): { claims: RxQrClaims; head: string; sig: Uint8Array } | null {
-  const payload = raw.trim();
+  const trimmed = raw.trim();
+  const payload = trimmed.slice(trimmed.lastIndexOf("/") + 1); // CLN-023: the printed QR is the verify link <patient-web>/rx/<token>
   const f = payload.split(".");
   if (f.length !== 8 || f[0] !== PREFIX) return null;
   try {
@@ -114,6 +115,7 @@ export function headline(status: ScanStatus, reason: string | null | undefined, 
       if (reason === "unknown-key") return "Cannot verify offline: no key cached for this prescription";
       if (reason === "unreadable") return "Not a Nabd prescription QR";
       if (reason === "not-found") return "No such prescription at this clinic";
+      if (reason === "revoked") return "Revoked by the prescriber: do not dispense";
       return "Signature invalid";
   }
 }

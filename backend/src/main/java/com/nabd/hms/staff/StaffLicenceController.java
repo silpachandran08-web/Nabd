@@ -25,11 +25,15 @@ import java.util.UUID;
 @RequestMapping("/v1/staff/{id}/clinical-licence")
 public class StaffLicenceController {
 
+    /** CLN-023: registrationCouncil prints beside the registration number; hasSignature = a signature image is on file for the Rx PDF. */
     public record LicenceResponse(UUID staffId, boolean isClinician, boolean hasRegistrationNo, LocalDate licenceExpiresOn,
-                                  Instant licenceOverrideUntil) {
+                                  Instant licenceOverrideUntil, String registrationCouncil, boolean hasSignature) {
     }
 
-    public record LicenceRequest(@NotNull Boolean isClinician, LocalDate licenceExpiresOn) {
+    /** CLN-023: registrationCouncil and signatureFileId are optional, null = unchanged; an empty council clears it. signatureFileId is a
+     * scanned, available PNG or JPEG upload (purpose signature) that belongs to no patient. */
+    public record LicenceRequest(@NotNull Boolean isClinician, LocalDate licenceExpiresOn,
+                                 @jakarta.validation.constraints.Size(max = 80) String registrationCouncil, UUID signatureFileId) {
     }
 
     public record OverrideRequest(@NotNull Instant until) {

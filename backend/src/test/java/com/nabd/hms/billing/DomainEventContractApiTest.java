@@ -302,6 +302,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.RECALL_CREATED.type()); // COM-052: Com052RecallOrderApiTest
         expected.remove(DomainEventType.SPECIALTY_PROFILE_ASSIGNED.type()); // CLN-042: Cln042SpecialtyProfilesApiTest
         expected.remove(DomainEventType.PATIENT_NOTIFICATION_PREFERENCES_CHANGED.type()); // COM-025: Com025NotificationPreferencesApiTest
+        expected.remove(DomainEventType.RX_REVOKED.type()); // CLN-023: Cln023RxPdfApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

@@ -25,12 +25,14 @@ class RxGateRepository {
     /** Row-locks the prescription lines in id order (deadlock-free between two bills linking the same lines). */
     Map<UUID, RxGate.RxItemRow> lockItems(UUID tenantId, Collection<UUID> ids) {
         Map<UUID, RxGate.RxItemRow> out = new HashMap<>();
-        jdbc.query("SELECT pi.id, pr.patient_id, pr.status, pi.quantity FROM prescription_items pi " +
+        jdbc.query("SELECT pi.id, pr.patient_id, pr.status, pi.quantity, EXISTS (SELECT 1 FROM prescription_rx_tokens r WHERE r.tenant_id = pr.tenant_id " +
+                        "AND r.prescription_id = pr.id AND r.revoked_at IS NOT NULL) AS revoked FROM prescription_items pi " +
                         "JOIN prescriptions pr ON pr.id = pi.prescription_id AND pr.tenant_id = pi.tenant_id " +
                         "WHERE pi.tenant_id = ? AND pi.id = ANY (?) ORDER BY pi.id FOR UPDATE OF pi",
                 (RowCallbackHandler) rs -> {
                     UUID id = rs.getObject("id", UUID.class);
-                    out.put(id, new RxGate.RxItemRow(id, rs.getObject("patient_id", UUID.class), rs.getString("status"), rs.getBigDecimal("quantity")));
+                    out.put(id, new RxGate.RxItemRow(id, rs.getObject("patient_id", UUID.class), rs.getString("status"), rs.getBigDecimal("quantity"),
+                            rs.getBoolean("revoked")));
                 },
                 tenantId, ids.toArray(new UUID[0]));
         return out;

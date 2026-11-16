@@ -35,8 +35,11 @@ class StaffLicenceService {
     private final TenantContext tenantContext;
     private final java.time.Clock clock;
 
+    private final com.nabd.hms.shared.FileStore files;
+
     StaffLicenceService(JdbcTemplate jdbc, StaffRepository staffRepo, RoleRepository roleRepo, AuditService auditService,
-                        TenantContext tenantContext, java.time.Clock clock) {
+                        TenantContext tenantContext, java.time.Clock clock, com.nabd.hms.shared.FileStore files) {
+        this.files = files;
         this.clock = clock;
         this.jdbc = jdbc;
         this.staffRepo = staffRepo;
@@ -62,6 +65,19 @@ class StaffLicenceService {
         staffRepo.updateClinician(tenantId, id, req.isClinician()); // PLT-016's single is_clinician writer (also resolves the review row)
         jdbc.update("UPDATE staff SET licence_expires_on = ? WHERE tenant_id = ? AND id = ?",
                 req.licenceExpiresOn() == null ? null : java.sql.Date.valueOf(req.licenceExpiresOn()), tenantId, id);
+        if (req.registrationCouncil() != null) { // CLN-023
+            jdbc.update("UPDATE staff SET registration_council = ? WHERE tenant_id = ? AND id = ?",
+                    req.registrationCouncil().isBlank() ? null : req.registrationCouncil().strip(), tenantId, id);
+        }
+        if (req.signatureFileId() != null) {
+            boolean ok = files.info(req.signatureFileId()).filter(f -> "available".equals(f.status()) && f.patientId() == null
+                    && ("image/png".equals(f.contentType()) || "image/jpeg".equals(f.contentType()))).isPresent();
+            if (!ok) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "signature-not-usable", "Signature image not usable",
+                        "Upload a PNG or JPEG of the signature and wait until the scan has finished.");
+            }
+            jdbc.update("UPDATE staff SET signature_file_id = ? WHERE tenant_id = ? AND id = ?", req.signatureFileId(), tenantId, id);
+        }
         LicenceResponse after = read(tenantId, id);
         audit(tenantId, callerId, ip, "staff.clinical_licence_updated", id, snapshot(before), snapshot(after));
         return after;
@@ -89,12 +105,14 @@ class StaffLicenceService {
     }
 
     private LicenceResponse read(UUID tenantId, UUID id) {
-        return jdbc.query("SELECT id, is_clinician, professional_registration_no, licence_expires_on, licence_override_until " +
+        return jdbc.query("SELECT id, is_clinician, professional_registration_no, licence_expires_on, licence_override_until, registration_council, " +
+                        "signature_file_id IS NOT NULL AS has_signature " +
                         "FROM staff WHERE tenant_id = ? AND id = ?",
                 (rs, i) -> new LicenceResponse(UUID.fromString(rs.getString("id")), rs.getBoolean("is_clinician"),
                         rs.getString("professional_registration_no") != null && !rs.getString("professional_registration_no").isBlank(),
                         rs.getDate("licence_expires_on") == null ? null : rs.getDate("licence_expires_on").toLocalDate(),
-                        rs.getTimestamp("licence_override_until") == null ? null : rs.getTimestamp("licence_override_until").toInstant()),
+                        rs.getTimestamp("licence_override_until") == null ? null : rs.getTimestamp("licence_override_until").toInstant(),
+                        rs.getString("registration_council"), rs.getBoolean("has_signature")),
                 tenantId, id).stream().findFirst().orElseThrow(ApiException::notFound);
     }
 
@@ -103,6 +121,8 @@ class StaffLicenceService {
         m.put("isClinician", l.isClinician());
         m.put("licenceExpiresOn", l.licenceExpiresOn() == null ? null : l.licenceExpiresOn().toString());
         m.put("licenceOverrideUntil", l.licenceOverrideUntil() == null ? null : l.licenceOverrideUntil().toString());
+        m.put("registrationCouncil", l.registrationCouncil());
+        m.put("hasSignature", l.hasSignature());
         return m;
     }
 

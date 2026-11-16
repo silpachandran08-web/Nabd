@@ -87,11 +87,15 @@ public class PrescriptionService {
     private final ActorDirectory actors;
     private final DrugCoding coding;
     private final RxSafetyService safety;
+    private final RxDocumentService rxDocuments;
+    private final PrescriptionPrintRepository printRepo;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
                          SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors,
-                         DrugCoding coding, RxSafetyService safety) {
+                         DrugCoding coding, RxSafetyService safety, RxDocumentService rxDocuments, PrescriptionPrintRepository printRepo) {
+        this.rxDocuments = rxDocuments;
+        this.printRepo = printRepo;
         this.safety = safety;
         this.actors = actors;
         this.coding = coding;
@@ -520,6 +524,11 @@ public class PrescriptionService {
         event.put("queueEntryId", queueEntryId.toString());
         event.put("signedBy", callerStaffId.toString());
         event.put("dictionaryVersion", dict.label()); // CLN-004's safety dictionary the sign was checked against
+        // CLN-023: the signed QR token is issued with the sign; events carry its payload hash, never the token itself
+        PrescriptionPrintRepository.Token token = rxDocuments.issue(tenantId,
+                printRepo.findHeader(tenantId, queueEntryId).orElseThrow(ApiException::notFound), queueEntryId);
+        event.put("validUntil", token.validUntil() == null ? null : token.validUntil().toString());
+        event.put("rxTokenRef", token.payloadSha256());
         eventPublisher.publish(tenantId, SIGNED_EVENT, event);
         eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.RX_SIGNED, row.id(), Map.of("prescriptionId", row.id(),
                 "queueEntryId", queueEntryId, "signedBy", callerStaffId, "status", "signed")); // OPS-015; SIGNED_EVENT above is deprecated

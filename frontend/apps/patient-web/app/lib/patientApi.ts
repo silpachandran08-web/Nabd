@@ -7,8 +7,12 @@
 //   GET  {base}/patient-links/{linkId}/content         -> Resolved           (Bearer)
 //   GET  {base}/patient-links/{linkId}/document        -> file bytes         (Bearer)
 //   POST {base}/exchange/consents/{id}/patient-decision -> 200 {status}      (Bearer, Idempotency-Key; 409 ARTEFACT_CHANGED, 410 EXPIRED)
+//   GET  {base}/public/rx/verify/{token}                -> RxVerification     (CLN-023, public; 404 unknown, 429 rate limited)
+//   GET  {base}/public/rx/keys                          -> JWKS               (CLN-023, public)
 //
 // The access token lives in component state only: never in a URL, storage or cookie.
+
+import type { Jwks, RxVerification } from "./rxVerify";
 
 export const API_BASE = (process.env.NEXT_PUBLIC_PATIENT_API_BASE_URL ?? "http://localhost:8080/v1").replace(/\/$/, "");
 const TIMEOUT_MS = 15000;
@@ -91,6 +95,9 @@ export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
   profileClaimOtp: async (token: string): Promise<void> => { await call(f, `/me/profile-claims/${enc(token)}/otp`, { method: "POST" }); },
   claimProfile: async (token: string, otp: string, keepGuardianScope: KeepScope): Promise<{ claimed: boolean; keptScope: KeepScope }> =>
     (await call(f, `/me/profile-claims/${enc(token)}`, { method: "POST", body: JSON.stringify({ otp, keepGuardianScope }) })).json(),
+  // CLN-023: public Rx verification (no sign-in; the token is the signed QR payload) and the keys an offline check uses
+  rxVerify: async (token: string): Promise<RxVerification> => (await call(f, `/public/rx/verify/${enc(token)}`)).json(),
+  rxKeys: async (): Promise<Jwks> => (await call(f, "/public/rx/keys")).json(),
   exportLink: async (token: string): Promise<ExportLink> => (await call(f, `/public/exports/${enc(token)}`)).json(),
   exportOtp: async (token: string): Promise<void> => { await call(f, `/public/exports/${enc(token)}/otp`, { method: "POST" }); },
   exportDownload: async (token: string, otp: string): Promise<Blob> =>
