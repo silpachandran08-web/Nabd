@@ -49,6 +49,8 @@ export type ClientOptions = {
   /** True when the token is ageing and should be refreshed before the call. */
   shouldRefresh?: (token: string | null) => boolean;
   language?: () => string | undefined;
+  /** Headers sent on every call (PLT-013: X-Device-Label); a per-call `headers` entry wins. */
+  defaultHeaders?: () => Record<string, string>;
   /** Step-up middleware (FEF-018): a 403 "step-up-required" calls this; a returned token replays the same request ONCE
    * with X-Step-Up-Token (same Idempotency-Key). null = the user cancelled, the 403 is thrown as an ApiError. */
   stepUp?: (problem: Record<string, unknown>) => Promise<string | null>;
@@ -84,6 +86,7 @@ export function createClient(o: ClientOptions) {
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
     if (key) headers["Idempotency-Key"] = key;
+    if (o.defaultHeaders) Object.assign(headers, o.defaultHeaders());
     if (opts.headers) Object.assign(headers, opts.headers);
     const lang = o.language ? o.language() : typeof navigator !== "undefined" ? navigator.language : undefined;
     if (lang) headers["Accept-Language"] = lang;

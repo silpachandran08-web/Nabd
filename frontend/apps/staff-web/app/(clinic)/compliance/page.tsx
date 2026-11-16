@@ -7,6 +7,7 @@ import StatusPill from "../../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import { can } from "../../lib/permissions";
 import { api, ApiError } from "../../lib/api";
+import BreakGlassReview from "./BreakGlassReview";
 
 // PLT-057. Matches GET /v1/support-access/requests and POST /v1/support-access/requests/{id}/decision.
 type Req = {
@@ -100,6 +101,7 @@ function Inner() {
             </>
           )}
       </section>
+      <BreakGlassReview />
     </main>
   );
 }

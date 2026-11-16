@@ -10,6 +10,7 @@ import { NEW_PIN_PATTERN, needsPinChange } from "../../lib/pinPolicy";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { safeReturnTo, storeTokens, takeReturnTo, signOutReason } from "../../lib/apiClient";
 import { LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
+import { deviceLabelHeader } from "../../lib/deviceLabel";
 import { api } from "../../lib/api";
 import { COOKIE_AUTH } from "../../lib/bffShim";
 import { signInCookiesFrom } from "../../lib/bff";
@@ -74,7 +75,7 @@ export default function LoginPage() {
       // the old token still carries pinChange=true; a refresh mints one without it
       const r = await loginFetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceLabelHeader() },
         body: JSON.stringify({ refreshToken: localStorage.getItem("nabd_refresh_token") }),
       }, slow);
       if (!r.ok) { dispatch({ type: "pinChangedSignIn", message: t("errors.pinChangedSignIn") }); return; }
@@ -92,7 +93,7 @@ export default function LoginPage() {
     try {
       const res = await loginFetch(`${API_BASE}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceLabelHeader() },
         body: JSON.stringify({ tenantSlug, email, pin }),
       }, slow);
       const body = await res.json();
@@ -138,7 +139,7 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/otp/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceLabelHeader() },
         body: JSON.stringify({ tenantSlug, mobilePhone, code }),
       });
       const body = await res.json();
@@ -158,7 +159,7 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/mfa/${useRecovery ? "recovery-verify" : "verify"}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceLabelHeader() },
         body: JSON.stringify(useRecovery
           ? { challengeToken: challenge.challengeId, recoveryCode: code.trim() }
           : { challengeId: challenge.challengeId, code }),

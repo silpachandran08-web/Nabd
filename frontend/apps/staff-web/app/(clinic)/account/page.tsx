@@ -6,6 +6,7 @@ import { storeTokens } from "../../lib/apiClient";
 import { api, reasonText } from "../../lib/api";
 import ThemeSwitch from "../../shell/ThemeSwitch";
 import PushToggle from "../../components/pwa/PushToggle";
+import DeviceNameCard from "./DeviceNameCard";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
@@ -142,6 +143,8 @@ export default function AccountPage() {
           <button className={styles.btnPrimary} onClick={startEnroll}>Set up two-factor authentication</button>
         )}
       </div>
+
+      <DeviceNameCard />
 
       <h2 className={styles.sectionTitle}>Active sessions</h2>
       <div className={styles.card}>
