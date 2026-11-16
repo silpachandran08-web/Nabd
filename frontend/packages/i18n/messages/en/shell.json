@@ -213,6 +213,32 @@
       "short": "Catalogue"
     }
   },
+  "soloNav": {
+    "solo-today": {
+      "label": "Today",
+      "short": "Today"
+    },
+    "solo-consult": {
+      "label": "Consultation",
+      "short": "Consult"
+    },
+    "solo-patients": {
+      "label": "Patients",
+      "short": "Patients"
+    },
+    "solo-money": {
+      "label": "Payments",
+      "short": "Payments"
+    },
+    "solo-specialty": {
+      "label": "Specialty workspace",
+      "short": "Specialty"
+    },
+    "solo-setup": {
+      "label": "My clinic settings",
+      "short": "Settings"
+    }
+  },
   "clinicNav": {
     "arrivals": {
       "label": "Today / Arrivals",
@@ -362,7 +388,8 @@
     "reception": "Reception",
     "pharmacist": "Pharmacist",
     "lab": "Lab",
-    "billing": "Billing"
+    "billing": "Billing",
+    "solo": "Solo doctor"
   },
   "nav": {
     "mainNav": "Main",

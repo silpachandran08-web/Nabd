@@ -3,7 +3,7 @@
 import type { IconName } from "../components/ui/Icon";
 import { NAV_MODULES, navAllowed, type Entitlements } from "../lib/entitlementRules.ts";
 
-export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing";
+export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing" | "solo";
 export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent";
 export type NavItem = {
   id: string; href: string; label: string; short: string; icon: IconName;
@@ -20,7 +20,7 @@ export type NavItem = {
   active?: (path: string, tab: string | null) => boolean;
 };
 
-export const ROLE_LABEL: Record<RoleContext, string> = { owner: "Owner", doctor: "Doctor", nurse: "Nurse", reception: "Reception", pharmacist: "Pharmacist", lab: "Lab", billing: "Billing" };
+export const ROLE_LABEL: Record<RoleContext, string> = { owner: "Owner", doctor: "Doctor", nurse: "Nurse", reception: "Reception", pharmacist: "Pharmacist", lab: "Lab", billing: "Billing", solo: "Solo doctor" };
 export const MY_DAY_HREF = "/my-day";
 
 const ACC = "Patient Access", CLN = "Clinical", MON = "Money & Pharmacy", OWN = "Owner & Admin";
@@ -146,11 +146,27 @@ const LAB: NavItem[] = [
   { id: "lab-validate", href: "/lab/validate", label: "Validation", short: "Validate", icon: "check", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] } },
   { id: "lab-catalog", href: "/lab/catalog", label: "Test catalogue", short: "Catalogue", icon: "settings", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] } },
 ];
+// FEF-056: the solo doctor (owner and the only doctor, no front desk: the clinic's published booking policy is in solo mode, ACC-013).
+// Prototype NB.ROLES.solo order (source prototype/js/core.js): today, consult, patients, money, specialty, setup. The squads own the
+// screens: Today and Consult are CLN-008/ACC-013's phone screens, Payments is Day Close, Settings is the booking rules with the Solo preset.
+export const SOLO_PROTOTYPE_ORDER = ["today", "consult", "patients", "money", "specialty", "setup"] as const;
+const SOLO: NavItem[] = [
+  { id: "solo-today", href: "/solo", label: "Today", short: "Today", icon: "sun", perms: ["queue:view"], owner: CLN, badge: "myday", active: (p) => p === "/solo" },
+  { id: "solo-consult", href: "/consult", label: "Consultation", short: "Consult", icon: "stethoscope", perms: ["clinical:edit", "queue:view"], owner: CLN,
+    active: (p) => p === "/consult" || p.startsWith("/consult/") || p.startsWith("/solo/consult") },
+  { id: "solo-patients", href: "/patients", label: "Patients", short: "Patients", icon: "users", perms: ["patients:view"], owner: ACC },
+  { id: "solo-money", href: "/billing", label: "Payments", short: "Payments", icon: "wallet", perms: ["billing:view"], owner: MON, badge: "checkout",
+    active: (p) => p.startsWith("/billing") || (p.startsWith("/checkout/") && p !== "/checkout/otc"), keywords: ["take payment", "day close", "dues"] },
+  { id: "solo-specialty", href: "/specialty", label: "Specialty workspace", short: "Specialty", icon: "stethoscope", perms: ["clinical:edit"], owner: CLN, planned: { module: ["emr_erx"] } },
+  { id: "solo-setup", href: "/setup/workflows", label: "My clinic settings", short: "Settings", icon: "settings", perms: ["setup:view"], owner: `${ACC} + ${PT}`,
+    active: (p) => p.startsWith("/setup"), keywords: ["hours", "auto-accept", "fees", "solo preset"] },
+];
+
 /** Counter role -> the grant that marks it, for a role that does not book patients (queue:create is the front desk's). */
 const COUNTER_SIGNAL: [RoleContext, string][] = [["pharmacist", "pharmacy:edit"], ["lab", LAB_GRANT], ["billing", "billing:create"]];
 export const COUNTER_ROLES: readonly RoleContext[] = COUNTER_SIGNAL.map(([r]) => r);
 
-export const NAV: Record<RoleContext, NavItem[]> = { owner: OWNER, doctor: DOCTOR, nurse: NURSE, reception: RECEPTION, pharmacist: PHARMACIST, lab: LAB, billing: BILLING };
+export const NAV: Record<RoleContext, NavItem[]> = { owner: OWNER, doctor: DOCTOR, nurse: NURSE, reception: RECEPTION, pharmacist: PHARMACIST, lab: LAB, billing: BILLING, solo: SOLO };
 export const findItem = (id: string): NavItem | undefined => Object.values(NAV).flat().find((i) => i.id === id);
 
 /** Specialty profile (T-298) -> the Specialty workspace item's label and icon. Cosmetic only. */
@@ -164,24 +180,25 @@ export function itemVisible(i: NavItem, perms: readonly string[], ent: Entitleme
   return i.modules ? !ent || i.modules.some(on) : navAllowed(i.href, ent);
 }
 
-/** Role contexts this session may use: an owner who also holds clinical grants can switch to the Doctor context. */
-export function rolesFor(perms: readonly string[], owner: boolean): RoleContext[] {
+/** Role contexts this session may use: an owner who also holds clinical grants can switch to the Doctor context. In a solo-mode clinic
+ * (FEF-056) that owner starts in the Solo doctor context and can still switch to the full Owner or Doctor nav. */
+export function rolesFor(perms: readonly string[], owner: boolean, solo = false): RoleContext[] {
   const doctor = perms.includes("clinical:edit") && perms.includes("queue:view");
-  if (owner) return doctor ? ["owner", "doctor"] : ["owner"];
+  if (owner) return doctor ? (solo ? ["solo", "owner", "doctor"] : ["owner", "doctor"]) : ["owner"];
   if (perms.includes("nursing:view")) return ["nurse"];
   if (perms.includes("clinical:edit")) return ["doctor"];
   const counter = perms.includes("queue:create") ? [] : COUNTER_SIGNAL.filter(([, g]) => perms.includes(g)).map(([r]) => r);
   return counter.length ? counter : ["reception"];
 }
 
-export type NavInput = { perms: readonly string[]; owner: boolean; ent: Entitlements | null; override?: string | null; specialty?: string | null };
-export function navFor({ perms, owner, ent, override, specialty }: NavInput): { role: RoleContext; roles: RoleContext[]; items: NavItem[] } {
-  const roles = rolesFor(perms, owner);
+export type NavInput = { perms: readonly string[]; owner: boolean; ent: Entitlements | null; override?: string | null; specialty?: string | null; solo?: boolean };
+export function navFor({ perms, owner, ent, override, specialty, solo }: NavInput): { role: RoleContext; roles: RoleContext[]; items: NavItem[] } {
+  const roles = rolesFor(perms, owner, solo);
   let role = roles.find((r) => r === override) ?? roles[0];
   let items = NAV[role].filter((i) => itemVisible(i, perms, ent));
   // A trimmed Owner role (or a counter role) that can open none of its items falls back to the generic staff list.
   if (items.length === 0 && (role === "owner" || COUNTER_ROLES.includes(role))) { role = "reception"; items = NAV.reception.filter((i) => itemVisible(i, perms, ent)); }
-  if (specialty) items = items.map((i) => (i.id === "specialty" ? { ...i, label: `${titleCase(specialty)} workspace`, short: titleCase(specialty), icon: SPECIALTY_ICON[specialty] ?? i.icon } : i));
+  if (specialty) items = items.map((i) => (i.id === "specialty" || i.id === "solo-specialty" ? { ...i, label: `${titleCase(specialty)} workspace`, short: titleCase(specialty), icon: SPECIALTY_ICON[specialty] ?? i.icon } : i));
   return { role, roles, items };
 }
 
@@ -197,7 +214,7 @@ export function jumpTargets(input: NavInput, query: string): NavItem[] {
   const q = query.trim().toLowerCase();
   const seen = new Set<string>();
   const out: NavItem[] = [];
-  for (const r of rolesFor(input.perms, input.owner)) {
+  for (const r of rolesFor(input.perms, input.owner, input.solo)) {
     for (const i of NAV[r].filter((x) => itemVisible(x, input.perms, input.ent))) {
       if (seen.has(i.href)) continue;
       seen.add(i.href);
@@ -210,12 +227,12 @@ export function jumpTargets(input: NavInput, query: string): NavItem[] {
 export const isActive = (i: NavItem, path: string | null, tab: string | null): boolean =>
   !!path && (i.active ? i.active(path, tab) : path === i.href.split("?")[0] || path.startsWith(`${i.href.split("?")[0]}/`));
 
-/** FEF-057: direct-URL gate of the counter shells, for the item of the role's nav this path belongs to.
+/** FEF-057 (FEF-056: also the solo shell): direct-URL gate of the counter shells, for the item of the role's nav this path belongs to.
  * open: render the page. wait: the item depends on a plan module and the first entitlements answer has not arrived (the page must not
  * mount and fetch yet). unverified: that answer failed: fail-closed, the module cannot be confirmed. blocked: no grant, or module off. */
 export type RouteGateState = { kind: "open" } | { kind: "wait" | "unverified" | "blocked"; item: NavItem };
 export function counterRouteState(role: RoleContext, input: NavInput, path: string | null, settled: boolean, tab: string | null = null): RouteGateState {
-  const item = COUNTER_ROLES.includes(role) ? NAV[role].find((i) => isActive(i, path, tab)) : undefined;
+  const item = COUNTER_ROLES.includes(role) || role === "solo" ? NAV[role].find((i) => isActive(i, path, tab)) : undefined;
   if (!item) return { kind: "open" };
   if (!item.perms.every((p) => input.perms.includes(p))) return { kind: "blocked", item };
   const moduleGated = !!(item.planned || item.modules || NAV_MODULES[item.href.split("?")[0]]);
