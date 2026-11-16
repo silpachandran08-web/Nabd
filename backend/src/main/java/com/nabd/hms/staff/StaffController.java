@@ -109,6 +109,6 @@ public class StaffController {
                                HttpServletRequest http) {
         AcceptedStaffIdentity identity = staffService.acceptInvite(token, req);
         return authService.sessionAfterInviteAccept(identity.tenantId(), identity.staffId(),
-                RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+                RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 }

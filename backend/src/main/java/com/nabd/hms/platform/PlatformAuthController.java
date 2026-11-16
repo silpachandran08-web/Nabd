@@ -36,13 +36,13 @@ public class PlatformAuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Object> login(@Valid @RequestBody OperatorLoginRequest req, HttpServletRequest http) {
-        Object result = service.login(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        Object result = service.login(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/mfa/verify")
     public TokenPairResponse verifyMfa(@Valid @RequestBody MfaVerifyRequest req, HttpServletRequest http) {
-        return service.verifyMfa(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return service.verifyMfa(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     /** PLT-005: forced enrolment for an operator without MFA; the platform mfa_setup token travels in the body. */
@@ -60,7 +60,7 @@ public class PlatformAuthController {
 
     @PostMapping("/refresh")
     public TokenPairResponse refresh(@Valid @RequestBody RefreshRequest req, HttpServletRequest http) {
-        return service.refresh(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return service.refresh(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     @GetMapping("/me")

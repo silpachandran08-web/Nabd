@@ -96,6 +96,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `iam.role.changed.v1` | RoleService.create / update / resetToPreset | roleId, status |
 | `iam.staff.changed.v1` | StaffService.patch / suspend | staffId, status |
 | `iam.session.revoked.v1` | StaffService: role change, suspend, MFA reset (all sessions of the staff member) | staffId, scope, reasonCode, status |
+| `iam.break_glass.reviewed.v1` | BreakGlassReviewService.review (PLT-013): the owner marked an ended emergency-access grant justified or not justified; subject = the grant. Consumer core.audit (log-only handler; the audit row is written in the same transaction) | grantId, outcome |
 | `billing.catalogue.changed.v1` | SetupService.addCharge / updateCharge | chargeHeadId, status |
 | `comms.notification.requested.v1` | NotificationService.request (COM-004), not when the patient has no consent | requestId, purpose, priority, channelPolicy, notBefore?, notAfter? |
 | `comms.notification.cancelled.v1` | NotificationService.cancelBySubject (appointment cancelled / rescheduled), consent withdrawn before the send | requestId, reason |

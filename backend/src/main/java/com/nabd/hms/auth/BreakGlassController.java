@@ -40,7 +40,7 @@ class BreakGlassController {
     BreakGlassActivateResponse activate(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody BreakGlassActivateRequest req,
                                         @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken,
                                         HttpServletRequest http) {
-        return service.activate(jwt, req, stepUpToken, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return service.activate(jwt, req, stepUpToken, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     // holder-or-staff:edit is decided in the service (it needs the grant's holder)

@@ -144,7 +144,9 @@ public class SessionService {
 
         sessionRepo.revokeSession(session.id(), "rotated");
         log.debug("session refreshed for staff {} (family {})", staff.id(), session.familyId());
-        return tokens.mintTokenPair(staff, session.familyId(), ip, device, userAgent);
+        // PLT-013: a refresh without X-Device-Label (the BFF's background refresh) keeps the label the session was signed in with
+        String label = com.nabd.hms.common.RequestMeta.UNKNOWN_DEVICE.equals(device) && session.deviceLabel() != null ? session.deviceLabel() : device;
+        return tokens.mintTokenPair(staff, session.familyId(), ip, label, userAgent);
     }
 
     @Transactional
