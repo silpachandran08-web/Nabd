@@ -30,3 +30,4 @@ comms:
 #   comms.core.base-url + comms.core.token   COM-023 scheduler and claim check against Core /internal/v1 (CORE_INTERNAL_URL, CORE_COMMS_TOKEN)
 #   comms.scheduler.tick-ms (15000), comms.scheduler.batch (500)
 #   comms.field-key (base64, 32 bytes) + comms.internal-token   COM-030 inbox (COMMS_FIELD_KEY, COMMS_INTERNAL_TOKEN)
+#   comms.sms.bsp.url + comms.sms.bsp.api-key + comms.sms.webhook.secret (+ comms.sms.webhook.allowed-ips)   COM-026 SMS, India only (needs comms.field-key)
