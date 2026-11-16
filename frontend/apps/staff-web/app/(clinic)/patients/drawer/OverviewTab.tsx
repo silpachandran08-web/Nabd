@@ -11,6 +11,7 @@ import AllergySection, { AllergyBanner } from "./AllergySection";
 import ConditionsSection from "./ConditionsSection";
 import GuardianSection from "./GuardianSection";
 import CompleteInChat from "../CompleteInChat";
+import NotificationPrefs from "../NotificationPrefs";
 import MedicinesSection from "./MedicinesSection";
 import TimelineSection from "./TimelineSection";
 
@@ -67,6 +68,7 @@ export default function OverviewTab({ patient, listLastVisit, perms, onRegistryC
                   {patientsEdit && <CompleteInChat key={patient.id} patientId={patient.id} />}
 
       <GuardianSection patient={patient} patientsEdit={patientsEdit} onRegistryChanged={onRegistryChanged} />
+      <NotificationPrefs key={`prefs-${patient.id}`} patientId={patient.id} canEdit={patientsEdit} />
 
       {clinicalView ? (
         <>

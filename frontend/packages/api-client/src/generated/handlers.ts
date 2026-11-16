@@ -47,6 +47,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.patch(`${baseUrl}/internal/v1/tenants/:tid/family/proxies/:id`, () => HttpResponse.json({"relation":"string","scope":"string","status":"string"}, { status: 200 })), // InternalFamilyController_change
     http.get(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash`, () => HttpResponse.json({}, { status: 200 })), // InternalHouseholdController_household
     http.post(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/dependants`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // InternalDependantController_add
+    http.patch(`${baseUrl}/internal/v1/tenants/:tid/households/:phoneHash/notification-preferences`, () => HttpResponse.json({"changed":0,"language":"string"}, { status: 200 })), // InternalNotificationPreferencesController_language
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients`, () => HttpResponse.json({"patientRef":"string"}, { status: 201 })), // ChatRegistrationController_create
     http.post(`${baseUrl}/internal/v1/tenants/:tid/patients/consents`, () => HttpResponse.json({"consentIds":["00000000-0000-7000-8000-000000000000"]}, { status: 201 })), // InternalChatConsentController_capture
     http.get(`${baseUrl}/internal/v1/tenants/:tid/patients/pending-completion/:phoneHash`, () => HttpResponse.json({"firstName":"string","patientRef":"string"}, { status: 200 })), // ChatRegistrationController_pending
@@ -328,6 +329,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/patients/:id/profile-claim/otp`, () => HttpResponse.json({}, { status: 202 })), // ProfileClaimController_deskOtp
     http.post(`${baseUrl}/v1/patients/:id/proxies/:proxyId/revoke`, () => new HttpResponse(null, { status: 204 })), // ProxyRevokeController_revoke
     http.get(`${baseUrl}/v1/patients/:patientId/messages`, () => HttpResponse.json({"items":[{"classId":"string","lang":"string","matchKind":"string","value":"string"}],"nextCursor":"string"}, { status: 200 })), // PatientMessagesController_messages
+    http.get(`${baseUrl}/v1/patients/:patientId/notification-preferences`, () => HttpResponse.json({"caregivers":[{"categories":[],"personRef":"00000000-0000-7000-8000-000000000000"}],"categories":{"careReminders":false,"feedback":false,"recalls":false,"reviews":false},"channel":"string","eligibleCaregivers":[{"firstName":"string","personRef":"00000000-0000-7000-8000-000000000000","relation":"string"}],"language":"string","quietHours":{"end":"string","start":"string"},"version":0}, { status: 200 })), // NotificationPreferencesController_get
+    http.put(`${baseUrl}/v1/patients/:patientId/notification-preferences`, () => HttpResponse.json({"caregivers":[{"categories":[],"personRef":"00000000-0000-7000-8000-000000000000"}],"categories":{"careReminders":false,"feedback":false,"recalls":false,"reviews":false},"channel":"string","eligibleCaregivers":[{"firstName":"string","personRef":"00000000-0000-7000-8000-000000000000","relation":"string"}],"language":"string","quietHours":{"end":"string","start":"string"},"version":0}, { status: 200 })), // NotificationPreferencesController_put
     http.get(`${baseUrl}/v1/patients/:patientId/privacy-notice`, () => HttpResponse.json({"acceptedVersion":"string","currentVersion":"string","language":"string","needsReAcknowledgement":false}, { status: 200 })), // NoticeController_status
     http.post(`${baseUrl}/v1/patients/:patientId/privacy-notice/acknowledge`, () => HttpResponse.json({"acceptedVersion":"string","currentVersion":"string","language":"string","needsReAcknowledgement":false}, { status: 200 })), // NoticeController_acknowledge
     http.get(`${baseUrl}/v1/pharmacy/adjustment-approvers`, () => HttpResponse.json([{"name":"string","staffId":"00000000-0000-7000-8000-000000000000"}], { status: 200 })), // StockTakeController_approvers
@@ -580,4 +583,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 566;
+export const operationCount = 569;

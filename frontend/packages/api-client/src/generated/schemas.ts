@@ -97,6 +97,7 @@ export const CallNextResponseSchema = z.object({ entry: QueueEntryResponseSchema
 export const CallbackEntryResponseSchema = z.object({ appointmentId: z.string().optional(), doctorId: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), startTime: z.string().optional(), status: z.string().optional() });
 export const CancelRequestSchema = z.object({ note: z.string().optional(), reason: z.string().optional(), reasonCode: z.string().optional() });
 export const CareRecipientSchema = z.object({ channel: z.string().optional(), recipientRef: z.string().optional(), relation: z.string().optional() });
+export const CaregiverRecipientSchema = z.object({ categories: z.array(z.string()), personRef: z.string() });
 export const CellSchema = z.object({ bookings: z.array(BookingSchema).optional(), doctorId: z.string().optional(), kind: z.string().optional(), slotStart: z.string().optional() });
 export const ChangeOfferAcceptSchema = z.object({ slotStart: z.string() });
 export const ChangeOfferRequestSchema = z.object({ slots: z.array(z.string()).optional() });
@@ -261,6 +262,7 @@ export const DuesRemindRequestSchema = z.object({ channel: z.string(), includePa
 export const DuesRowSchema = z.object({ bucket: z.string().optional(), invoiceNumbers: z.array(z.string()).optional(), lastRemindedAt: z.string().optional(), oldestAt: z.string().optional(), oldestDays: z.number().int().optional(), patientId: z.string().optional(), patientName: z.string().optional(), totalDue: z.number().optional() });
 export const DuesResponseSchema = z.object({ items: z.array(DuesRowSchema).optional(), nextCursor: z.string().optional() });
 export const DuplicateSuggestionPageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
+export const EligibleCaregiverSchema = z.object({ firstName: z.string().optional(), personRef: z.string().optional(), relation: z.string().optional() });
 export const EncounterListItemSchema = z.object({ amendmentCount: z.number().int().optional(), documentsDraft: z.number().int().optional(), documentsIssued: z.number().int().optional(), noteSignedAt: z.string().optional(), noteState: z.string().optional(), occurredAt: z.string().optional(), patientId: z.string().optional(), patientMrn: z.string().optional(), patientName: z.string().optional(), queueDate: z.string().optional(), queueEntryId: z.string().optional(), rxItemCount: z.number().int().optional(), rxStatus: z.string().optional(), visitStatus: z.string().optional() });
 export const EncounterListPageSchema = z.object({ data: z.array(EncounterListItemSchema).optional(), page: PageMetaSchema.optional() });
 export const EncounterResponseSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), doctorId: z.string().optional(), medications: z.string().optional(), occurredAt: z.string().optional(), queueEntryId: z.string().optional() });
@@ -328,6 +330,8 @@ export const GuardianReviewDecisionRequestSchema = z.object({ decision: z.string
 export const GuardianReviewResponseSchema = z.object({ claimExpiresAt: z.string().optional(), claimSentAt: z.string().optional(), dob: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), handoverDate: z.string().optional(), mrn: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), status: z.string().optional() });
 export const HolidayEffectRequestSchema = z.object({ effect: z.string(), hours: z.array(HolidayWindowSchema).optional() });
 export const HolidayTemplateResponseSchema = z.object({ code: z.string().optional(), name: z.string().optional(), source: z.string().optional(), year: z.number().int().optional() });
+export const HouseholdLanguageRequestSchema = z.object({ language: z.string() });
+export const HouseholdLanguageResultSchema = z.object({ changed: z.number().int().optional(), language: z.string().optional() });
 export const HouseholdMemberSchema = z.object({ age: z.string().optional(), firstName: z.string().optional(), isGuardian: z.boolean().optional(), patientRef: z.string().optional(), relation: z.string().optional(), years: z.number().int().optional() });
 export const HouseholdResponseSchema = z.object({ household: z.array(MemberSchema).optional() });
 export const ImportColumnSchema = z.object({ source: z.string().min(1), target: z.string().min(1) });
@@ -414,8 +418,12 @@ export const NoteAmendmentRequestSchema = z.object({ assessment: z.string().opti
 export const NoteAmendmentResponseSchema = z.object({ amendedBy: z.string().optional(), assessment: z.string().optional(), createdAt: z.string().optional(), diagnosis: z.string().optional(), id: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), reason: z.string().optional(), subjective: z.string().optional() });
 export const NoteResponseSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), doctorId: z.string().optional(), id: z.string().optional(), objective: z.string().optional(), patientId: z.string().optional(), plan: z.string().optional(), queueEntryId: z.string().optional(), signedAt: z.string().optional(), signedBy: z.string().optional(), status: z.string().optional(), subjective: z.string().optional(), updatedAt: z.string().optional() });
 export const NoteUpsertRequestSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), subjective: z.string().optional() });
+export const NotificationCategoriesSchema = z.object({ careReminders: z.boolean().optional(), feedback: z.boolean().optional(), recalls: z.boolean().optional(), reviews: z.boolean().optional() });
 export const NotificationClaimRecipientSchema = z.object({ patientId: z.string().optional(), phoneE164: z.string().optional() });
 export const NotificationClaimSchema = z.object({ consentClass: z.string().optional(), language: z.string().optional(), notAfter: z.string().optional(), notBefore: z.string().optional(), params: z.array(z.string()).optional(), purpose: z.string().optional(), recipient: NotificationClaimRecipientSchema.optional(), requestId: z.string().optional(), templateKey: z.string().optional(), tenantId: z.string().optional() });
+export const NotificationQuietHoursSchema = z.object({ end: z.string(), start: z.string() });
+export const NotificationPreferencesSchema = z.object({ caregivers: z.array(CaregiverRecipientSchema), categories: NotificationCategoriesSchema, channel: z.string(), eligibleCaregivers: z.array(EligibleCaregiverSchema), language: z.string().optional(), quietHours: NotificationQuietHoursSchema.optional(), version: z.number().int() });
+export const NotificationPreferencesRequestSchema = z.object({ caregivers: z.array(CaregiverRecipientSchema).optional(), categories: NotificationCategoriesSchema.optional(), channel: z.string(), language: z.string().optional(), quietHours: NotificationQuietHoursSchema.optional() });
 export const OfferSchema = z.object({ currency: z.string().optional(), feeMinor: z.number().int().optional(), feeStatus: z.string().optional(), waiverReason: z.string().optional() });
 export const OperatorLoginRequestSchema = z.object({ email: z.string().min(1), pin: z.string().min(1) });
 export const OperatorProfileResponseSchema = z.object({ email: z.string().optional(), id: z.string().optional(), name: z.string().optional(), permissions: z.array(z.string()).optional(), role: z.string().optional() });
@@ -767,6 +775,7 @@ export const operationSchemas = {
   InternalFamilyController_change: { body: FamilyProxyChangeSchema, response: AccessSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   InternalDependantController_add: { body: ChatDependantRequestSchema, response: ChatDependantResponseSchema },
+  InternalNotificationPreferencesController_language: { body: HouseholdLanguageRequestSchema, response: HouseholdLanguageResultSchema },
   ChatRegistrationController_create: { body: ChatPatientCreateSchema, response: ChatPatientRefSchema },
   InternalChatConsentController_capture: { body: ChatConsentRequestSchema, response: ChatConsentResponseSchema },
   ChatRegistrationController_pending: { response: ChatPendingCompletionSchema },
@@ -1048,6 +1057,8 @@ export const operationSchemas = {
   ProfileClaimController_deskOtp: { response: z.record(z.string(), z.boolean()) },
   ProxyRevokeController_revoke: { body: ProxyRevokeRequestSchema },
   PatientMessagesController_messages: { response: PageSchema },
+  NotificationPreferencesController_get: { response: NotificationPreferencesSchema },
+  NotificationPreferencesController_put: { body: NotificationPreferencesRequestSchema, response: NotificationPreferencesSchema },
   NoticeController_status: { response: PrivacyNoticeStatusSchema },
   NoticeController_acknowledge: { response: PrivacyNoticeStatusSchema },
   StockTakeController_approvers: { response: z.array(AdjustmentApproverSchema) },
