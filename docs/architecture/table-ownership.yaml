@@ -23,6 +23,10 @@ modules:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
     owns: [abdm_share_requests, patient_identifiers, tenant_integrations_abdm]
     reads: []
+  engagement:
+    # COM-052: recall orders (the retention engine). Booking a follow-up reaches it through engagement.api.RecallBookings.
+    owns: [recall_orders]
+    reads: [appointments, queue_entries]  # COM-052: the closing visit's patient, doctor and clinic date; an upcoming follow-up already booked with that doctor (ids and status only)
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory

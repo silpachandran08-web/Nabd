@@ -26,6 +26,7 @@ import { AssessStep, ExamineStep, PlanField, ReasonStep } from "../note/NoteStep
 import { saveBadge } from "../note/SaveBadge";
 import { useNoteEditor } from "../note/useNoteEditor";
 import ToolsAside from "../orders/ToolsAside";
+import type { Recall } from "../recall";
 import RxConflictDialog from "../rx/RxConflictDialog";
 import RxPanel from "../rx/RxPanel";
 import { useRxPad, type RxConflict } from "../rx/useRxPad";
@@ -62,6 +63,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
   const [unavailable, setUnavailable] = useState(false); // IDC-001: the server answered patient-not-found for this visit (consent withdrawn / out of scope)
   // undefined = not known (still checking, or the lookup failed): never shown as "Not set" (T1-BUG-2).
   const [followUpLabel, setFollowUpLabel] = useState<string | null | undefined>(undefined);
+  const [recall, setRecall] = useState<Recall | null | undefined>(undefined); // COM-052: same undefined = not known rule
   const [notice, setNotice] = useState<string | null>(null);
   const [rxDismissed, setRxDismissed] = useState<RxConflict | null>(null); // "Decide later" hides that Rx conflict until "Review differences"
   const [shellError, setShellError] = useState<string | null>(null);
@@ -190,14 +192,15 @@ export default function VisitWorkspace(w: WorkspaceProps) {
           {wf.step === "close" && (
             <PanelBoundary panel="closeout">
               <CloseOutPanel entry={entry} patient={patient} authedFetch={authedFetch} view={view} noteSigned={locked} diagnosis={n.note.diagnosis}
-                rxItems={pad.rxItems} rxStatus={pad.rxStatus} followUpLabel={followUpLabel} closeAck={wf.closeAck}
+                rxItems={pad.rxItems} rxStatus={pad.rxStatus} followUpLabel={followUpLabel} recall={recall} closeAck={wf.closeAck}
                 onAck={(value) => dispatch({ type: "closeAck", value })} onGoToRx={() => dispatch({ type: "goto", step: "plan" })} />
             </PanelBoundary>
           )}
         </div>
 
         <ToolsAside entry={entry} patient={patient} authedFetch={authedFetch} rxItems={pad.rxItems} rxStatus={pad.rxStatus}
-          onOpenRx={() => dispatch({ type: "goto", step: "plan" })} onFollowUp={setFollowUpLabel} />
+          onOpenRx={() => dispatch({ type: "goto", step: "plan" })} onFollowUp={setFollowUpLabel}
+          canSetRecall={entry.doctorId === selfId && can("clinical:edit")} onRecall={setRecall} />
       </div>
 
       <ActionBar badge={badge} step={wf.step} closedOut={view.closedOut} locked={locked} canEditNote={canEditNote} noteLoaded={n.noteLoad === "ok"} mayAmend={mayAmendNote} mayDecideRx={mayDecideRx}

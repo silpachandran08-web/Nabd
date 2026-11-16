@@ -110,3 +110,6 @@
 .iconFilled svg { fill: currentColor; fill-opacity: 0.3; }
 .viewerFrame { inline-size: 100%; block-size: 70vh; border: 0; }
 .viewerImg { max-inline-size: 100%; }
+
+/* COM-052 recall chips: thumb-sized on touch screens (one-hand layout) */
+@media (pointer: coarse) { .recallChip { min-height: 48px; min-inline-size: 48px; } }

@@ -89,6 +89,7 @@ super_admin,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:vie
 super_admin,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/session,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+super_admin,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 super_admin,GET /v1/facility/checkin-attempts,queue:view,deny-401
 super_admin,GET /v1/facility/checkin-config,setup:edit,deny-401
 super_admin,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -325,6 +326,7 @@ super_admin,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 super_admin,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 super_admin,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 super_admin,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+super_admin,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 super_admin,POST /v1/files/uploads,clinical:create,deny-401
 super_admin,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 super_admin,POST /v1/files/{id}/download-url,clinical:view,deny-401
@@ -544,6 +546,7 @@ implementation,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:
 implementation,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/session,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+implementation,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 implementation,GET /v1/facility/checkin-attempts,queue:view,deny-401
 implementation,GET /v1/facility/checkin-config,setup:edit,deny-401
 implementation,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -780,6 +783,7 @@ implementation,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 implementation,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 implementation,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 implementation,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+implementation,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 implementation,POST /v1/files/uploads,clinical:create,deny-401
 implementation,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 implementation,POST /v1/files/{id}/download-url,clinical:view,deny-401
@@ -999,6 +1003,7 @@ support_engineer,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queu
 support_engineer,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/session,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+support_engineer,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 support_engineer,GET /v1/facility/checkin-attempts,queue:view,deny-401
 support_engineer,GET /v1/facility/checkin-config,setup:edit,deny-401
 support_engineer,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -1235,6 +1240,7 @@ support_engineer,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+support_engineer,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 support_engineer,POST /v1/files/uploads,clinical:create,deny-401
 support_engineer,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 support_engineer,POST /v1/files/{id}/download-url,clinical:view,deny-401
@@ -1454,6 +1460,7 @@ billing,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,de
 billing,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 billing,GET /v1/doctors/{id}/session,queue:view,deny-401
 billing,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+billing,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 billing,GET /v1/facility/checkin-attempts,queue:view,deny-401
 billing,GET /v1/facility/checkin-config,setup:edit,deny-401
 billing,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -1690,6 +1697,7 @@ billing,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 billing,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 billing,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 billing,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+billing,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 billing,POST /v1/files/uploads,clinical:create,deny-401
 billing,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 billing,POST /v1/files/{id}/download-url,clinical:view,deny-401
@@ -1909,6 +1917,7 @@ sre,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view,deny-4
 sre,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 sre,GET /v1/doctors/{id}/session,queue:view,deny-401
 sre,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+sre,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 sre,GET /v1/facility/checkin-attempts,queue:view,deny-401
 sre,GET /v1/facility/checkin-config,setup:edit,deny-401
 sre,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -2145,6 +2154,7 @@ sre,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 sre,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 sre,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 sre,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+sre,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 sre,POST /v1/files/uploads,clinical:create,deny-401
 sre,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 sre,POST /v1/files/{id}/download-url,clinical:view,deny-401
@@ -2364,6 +2374,7 @@ commercial,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:view
 commercial,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/session,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+commercial,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 commercial,GET /v1/facility/checkin-attempts,queue:view,deny-401
 commercial,GET /v1/facility/checkin-config,setup:edit,deny-401
 commercial,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -2600,6 +2611,7 @@ commercial,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 commercial,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 commercial,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 commercial,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+commercial,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 commercial,POST /v1/files/uploads,clinical:create,deny-401
 commercial,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 commercial,POST /v1/files/{id}/download-url,clinical:view,deny-401
@@ -2819,6 +2831,7 @@ compliance_dpo,GET /v1/doctors/{id}/leave/{leaveId}/affected-appointments,queue:
 compliance_dpo,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/session,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+compliance_dpo,GET /v1/encounters/{encounterId}/recall-orders,clinical:view,deny-401
 compliance_dpo,GET /v1/facility/checkin-attempts,queue:view,deny-401
 compliance_dpo,GET /v1/facility/checkin-config,setup:edit,deny-401
 compliance_dpo,GET /v1/facility/checkin-qr,setup:edit,deny-401
@@ -3055,6 +3068,7 @@ compliance_dpo,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+compliance_dpo,POST /v1/encounters/{encounterId}/recall-orders,clinical:edit,deny-401
 compliance_dpo,POST /v1/files/uploads,clinical:create,deny-401
 compliance_dpo,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
 compliance_dpo,POST /v1/files/{id}/download-url,clinical:view,deny-401

@@ -531,6 +531,8 @@ export type RaiseTicketRequest = { description: string; priority?: string; subje
 export type RangeTotals = { asOf?: string; billed?: number; byMethod?: Record<string, number>; collected?: number; completed?: number; from?: string; noShows?: number; packagesSold?: number; to?: string; visits?: number; };
 export type ReasonCodeAddRequest = { code: string; kind: string; labels: Record<string, string>; };
 export type ReasonCodeList = { items?: Array<Item>; };
+export type RecallOrderRequest = { intervalDays?: number; reasonCode?: string; ruleId?: string; };
+export type RecallOrderResponse = { bookedAppointmentId?: string; dueDate?: string; intervalDays?: number; reasonCode?: string; recallId?: string; status?: string; };
 export type RecentMerges = { items?: Array<Item>; };
 export type RecoveryVerifyRequest = { challengeToken: string; recoveryCode: string; };
 export type RecoveryVerifyResponse = { accessToken?: string; expiresIn?: number; refreshToken?: string; remainingCodes?: number; };
@@ -956,6 +958,8 @@ export type Operations = {
   ScheduleController_addWorkingHours: { method: "post"; path: "/v1/doctors/{id}/working-hours"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
   ScheduleController_updateWorkingHours: { method: "put"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
   ScheduleController_deleteWorkingHours: { method: "delete"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: never; response: void };
+  RecallController_list: { method: "get"; path: "/v1/encounters/{encounterId}/recall-orders"; permission: "clinical:view"; pathParams: { encounterId: string; }; query: never; body: never; response: Array<RecallOrderResponse> };
+  RecallController_create: { method: "post"; path: "/v1/encounters/{encounterId}/recall-orders"; permission: "clinical:edit"; pathParams: { encounterId: string; }; query: never; body: RecallOrderRequest; response: RecallOrderResponse };
   EventsController_stream: { method: "get"; path: "/v1/events"; permission: "authenticated"; pathParams: never; query: { topics?: string; }; body: never; response: SseEmitter };
   FacilityCheckInController_attempts: { method: "get"; path: "/v1/facility/checkin-attempts"; permission: "queue:view"; pathParams: never; query: { limit?: number; }; body: never; response: Array<Attempt> };
   FacilityCheckInController_config: { method: "get"; path: "/v1/facility/checkin-config"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: FacilityCheckInConfig };

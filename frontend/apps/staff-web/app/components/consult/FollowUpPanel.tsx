@@ -9,6 +9,8 @@ import { Skeleton } from "../ui/StateViews";
 import { upcomingFollowUp, type AppointmentLite } from "@nabd/domain";
 import type { AuthedFetch, Problem } from "./shared";
 import { useSectionDraft } from "./useSectionDraft";
+import RecallChips from "./RecallChips";
+import type { Recall } from "./recall";
 import s from "./consultParts.module.css";
 
 const INTERVALS: { id: string; label: string; days?: number; months?: number }[] = [
@@ -28,11 +30,13 @@ function addToDate(ymd: string, days: number, months: number): string {
 const BLANK_PICK = { interval: null as string | null, date: "", slot: "" };
 
 export default function FollowUpPanel({
-  authedFetch, entryId, doctorId, patientId, onBooked, canBook,
+  authedFetch, entryId, doctorId, patientId, onBooked, canBook, recall,
 }: {
   authedFetch: AuthedFetch; entryId: string; doctorId: string; patientId: string; onBooked: (label: string | null | undefined) => void;
   /** queue:create — booking controls are absent without it; the existing follow-up still shows. */
   canBook: boolean;
+  /** COM-052: recall chips (canSet = the visit doctor with clinical:edit; canView = clinical:view). */
+  recall: { canSet: boolean; canView: boolean; onChange: (r: Recall | null | undefined) => void };
 }) {
   const tx = useTranslations("consult.followUpPanel");
   const tz = useClinicTimeZone(); // clinic wall-clock time from the session, not the browser's (DOC-038, FEF-011)
@@ -176,9 +180,7 @@ export default function FollowUpPanel({
       )}
       {message && <div className={`${s.notice} ${s.noticeDanger} ${s.mtS}`} role="alert">{message}</div>}
       </>)}
-      <p className={`${s.muted} ${s.mtS}`}>
-        {tx("reminderNotAvailableYetNo")}
-      </p>
+      <RecallChips entryId={entryId} canSet={recall.canSet} canView={recall.canView} onChange={recall.onChange} refresh={booked} />
     </section>
   );
 }

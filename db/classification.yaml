@@ -1775,6 +1775,25 @@ schemas:
       effective_from: operational
       created_by: operational
       created_at: operational
+    recall_orders:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      source_encounter_id: operational
+      doctor_id: operational
+      rule_id: operational
+      source: operational
+      reason_code: phi
+      interval_days: phi
+      due_date: phi
+      status: phi
+      messages_sent: operational
+      last_messaged_at: operational
+      booked_appointment_id: operational
+      callback_after: operational
+      created_by: operational
+      created_at: operational
+      updated_at: operational
     procedure_consents:
       id: operational
       tenant_id: operational
