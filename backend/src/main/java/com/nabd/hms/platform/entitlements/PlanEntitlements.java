@@ -42,6 +42,11 @@ public class PlanEntitlements implements Entitlements {
 
     static final long TTL_MILLIS = 60_000;
 
+    /** CLN-042: a specialty profile's entitlement code (specialty_profiles.config.module); the registry is the specialty module's. */
+    public static boolean isSpecialty(String code) {
+        return code != null && code.matches("specialty_[a-z0-9_]{1,30}");
+    }
+
     record Ovr(String state, Instant expiresAt) {
     }
 
@@ -112,6 +117,8 @@ public class PlanEntitlements implements Entitlements {
         }
         // whatsapp_bot is not a plan module: it is on unless killed
         if (s.modules() == null || "whatsapp_bot".equals(feature)) return State.ENABLED;
+        // CLN-042: a plan version that lists no specialty keeps every specialty profile (same legacy rule as above)
+        if (isSpecialty(feature) && s.modules().stream().noneMatch(PlanEntitlements::isSpecialty)) return State.ENABLED;
         return s.modules().contains(feature) ? State.ENABLED : State.NOT_IN_PLAN;
     }
 

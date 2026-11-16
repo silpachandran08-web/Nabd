@@ -43,6 +43,7 @@ export const AppointmentPageSchema = z.object({ data: z.array(AppointmentRespons
 export const AppointmentWriteRequestSchema = z.object({ actedByPatientId: z.string().optional(), actedByRelation: z.string().optional(), doctorId: z.string(), followUpOrDefault: z.boolean().optional(), isFollowUp: z.boolean().optional(), patientId: z.string(), startTime: z.string() });
 export const ApproveRefundRequestSchema = z.object({ expectedAmount: z.number().optional() });
 export const ApproveRequestSchema = z.object({ approvedBy: z.string().min(0).max(200), csoApprovalRef: z.string().min(0).max(200) });
+export const AssignRequestSchema = z.object({ primary: z.string(), secondary: z.string().optional() });
 export const AttachmentCreateRequestSchema = z.object({ fileId: z.string(), kind: z.string(), note: z.string().min(0).max(500).optional() });
 export const AttachmentCreateResponseSchema = z.object({ attachmentId: z.string().optional() });
 export const AttemptSchema = z.object({ appointmentId: z.string().optional(), channel: z.string().optional(), createdAt: z.string().optional(), distanceM: z.number().int().optional(), id: z.string().optional(), outcome: z.string().optional() });
@@ -407,6 +408,7 @@ export const ModuleGrantSchema = z.object({ approve: z.boolean().optional(), bre
 export const ServiceSchema = z.object({ name: z.string().optional(), revenue: z.number().optional() });
 export const TenderSchema = z.object({ amount: z.number().optional(), count: z.number().int().optional(), method: z.string().optional() });
 export const MoneyResponseSchema = z.object({ billsRaised: z.number().int().optional(), bookings: z.number().int().optional(), collected: z.number().optional(), currency: z.string().optional(), from: z.string().optional(), includesToday: z.boolean().optional(), noShows: z.number().int().optional(), taxCollected: z.number().optional(), taxLabel: z.string().optional(), tender: z.array(TenderSchema).optional(), to: z.string().optional(), topServices: z.array(ServiceSchema).optional(), waitingNow: z.number().int().optional() });
+export const MySpecialtyProfileSchema = z.object({ config: z.record(z.string(), z.record(z.string(), z.unknown()).nullable()).nullable().optional(), configVersion: z.number().int().nullable().optional(), name: z.record(z.string(), z.string().nullable()).nullable().optional(), primary: z.string().nullable().optional(), secondary: z.string().nullable().optional(), writable: z.boolean() });
 export const NextInvoiceSchema = z.object({ amountMinor: z.number().int().optional(), currency: z.string().optional() });
 export const NoShowRequestSchema = z.object({ reasonCode: z.string().optional() });
 export const NoShowRiskResponseSchema = z.object({ entries: z.array(EntrySchema).optional(), rule: z.string().optional() });
@@ -622,6 +624,8 @@ export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().op
 export const SetupDraftRequestSchema = z.object({ draft: JsonNodeSchema, version: z.number().int().gte(0) });
 export const SetupDraftResponseSchema = z.object({ step: z.string().optional(), version: z.number().int().optional() });
 export const SourceBreakdownResponseSchema = z.object({ revenue: z.number().optional(), source: z.string().optional(), untaggedCount: z.number().int().optional(), visitCount: z.number().int().optional() });
+export const SpecialtyProfileItemSchema = z.object({ code: z.string(), configVersion: z.number().int(), entitled: z.boolean(), name: z.record(z.string(), z.string()) });
+export const SpecialtyProfileListSchema = z.object({ items: z.array(SpecialtyProfileItemSchema) });
 export const SseEmitterSchema = z.object({ timeout: z.number().int().optional() });
 export const StaffHprSchema = z.object({ hprId: z.string().optional(), hprVerified: z.boolean().optional(), staffId: z.string().optional() });
 export const StaffHprRequestSchema = z.object({ hprId: z.string().min(1) });
@@ -636,6 +640,7 @@ export const StaffPerformanceReportSchema = z.object({ rows: z.array(StaffPerfor
 export const StaffRosterEntrySchema = z.object({ departmentName: z.string().optional(), id: z.string().optional(), name: z.string().optional() });
 export const StaffShiftResponseSchema = z.object({ effectiveFrom: z.string().optional(), effectiveTo: z.string().optional(), id: z.string().optional(), patternJson: z.string().optional(), staffId: z.string().optional(), staffName: z.string().optional() });
 export const StaffShiftWriteRequestSchema = z.object({ effectiveFrom: z.string(), effectiveTo: z.string().optional(), patternJson: z.string().min(1), staffId: z.string() });
+export const StaffSpecialtyProfilesSchema = z.object({ primary: z.string().nullable().optional(), secondary: z.string().nullable().optional() });
 export const StaffSummaryResponseSchema = z.object({ id: z.string().optional(), name: z.string().optional(), roleName: z.string().optional() });
 export const StartRequestSchema = z.object({ clinicName: z.string().optional(), consentToContact: z.boolean().optional(), market: z.string().optional(), mobile: z.string().optional(), specialty: z.string().optional() });
 export const StartedSchema = z.object({ estimateMinutes: z.number().int().optional(), id: z.string().optional(), status: z.string().optional() });
@@ -1272,6 +1277,8 @@ export const operationSchemas = {
   DentalController_updateSupernumerary: { body: ToothWriteRequestSchema, response: ToothResponseSchema },
   DentalController_removeSupernumerary: {  },
   DentalController_upsertTooth: { body: ToothWriteRequestSchema, response: ToothResponseSchema },
+  SpecialtyController_me: { response: MySpecialtyProfileSchema },
+  SpecialtyController_profiles: { response: SpecialtyProfileListSchema },
   StaffController_list: { response: StaffPageSchema },
   StaffController_invite: { body: StaffInviteRequestSchema, response: StaffInviteResponseSchema },
   StaffController_clinicianReview: { response: z.array(ClinicianReviewEntrySchema) },
@@ -1287,6 +1294,8 @@ export const operationSchemas = {
   StaffAccessController_remind: {  },
   StaffController_resetMfa: { body: MfaResetRequestSchema },
   StaffController_suspend: {  },
+  SpecialtyController_get: { response: StaffSpecialtyProfilesSchema },
+  SpecialtyController_put: { body: AssignRequestSchema, response: StaffSpecialtyProfilesSchema },
   SupportAccessOwnerController_list: { response: OwnerRequestResponseSchema },
   SupportAccessOwnerController_decide: { body: DecisionRequestSchema, response: DecisionResponseSchema },
   TicketController_raise: { body: RaiseTicketRequestSchema, response: TicketResponseSchema },

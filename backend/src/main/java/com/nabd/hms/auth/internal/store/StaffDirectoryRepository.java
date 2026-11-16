@@ -140,6 +140,13 @@ public class StaffDirectoryRepository {
                 (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
     }
 
+    /** CLN-042: the staff member's specialty profiles, primary first: [code, entitlement/permission module]. */
+    public List<String[]> findSpecialtyProfiles(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.code, p.config->>'module' FROM staff_specialty_profiles s JOIN specialty_profiles p ON p.code = s.code " +
+                        "WHERE s.tenant_id = ? AND s.staff_id = ? ORDER BY s.is_primary DESC",
+                (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, tenantId, staffId);
+    }
+
     /** PLT-005: an owner's shadow staff row (staff.owner_id set) is reached only through the owner account's own MFA. */
     public boolean isOwnerLinked(UUID staffId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT owner_id IS NOT NULL FROM staff WHERE id = ?", Boolean.class, staffId));

@@ -191,6 +191,17 @@ public class TokenService {
             }
         }
 
+        // CLN-042: the assigned specialty profiles grant <module>:view|edit (the emergency token: view only). Whether the
+        // clinic's plan still includes the profile is checked on each write (403 ENTITLEMENT_EXPIRED), so history stays readable.
+        List<String[]> specialties = staffDir.findSpecialtyProfiles(staff.tenantId(), staff.id());
+        for (String[] sp : specialties) {
+            for (String p : bg != null ? List.of(sp[1] + ":view") : List.of(sp[1] + ":view", sp[1] + ":edit")) {
+                if (!permissions.contains(p)) {
+                    permissions.add(p);
+                }
+            }
+        }
+
         UUID sessionId = bg != null ? bg.sessionId() : com.nabd.hms.shared.UuidV7.next();
         Instant now = Instant.now(clock);
         Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
@@ -218,6 +229,9 @@ public class TokenService {
                 .claim("pinChange", guard.pinChangeRequired(staff.id()));
         if (bg != null) {
             claimsB.claim("bg", bg.grantId().toString());
+        }
+        if (!specialties.isEmpty()) {
+            claimsB.claim("specialty", specialties.get(0)[0]); // the primary profile code, e.g. DERM
         }
         TokenType.ACCESS.stamp(claimsB, Audience.STAFF_API);
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue();
