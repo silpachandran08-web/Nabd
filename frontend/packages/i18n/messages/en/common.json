@@ -101,5 +101,60 @@
     },
     "save": "Save",
     "saving": "Saving..."
+  },
+  "breakGlassReview": {
+    "title": "Emergency access reviews",
+    "intro": "Every use of emergency (break-glass) access, once it has ended. Check what was opened and record whether it was justified.",
+    "showUnreviewed": "Waiting for review",
+    "showReviewed": "Reviewed",
+    "loading": "Loading emergency access uses",
+    "loadError": "Couldn't load emergency access uses. Try again.",
+    "emptyUnreviewed": "Nothing waiting for review",
+    "emptyUnreviewedHint": "When someone uses emergency access you will see it here after it ends.",
+    "emptyReviewed": "No reviewed emergency access yet",
+    "reminder": "{count, plural, one {# use has} other {# uses have}} waited more than 24 hours for your review.",
+    "overdue": "Over 24 h",
+    "window": "{start} to {end}",
+    "device": "Device: {device}",
+    "reads": "{count, plural, one {# record opened} other {# records opened}}",
+    "review": "Review",
+    "view": "View",
+    "loadMore": "Load more",
+    "dialogTitle": "Emergency access by {name}",
+    "reason": "Reason",
+    "timeline": "What was opened",
+    "readsLoading": "Loading what was opened",
+    "readsError": "Couldn't load what was opened. Try again.",
+    "noReads": "No patient records were opened during this access.",
+    "readRow": "{time}: {patient} ({ref}), {type}",
+    "unknownPatient": "Unknown patient",
+    "outcome": "Outcome",
+    "justified": "Justified",
+    "notJustified": "Not justified",
+    "incidentNote": "Incident note",
+    "incidentNoteHint": "Required. Say what was wrong; this opens an incident.",
+    "noteOptional": "Note (optional)",
+    "revoke": "Also remove emergency access from {name}",
+    "save": "Save review",
+    "noteRequired": "Write an incident note when the access was not justified.",
+    "alreadyReviewed": "This emergency access was already reviewed.",
+    "saveError": "Couldn't save the review. Try again.",
+    "outcomeLabel": {
+      "justified": "Justified",
+      "not_justified": "Not justified"
+    },
+    "reasons": {
+      "unconscious_patient": "Unconscious patient",
+      "life_threatening": "Life-threatening",
+      "no_treating_clinician_available": "No treating clinician available",
+      "other": "Other"
+    }
+  },
+  "deviceLabel": {
+    "title": "This device's name",
+    "hint": "The clinic owner sees it on your sessions and emergency access, for example \"Front desk PC 2\". English letters, numbers and spaces, up to 64 characters.",
+    "label": "Device name",
+    "save": "Save name",
+    "saved": "Saved. It is used from your next sign-in."
   }
 }

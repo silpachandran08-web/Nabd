@@ -178,6 +178,10 @@ public class TokenService {
             }
         }
 
+        if (permissions.contains("clinical:breakGlass") && staffDir.breakGlassRevoked(staff.id())) {
+            permissions.remove("clinical:breakGlass"); // PLT-013: removed from this person only, their role (and any loan) keeps it
+        }
+
         // NB-048: same lazy expire-and-audit shape as delegation above.
         for (UUID expiredId : staffDir.expireStaleBreakGlass(staff.id())) {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,

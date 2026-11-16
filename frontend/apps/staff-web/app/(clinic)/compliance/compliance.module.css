@@ -12,3 +12,10 @@
 .history { list-style: none; margin: var(--nb-space-16) 0 0; padding: 0; display: grid; gap: var(--nb-space-12); }
 .error { padding: var(--nb-space-12); border-radius: 8px; border: 1px solid var(--nb-danger-500); margin-block-end: var(--nb-space-16); }
 @media (max-width: 480px) { .page { padding: var(--nb-space-16); } .card { padding: var(--nb-space-16); } }
+.h3 { font-size: 14px; font-weight: 600; margin: var(--nb-space-16) 0 var(--nb-space-8); }
+.dialogBody { display: grid; gap: var(--nb-space-8); }
+.fieldset { border: 0; padding: 0; margin: var(--nb-space-16) 0 0; display: grid; gap: var(--nb-space-8); }
+.field { display: grid; gap: var(--nb-space-4); }
+.choice { display: flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; cursor: pointer; }
+.choice input { inline-size: 20px; block-size: 20px; }
+.textarea { min-block-size: 88px; padding: var(--nb-space-8) var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: 8px; background: transparent; color: inherit; font: inherit; }

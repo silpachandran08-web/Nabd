@@ -91,6 +91,11 @@ public class StaffDirectoryRepository {
 
     // ── break-glass (NB-048) ─────────────────────────────────────────────
 
+    /** PLT-013: an owner removed clinical:breakGlass from this staff member after a 'not justified' review. */
+    public boolean breakGlassRevoked(UUID staffId) {
+        return jdbc.queryForList("SELECT 1 FROM staff WHERE id = ? AND break_glass_revoked_at IS NOT NULL", Integer.class, staffId).size() == 1;
+    }
+
     /** Same "detect and close on next read" shape as delegation expiry — see AuthService.mintTokenPair. */
     public List<UUID> expireStaleBreakGlass(UUID staffId) {
         return jdbc.query(

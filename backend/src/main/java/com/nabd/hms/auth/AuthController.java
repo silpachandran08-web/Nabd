@@ -49,7 +49,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Object> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-        Object result = authService.login(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        Object result = authService.login(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
         return ResponseEntity.ok(result);
     }
 
@@ -62,7 +62,7 @@ public class AuthController {
 
     @PostMapping("/otp/verify")
     public ResponseEntity<Object> verifyOtp(@Valid @RequestBody OtpVerifyRequest req, HttpServletRequest http) {
-        Object result = authService.verifyOtp(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        Object result = authService.verifyOtp(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
         return ResponseEntity.ok(result);
     }
 
@@ -74,12 +74,12 @@ public class AuthController {
         if (callerJwt != null) {
             return authService.issueStepUpToken(callerJwt, req.code(), req.target());
         }
-        return authService.verifyMfa(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return authService.verifyMfa(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     @PostMapping("/refresh")
     public TokenPairResponse refresh(@Valid @RequestBody RefreshRequest req, HttpServletRequest http) {
-        return authService.refresh(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return authService.refresh(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     @PostMapping("/logout")
@@ -108,7 +108,7 @@ public class AuthController {
 
     @PostMapping("/mfa/recovery-verify")
     public com.nabd.hms.auth.dto.RecoveryVerifyResponse recoveryVerify(@Valid @RequestBody com.nabd.hms.auth.dto.RecoveryVerifyRequest req, HttpServletRequest http) {
-        return authService.recoveryVerify(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return authService.recoveryVerify(req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     @PostMapping("/mfa/confirm")

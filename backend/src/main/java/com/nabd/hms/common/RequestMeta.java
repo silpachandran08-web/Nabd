@@ -29,6 +29,25 @@ public final class RequestMeta {
         }
     }
 
+    public static final String UNKNOWN_DEVICE = "Unknown device";
+
+    /** PLT-013: the client's X-Device-Label ("Front desk PC 2"), control/format characters removed, whitespace collapsed,
+     * at most 64 characters; UNKNOWN_DEVICE when absent or empty. Display only: never use it for a security decision. */
+    public static String deviceLabel(HttpServletRequest http) {
+        return sanitiseDeviceLabel(http.getHeader("X-Device-Label"));
+    }
+
+    static String sanitiseDeviceLabel(String raw) {
+        if (raw == null) {
+            return UNKNOWN_DEVICE;
+        }
+        String s = raw.replaceAll("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}<>]", " ").replaceAll("\\s+", " ").strip();
+        if (s.codePointCount(0, s.length()) > 64) {
+            s = s.substring(0, s.offsetByCodePoints(0, 64)).strip();
+        }
+        return s.isEmpty() ? UNKNOWN_DEVICE : s;
+    }
+
     public static String userAgent(HttpServletRequest http) {
         String ua = http.getHeader("User-Agent");
         return ua == null ? "unknown-device" : ua;

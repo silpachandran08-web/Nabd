@@ -82,7 +82,7 @@ public class OwnerController {
     @PostMapping("/workspaces/select")
     public TokenPairResponse selectWorkspace(@RequestHeader(value = "Authorization", required = false) String auth, @Valid @RequestBody WorkspaceSelectRequest req,
                                               HttpServletRequest http) {
-        return service.selectWorkspace(pending(auth), req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return service.selectWorkspace(pending(auth), req, RequestMeta.clientIp(http), RequestMeta.deviceLabel(http), RequestMeta.userAgent(http));
     }
 
     /** PLT-001: the owner_select token is decoded here, never by the resource server. */

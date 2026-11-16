@@ -315,6 +315,7 @@ schemas:
       owner_staff_id: operational
       message: pii  # uncertain: names actor and patient; no clinical content expected
       created_at: operational
+      kind: operational
     break_glass_grants:
       id: operational
       tenant_id: operational
@@ -331,6 +332,12 @@ schemas:
       notified_at: operational
       session_id: operational
       deactivated_by: operational
+      device_label: operational
+      reviewed_by: operational
+      reviewed_at: operational
+      review_outcome: operational
+      review_note: phi  # free-text review / incident note may name a condition
+      review_reminded_at: operational
     charge_catalogue:
       drug_id: operational
       id: operational
@@ -2146,6 +2153,7 @@ schemas:
       mfa_pending_created_at: operational
       mfa_reset_required: operational
       is_clinician: operational
+      break_glass_revoked_at: operational
       licence_expires_on: pii
       licence_override_until: operational
       hpr_id: pii

@@ -265,7 +265,7 @@ public class PlatformAuthService {
 
         repo.revokeSession(session.id(), "rotated");
         log.debug("session refreshed for operator {} (family {})", operator.id(), session.familyId());
-        return mintTokenPair(operator, session.familyId(), ip, device, userAgent);
+        return mintTokenPair(operator, session.familyId(), ip, com.nabd.hms.common.RequestMeta.UNKNOWN_DEVICE.equals(device) && session.deviceLabel() != null ? session.deviceLabel() : device, userAgent); // PLT-013
     }
 
     @Transactional
