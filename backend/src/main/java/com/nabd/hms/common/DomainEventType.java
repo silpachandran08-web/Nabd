@@ -53,7 +53,9 @@ public enum DomainEventType {
     PATIENT_GUARDIAN_HANDOVER_COMPLETED("patient.guardian.handover_completed.v1", "core/patient"),
     ORGANIZATION_EXPORT_READY("organization.export.ready.v1", "core/organization"),
     TEMPLATE_STATUS_CHANGED("comms.template.status_changed.v1", "core/messaging"),
-    APPOINTMENT_CONFIRMED("scheduling.appointment.confirmed.v1", "core/scheduling");
+    APPOINTMENT_CONFIRMED("scheduling.appointment.confirmed.v1", "core/scheduling"),
+    /** COM-025: a patient's notification preferences changed (desk PUT or the WhatsApp Settings menu). Ids and version only. */
+    PATIENT_NOTIFICATION_PREFERENCES_CHANGED("patient.notification_preferences.changed.v1", "core/patient");
 
     private final String type;
     private final String source;

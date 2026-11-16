@@ -1501,6 +1501,49 @@ paths:
       tags:
       - patient
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/households/{phoneHash}/notification-preferences:
+    patch:
+      operationId: InternalNotificationPreferencesController_language
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: phoneHash
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HouseholdLanguageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/HouseholdLanguageResult"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/patients:
     post:
       operationId: ChatRegistrationController_create
@@ -12338,6 +12381,87 @@ paths:
       tags:
       - patient
       x-required-permission: patients:view
+  /v1/patients/{patientId}/notification-preferences:
+    get:
+      operationId: NotificationPreferencesController_get
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:view
+    put:
+      operationId: NotificationPreferencesController_put
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationPreferencesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/patients/{patientId}/privacy-notice:
     get:
       operationId: NoticeController_status
@@ -23208,6 +23332,23 @@ components:
           type: string
         relation:
           type: string
+    CaregiverRecipient:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            type: string
+            pattern: careReminders|recalls
+          maxItems: 2
+          minItems: 0
+        personRef:
+          type: string
+          format: uuid
+          description: The caregiver's patient id (one of eligibleCaregivers)
+      required:
+      - categories
+      - personRef
     Cell:
       type: object
       properties:
@@ -25614,6 +25755,18 @@ components:
             $ref: "#/components/schemas/Item"
         nextCursor:
           type: string
+    EligibleCaregiver:
+      type: object
+      description: "A caregiver who may be added now: guardian or live proxy with\
+        \ their own messaging consent and number."
+      properties:
+        firstName:
+          type: string
+        personRef:
+          type: string
+          format: uuid
+        relation:
+          type: string
     EncounterListItem:
       type: object
       properties:
@@ -26624,6 +26777,22 @@ components:
         from:
           type: string
         to:
+          type: string
+    HouseholdLanguageRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          pattern: en|hi|ar|kn|te
+      required:
+      - language
+    HouseholdLanguageResult:
+      type: object
+      properties:
+        changed:
+          type: integer
+          format: int32
+        language:
           type: string
     HouseholdMember:
       type: object
@@ -28123,6 +28292,19 @@ components:
           type: string
         subjective:
           type: string
+    NotificationCategories:
+      type: object
+      description: true = the patient receives this kind of message. Omitted in a
+        PUT = on.
+      properties:
+        careReminders:
+          type: boolean
+        feedback:
+          type: boolean
+        recalls:
+          type: boolean
+        reviews:
+          type: boolean
     NotificationClaim:
       type: object
       properties:
@@ -28160,6 +28342,70 @@ components:
           format: uuid
         phoneE164:
           type: string
+    NotificationPreferences:
+      type: object
+      properties:
+        caregivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaregiverRecipient"
+        categories:
+          $ref: "#/components/schemas/NotificationCategories"
+        channel:
+          type: string
+        eligibleCaregivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/EligibleCaregiver"
+        language:
+          type: string
+        quietHours:
+          $ref: "#/components/schemas/NotificationQuietHours"
+        version:
+          type: integer
+          format: int64
+      required:
+      - caregivers
+      - categories
+      - channel
+      - eligibleCaregivers
+      - version
+    NotificationPreferencesRequest:
+      type: object
+      properties:
+        caregivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaregiverRecipient"
+          maxItems: 10
+          minItems: 0
+        categories:
+          $ref: "#/components/schemas/NotificationCategories"
+        channel:
+          type: string
+          pattern: whatsapp|sms|email
+        language:
+          type: string
+          description: null = the clinic default (English)
+          pattern: en|hi|ar|kn|te
+        quietHours:
+          $ref: "#/components/schemas/NotificationQuietHours"
+      required:
+      - channel
+    NotificationQuietHours:
+      type: object
+      description: "Extra quiet hours of this patient, clinic local time (HH:mm);\
+        \ the clinic's own quiet hours still apply."
+      properties:
+        end:
+          type: string
+          pattern: "([01]\\d|2[0-3]):[0-5]\\d"
+        start:
+          type: string
+          pattern: "([01]\\d|2[0-3]):[0-5]\\d"
+      required:
+      - end
+      - start
     Offer:
       type: object
       properties:

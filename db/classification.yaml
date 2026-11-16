@@ -1642,6 +1642,18 @@ schemas:
       verified_at: operational
       updated_by: operational
       updated_at: operational
+    patient_notification_preferences:
+      tenant_id: operational
+      patient_id: pii
+      language: pii  # COM-025: the patient's chosen language
+      channel: operational
+      categories: operational
+      quiet_start: operational
+      quiet_end: operational
+      caregiver_recipients: pii  # caregiver patient ids and their message categories
+      version: operational
+      updated_by: operational
+      updated_at: operational
     patient_proxies:
       id: operational
       tenant_id: operational
@@ -2260,6 +2272,7 @@ schemas:
       dedupe_key: operational
       status: operational
       created_at: operational
+      about_patient_id: pii  # COM-025: the patient a caregiver's copy is about
     whatsapp_messages:
       id: operational
       tenant_id: operational

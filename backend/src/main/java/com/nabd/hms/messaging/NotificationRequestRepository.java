@@ -13,7 +13,8 @@ import java.util.UUID;
 class NotificationRequestRepository {
 
     record Row(UUID id, UUID tenantId, String purpose, UUID recipientPatientId, byte[] paramsEnc, String language,
-               String channelPolicy, Instant notBefore, Instant notAfter, String status, String subjectType, UUID subjectId) {
+               String channelPolicy, Instant notBefore, Instant notAfter, String status, String subjectType, UUID subjectId,
+               UUID aboutPatientId) {
     }
 
     private final JdbcTemplate jdbc;
@@ -25,13 +26,13 @@ class NotificationRequestRepository {
     /** @return true when inserted, false when (tenant, dedupe key) already existed */
     boolean insert(UUID id, UUID tenantId, String purpose, String subjectType, UUID subjectId, UUID patientId, byte[] paramsEnc,
                    String language, String priority, String channelPolicy, Instant notBefore, Instant notAfter,
-                   String dedupeKey, String status) {
+                   String dedupeKey, String status, UUID aboutPatientId) {
         return jdbc.update("""
                 INSERT INTO notification_requests (id, tenant_id, purpose, subject_type, subject_id, recipient_patient_id,
-                    params_enc, language, priority, channel_policy, not_before, not_after, dedupe_key, status)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (tenant_id, dedupe_key) DO NOTHING
+                    params_enc, language, priority, channel_policy, not_before, not_after, dedupe_key, status, about_patient_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (tenant_id, dedupe_key) DO NOTHING
                 """, id, tenantId, purpose, subjectType, subjectId, patientId, paramsEnc, language, priority, channelPolicy,
-                ts(notBefore), ts(notAfter), dedupeKey, status) == 1;
+                ts(notBefore), ts(notAfter), dedupeKey, status, aboutPatientId) == 1;
     }
 
     Row byDedupeKey(UUID tenantId, String dedupeKey) {
@@ -79,7 +80,7 @@ class NotificationRequestRepository {
     }
 
     private static final String SELECT = """
-            SELECT id, tenant_id, purpose, recipient_patient_id, params_enc, language, channel_policy, not_before, not_after, status, subject_type, subject_id
+            SELECT id, tenant_id, purpose, recipient_patient_id, params_enc, language, channel_policy, not_before, not_after, status, subject_type, subject_id, about_patient_id
             FROM notification_requests\s""";
 
     private static final org.springframework.jdbc.core.RowMapper<Row> MAPPER = (rs, i) -> new Row(
@@ -88,5 +89,5 @@ class NotificationRequestRepository {
             rs.getString("channel_policy"),
             rs.getTimestamp("not_before") == null ? null : rs.getTimestamp("not_before").toInstant(),
             rs.getTimestamp("not_after") == null ? null : rs.getTimestamp("not_after").toInstant(), rs.getString("status"),
-            rs.getString("subject_type"), rs.getObject("subject_id", UUID.class));
+            rs.getString("subject_type"), rs.getObject("subject_id", UUID.class), rs.getObject("about_patient_id", UUID.class));
 }
