@@ -522,6 +522,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/setup/licences`, () => HttpResponse.json({"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // SetupController_addLicence
     http.patch(`${baseUrl}/v1/setup/licences/:id`, () => HttpResponse.json({"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // SetupController_updateLicence
     http.post(`${baseUrl}/v1/setup/licences/:id/override`, () => HttpResponse.json({"hasRegistrationNo":false,"isClinician":false,"licenceExpiresOn":"2026-01-01","licenceOverrideUntil":"2026-01-01T00:00:00Z","staffId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // LicenceOverrideController_override
+    http.get(`${baseUrl}/v1/setup/messaging-settings`, () => HttpResponse.json({"prayerWindows":{"bufferMinutes":0,"enabled":false,"fridayBlock":{"end":"string","start":"string"},"latitude":0,"longitude":0,"method":"string"},"quietHours":{"enabled":false,"end":"string","start":"string"}}, { status: 200 })), // MessagingSettingsController_get
+    http.put(`${baseUrl}/v1/setup/messaging-settings`, () => HttpResponse.json({"prayerWindows":{"bufferMinutes":0,"enabled":false,"fridayBlock":{"end":"string","start":"string"},"latitude":0,"longitude":0,"method":"string"},"quietHours":{"enabled":false,"end":"string","start":"string"}}, { status: 200 })), // MessagingSettingsController_put
     http.get(`${baseUrl}/v1/setup/payroll-export`, () => HttpResponse.json([{"days":0,"hours":0,"notes":"string","role":"string","salary":0,"staffId":"string","staffName":"string"}], { status: 200 })), // SetupController_payrollExport
     http.get(`${baseUrl}/v1/setup/policies`, () => HttpResponse.json([{"id":"string","policyKey":"string","value":"string","version":0}], { status: 200 })), // SetupController_policies
     http.put(`${baseUrl}/v1/setup/policies/follow_up_window_days`, () => HttpResponse.json({"id":"string","policyKey":"string","value":"string","version":0}, { status: 200 })), // PricingController_followUpWindow
@@ -580,4 +582,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 566;
+export const operationCount = 568;

@@ -393,10 +393,18 @@ export const LoginRequestSchema = z.object({ email: z.string().min(1), pin: z.st
 export const ModuleStateSchema = z.object({ code: z.string().optional(), enabled: z.boolean().optional() });
 export const MeEntitlementsSchema = z.object({ killedFeatures: z.array(z.string()).optional(), modules: z.array(ModuleStateSchema).optional(), seatLimit: z.number().int().optional() });
 export const MergeRequestSchema = z.object({ duplicatePatientId: z.string() });
+export const MessagingFridayBlockSchema = z.object({ end: z.string().optional(), start: z.string().optional() });
+export const MessagingFridayBlockInputSchema = z.object({ end: z.string(), start: z.string() });
 export const SenderEventSchema = z.object({ at: z.string().optional(), kind: z.string().optional(), text: z.string().optional() });
 export const MessagingSenderSchema = z.object({ blockRate24h: z.number().optional(), blockRate7d: z.array(z.number()).optional(), displayName: z.string().optional(), displayPhone: z.string().optional(), events: z.array(SenderEventSchema).optional(), id: z.string().optional(), kind: z.string().optional(), overrideUntil: z.string().optional(), quality: z.string().optional(), rating: z.string().optional(), status: z.string().optional(), throttleLine: z.number().optional(), throttleMode: z.string().optional(), throttleReason: z.string().optional(), tier: z.string().optional(), tierLabel: z.string().optional() });
 export const MessagingTemplateSchema = z.object({ category: z.string().optional(), id: z.string().optional(), language: z.string().optional(), name: z.string().optional(), rejectionReason: z.string().optional(), status: z.string().optional() });
 export const MessagingHealthSchema = z.object({ senders: z.array(MessagingSenderSchema).optional(), templates: z.array(MessagingTemplateSchema).optional() });
+export const MessagingPrayerWindowsSchema = z.object({ bufferMinutes: z.number().int().optional(), enabled: z.boolean().optional(), fridayBlock: MessagingFridayBlockSchema.optional(), latitude: z.number().optional(), longitude: z.number().optional(), method: z.string().optional() });
+export const MessagingPrayerWindowsInputSchema = z.object({ bufferMinutes: z.number().int(), enabled: z.boolean(), fridayBlock: MessagingFridayBlockInputSchema, latitude: z.number().optional(), longitude: z.number().optional(), method: z.string() });
+export const MessagingQuietHoursSchema = z.object({ enabled: z.boolean().optional(), end: z.string().optional(), start: z.string().optional() });
+export const MessagingQuietHoursInputSchema = z.object({ enabled: z.boolean(), end: z.string(), start: z.string() });
+export const MessagingSettingsRequestSchema = z.object({ prayerWindows: MessagingPrayerWindowsInputSchema, quietHours: MessagingQuietHoursInputSchema });
+export const MessagingSettingsResponseSchema = z.object({ prayerWindows: MessagingPrayerWindowsSchema.optional(), quietHours: MessagingQuietHoursSchema.optional() });
 export const MfaConfirmRequestSchema = z.object({ code: z.string().min(1), setupToken: z.string().optional() });
 export const MfaConfirmResponseSchema = z.object({ recoveryCodes: z.array(z.string()).optional() });
 export const MfaEnrollRequestSchema = z.object({ currentCode: z.string().optional(), setupToken: z.string().optional() });
@@ -1242,6 +1250,8 @@ export const operationSchemas = {
   SetupController_addLicence: { body: LicenceWriteRequestSchema, response: LicenceResponseSchema },
   SetupController_updateLicence: { body: LicenceWriteRequestSchema, response: LicenceResponseSchema },
   LicenceOverrideController_override: { body: LicenceOverrideRequestSchema, response: LicenceResponseSchema },
+  MessagingSettingsController_get: { response: MessagingSettingsResponseSchema },
+  MessagingSettingsController_put: { body: MessagingSettingsRequestSchema, response: MessagingSettingsResponseSchema },
   SetupController_payrollExport: { response: z.array(PayrollExportRowResponseSchema) },
   SetupController_policies: { response: z.array(PolicyResponseSchema) },
   PricingController_followUpWindow: { body: WindowRequestSchema, response: PolicyResponseSchema },
