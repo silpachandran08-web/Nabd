@@ -404,6 +404,16 @@ schemas:
       from_time: operational
       to_time: operational
       updated_at: operational
+    tenant_messaging_settings:
+      tenant_id: operational
+      prayer_enabled: operational
+      prayer_method: operational
+      prayer_buffer_min: operational
+      friday_start: operational
+      friday_end: operational
+      latitude: operational
+      longitude: operational
+      updated_at: operational
     holiday_templates:
       code: operational
       market: operational

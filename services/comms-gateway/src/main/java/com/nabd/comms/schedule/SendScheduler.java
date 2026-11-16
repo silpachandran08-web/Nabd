@@ -13,9 +13,11 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -23,12 +25,14 @@ import java.util.UUID;
  * past notAfter -> expired, claim check says gone (410) -> cancelled. A send is never queued after its notAfter. The leader lock
  * keeps one instance ticking; the status compare-and-set keeps a double run harmless. Core unreachable: the row stays scheduled
  * and is retried, and expires once its window has passed. Only runs when the claim check is configured (comms.core.base-url).
+ * COM-024: a non-urgent send inside the clinic's quiet hours or a prayer hold ({@link SendWindows}) is deferred to the next
+ * allowed minute, or expired when that minute is past its notAfter; URGENT sends bypass the holds.
  */
 @Component
 @ConditionalOnProperty("comms.core.base-url")
 public class SendScheduler {
 
-    public record Stats(int queued, int cancelled, int expired, int retried) {}
+    public record Stats(int queued, int cancelled, int expired, int retried, int deferred) {}
 
     private static final Logger log = LoggerFactory.getLogger(SendScheduler.class);
     private static final int RECONCILE_EVERY = 20; // ticks (5 min): pick up rows another path scheduled without the index
@@ -75,14 +79,16 @@ public class SendScheduler {
         } catch (RuntimeException e) { // Valkey down: the DB index serves the same list
             due = store.scheduled(now, batch);
         }
-        int queued = 0, cancelled = 0, expired = 0, retried = 0, failures = 0;
+        int queued = 0, cancelled = 0, expired = 0, retried = 0, deferred = 0, failures = 0;
+        Map<UUID, Optional<SendWindows.Settings>> windows = new HashMap<>(); // one settings read per clinic per tick
         for (DueIndex.Entry e : due) {
-            String outcome = handle(e);
+            String outcome = handle(e, windows);
             switch (outcome) {
                 case "queued" -> queued++;
                 case "cancelled" -> cancelled++;
                 case "expired" -> expired++;
                 case "retry" -> retried++;
+                case "deferred" -> deferred++;
                 default -> { }
             }
             failures = "retry".equals(outcome) ? failures + 1 : 0;
@@ -90,10 +96,10 @@ public class SendScheduler {
                 break; // Core is down: stop hammering it, the rest stay due and keep their order
             }
         }
-        return new Stats(queued, cancelled, expired, retried);
+        return new Stats(queued, cancelled, expired, retried, deferred);
     }
 
-    private String handle(DueIndex.Entry e) {
+    private String handle(DueIndex.Entry e, Map<UUID, Optional<SendWindows.Settings>> windows) {
         var row = store.find(e.tenantId(), e.messageId());
         if (row.isEmpty() || !"scheduled".equals(row.get().status())) {
             index.remove(e.tenantId(), e.messageId());
@@ -102,6 +108,10 @@ public class SendScheduler {
         Row r = new Row(row.get());
         if (r.late(clock.instant())) {
             return settle(e, r, "expired");
+        }
+        String held = hold(e, r, windows.computeIfAbsent(e.tenantId(), store::windows));
+        if (held != null) {
+            return held;
         }
         if (r.requestId() != null) {
             try {
@@ -115,6 +125,26 @@ public class SendScheduler {
             }
         }
         return settle(e, r, r.late(clock.instant()) ? "expired" : "queued"); // the claim check may have taken long
+    }
+
+    /** COM-024: null when the send may go now; otherwise deferred to the next allowed minute, or expired if that is past notAfter. */
+    private String hold(DueIndex.Entry e, Row r, Optional<SendWindows.Settings> settings) {
+        if (settings.isEmpty() || SendWindows.urgent(r.priority(), r.templateName())) {
+            return null;
+        }
+        Instant now = clock.instant();
+        Instant next = SendWindows.nextAllowed(settings.get(), now);
+        if (!next.isAfter(now)) {
+            return null;
+        }
+        if (r.notAfter() != null && next.isAfter(r.notAfter())) {
+            return settle(e, r, "expired"); // sending late is worse than not sending
+        }
+        if (store.defer(e.tenantId(), e.messageId(), next, now)) {
+            meters.counter("comms_scheduled_total", "outcome", "deferred").increment();
+            return "deferred";
+        }
+        return "skipped";
     }
 
     private String settle(DueIndex.Entry e, Row r, String to) {
@@ -140,9 +170,9 @@ public class SendScheduler {
         return won ? to : "skipped";
     }
 
-    private record Row(UUID requestId, Instant notAfter) {
+    private record Row(UUID requestId, Instant notAfter, String priority, String templateName) {
         Row(ScheduledSendStore.Row r) {
-            this(r.requestId(), r.notAfter());
+            this(r.requestId(), r.notAfter(), r.priority(), r.templateName());
         }
 
         boolean late(Instant now) {
