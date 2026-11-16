@@ -56,6 +56,7 @@ abstract class RbacMatrixTestBase extends ApiTestBase {
     private static final Pattern AUTHORITY_CALL = Pattern.compile("has(?:Any)?Authority\\(([^)]*)\\)");
     private static final Pattern SELF_AND = Pattern.compile(
             "hasAuthority\\('([^']+)'\\) and \\(authentication\\.name == #id\\.toString\\(\\) or hasAuthority\\('([^']+)'\\)\\)");
+    private static final Pattern BOTH = Pattern.compile("hasAuthority\\('([^']+)'\\) and hasAuthority\\('([^']+)'\\)");
     private static final Pattern QUOTED = Pattern.compile("'([^']+)'");
     static final String ALLOW = "allow", DENY_403 = "deny-403", DENY_401 = "deny-401";
 
@@ -162,6 +163,8 @@ abstract class RbacMatrixTestBase extends ApiTestBase {
         // "A and (authentication.name == #id.toString() or B)" (DoctorSessionController): a random id never matches the self clause, so A and B are both needed; one "A&B" entry = all of.
         Matcher self = SELF_AND.matcher(expression);
         if (self.matches()) return Set.of(self.group(1) + "&" + self.group(2));
+        Matcher both = BOTH.matcher(expression);  // "A and B" (CLN-023 Rx PDF send): all of
+        if (both.matches()) return Set.of(both.group(1) + "&" + both.group(2));
         if (expression.contains(" and ") || expression.contains("&&") || expression.contains("!")) {
             throw new IllegalStateException("OPS-042 cannot model this @PreAuthorize yet: " + expression);
         }

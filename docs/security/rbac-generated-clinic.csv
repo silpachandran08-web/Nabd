@@ -42,6 +42,8 @@ owner,GET /v1/billing/tax/guided-picker,setup:view,allow
 owner,GET /v1/booking-policy,queue:view,allow
 owner,GET /v1/booking-policy/versions,queue:view,allow
 owner,GET /v1/booking-requests,queue:create,allow
+owner,GET /v1/break-glass/grants,compliance:view|staff:edit,allow
+owner,GET /v1/break-glass/grants/{id}/reads,compliance:view,allow
 owner,GET /v1/clinical/conditions/due,clinical:view,allow
 owner,GET /v1/clinical/documents/{id},clinical:view,allow
 owner,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -63,6 +65,7 @@ owner,GET /v1/clinical/patients/{patientId}/pregnancy-status/history,clinical:vi
 owner,GET /v1/clinical/patients/{patientId}/prescriptions,clinical:view,allow
 owner,GET /v1/clinical/patients/{patientId}/timeline,clinical:view,allow
 owner,GET /v1/clinical/prescriptions/{queueEntryId},clinical:view,allow
+owner,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 owner,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 owner,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 owner,GET /v1/clinical/rx-sets,clinical:view,allow
@@ -125,6 +128,7 @@ owner,GET /v1/patients/registry,patients:view,allow
 owner,GET /v1/patients/{id},patients:view,allow
 owner,GET /v1/patients/{id}/consents,patients:view,allow
 owner,GET /v1/patients/{patientId}/messages,patients:view,allow
+owner,GET /v1/patients/{patientId}/notification-preferences,patients:view,allow
 owner,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 owner,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,allow
 owner,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
@@ -208,6 +212,7 @@ owner,GET /v1/setup/import-jobs/{id},setup:edit,allow
 owner,GET /v1/setup/import-jobs/{id}/duplicates,setup:edit,allow
 owner,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,allow
 owner,GET /v1/setup/licences,setup:view,allow
+owner,GET /v1/setup/messaging-settings,setup:view,allow
 owner,GET /v1/setup/payroll-export,setup:view,allow
 owner,GET /v1/setup/policies,setup:view,allow
 owner,GET /v1/setup/price-templates,setup:view,allow
@@ -307,6 +312,7 @@ owner,POST /v1/booking-policy/draft/publish,setup:edit,allow
 owner,POST /v1/booking-requests/{id}/accept,queue:create,allow
 owner,POST /v1/booking-requests/{id}/decline,queue:create,allow
 owner,POST /v1/booking-requests/{id}/suggest,queue:create,allow
+owner,POST /v1/break-glass/grants/{id}/review,compliance:approve,allow
 owner,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-403
 owner,POST /v1/clinical/note-templates,clinical:edit,deny-403
 owner,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-403
@@ -314,7 +320,9 @@ owner,POST /v1/clinical/notes/{queueEntryId}/sign,clinical:edit,deny-403
 owner,POST /v1/clinical/patients/{patientId}/allergies,clinical:edit,deny-403
 owner,POST /v1/clinical/patients/{patientId}/conditions,clinical:edit,deny-403
 owner,POST /v1/clinical/prescriptions/{queueEntryId}/apply-set/{setId},clinical:edit,deny-403
+owner,POST /v1/clinical/prescriptions/{queueEntryId}/pdf/send,clinical:view&patients:edit,allow
 owner,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,deny-403
+owner,POST /v1/clinical/prescriptions/{queueEntryId}/revoke,clinical:approve|clinical:edit,deny-403
 owner,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 owner,POST /v1/clinical/rx-sets,clinical:edit,deny-403
 owner,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
@@ -445,6 +453,7 @@ owner,PUT /v1/doctors/{id}/queue-settings,setup:edit,allow
 owner,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,PUT /v1/facility/checkin-config,setup:edit,allow
 owner,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner,PUT /v1/patients/{patientId}/notification-preferences,patients:edit,allow
 owner,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
 owner,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,allow
 owner,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
@@ -457,6 +466,7 @@ owner,PUT /v1/setup/calendar/quiet-hours,setup:edit,allow
 owner,PUT /v1/setup/charges/{id}/doctor-fees,setup:edit,allow
 owner,PUT /v1/setup/checklist/{step}/draft,setup:edit,allow
 owner,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,allow
+owner,PUT /v1/setup/messaging-settings,setup:edit,allow
 owner,PUT /v1/setup/policies/follow_up_window_days,setup:edit,allow
 owner,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
 owner,PUT /v1/staff/{id}/hpr,staff:edit,allow
@@ -502,6 +512,8 @@ owner_doctor,GET /v1/billing/tax/guided-picker,setup:view,allow
 owner_doctor,GET /v1/booking-policy,queue:view,allow
 owner_doctor,GET /v1/booking-policy/versions,queue:view,allow
 owner_doctor,GET /v1/booking-requests,queue:create,allow
+owner_doctor,GET /v1/break-glass/grants,compliance:view|staff:edit,allow
+owner_doctor,GET /v1/break-glass/grants/{id}/reads,compliance:view,allow
 owner_doctor,GET /v1/clinical/conditions/due,clinical:view,allow
 owner_doctor,GET /v1/clinical/documents/{id},clinical:view,allow
 owner_doctor,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -523,6 +535,7 @@ owner_doctor,GET /v1/clinical/patients/{patientId}/pregnancy-status/history,clin
 owner_doctor,GET /v1/clinical/patients/{patientId}/prescriptions,clinical:view,allow
 owner_doctor,GET /v1/clinical/patients/{patientId}/timeline,clinical:view,allow
 owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId},clinical:view,allow
+owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 owner_doctor,GET /v1/clinical/rx-sets,clinical:view,allow
@@ -585,6 +598,7 @@ owner_doctor,GET /v1/patients/registry,patients:view,allow
 owner_doctor,GET /v1/patients/{id},patients:view,allow
 owner_doctor,GET /v1/patients/{id}/consents,patients:view,allow
 owner_doctor,GET /v1/patients/{patientId}/messages,patients:view,allow
+owner_doctor,GET /v1/patients/{patientId}/notification-preferences,patients:view,allow
 owner_doctor,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 owner_doctor,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,allow
 owner_doctor,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
@@ -668,6 +682,7 @@ owner_doctor,GET /v1/setup/import-jobs/{id},setup:edit,allow
 owner_doctor,GET /v1/setup/import-jobs/{id}/duplicates,setup:edit,allow
 owner_doctor,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,allow
 owner_doctor,GET /v1/setup/licences,setup:view,allow
+owner_doctor,GET /v1/setup/messaging-settings,setup:view,allow
 owner_doctor,GET /v1/setup/payroll-export,setup:view,allow
 owner_doctor,GET /v1/setup/policies,setup:view,allow
 owner_doctor,GET /v1/setup/price-templates,setup:view,allow
@@ -767,6 +782,7 @@ owner_doctor,POST /v1/booking-policy/draft/publish,setup:edit,allow
 owner_doctor,POST /v1/booking-requests/{id}/accept,queue:create,allow
 owner_doctor,POST /v1/booking-requests/{id}/decline,queue:create,allow
 owner_doctor,POST /v1/booking-requests/{id}/suggest,queue:create,allow
+owner_doctor,POST /v1/break-glass/grants/{id}/review,compliance:approve,allow
 owner_doctor,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,allow
 owner_doctor,POST /v1/clinical/note-templates,clinical:edit,allow
 owner_doctor,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,allow
@@ -774,7 +790,9 @@ owner_doctor,POST /v1/clinical/notes/{queueEntryId}/sign,clinical:edit,allow
 owner_doctor,POST /v1/clinical/patients/{patientId}/allergies,clinical:edit,allow
 owner_doctor,POST /v1/clinical/patients/{patientId}/conditions,clinical:edit,allow
 owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/apply-set/{setId},clinical:edit,allow
+owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/pdf/send,clinical:view&patients:edit,allow
 owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,allow
+owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/revoke,clinical:approve|clinical:edit,allow
 owner_doctor,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 owner_doctor,POST /v1/clinical/rx-sets,clinical:edit,allow
 owner_doctor,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
@@ -905,6 +923,7 @@ owner_doctor,PUT /v1/doctors/{id}/queue-settings,setup:edit,allow
 owner_doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,PUT /v1/facility/checkin-config,setup:edit,allow
 owner_doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner_doctor,PUT /v1/patients/{patientId}/notification-preferences,patients:edit,allow
 owner_doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
 owner_doctor,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,allow
 owner_doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
@@ -917,6 +936,7 @@ owner_doctor,PUT /v1/setup/calendar/quiet-hours,setup:edit,allow
 owner_doctor,PUT /v1/setup/charges/{id}/doctor-fees,setup:edit,allow
 owner_doctor,PUT /v1/setup/checklist/{step}/draft,setup:edit,allow
 owner_doctor,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,allow
+owner_doctor,PUT /v1/setup/messaging-settings,setup:edit,allow
 owner_doctor,PUT /v1/setup/policies/follow_up_window_days,setup:edit,allow
 owner_doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
 owner_doctor,PUT /v1/staff/{id}/hpr,staff:edit,allow
@@ -962,6 +982,8 @@ doctor,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 doctor,GET /v1/booking-policy,queue:view,allow
 doctor,GET /v1/booking-policy/versions,queue:view,allow
 doctor,GET /v1/booking-requests,queue:create,deny-403
+doctor,GET /v1/break-glass/grants,compliance:view|staff:edit,deny-403
+doctor,GET /v1/break-glass/grants/{id}/reads,compliance:view,deny-403
 doctor,GET /v1/clinical/conditions/due,clinical:view,allow
 doctor,GET /v1/clinical/documents/{id},clinical:view,allow
 doctor,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -983,6 +1005,7 @@ doctor,GET /v1/clinical/patients/{patientId}/pregnancy-status/history,clinical:v
 doctor,GET /v1/clinical/patients/{patientId}/prescriptions,clinical:view,allow
 doctor,GET /v1/clinical/patients/{patientId}/timeline,clinical:view,allow
 doctor,GET /v1/clinical/prescriptions/{queueEntryId},clinical:view,allow
+doctor,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 doctor,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 doctor,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 doctor,GET /v1/clinical/rx-sets,clinical:view,allow
@@ -1045,6 +1068,7 @@ doctor,GET /v1/patients/registry,patients:view,allow
 doctor,GET /v1/patients/{id},patients:view,allow
 doctor,GET /v1/patients/{id}/consents,patients:view,allow
 doctor,GET /v1/patients/{patientId}/messages,patients:view,allow
+doctor,GET /v1/patients/{patientId}/notification-preferences,patients:view,allow
 doctor,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 doctor,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 doctor,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
@@ -1128,6 +1152,7 @@ doctor,GET /v1/setup/import-jobs/{id},setup:edit,deny-403
 doctor,GET /v1/setup/import-jobs/{id}/duplicates,setup:edit,deny-403
 doctor,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 doctor,GET /v1/setup/licences,setup:view,deny-403
+doctor,GET /v1/setup/messaging-settings,setup:view,deny-403
 doctor,GET /v1/setup/payroll-export,setup:view,deny-403
 doctor,GET /v1/setup/policies,setup:view,deny-403
 doctor,GET /v1/setup/price-templates,setup:view,deny-403
@@ -1227,6 +1252,7 @@ doctor,POST /v1/booking-policy/draft/publish,setup:edit,deny-403
 doctor,POST /v1/booking-requests/{id}/accept,queue:create,deny-403
 doctor,POST /v1/booking-requests/{id}/decline,queue:create,deny-403
 doctor,POST /v1/booking-requests/{id}/suggest,queue:create,deny-403
+doctor,POST /v1/break-glass/grants/{id}/review,compliance:approve,deny-403
 doctor,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,allow
 doctor,POST /v1/clinical/note-templates,clinical:edit,allow
 doctor,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,allow
@@ -1234,7 +1260,9 @@ doctor,POST /v1/clinical/notes/{queueEntryId}/sign,clinical:edit,allow
 doctor,POST /v1/clinical/patients/{patientId}/allergies,clinical:edit,allow
 doctor,POST /v1/clinical/patients/{patientId}/conditions,clinical:edit,allow
 doctor,POST /v1/clinical/prescriptions/{queueEntryId}/apply-set/{setId},clinical:edit,allow
+doctor,POST /v1/clinical/prescriptions/{queueEntryId}/pdf/send,clinical:view&patients:edit,allow
 doctor,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,allow
+doctor,POST /v1/clinical/prescriptions/{queueEntryId}/revoke,clinical:approve|clinical:edit,allow
 doctor,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 doctor,POST /v1/clinical/rx-sets,clinical:edit,allow
 doctor,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
@@ -1365,6 +1393,7 @@ doctor,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,PUT /v1/facility/checkin-config,setup:edit,deny-403
 doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+doctor,PUT /v1/patients/{patientId}/notification-preferences,patients:edit,allow
 doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 doctor,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
@@ -1377,6 +1406,7 @@ doctor,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 doctor,PUT /v1/setup/charges/{id}/doctor-fees,setup:edit,deny-403
 doctor,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 doctor,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
+doctor,PUT /v1/setup/messaging-settings,setup:edit,deny-403
 doctor,PUT /v1/setup/policies/follow_up_window_days,setup:edit,deny-403
 doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 doctor,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
@@ -1422,6 +1452,8 @@ nurse,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 nurse,GET /v1/booking-policy,queue:view,allow
 nurse,GET /v1/booking-policy/versions,queue:view,allow
 nurse,GET /v1/booking-requests,queue:create,deny-403
+nurse,GET /v1/break-glass/grants,compliance:view|staff:edit,deny-403
+nurse,GET /v1/break-glass/grants/{id}/reads,compliance:view,deny-403
 nurse,GET /v1/clinical/conditions/due,clinical:view,allow
 nurse,GET /v1/clinical/documents/{id},clinical:view,allow
 nurse,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -1443,6 +1475,7 @@ nurse,GET /v1/clinical/patients/{patientId}/pregnancy-status/history,clinical:vi
 nurse,GET /v1/clinical/patients/{patientId}/prescriptions,clinical:view,allow
 nurse,GET /v1/clinical/patients/{patientId}/timeline,clinical:view,allow
 nurse,GET /v1/clinical/prescriptions/{queueEntryId},clinical:view,allow
+nurse,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 nurse,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 nurse,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 nurse,GET /v1/clinical/rx-sets,clinical:view,allow
@@ -1505,6 +1538,7 @@ nurse,GET /v1/patients/registry,patients:view,allow
 nurse,GET /v1/patients/{id},patients:view,allow
 nurse,GET /v1/patients/{id}/consents,patients:view,allow
 nurse,GET /v1/patients/{patientId}/messages,patients:view,allow
+nurse,GET /v1/patients/{patientId}/notification-preferences,patients:view,allow
 nurse,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 nurse,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 nurse,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
@@ -1588,6 +1622,7 @@ nurse,GET /v1/setup/import-jobs/{id},setup:edit,deny-403
 nurse,GET /v1/setup/import-jobs/{id}/duplicates,setup:edit,deny-403
 nurse,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 nurse,GET /v1/setup/licences,setup:view,deny-403
+nurse,GET /v1/setup/messaging-settings,setup:view,deny-403
 nurse,GET /v1/setup/payroll-export,setup:view,deny-403
 nurse,GET /v1/setup/policies,setup:view,deny-403
 nurse,GET /v1/setup/price-templates,setup:view,deny-403
@@ -1687,6 +1722,7 @@ nurse,POST /v1/booking-policy/draft/publish,setup:edit,deny-403
 nurse,POST /v1/booking-requests/{id}/accept,queue:create,deny-403
 nurse,POST /v1/booking-requests/{id}/decline,queue:create,deny-403
 nurse,POST /v1/booking-requests/{id}/suggest,queue:create,deny-403
+nurse,POST /v1/break-glass/grants/{id}/review,compliance:approve,deny-403
 nurse,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,allow
 nurse,POST /v1/clinical/note-templates,clinical:edit,allow
 nurse,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,allow
@@ -1694,7 +1730,9 @@ nurse,POST /v1/clinical/notes/{queueEntryId}/sign,clinical:edit,allow
 nurse,POST /v1/clinical/patients/{patientId}/allergies,clinical:edit,allow
 nurse,POST /v1/clinical/patients/{patientId}/conditions,clinical:edit,allow
 nurse,POST /v1/clinical/prescriptions/{queueEntryId}/apply-set/{setId},clinical:edit,allow
+nurse,POST /v1/clinical/prescriptions/{queueEntryId}/pdf/send,clinical:view&patients:edit,allow
 nurse,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,allow
+nurse,POST /v1/clinical/prescriptions/{queueEntryId}/revoke,clinical:approve|clinical:edit,allow
 nurse,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 nurse,POST /v1/clinical/rx-sets,clinical:edit,allow
 nurse,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
@@ -1825,6 +1863,7 @@ nurse,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 nurse,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,PUT /v1/facility/checkin-config,setup:edit,deny-403
 nurse,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+nurse,PUT /v1/patients/{patientId}/notification-preferences,patients:edit,allow
 nurse,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 nurse,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 nurse,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
@@ -1837,6 +1876,7 @@ nurse,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 nurse,PUT /v1/setup/charges/{id}/doctor-fees,setup:edit,deny-403
 nurse,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 nurse,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
+nurse,PUT /v1/setup/messaging-settings,setup:edit,deny-403
 nurse,PUT /v1/setup/policies/follow_up_window_days,setup:edit,deny-403
 nurse,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 nurse,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
@@ -1882,6 +1922,8 @@ receptionist,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 receptionist,GET /v1/booking-policy,queue:view,allow
 receptionist,GET /v1/booking-policy/versions,queue:view,allow
 receptionist,GET /v1/booking-requests,queue:create,allow
+receptionist,GET /v1/break-glass/grants,compliance:view|staff:edit,deny-403
+receptionist,GET /v1/break-glass/grants/{id}/reads,compliance:view,deny-403
 receptionist,GET /v1/clinical/conditions/due,clinical:view,deny-403
 receptionist,GET /v1/clinical/documents/{id},clinical:view,deny-403
 receptionist,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-403
@@ -1903,6 +1945,7 @@ receptionist,GET /v1/clinical/patients/{patientId}/pregnancy-status/history,clin
 receptionist,GET /v1/clinical/patients/{patientId}/prescriptions,clinical:view,deny-403
 receptionist,GET /v1/clinical/patients/{patientId}/timeline,clinical:view,deny-403
 receptionist,GET /v1/clinical/prescriptions/{queueEntryId},clinical:view,deny-403
+receptionist,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,deny-403
 receptionist,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-403
 receptionist,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-403
 receptionist,GET /v1/clinical/rx-sets,clinical:view,deny-403
@@ -1965,6 +2008,7 @@ receptionist,GET /v1/patients/registry,patients:view,allow
 receptionist,GET /v1/patients/{id},patients:view,allow
 receptionist,GET /v1/patients/{id}/consents,patients:view,allow
 receptionist,GET /v1/patients/{patientId}/messages,patients:view,allow
+receptionist,GET /v1/patients/{patientId}/notification-preferences,patients:view,allow
 receptionist,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 receptionist,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 receptionist,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
@@ -2048,6 +2092,7 @@ receptionist,GET /v1/setup/import-jobs/{id},setup:edit,deny-403
 receptionist,GET /v1/setup/import-jobs/{id}/duplicates,setup:edit,deny-403
 receptionist,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 receptionist,GET /v1/setup/licences,setup:view,deny-403
+receptionist,GET /v1/setup/messaging-settings,setup:view,deny-403
 receptionist,GET /v1/setup/payroll-export,setup:view,deny-403
 receptionist,GET /v1/setup/policies,setup:view,deny-403
 receptionist,GET /v1/setup/price-templates,setup:view,deny-403
@@ -2147,6 +2192,7 @@ receptionist,POST /v1/booking-policy/draft/publish,setup:edit,deny-403
 receptionist,POST /v1/booking-requests/{id}/accept,queue:create,allow
 receptionist,POST /v1/booking-requests/{id}/decline,queue:create,allow
 receptionist,POST /v1/booking-requests/{id}/suggest,queue:create,allow
+receptionist,POST /v1/break-glass/grants/{id}/review,compliance:approve,deny-403
 receptionist,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-403
 receptionist,POST /v1/clinical/note-templates,clinical:edit,deny-403
 receptionist,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-403
@@ -2154,7 +2200,9 @@ receptionist,POST /v1/clinical/notes/{queueEntryId}/sign,clinical:edit,deny-403
 receptionist,POST /v1/clinical/patients/{patientId}/allergies,clinical:edit,deny-403
 receptionist,POST /v1/clinical/patients/{patientId}/conditions,clinical:edit,deny-403
 receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/apply-set/{setId},clinical:edit,deny-403
+receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/pdf/send,clinical:view&patients:edit,deny-403
 receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,deny-403
+receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/revoke,clinical:approve|clinical:edit,deny-403
 receptionist,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-403
 receptionist,POST /v1/clinical/rx-sets,clinical:edit,deny-403
 receptionist,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
@@ -2285,6 +2333,7 @@ receptionist,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 receptionist,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,PUT /v1/facility/checkin-config,setup:edit,deny-403
 receptionist,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+receptionist,PUT /v1/patients/{patientId}/notification-preferences,patients:edit,allow
 receptionist,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 receptionist,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 receptionist,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
@@ -2297,6 +2346,7 @@ receptionist,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 receptionist,PUT /v1/setup/charges/{id}/doctor-fees,setup:edit,deny-403
 receptionist,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 receptionist,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
+receptionist,PUT /v1/setup/messaging-settings,setup:edit,deny-403
 receptionist,PUT /v1/setup/policies/follow_up_window_days,setup:edit,deny-403
 receptionist,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 receptionist,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
@@ -2342,6 +2392,8 @@ frontdesk_vitals,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 frontdesk_vitals,GET /v1/booking-policy,queue:view,allow
 frontdesk_vitals,GET /v1/booking-policy/versions,queue:view,allow
 frontdesk_vitals,GET /v1/booking-requests,queue:create,allow
+frontdesk_vitals,GET /v1/break-glass/grants,compliance:view|staff:edit,deny-403
+frontdesk_vitals,GET /v1/break-glass/grants/{id}/reads,compliance:view,deny-403
 frontdesk_vitals,GET /v1/clinical/conditions/due,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/documents/{id},clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -2363,6 +2415,7 @@ frontdesk_vitals,GET /v1/clinical/patients/{patientId}/pregnancy-status/history,
 frontdesk_vitals,GET /v1/clinical/patients/{patientId}/prescriptions,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/patients/{patientId}/timeline,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId},clinical:view,allow
+frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/rx-sets,clinical:view,allow
@@ -2425,6 +2478,7 @@ frontdesk_vitals,GET /v1/patients/registry,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id},patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id}/consents,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{patientId}/messages,patients:view,allow
+frontdesk_vitals,GET /v1/patients/{patientId}/notification-preferences,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 frontdesk_vitals,GET /v1/pharmacy/adjustment-approvers,pharmacy:edit,deny-403
 frontdesk_vitals,GET /v1/pharmacy/batches/{id}/movements,pharmacy:view,allow
@@ -2508,6 +2562,7 @@ frontdesk_vitals,GET /v1/setup/import-jobs/{id},setup:edit,deny-403
 frontdesk_vitals,GET /v1/setup/import-jobs/{id}/duplicates,setup:edit,deny-403
 frontdesk_vitals,GET /v1/setup/import-jobs/{id}/errors.csv,setup:edit,deny-403
 frontdesk_vitals,GET /v1/setup/licences,setup:view,deny-403
+frontdesk_vitals,GET /v1/setup/messaging-settings,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/payroll-export,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/policies,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/price-templates,setup:view,deny-403
@@ -2607,6 +2662,7 @@ frontdesk_vitals,POST /v1/booking-policy/draft/publish,setup:edit,deny-403
 frontdesk_vitals,POST /v1/booking-requests/{id}/accept,queue:create,allow
 frontdesk_vitals,POST /v1/booking-requests/{id}/decline,queue:create,allow
 frontdesk_vitals,POST /v1/booking-requests/{id}/suggest,queue:create,allow
+frontdesk_vitals,POST /v1/break-glass/grants/{id}/review,compliance:approve,deny-403
 frontdesk_vitals,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/note-templates,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-403
@@ -2614,7 +2670,9 @@ frontdesk_vitals,POST /v1/clinical/notes/{queueEntryId}/sign,clinical:edit,deny-
 frontdesk_vitals,POST /v1/clinical/patients/{patientId}/allergies,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/patients/{patientId}/conditions,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/apply-set/{setId},clinical:edit,deny-403
+frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/pdf/send,clinical:view&patients:edit,allow
 frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,deny-403
+frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/revoke,clinical:approve|clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,allow
 frontdesk_vitals,POST /v1/clinical/rx-sets,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
@@ -2745,6 +2803,7 @@ frontdesk_vitals,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/facility/checkin-config,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+frontdesk_vitals,PUT /v1/patients/{patientId}/notification-preferences,patients:edit,allow
 frontdesk_vitals,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 frontdesk_vitals,PUT /v1/pharmacy/stock-takes/{id}/counts,pharmacy:edit,deny-403
 frontdesk_vitals,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
@@ -2757,6 +2816,7 @@ frontdesk_vitals,PUT /v1/setup/calendar/quiet-hours,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/charges/{id}/doctor-fees,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/checklist/{step}/draft,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
+frontdesk_vitals,PUT /v1/setup/messaging-settings,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/policies/follow_up_window_days,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 frontdesk_vitals,PUT /v1/staff/{id}/hpr,staff:edit,deny-403

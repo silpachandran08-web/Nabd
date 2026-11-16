@@ -1501,6 +1501,49 @@ paths:
       tags:
       - patient
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/households/{phoneHash}/notification-preferences:
+    patch:
+      operationId: InternalNotificationPreferencesController_language
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: phoneHash
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HouseholdLanguageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/HouseholdLanguageResult"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/households/{phoneHash}/reverification:
     get:
       operationId: InternalPhoneReverificationController_state
@@ -5160,6 +5203,139 @@ paths:
       tags:
       - queue
       x-required-permission: queue:create
+  /v1/break-glass/grants:
+    get:
+      operationId: BreakGlassReviewController_queue
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BreakGlassReviewQueueResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - auth
+      x-required-permission: compliance:view | staff:edit
+  /v1/break-glass/grants/{id}/reads:
+    get:
+      operationId: BreakGlassReviewController_reads
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BreakGlassReadsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - auth
+      x-required-permission: compliance:view
+  /v1/break-glass/grants/{id}/review:
+    post:
+      operationId: BreakGlassReviewController_review
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BreakGlassReviewRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BreakGlassReviewResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - auth
+      x-required-permission: compliance:approve
   /v1/client-telemetry:
     post:
       operationId: ClientTelemetryController_ingest
@@ -6776,6 +6952,94 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:edit
+  /v1/clinical/prescriptions/{queueEntryId}/pdf:
+    get:
+      operationId: PrescriptionPrintController_pdf
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: string
+          default: a4
+      responses:
+        "200":
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:view
+  /v1/clinical/prescriptions/{queueEntryId}/pdf/send:
+    post:
+      operationId: PrescriptionPrintController_send
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RxSendRequest"
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Issued"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: hasAuthority('clinical:view') and hasAuthority('patients:edit')
   /v1/clinical/prescriptions/{queueEntryId}/print-header:
     get:
       operationId: PrescriptionPrintController_header
@@ -6857,6 +7121,50 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:edit
+  /v1/clinical/prescriptions/{queueEntryId}/revoke:
+    post:
+      operationId: PrescriptionPrintController_revoke
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RxRevokeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RxRevokeResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:edit | clinical:approve
   /v1/clinical/prescriptions/{queueEntryId}/sign:
     post:
       operationId: PrescriptionController_sign
@@ -12544,6 +12852,87 @@ paths:
       tags:
       - patient
       x-required-permission: patients:view
+  /v1/patients/{patientId}/notification-preferences:
+    get:
+      operationId: NotificationPreferencesController_get
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:view
+    put:
+      operationId: NotificationPreferencesController_put
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationPreferencesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/patients/{patientId}/privacy-notice:
     get:
       operationId: NoticeController_status
@@ -16247,6 +16636,52 @@ paths:
           description: Error (RFC 7807)
       tags:
       - patient
+      x-required-permission: public
+  /v1/public/rx/keys:
+    get:
+      operationId: PublicRxController_keys
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: public
+  /v1/public/rx/verify/{token}:
+    get:
+      operationId: PublicRxController_verify
+      parameters:
+      - in: path
+        name: token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RxPublicVerification"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
       x-required-permission: public
   /v1/public/trials:
     post:
@@ -23537,6 +23972,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BreakGlassResponse"
+    BreakGlassReadsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
     BreakGlassResponse:
       type: object
       properties:
@@ -23553,6 +23995,38 @@ components:
           type: string
         staffName:
           type: string
+    BreakGlassReviewQueueResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        nextCursor:
+          type: string
+    BreakGlassReviewRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        outcome:
+          type: string
+          minLength: 1
+          pattern: justified|not_justified
+        revokePermission:
+          type: boolean
+      required:
+      - outcome
+    BreakGlassReviewResponse:
+      type: object
+      properties:
+        permissionRevoked:
+          type: boolean
+        reviewedAt:
+          type: string
+          format: date-time
     BulkChargesRequest:
       type: object
       properties:
@@ -23635,6 +24109,23 @@ components:
           type: string
         relation:
           type: string
+    CaregiverRecipient:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            type: string
+            pattern: careReminders|recalls
+          maxItems: 2
+          minItems: 0
+        personRef:
+          type: string
+          format: uuid
+          description: The caregiver's patient id (one of eligibleCaregivers)
+      required:
+      - categories
+      - personRef
     Cell:
       type: object
       properties:
@@ -26041,6 +26532,18 @@ components:
             $ref: "#/components/schemas/Item"
         nextCursor:
           type: string
+    EligibleCaregiver:
+      type: object
+      description: "A caregiver who may be added now: guardian or live proxy with\
+        \ their own messaging consent and number."
+      properties:
+        firstName:
+          type: string
+        personRef:
+          type: string
+          format: uuid
+        relation:
+          type: string
     EncounterListItem:
       type: object
       properties:
@@ -27056,6 +27559,22 @@ components:
           type: string
         to:
           type: string
+    HouseholdLanguageRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          pattern: en|hi|ar|kn|te
+      required:
+      - language
+    HouseholdLanguageResult:
+      type: object
+      properties:
+        changed:
+          type: integer
+          format: int32
+        language:
+          type: string
     HouseholdMember:
       type: object
       properties:
@@ -27930,12 +28449,21 @@ components:
         licenceExpiresOn:
           type: string
           format: date
+        registrationCouncil:
+          type: string
+          maxLength: 80
+          minLength: 0
+        signatureFileId:
+          type: string
+          format: uuid
       required:
       - isClinician
     LicenceResponse:
       type: object
       properties:
         hasRegistrationNo:
+          type: boolean
+        hasSignature:
           type: boolean
         isClinician:
           type: boolean
@@ -27945,6 +28473,8 @@ components:
         licenceOverrideUntil:
           type: string
           format: date-time
+        registrationCouncil:
+          type: string
         staffId:
           type: string
           format: uuid
@@ -28211,17 +28741,6 @@ components:
           format: uuid
       required:
       - duplicatePatientId
-    MessagingHealth:
-      type: object
-      properties:
-        senders:
-          type: array
-          items:
-            $ref: "#/components/schemas/MessagingSender"
-        templates:
-          type: array
-          items:
-            $ref: "#/components/schemas/MessagingTemplate"
     MessagingFridayBlock:
       type: object
       properties:
@@ -28241,6 +28760,17 @@ components:
       required:
       - end
       - start
+    MessagingHealth:
+      type: object
+      properties:
+        senders:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessagingSender"
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessagingTemplate"
     MessagingPrayerWindows:
       type: object
       properties:
@@ -28682,6 +29212,19 @@ components:
           type: string
         subjective:
           type: string
+    NotificationCategories:
+      type: object
+      description: true = the patient receives this kind of message. Omitted in a
+        PUT = on.
+      properties:
+        careReminders:
+          type: boolean
+        feedback:
+          type: boolean
+        recalls:
+          type: boolean
+        reviews:
+          type: boolean
     NotificationClaim:
       type: object
       properties:
@@ -28719,6 +29262,70 @@ components:
           format: uuid
         phoneE164:
           type: string
+    NotificationPreferences:
+      type: object
+      properties:
+        caregivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaregiverRecipient"
+        categories:
+          $ref: "#/components/schemas/NotificationCategories"
+        channel:
+          type: string
+        eligibleCaregivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/EligibleCaregiver"
+        language:
+          type: string
+        quietHours:
+          $ref: "#/components/schemas/NotificationQuietHours"
+        version:
+          type: integer
+          format: int64
+      required:
+      - caregivers
+      - categories
+      - channel
+      - eligibleCaregivers
+      - version
+    NotificationPreferencesRequest:
+      type: object
+      properties:
+        caregivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaregiverRecipient"
+          maxItems: 10
+          minItems: 0
+        categories:
+          $ref: "#/components/schemas/NotificationCategories"
+        channel:
+          type: string
+          pattern: whatsapp|sms|email
+        language:
+          type: string
+          description: null = the clinic default (English)
+          pattern: en|hi|ar|kn|te
+        quietHours:
+          $ref: "#/components/schemas/NotificationQuietHours"
+      required:
+      - channel
+    NotificationQuietHours:
+      type: object
+      description: "Extra quiet hours of this patient, clinic local time (HH:mm);\
+        \ the clinic's own quiet hours still apply."
+      properties:
+        end:
+          type: string
+          pattern: "([01]\\d|2[0-3]):[0-5]\\d"
+        start:
+          type: string
+          pattern: "([01]\\d|2[0-3]):[0-5]\\d"
+      required:
+      - end
+      - start
     Offer:
       type: object
       properties:
@@ -30423,7 +31030,17 @@ components:
           type: string
         qrSvg:
           type: string
+        registrationCouncil:
+          type: string
+        revokeReason:
+          type: string
+        revokedAt:
+          type: string
+          format: date-time
         signedAt:
+          type: string
+          format: date-time
+        validUntil:
           type: string
           format: date-time
     PrescriptionResponse:
@@ -32011,6 +32628,34 @@ components:
           minLength: 1
       required:
       - phone
+    RxPublicDoctor:
+      type: object
+      properties:
+        council:
+          type: string
+        name:
+          type: string
+        registrationNo:
+          type: string
+    RxPublicVerification:
+      type: object
+      properties:
+        dispensedAt:
+          type: string
+          format: date-time
+        doctor:
+          $ref: "#/components/schemas/RxPublicDoctor"
+        issuedAt:
+          type: string
+          format: date-time
+        lineCount:
+          type: integer
+          format: int32
+        status:
+          type: string
+        validUntil:
+          type: string
+          format: date-time
     RxReasonOption:
       type: object
       properties:
@@ -32018,6 +32663,29 @@ components:
           type: string
         label:
           type: string
+    RxRevokeRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 5
+      required:
+      - reason
+    RxRevokeResponse:
+      type: object
+      properties:
+        revokedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+    RxSendRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
     RxVerification:
       type: object
       properties:
