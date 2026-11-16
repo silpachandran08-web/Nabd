@@ -483,6 +483,10 @@ export const PharmacyStockMovementResponseSchema = z.object({ actorId: z.string(
 export const PharmacyWorklistLineSchema = z.object({ drug: z.string().optional(), inStock: z.boolean().optional(), prescriptionItemId: z.string().optional(), qtyDispensed: z.number().optional(), qtyPrescribed: z.number().optional() });
 export const PharmacyWorklistEntrySchema = z.object({ claimedBy: z.string().optional(), claimedByName: z.string().optional(), doctorName: z.string().optional(), id: z.string().optional(), lines: z.array(PharmacyWorklistLineSchema).optional(), patientName: z.string().optional(), prescriptionId: z.string().optional(), queueEntryId: z.string().optional(), signedAt: z.string().optional(), status: z.string().optional(), token: z.number().int().optional(), validUntil: z.string().optional() });
 export const PharmacyWorklistPageSchema = z.object({ items: z.array(PharmacyWorklistEntrySchema).optional(), nextCursor: z.string().optional() });
+export const PhoneReverificationStateSchema = z.object({ state: z.string().optional() });
+export const PhoneReverificationStepSchema = z.object({ attempt: z.number().int().gte(1).optional(), lockedUntil: z.string().optional(), method: z.string().optional(), reason: z.string().optional(), step: z.string() });
+export const PhoneSecondFactorRequestSchema = z.object({ dob: z.string() });
+export const PhoneSecondFactorResponseSchema = z.object({ match: z.boolean().optional() });
 export const QuestionSchema = z.object({ answers: z.array(AnswerSchema).optional(), id: z.string().optional(), text: z.string().optional() });
 export const PickerSchema = z.object({ jurisdiction: z.string().optional(), outcomes: z.array(OutcomeSchema).optional(), questions: z.array(QuestionSchema).optional() });
 export const PinAssertionRequestSchema = z.object({ approvalId: z.string().optional(), pin: z.string().min(1) });
@@ -767,6 +771,9 @@ export const operationSchemas = {
   InternalFamilyController_change: { body: FamilyProxyChangeSchema, response: AccessSchema },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   InternalDependantController_add: { body: ChatDependantRequestSchema, response: ChatDependantResponseSchema },
+  InternalPhoneReverificationController_state: { response: PhoneReverificationStateSchema },
+  InternalPhoneReverificationController_report: { body: PhoneReverificationStepSchema },
+  InternalPhoneReverificationController_check: { body: PhoneSecondFactorRequestSchema, response: PhoneSecondFactorResponseSchema },
   ChatRegistrationController_create: { body: ChatPatientCreateSchema, response: ChatPatientRefSchema },
   InternalChatConsentController_capture: { body: ChatConsentRequestSchema, response: ChatConsentResponseSchema },
   ChatRegistrationController_pending: { response: ChatPendingCompletionSchema },

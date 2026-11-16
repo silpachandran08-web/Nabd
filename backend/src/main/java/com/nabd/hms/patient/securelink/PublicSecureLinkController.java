@@ -73,6 +73,8 @@ class PublicSecureLinkController {
             case LOCKED -> new ApiException(HttpStatus.LOCKED, "link-locked", "Link locked", "Too many wrong codes. Ask the clinic to send a new link.");
             case RATE_LIMITED -> new ApiException(HttpStatus.TOO_MANY_REQUESTS, "otp-rate-limited", "Too many codes requested", "Please wait before asking for another code.");
             case OTP_INVALID -> new ApiException(HttpStatus.UNAUTHORIZED, "otp-invalid", "Code not accepted", "That code is wrong or has expired.");
+            case REVERIFY -> new ApiException(HttpStatus.LOCKED, "phone-reverify-required", "Number not verified",
+                    "This number must be verified again in the clinic's WhatsApp chat before the link can be opened."); // COM-041
         };
     }
 
