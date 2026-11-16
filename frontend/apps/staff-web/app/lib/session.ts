@@ -119,7 +119,9 @@ export function hasNursingGrant(permissions: string[]): boolean {
 // The clinic owner holds every grant; their sidebar (and home) is the Owner list, led by the Overview.
 // "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair); tokens minted
 // before that claim existed simply fall through. Same role selection as ClinicNav's render.
-export function landingPathFor(permissions: string[], owner = false): string {
+export function landingPathFor(permissions: string[], owner = false, solo = false): string {
+  // FEF-056: an owner who is the doctor of a solo-mode clinic lands on the solo role home (Today).
+  if (owner && solo) { const s = navFor({ perms: permissions, owner, ent: null, solo }); if (s.role === "solo") return s.items[0].href; }
   const first = (list: Destination[]) => list.find(([, ...need]) => need.every((p) => permissions.includes(p)))?.[0];
   const ownerHome = owner ? first(OWNER_LANDING) : undefined;
   if (ownerHome) return ownerHome;

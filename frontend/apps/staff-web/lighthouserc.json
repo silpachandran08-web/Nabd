@@ -2,7 +2,7 @@
   "nabdBudgets": {
     "lcpMs": 3000,
     "bundleKB": 1536,
-    "routes": ["/login", "/arrivals", "/consult", "/checkout/otc", "/my-day"]
+    "routes": ["/login", "/arrivals", "/consult", "/checkout/otc", "/my-day", "/solo"]
   },
   "ci": {
     "collect": {

@@ -13,6 +13,7 @@ import { LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
 import { api } from "../../lib/api";
 import { COOKIE_AUTH } from "../../lib/bffShim";
 import { signInCookiesFrom } from "../../lib/bff";
+import { loadSoloMode } from "../../shell/soloMode";
 import { LOCALE_COOKIE } from "@nabd/i18n";
 import { initialLogin, loginReducer, problemAction, signInAction, type LoginProblem, type MfaChallenge, type MfaSetupRequired, type TokenPair } from "./loginMachine";
 import { ForgotView, MfaSetupView, MfaVerifyView, OtpView, PinChangeView, SignInView } from "./LoginViews";
@@ -39,7 +40,9 @@ export default function LoginPage() {
       return;
     }
     // FEF-002: back to the page the session ended on (validated same-origin path), else the role landing page.
-    const to = takeReturnTo() ?? landingPathFor(claims?.permissions ?? [], claims?.owner === true);
+    const perms = claims?.permissions ?? [], owner = claims?.owner === true;
+    const solo = await loadSoloMode(claims?.tenantId ?? null, perms, owner); // FEF-056: the solo doctor lands on Today
+    const to = takeReturnTo() ?? landingPathFor(perms, owner, solo);
     // FEF-025 AC3: in bearer mode no BFF sets the saved theme/language cookies at sign-in, so take them from the preferences here.
     // Best effort: a slow or failed answer keeps this machine's cookies.
     if (!COOKIE_AUTH) {

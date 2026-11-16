@@ -3,13 +3,14 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { decodeAccessToken, landingPathFor } from "./lib/session";
+import { soloMode } from "./shell/soloMode";
 
 export default function HomeRedirect() {
   const router = useRouter();
   useEffect(() => {
     const token = localStorage.getItem("nabd_access_token");
     const claims = token ? decodeAccessToken(token) : null;
-    router.replace(claims ? landingPathFor(claims.permissions ?? [], claims.owner === true) : "/login");
+    router.replace(claims ? landingPathFor(claims.permissions ?? [], claims.owner === true, soloMode(claims.tenantId ?? null)) : "/login");
   }, [router]);
   return null;
 }

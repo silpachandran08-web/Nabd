@@ -6,7 +6,8 @@ import Link from "next/link";
 import styles from "./workspaces.module.css";
 import StatusPill, { type PillTone } from "../../../components/ui/StatusPill";
 import { ErrorState, Skeleton } from "../../../components/ui/StateViews";
-import { decodeAccessToken, regionLabel, signOut as endClinicSession } from "../../../lib/session";
+import { decodeAccessToken, landingPathFor, regionLabel, signOut as endClinicSession } from "../../../lib/session";
+import { loadSoloMode } from "../../../shell/soloMode";
 import { storeTokens } from "../../../lib/apiClient";
 import { COOKIE_AUTH } from "../../../lib/bffShim";
 import { publicApi, ApiError, reasonText } from "../../../lib/api";
@@ -112,7 +113,10 @@ export default function OwnerWorkspacesPage() {
       // Unlike staff PIN login (lib/session's landingPathFor, which guesses a home page from
       // permissions), this caller already knows the identity entering the clinic — the tenant
       // owner — so it goes straight to the owner's Overview instead of matching queue:view first.
-      router.replace("/overview");
+      // FEF-056: unless the clinic is in solo mode and the owner is its doctor: then the solo role home (Today).
+      const c = decodeAccessToken(pair.accessToken);
+      const solo = await loadSoloMode(c?.tenantId ?? null, c?.permissions ?? [], true);
+      router.replace(solo ? landingPathFor(c?.permissions ?? [], true, true) : "/overview");
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         sessionStorage.removeItem("nabd_owner_pending_token");

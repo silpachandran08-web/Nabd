@@ -213,6 +213,32 @@
       "short": "सूची"
     }
   },
+  "soloNav": {
+    "solo-today": {
+      "label": "आज",
+      "short": "आज"
+    },
+    "solo-consult": {
+      "label": "परामर्श",
+      "short": "परामर्श"
+    },
+    "solo-patients": {
+      "label": "मरीज़",
+      "short": "मरीज़"
+    },
+    "solo-money": {
+      "label": "भुगतान",
+      "short": "भुगतान"
+    },
+    "solo-specialty": {
+      "label": "विशेषज्ञता कार्यक्षेत्र",
+      "short": "विशेषज्ञता"
+    },
+    "solo-setup": {
+      "label": "मेरी क्लिनिक सेटिंग्स",
+      "short": "सेटिंग्स"
+    }
+  },
   "clinicNav": {
     "arrivals": {
       "label": "आज / आगमन",
@@ -362,7 +388,8 @@
     "reception": "रिसेप्शन",
     "pharmacist": "फ़ार्मासिस्ट",
     "lab": "लैब",
-    "billing": "बिलिंग"
+    "billing": "बिलिंग",
+    "solo": "एकल डॉक्टर"
   },
   "nav": {
     "mainNav": "मुख्य",
