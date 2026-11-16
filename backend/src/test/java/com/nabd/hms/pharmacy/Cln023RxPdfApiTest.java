@@ -216,7 +216,8 @@ class Cln023RxPdfApiTest extends ApiTestBase {
         ResponseEntity<Map> tampered = publicVerify(String.join(".", f));
         assertThat(tampered.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(slug(tampered)).isEqualTo("UNKNOWN_TOKEN");
-        assertThat(publicVerify("NRX1.%2e%2e.%00").getStatusCode()).isIn(HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST);
+        // an encoded traversal never reaches the controller: the security chain refuses it (401) or the firewall (400)
+        assertThat(publicVerify("NRX1.%2e%2e.%00").getStatusCode()).isIn(HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED);
         assertThat(publicVerify("a".repeat(1200)).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
         ResponseEntity<Map> keys = exchange("/v1/public/rx/keys", HttpMethod.GET, HttpEntity.EMPTY, Map.class);

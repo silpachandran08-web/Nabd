@@ -142,7 +142,7 @@ public class PrescriptionController {
     @PostMapping("/prescriptions/{queueEntryId}/repeat-last")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public PrescriptionResponse repeatLast(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
-                                            @RequestBody(required = false) RepeatLastRequest req, HttpServletRequest http) {
+                                            @Valid @RequestBody(required = false) RepeatLastRequest req, HttpServletRequest http) {
         return service.repeatLast(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http),
                 req == null ? null : req.sourcePrescriptionId());
     }

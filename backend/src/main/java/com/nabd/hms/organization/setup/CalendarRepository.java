@@ -75,6 +75,13 @@ class CalendarRepository {
                 tenantId, enabled, from, to);
     }
 
+    /** COM-024: the region's default (regions table, V3221) for a clinic that never saved prayer settings. */
+    Prayer prayerDefault(String region) {
+        return jdbc.query("SELECT prayer_windows_default, prayer_method FROM regions WHERE code = ?",
+                (rs, i) -> new Prayer(rs.getBoolean(1), rs.getString(2), 20, LocalTime.of(11, 30), LocalTime.of(13, 30), null, null), region)
+                .stream().findFirst().orElse(new Prayer(false, "mwl", 20, LocalTime.of(11, 30), LocalTime.of(13, 30), null, null));
+    }
+
     Optional<Prayer> prayer(UUID tenantId) {
         return jdbc.query("""
                 SELECT prayer_enabled, prayer_method, prayer_buffer_min, friday_start, friday_end, latitude, longitude

@@ -25,7 +25,7 @@ import java.util.UUID;
 /**
  * COM-024: the clinic's messaging settings: quiet hours (clinic_quiet_hours, ADM-028) and prayer windows (V3220). Every change
  * publishes organization.messaging_settings.changed.v1 with the whole settings and the clinic's time zone, which the Comms Gateway
- * mirrors and its send scheduler applies. Prayer windows default on for KSA and off elsewhere (DEC-27 can flip either way).
+ * mirrors and its send scheduler applies. Prayer-window defaults and method come from the regions table (V3221; DEC-27 can flip them).
  */
 @Service
 public class MessagingSettingsService {
@@ -119,24 +119,12 @@ public class MessagingSettingsService {
     @Transactional(propagation = Propagation.MANDATORY)
     MessagingSettingsResponse view(UUID tenantId) {
         var quiet = repo.quiet(tenantId).orElse(new CalendarRepository.Quiet(false, LocalTime.of(21, 0), LocalTime.of(9, 0)));
-        String region = clock.region(tenantId);
-        var prayer = repo.prayer(tenantId).orElse(new CalendarRepository.Prayer("SA".equals(region), defaultMethod(region), 20,
-                LocalTime.of(11, 30), LocalTime.of(13, 30), null, null));
+        var prayer = repo.prayer(tenantId).orElseGet(() -> repo.prayerDefault(clock.region(tenantId)));
         return new MessagingSettingsResponse(
                 new MessagingSettingsResponse.MessagingQuietHours(quiet.enabled(), quiet.from().format(HH_MM), quiet.to().format(HH_MM)),
                 new MessagingSettingsResponse.MessagingPrayerWindows(prayer.enabled(), prayer.method(), prayer.bufferMinutes(),
                         new MessagingSettingsResponse.MessagingFridayBlock(prayer.fridayFrom().format(HH_MM), prayer.fridayTo().format(HH_MM)),
                         prayer.latitude(), prayer.longitude()));
-    }
-
-    /** The method each GCC authority publishes; elsewhere Muslim World League. NEEDS LOCAL CHECK. */
-    static String defaultMethod(String region) {
-        return switch (region == null ? "" : region) {
-            case "SA" -> "umm_al_qura";
-            case "QA" -> "qatar";
-            case "AE" -> "dubai";
-            default -> "mwl";
-        };
     }
 
     private static BigDecimal scale(BigDecimal v) {

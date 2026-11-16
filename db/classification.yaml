@@ -1979,6 +1979,8 @@ schemas:
       active: operational
       display_languages: operational
       einvoice_scheme: operational
+      prayer_method: operational
+      prayer_windows_default: operational
     price_templates:
       id: operational
       specialty: operational
