@@ -209,6 +209,20 @@ export const DelayResponseItemSchema = z.object({ appointmentId: z.string().opti
 export const DelayResponsesResponseSchema = z.object({ counts: z.record(z.string(), z.number().int()).optional(), items: z.array(DelayResponseItemSchema).optional() });
 export const DelegationRequestSchema = z.object({ delegatedRoleId: z.string(), expiresAt: z.string(), reason: z.string().min(1), staffId: z.string() });
 export const DelegationResponseSchema = z.object({ active: z.boolean().optional(), delegatedRoleId: z.string().optional(), delegatedRoleName: z.string().optional(), expiresAt: z.string().optional(), grantedBy: z.string().optional(), id: z.string().optional(), reason: z.string().optional(), revokedAt: z.string().optional(), revokedReason: z.string().optional(), staffId: z.string().optional(), startsAt: z.string().optional() });
+export const DentalChairNoteCreatedSchema = z.object({ noteId: z.string().optional() });
+export const DentalChairNoteItemSchema = z.object({ createdAt: z.string().optional(), createdBy: z.string().optional(), laDrugId: z.string().optional(), laLot: z.string().optional(), noteId: z.string().optional(), patientId: z.string().optional(), presetCode: z.string().optional(), queueEntryId: z.string().optional(), text: z.string().optional(), tooth: z.number().int().optional() });
+export const DentalChairNoteListSchema = z.object({ items: z.array(DentalChairNoteItemSchema).optional() });
+export const DentalLaBatchSchema = z.object({ drugId: z.string(), lot: z.string().min(0).max(80) });
+export const DentalChairNoteRequestSchema = z.object({ laBatch: DentalLaBatchSchema.optional(), presetCode: z.string().min(0).max(40), queueEntryId: z.string(), tooth: z.number().int() });
+export const DentalImageCreatedSchema = z.object({ imageId: z.string().optional() });
+export const DentalImageItemSchema = z.object({ createdAt: z.string().optional(), fileId: z.string().optional(), imageId: z.string().optional(), kind: z.string().optional(), patientId: z.string().optional(), queueEntryId: z.string().optional(), teeth: z.array(z.number().int()).optional() });
+export const DentalImageListSchema = z.object({ items: z.array(DentalImageItemSchema).optional() });
+export const DentalImageRequestSchema = z.object({ kind: z.string(), queueEntryId: z.string(), teeth: z.array(z.number().int()).optional(), uploadId: z.string() });
+export const DentalLaLotSchema = z.object({ drugId: z.string().optional(), drugName: z.string().optional(), expiryDate: z.string().optional(), lot: z.string().optional() });
+export const DentalPresetSchema = z.object({ code: z.string().min(1), drugQuery: z.string().min(0).max(60).optional(), la: z.boolean().optional(), label: z.string().min(0).max(60) });
+export const DentalMyPresetsRequestSchema = z.object({ presets: z.array(DentalPresetSchema) });
+export const DentalSettingsRequestSchema = z.object({ numbering: z.string(), presets: z.array(DentalPresetSchema).optional() });
+export const DentalSettingsResponseSchema = z.object({ clinicPresets: z.array(DentalPresetSchema).optional(), myPresets: z.array(DentalPresetSchema).optional(), numbering: z.string().optional(), presets: z.array(DentalPresetSchema).optional() });
 export const DepartmentResponseSchema = z.object({ active: z.boolean().optional(), id: z.string().optional(), isDefault: z.boolean().optional(), name: z.string().optional() });
 export const DepartmentWorkflowRequestSchema = z.object({ templateCode: z.string().min(1), toggles: z.record(z.string(), z.boolean()).optional() });
 export const WorkflowTemplateResponseSchema = z.object({ code: z.string().optional(), name: z.string().optional(), steps: z.array(z.string()).optional(), toggleKeys: z.array(z.string()).optional() });
@@ -1321,12 +1335,20 @@ export const operationSchemas = {
   TemplateLintController_dryRun: { body: TemplateLintRequestSchema, response: TemplateLintResponseSchema },
   WhiteGloveController_view: { response: OwnerViewSchema },
   WhiteGloveController_book: { body: BookRequestSchema, response: BookedSchema },
+  DentalCaseController_laLots: { response: z.array(DentalLaLotSchema) },
+  DentalCaseController_chairNotes: { response: DentalChairNoteListSchema },
+  DentalCaseController_addChairNote: { body: DentalChairNoteRequestSchema, response: DentalChairNoteCreatedSchema },
   DentalController_chart: { response: z.array(ToothResponseSchema) },
   DentalController_history: { response: z.array(ToothHistoryEntryResponseSchema) },
   DentalController_addSupernumerary: { body: SupernumeraryToothRequestSchema, response: ToothResponseSchema },
   DentalController_updateSupernumerary: { body: ToothWriteRequestSchema, response: ToothResponseSchema },
   DentalController_removeSupernumerary: {  },
   DentalController_upsertTooth: { body: ToothWriteRequestSchema, response: ToothResponseSchema },
+  DentalCaseController_images: { response: DentalImageListSchema },
+  DentalCaseController_attachImage: { body: DentalImageRequestSchema, response: DentalImageCreatedSchema },
+  DentalCaseController_settings: { response: DentalSettingsResponseSchema },
+  DentalCaseController_updateSettings: { body: DentalSettingsRequestSchema, response: DentalSettingsResponseSchema },
+  DentalCaseController_updateMyPresets: { body: DentalMyPresetsRequestSchema, response: DentalSettingsResponseSchema },
   SpecialtyController_me: { response: MySpecialtyProfileSchema },
   SpecialtyController_profiles: { response: SpecialtyProfileListSchema },
   StaffController_list: { response: StaffPageSchema },
