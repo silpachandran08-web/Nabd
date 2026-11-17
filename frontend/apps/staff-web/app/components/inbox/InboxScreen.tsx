@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { api, errorText } from "../../lib/api";
-import { decodeAccessToken } from "../../lib/session";
+import { decodeAccessToken, getIdentity } from "../../lib/session";
 import { usePermissions } from "../../lib/usePermissions";
 import Composer from "./Composer";
 import NotesDialog from "./NotesDialog";
 import TemplatePicker from "./TemplatePicker";
-import { FILTERS, authorLabel, canFreeText, isFailed, keyAction, oldestWaiting, previewText, sessionPill, tick, waitingChip, type FilterId } from "./inboxLogic";
+import { FILTERS, authorLabel, canFreeText, canSendAsSms, isFailed, keyAction, oldestWaiting, previewText, sessionPill, tick, waitingChip, type FilterId } from "./inboxLogic";
 import { useMessages, useThreads } from "./useInbox";
 import styles from "./inbox.module.css";
 
@@ -29,6 +29,7 @@ export default function InboxScreen() {
   const { permissions } = usePermissions();
   const canReply = permissions.includes("inbox:reply");
   const meId = useMemo(() => { try { return decodeAccessToken(localStorage.getItem("nabd_access_token") ?? "")?.sub ?? null; } catch { return null; } }, []);
+  const region = useMemo(() => getIdentity()?.tenantRegion ?? null, []);
   const phone = usePhone();
   const now = useMinute();
   const [filter, setFilter] = useState<FilterId>("all");
@@ -76,6 +77,13 @@ export default function InboxScreen() {
 
   async function act(path: string, body: unknown, fail: string) {
     try { await api.post(`/inbox/threads/${selected?.id}/${path}`, body); setNotice(""); await Promise.all([reload(), reloadMessages()]); } catch (e) { setNotice(errorText(e, fail)); }
+  }
+  async function sendAsSms(messageId: string) {
+    try {
+      const r = await api.post<{ status?: string }>(`/inbox/messages/${messageId}/sms`, {});
+      setNotice(r?.status === "blocked" ? "Not sent by SMS: this patient has not agreed to messages." : r?.status === "sent" ? "Sent by SMS." : "SMS could not be sent.");
+      await reloadMessages();
+    } catch (e) { setNotice(errorText(e, "Couldn't send the SMS. Nothing was sent.")); }
   }
   const handover = (mode: "bot" | "human") => act("mode", { mode }, "Couldn't change who replies. Nothing changed.");
 
@@ -179,11 +187,13 @@ export default function InboxScreen() {
                           <span className={styles.text}>{m.text ?? (m.templateName ? `Template sent: ${m.templateName}` : "Attachment")}</span>
                           <span className={styles.stamp}>
                             {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {out && m.channel === "sms" && <span className={styles.badge}>Sent by SMS</span>}
                             {out && <span className={styles.tick} aria-label={t.label}>{t.glyph}</span>}
                           </span>
                           {out && isFailed(m.status) && (
                             <span className={styles.failed} role="alert">Not delivered.
                               {canReply && m.text && canFreeText(selected, now) && <button type="button" className={styles.secondary} onClick={() => void act("replies", { text: m.text }, "Couldn't resend. Nothing was sent.")}>Retry</button>}
+                              {canReply && canSendAsSms(m, region) && <button type="button" className={styles.secondary} onClick={() => void sendAsSms(m.id)}>Send as SMS</button>}
                             </span>
                           )}
                         </li>

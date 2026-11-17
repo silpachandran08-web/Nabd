@@ -30,4 +30,9 @@ class SmsConfig {
                           ObjectMapper json, MeterRegistry metrics, Clock clock, @Value("${comms.region:in}") String region) {
         return new SmsService(jdbc, tx, crypto, provider, gate, events, json, metrics, clock, region);
     }
+
+    @Bean
+    SmsFallback smsFallback(JdbcTemplate jdbc, TransactionTemplate tx, FieldCrypto crypto, SmsService sms, MeterRegistry metrics, Clock clock) {
+        return new SmsFallback(jdbc, tx, crypto, sms, metrics, clock);
+    }
 }

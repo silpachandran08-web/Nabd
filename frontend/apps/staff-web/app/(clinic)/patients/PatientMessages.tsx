@@ -9,7 +9,7 @@ import styles from "./patientMessages.module.css";
 import pageStyles from "./patients.module.css";
 
 // COM-006: GET /v1/patients/{id}/messages. Only these fields are relied on; extras are ignored.
-export type MessageItem = { id: string; purpose?: string; templateName: string; status: string; statusAt: string; failureReason?: string | null };
+export type MessageItem = { id: string; channel?: string; purpose?: string; templateName: string; status: string; statusAt: string; failureReason?: string | null; fallbackOf?: string | null };
 type Page = { items: MessageItem[]; nextCursor?: string | null };
 
 /** Patient file > Messages: what this patient was sent and whether it arrived. The list refreshes by itself when a
@@ -70,6 +70,7 @@ export default function PatientMessages({ patientId }: { patientId: string }) {
               <br />
               <span className={styles.meta}>{new Date(m.statusAt).toLocaleString()}</span>
               {m.failureReason && <><br /><span className={styles.reason}>{m.failureReason}</span></>}
+              {m.channel === "sms" && <><br /><span className={styles.meta}>{m.fallbackOf ? "Sent by SMS (WhatsApp did not deliver)" : "Sent by SMS"}</span></>}
             </span>
             <span className={styles.status}>
               <span className={`${styles.tick} ${tone}`} aria-hidden="true" data-tone={t.tone}>{t.glyph}</span>
