@@ -11,6 +11,7 @@ import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.patient.api.PatientRefs;
 import com.nabd.hms.shared.ConsentSignature;
 import com.nabd.hms.shared.FileStore;
+import com.nabd.hms.shared.HiddenFiles;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ import java.util.UUID;
  * or audited: audit rows carry ids, scope and site only.
  */
 @Service
-public class DermPhotoService {
+public class DermPhotoService implements HiddenFiles {
 
     static final String PURPOSE = "clinical_photo";
 
@@ -181,9 +182,10 @@ public class DermPhotoService {
         return new DermPhotoController.Timeline(consent, repo.hiddenCount(tenantId, patientId), out);
     }
 
-    /** True when the file is a photo hidden by a withdrawn consent (the generic download-url endpoint must not serve it). */
+    /** True when the file is a photo hidden by a withdrawn consent: no new download-url, and the blob endpoint stops serving earlier links. */
+    @Override
     @Transactional(readOnly = true)
-    public boolean hiddenPhoto(UUID tenantId, UUID fileId) {
+    public boolean hidden(UUID tenantId, UUID fileId) {
         return repo.hiddenUpload(tenantId, fileId);
     }
 

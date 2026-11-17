@@ -2,6 +2,7 @@ package com.nabd.hms.clinical.derm;
 
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.platform.entitlements.PlanEntitlements;
+import com.nabd.hms.shared.files.ObjectStorage;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -44,6 +46,8 @@ class Cln047DermPhotosApiTest extends ApiTestBase {
 
     @Autowired
     private PlanEntitlements planEntitlements;
+    @Autowired
+    private ObjectStorage storage;
 
     private record Clinic(SeededTenant t, SeededStaff owner, String ownerToken, SeededStaff doctor, String doctorToken, String patientId,
                           String visitId) {
@@ -295,6 +299,51 @@ class Cln047DermPhotosApiTest extends ApiTestBase {
         assertThat(again).containsEntry("hiddenCount", 1);
         assertThat((List<?>) sites(again).get(0).get("photos")).hasSize(1);
         assertThat(inTenantTx(c.t().id(), () -> jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action = 'derm_photo_consent.withdrawn'", Integer.class))).isEqualTo(1);
+    }
+
+    /** T1-BUG-4: the bytes are refused at serve time, so a link issued before the withdrawal dies with it (not only new link requests). */
+    @Test
+    void t1bug4_linksIssuedBeforeTheWithdrawalStopServingThePhoto_otherAttachmentsKeepWorking() throws Exception {
+        Clinic c = clinic();
+        consent(c, "record_only", SIGNATURE);
+        String up = upload(c.doctorToken(), small());
+        assertThat(addPhoto(c, up, c.visitId(), "cheek", "left").getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String timelineUrl = (String) ((List<Map<String, Object>>) sites(timeline(c, "")).get(0).get("photos")).get(0).get("url");
+        String downloadUrl = (String) exchange("/v1/files/" + up + "/download-url", HttpMethod.POST, authed(c.doctorToken()), Map.class).getBody().get("url");
+        // an ordinary visit attachment of the same patient (not a consented derm photo)
+        String xray = upload(c.doctorToken(), small());
+        assertThat(exchange("/v1/clinical/visits/" + c.visitId() + "/attachments", HttpMethod.POST,
+                authedJsonBody(c.doctorToken(), Map.of("fileId", xray, "kind", "xray")), Map.class).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String xrayUrl = (String) exchange("/v1/files/" + xray + "/download-url", HttpMethod.POST, authed(c.doctorToken()), Map.class).getBody().get("url");
+        // another clinic's photo: its consent stands
+        Clinic other = clinic();
+        consent(other, "record_only", SIGNATURE);
+        assertThat(addPhoto(other, upload(other.doctorToken(), small()), other.visitId(), "cheek", "left").getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String otherUrl = (String) ((List<Map<String, Object>>) sites(timeline(other, "")).get(0).get("photos")).get(0).get("url");
+        for (String u : List.of(timelineUrl, downloadUrl, xrayUrl, otherUrl)) {
+            assertThat(http.exchange(URI.create(url(u)), HttpMethod.GET, null, byte[].class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        assertThat(exchange(base(c) + "/photo-consent/withdraw", HttpMethod.POST, authed(c.doctorToken()), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // exactly what a signed link to an object that does not exist answers: 404, no body
+        ResponseEntity<byte[]> unknown = http.exchange(URI.create(url(storage.presign(false, ObjectStorage.Bucket.CLEAN,
+                "tenant/" + c.t().id() + "/" + UUID.randomUUID(), Duration.ofMinutes(5), 0))), HttpMethod.GET, null, byte[].class);
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        for (String u : List.of(timelineUrl, downloadUrl)) {
+            ResponseEntity<byte[]> r = http.exchange(URI.create(url(u)), HttpMethod.GET, null, byte[].class);
+            assertThat(r.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(r.getBody()).isNull();
+            assertThat(r.getHeaders().getContentType()).isEqualTo(unknown.getHeaders().getContentType());
+        }
+        for (String u : List.of(xrayUrl, otherUrl)) {
+            ResponseEntity<byte[]> r = http.exchange(URI.create(url(u)), HttpMethod.GET, null, byte[].class);
+            assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(r.getBody()).isNotEmpty();
+        }
+        // a new consent does not bring the old link back
+        consent(c, "record_only", SIGNATURE);
+        assertThat(http.exchange(URI.create(url(timelineUrl)), HttpMethod.GET, null, byte[].class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
