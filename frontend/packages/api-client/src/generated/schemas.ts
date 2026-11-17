@@ -655,6 +655,8 @@ export const SettingsSchema = z.object({ effectiveMode: z.string().optional(), e
 export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().optional(), draft: JsonNodeSchema.optional(), skippedAt: z.string().optional(), status: z.string().optional(), step: z.string().optional(), updatedAt: z.string().optional(), version: z.number().int().optional() });
 export const SetupDraftRequestSchema = z.object({ draft: JsonNodeSchema, version: z.number().int().gte(0) });
 export const SetupDraftResponseSchema = z.object({ step: z.string().optional(), version: z.number().int().optional() });
+export const SmsKeywordRequestSchema = z.object({ inboundRef: z.number().int().gte(0), phone: z.string(), tenantId: z.string().optional(), text: z.string().min(0).max(64) });
+export const SmsKeywordResponseSchema = z.object({ confirm: z.boolean().optional(), optedOut: z.boolean().optional() });
 export const SourceBreakdownResponseSchema = z.object({ revenue: z.number().optional(), source: z.string().optional(), untaggedCount: z.number().int().optional(), visitCount: z.number().int().optional() });
 export const SpecialtyProfileItemSchema = z.object({ code: z.string(), configVersion: z.number().int(), entitled: z.boolean(), name: z.record(z.string(), z.string()) });
 export const SpecialtyProfileListSchema = z.object({ items: z.array(SpecialtyProfileItemSchema) });
@@ -775,6 +777,7 @@ export const operationSchemas = {
   BlobController_get: { response: z.string() },
   BlobController_put: { body: z.string() },
   ConsentExportController_export: { response: PageSchema },
+  SmsKeywordController_keyword: { body: SmsKeywordRequestSchema, response: SmsKeywordResponseSchema },
   DrugMasterImportController_start: { body: DrugMasterImportRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   DrugMasterImportController_status: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   DrugMasterImportController_activate: { body: DrugMasterActivateRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },

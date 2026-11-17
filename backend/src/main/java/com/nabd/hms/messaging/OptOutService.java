@@ -24,6 +24,7 @@ class OptOutService {
 
     static final String SOURCE_STOP = "whatsapp_stop";
     static final String SOURCE_START = "whatsapp_start";
+    static final String SOURCE_SMS_STOP = "sms_stop";
     static final String CONFIRM_STOP = "optout_confirm";
     static final String CONFIRM_START = "optin_confirm";
     private static final Logger log = LoggerFactory.getLogger(OptOutService.class);
@@ -64,6 +65,25 @@ class OptOutService {
         if (tenant != null && (recorded || changed > 0)) { // one confirmation per opt-out, not per repeated STOP
             confirm(tenant, phone, CONFIRM_STOP);
         }
+    }
+
+    /** answer of {@link #handleSms}: optedOut = the text was a STOP; confirm = it changed something (send one confirmation). */
+    record SmsResult(boolean optedOut, boolean confirm) {}
+
+    /**
+     * COM-028: a keyword sent by SMS (MO on the BSP's long code, relayed by the Comms Gateway). Same matcher as WhatsApp, but any STOP
+     * withdraws 'marketing' only (SMS opt-out is the promotional opt-out, CMP-07) and the suppression covers every clinic, so WhatsApp and
+     * SMS promotions stop everywhere at send time. The consent rows change in the clinic bound by the caller (the clinic of the latest
+     * SMS to the number), none when unbound. The gateway sends the SMS confirmation. START by SMS is not handled (no lift).
+     */
+    SmsResult handleSms(UUID tenantOrNull, String phoneDigits, String text, long inboundRef) {
+        OptOutKeywords.Intent intent = OptOutKeywords.classify(text, null);
+        if (intent != OptOutKeywords.Intent.STOP_ALL && intent != OptOutKeywords.Intent.STOP_MARKETING) {
+            return new SmsResult(false, false);
+        }
+        boolean recorded = registry.suppress(null, phoneDigits, OptOutRegistry.MARKETING, SOURCE_SMS_STOP);
+        int changed = tenantOrNull == null ? 0 : consents.withdrawByPhone(phoneDigits, OptOutRegistry.MARKETING, SOURCE_SMS_STOP, inboundRef).changed();
+        return new SmsResult(true, recorded || changed > 0);
     }
 
     /** Best effort: the clinic may not have the (approved, no-parameter) utility template yet; the opt-out stands regardless. */

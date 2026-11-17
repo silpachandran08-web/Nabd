@@ -18,6 +18,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/files-blob/object`, () => HttpResponse.json("AA==", { status: 200 })), // BlobController_get
     http.put(`${baseUrl}/files-blob/object`, () => new HttpResponse(null, { status: 200 })), // BlobController_put
     http.get(`${baseUrl}/internal/v1/consents:export`, () => HttpResponse.json({"items":[{"classId":"string","lang":"string","matchKind":"string","value":"string"}],"nextCursor":"string"}, { status: 200 })), // ConsentExportController_export
+    http.post(`${baseUrl}/internal/v1/consents:sms-keyword`, () => HttpResponse.json({"confirm":false,"optedOut":false}, { status: 200 })), // SmsKeywordController_keyword
     http.post(`${baseUrl}/internal/v1/drug-master/imports`, () => HttpResponse.json({}, { status: 200 })), // DrugMasterImportController_start
     http.get(`${baseUrl}/internal/v1/drug-master/imports/:importId`, () => HttpResponse.json({}, { status: 200 })), // DrugMasterImportController_status
     http.post(`${baseUrl}/internal/v1/drug-master/imports/:importId/activate`, () => HttpResponse.json({}, { status: 200 })), // DrugMasterImportController_activate
@@ -602,4 +603,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 588;
+export const operationCount = 589;
