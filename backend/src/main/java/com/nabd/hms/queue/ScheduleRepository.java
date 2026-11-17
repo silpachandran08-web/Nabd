@@ -204,25 +204,6 @@ class ScheduleRepository {
                 tenantId, doctorId, Timestamp.from(from), Timestamp.from(to));
     }
 
-    /**
-     * NB-091: "blocking a doctor warns about affected package sessions restricted to that doctor" —
-     * a narrow direct query into the packages module's tables (same convention as CheckoutRepository
-     * reading pharmacy/procedure_orders directly) rather than injecting PackageRepository. Active
-     * instances only, and only packages actually restricted to a doctor via package_eligible_doctors
-     * (an unrestricted package is never "affected" by one doctor's leave), with at least one
-     * item still unconsumed.
-     */
-    List<String> findAffectedPackagePatientNames(UUID tenantId, UUID doctorId) {
-        return jdbc.query(
-                "SELECT DISTINCT p.name || ' (' || pi.package_name || ')' AS label " +
-                        "FROM package_instances pi " +
-                        "JOIN patients p ON p.id = pi.patient_id " +
-                        "JOIN package_eligible_doctors ed ON ed.package_id = pi.package_id AND ed.doctor_id = ? " +
-                        "WHERE pi.tenant_id = ? AND pi.status = 'active' " +
-                        "AND EXISTS (SELECT 1 FROM package_instance_items i WHERE i.instance_id = pi.id AND i.quantity_consumed < i.quantity_total)",
-                (rs, i) -> rs.getString("label"), doctorId, tenantId);
-    }
-
     /** Start times already booked (requested, scheduled, arrived) for a doctor on a given date — used to exclude taken slots. */
     List<Instant> bookedStartTimes(UUID doctorId, Instant dayStart, Instant dayEnd) {
         return jdbc.query(

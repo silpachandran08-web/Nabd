@@ -19,6 +19,8 @@ public enum DomainEventType {
     RX_SIGNED("clinical.rx.signed.v1", "core/clinical"),
     ALLERGY_CHANGED("clinical.allergy.changed.v1", "core/clinical"),
     INVOICE_PAID("billing.invoice.paid.v1", "core/billing"),
+    /** PLT-035: the visit's bill was settled at its terminal billing stop (checkout). Consumer: queue.InvoiceSettledConsumer (visit status). */
+    INVOICE_SETTLED("billing.invoice.settled.v1", "core/billing"),
     PAYMENT_RECORDED("billing.payment.recorded.v1", "core/billing"),
     REFUND_APPROVED("billing.refund.approved.v1", "core/billing"),
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
