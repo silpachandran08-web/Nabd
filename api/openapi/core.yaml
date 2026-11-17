@@ -29152,6 +29152,9 @@ components:
           format: uuid
         name:
           type: string
+        tenantId:
+          type: string
+          format: uuid
     InternalSession:
       type: object
       properties:
