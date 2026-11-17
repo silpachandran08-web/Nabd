@@ -2,6 +2,7 @@ package com.nabd.hms.clinical;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.common.VisitReadGate;
 import com.nabd.hms.staff.StaffService;
 import com.nabd.hms.staff.dto.CallerInfo;
 import org.springframework.http.HttpStatus;
@@ -25,7 +26,7 @@ import java.util.UUID;
  * Phase 0 bridge: IDC-027 replaces these SQL gates with the Cedar PEP.
  */
 @Component
-public class ClinicalReadScope {
+public class ClinicalReadScope implements VisitReadGate {
 
     /** For a clinical GET that returns no patient data (drug search, rx sets, templates); the arch test accepts it. */
     @Retention(RetentionPolicy.RUNTIME)
@@ -69,6 +70,12 @@ public class ClinicalReadScope {
     @Transactional(readOnly = true)
     public void requireVisit(ReadScope scope, UUID queueEntryId) {
         probe("SELECT q.id FROM queue_entries q WHERE q.tenant_id = ? AND q.id = ? " + scope.gate("q.patient_id", "q.tenant_id"), scope, queueEntryId);
+    }
+
+    /** VisitReadGate for modules that cannot import clinical; runs in the caller's transaction (self-calls skip the proxy). */
+    @Override
+    public void requireVisit(Jwt jwt, UUID queueEntryId) {
+        requireVisit(resolve(jwt), queueEntryId);
     }
 
     @Transactional(readOnly = true)

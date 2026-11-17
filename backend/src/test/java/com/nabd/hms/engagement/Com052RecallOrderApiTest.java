@@ -30,7 +30,7 @@ class Com052RecallOrderApiTest extends ApiTestBase {
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 300_000) + 400_000);
 
-    private record Clinic(SeededTenant t, SeededStaff doctor, String doc, String otherDoc, String desk) {
+    private record Clinic(SeededTenant t, SeededStaff doctor, String doc, String otherDoc, String desk, UUID doctorRole) {
     }
 
     private record Visit(String patientId, String entry) {
@@ -54,7 +54,7 @@ class Com052RecallOrderApiTest extends ApiTestBase {
         int dow = followUpDay().getDayOfWeek().getValue() % 7;
         assertThat(exchange("/v1/doctors/" + doctor.id() + "/working-hours", HttpMethod.POST, authedJsonBody(admin, Map.of(
                 "dayOfWeek", dow, "startTime", "09:00:00", "endTime", "12:00:00", "slotMinutes", 30)), Map.class).getStatusCode().is2xxSuccessful()).isTrue();
-        return new Clinic(t, doctor, loginAndGetAccessToken(doctor), other, desk);
+        return new Clinic(t, doctor, loginAndGetAccessToken(doctor), other, desk, doctorRole);
     }
 
     private static LocalDate followUpDay() {
@@ -202,6 +202,28 @@ class Com052RecallOrderApiTest extends ApiTestBase {
 
         // the boundaries are accepted
         assertThat(recall(c.doc(), v.entry(), Map.of("intervalDays", 730)).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    // T1-BUG-3 (IDC-001): an own-patients-only doctor gets the unknown-visit 404 on both endpoints, not the 403 that confirms the visit
+    @Test
+    void anOwnPatientsOnlyDoctorSeesAnotherDoctorsVisitAsMissing() {
+        Clinic c = clinic();
+        Visit v = visit(c);
+        assertThat(recall(c.doc(), v.entry(), Map.of("intervalDays", 14)).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        SeededStaff own = seedStaff(c.t(), c.doctorRole(), "rc" + SEQ.incrementAndGet() + "@q.com", phone(), false);
+        su().update("UPDATE staff SET scope = 'own_patients_only' WHERE id = ?", own.id());
+        String token = loginAndGetAccessToken(own);
+        ResponseEntity<Map> missing = recall(token, UUID.randomUUID().toString(), Map.of("intervalDays", 14));
+        ResponseEntity<Map> post = recall(token, v.entry(), Map.of("intervalDays", 14));
+        ResponseEntity<Map> get = exchange("/v1/encounters/" + v.entry() + "/recall-orders", HttpMethod.GET, authed(token), Map.class);
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        for (ResponseEntity<Map> r : List.of(post, get)) {
+            assertThat(r.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            for (String k : new String[]{"type", "title", "detail"}) {
+                assertThat(r.getBody().get(k)).as(k).isEqualTo(missing.getBody().get(k));
+            }
+        }
+        assertThat(su().queryForObject("SELECT count(*) FROM recall_orders WHERE tenant_id = ?", Integer.class, c.t().id())).isEqualTo(1);
     }
 
     @Test
