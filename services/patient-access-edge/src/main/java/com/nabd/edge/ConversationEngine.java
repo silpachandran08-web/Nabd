@@ -38,6 +38,7 @@ public class ConversationEngine {
     private final java.util.List<Intent> intents;
     private final ClinicRollout rollout;
     private final PhoneVerifications phones;
+    private final OutputGuard guard;
     /** The booking journey (ACC-040/042). Consent, registration and check-in keep their own outage handling (silent retry). */
     static final java.util.Set<State> BOOKING_STATES = java.util.EnumSet.of(State.START, State.LANGUAGE, State.MENU, State.WHO, State.CHILD_NAME,
             State.CHILD_DOB, State.CHILD_SEX, State.CHOOSING_DOCTOR, State.CHOOSING_DAY, State.CHOOSING_SLOT, State.CONFIRMING, State.DONE);
@@ -52,7 +53,8 @@ public class ConversationEngine {
 
     ConversationEngine(ConversationStore store, RateLimiter limiter, CommsClient comms, ButtonTokens buttons, MeterRegistry meters,
                        ObjectProvider<FlowHandler> flows, ObjectProvider<Intent> intents, ClinicRollout rollout,
-                       PhoneVerifications phones) {
+                       PhoneVerifications phones, OutputGuard guard) {
+        this.guard = guard;
         this.rollout = rollout;
         this.phones = phones;
         this.store = store;
@@ -134,6 +136,7 @@ public class ConversationEngine {
                 }
                 throw e;
             }
+            o = guard.check(c, o); // COM-016: never show or suggest another clinic
             checkContext(o);
             switch (store.commit(c, o, messageId)) {
                 case DUPLICATE -> {
@@ -161,7 +164,7 @@ public class ConversationEngine {
     public void open(UUID tenantId, String channel, String contact, java.util.function.Function<Conversation, Outcome> first, String key) {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             Conversation c = store.load(tenantId, channel, contact);
-            Outcome o = first.apply(c);
+            Outcome o = guard.check(c, first.apply(c));
             checkContext(o);
             switch (store.commit(c, o, key)) {
                 case DUPLICATE -> {
