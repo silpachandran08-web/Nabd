@@ -20,7 +20,8 @@ import java.util.UUID;
 class InternalBookingProfileController {
 
     @Schema(name = "InternalProfileDoctor")
-    record Doctor(UUID doctorId, String name) {
+    /** tenantId: the clinic the staff row belongs to (findActors reads only that clinic's rows); the Edge output guard (COM-016) refuses a row marked for another clinic. */
+    record Doctor(UUID doctorId, String name, UUID tenantId) {
     }
 
     @Schema(name = "InternalBookingProfile")
@@ -47,7 +48,7 @@ class InternalBookingProfileController {
         return tenantScope.run(tid, () -> {
             var names = actors.findActors(tid, schedule.doctorsWithHours(tid));
             return new Profile(jdbc.queryForObject("SELECT name FROM tenants WHERE id = ?", String.class, tid), clock.zone(tid).getId(),
-                    names.values().stream().sorted(java.util.Comparator.comparing(ActorDirectory.Actor::name)).map(a -> new Doctor(a.id(), a.name())).toList());
+                    names.values().stream().sorted(java.util.Comparator.comparing(ActorDirectory.Actor::name)).map(a -> new Doctor(a.id(), a.name(), tid)).toList());
         });
     }
 }
