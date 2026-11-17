@@ -111,6 +111,13 @@ export const isFailed = (status: string | null | undefined): boolean => status =
 export const canSendAsSms = (m: Pick<Message, "direction" | "status" | "channel">, region: string | null | undefined): boolean =>
   region === "IN" && m.direction === "out" && m.channel !== "sms" && (m.status === "failed" || m.status === "expired");
 
+/** The answer to 'Send as SMS' as the desk reads it; "sending" is a second press while the SMS is on its way, not a failure. */
+export const smsNotice = (status: string | null | undefined): string =>
+  status === "blocked" ? "Not sent by SMS: this patient has not agreed to messages."
+    : status === "sent" || status === "delivered" ? "Sent by SMS."
+    : status === "sending" || status === "queued" ? "This message is being sent by SMS."
+    : "SMS could not be sent.";
+
 /** The same two checks the server runs (COM-032): they only warn, a person decides. */
 const RESULT_OR_DIAGNOSIS = /\b(diagnos(is|ed)|test results?|lab results?|report shows|biopsy|hba1c|you (have|tested) (positive|negative)|(positive|negative) for)\b|\b\d+(\.\d+)?\s?(mg\/dl|mmol\/l|g\/dl|iu\/l)\b/i;
 export const looksLikeResultOrDiagnosis = (text: string): boolean => RESULT_OR_DIAGNOSIS.test(text);

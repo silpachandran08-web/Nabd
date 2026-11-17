@@ -120,7 +120,7 @@ public class SmsFallback {
             return false;
         }
         try {
-            Sent s = send(o);
+            Sent s = send(o, false);
             if (s == null) {
                 return false;
             }
@@ -147,7 +147,7 @@ public class SmsFallback {
         if (prior(o) != null) {
             throw new InboxException(HttpStatus.CONFLICT, "ALREADY_SENT_BY_SMS");
         }
-        Sent s = send(o);
+        Sent s = send(o, true);
         if (s == null) {
             throw new InboxException(HttpStatus.UNPROCESSABLE_ENTITY, "NO_SMS_TEMPLATE");
         }
@@ -171,7 +171,7 @@ public class SmsFallback {
     }
 
     /** Renders the SMS, sends it linked to the original, then marks the original (and cancels it when it never left). null = no template. */
-    private Sent send(Original o) {
+    private Sent send(Original o, boolean desk) {
         String text = render(o);
         if (text == null) {
             decide(o.tenant(), o.id(), "no_sms_template");
@@ -183,6 +183,9 @@ public class SmsFallback {
         } catch (InboxException e) {
             if (!"DUPLICATE_REQUEST".equals(e.code())) {
                 throw e;
+            }
+            if (desk) { // a second press that raced past prior(): the first press sends and writes the one audit row
+                throw new InboxException(HttpStatus.CONFLICT, "ALREADY_SENT_BY_SMS");
             }
             s = existing(o); // another instance (or the desk) sent it a moment ago
         }

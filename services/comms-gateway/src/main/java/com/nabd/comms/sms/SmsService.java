@@ -106,6 +106,9 @@ public class SmsService {
         } catch (DuplicateKeyException e) { // the same requestId raced in twice: the other call sends
             throw new InboxException(HttpStatus.CONFLICT, "DUPLICATE_REQUEST");
         }
+        if (prepared.template() == null && fallbackOf != null) { // COM-027: the fallback (timer or desk) must know this SMS is another call's
+            throw new InboxException(HttpStatus.CONFLICT, "DUPLICATE_REQUEST");
+        }
         if (prepared.template() == null || "blocked".equals(prepared.sent().status())) {
             return prepared.sent();
         }
