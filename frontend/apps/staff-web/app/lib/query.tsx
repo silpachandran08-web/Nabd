@@ -53,6 +53,14 @@ export const adminOrdersQuery = () => queryOptions({
   queryFn: getter<AdministrationOrderResponse[]>("/nursing/administration-orders/today"),
 });
 
+/** PHL-008: GET /pharmacy/alerts?limit=1 for the pharmacist's nav badge (the counts cover every open alert). */
+export const stockAlertsQuery = () => queryOptions({
+  staleTime: 60_000,
+  refetchOnWindowFocus: false,
+  queryKey: key("pharmacy", { list: "alerts-badge" }),
+  queryFn: getter<{ counts?: { expiry: number; low: number; dead: number } }>("/pharmacy/alerts?limit=1"),
+});
+
 /** Cancel whatever is in flight under these resources and fetch again; skipped while a mutation is
  * in flight so a poll never paints over an optimistic row. */
 export function useReload(...resources: string[]) {

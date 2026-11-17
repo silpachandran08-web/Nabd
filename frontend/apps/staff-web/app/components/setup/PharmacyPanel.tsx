@@ -25,7 +25,7 @@ import type { DispensingQueueEntryResponse, DispensingQueueItem, PharmacyItemRes
 export type PharmacyMode = "external" | "hybrid" | "in_house";
 type PharmacySettings = Omit<Full<PharmacySettingsResponse>, "mode"> & { mode: PharmacyMode };
 // PHL-002/004 fields (also in the generated type once regenerated): class, register badge, generic name, dispensed-here flag.
-type PharmacyItem = Full<PharmacyItemResponse, "hsnCode"> & { scheduleClass: string; register?: string | null; genericName?: string | null; inHouse: boolean };
+type PharmacyItem = Omit<Full<PharmacyItemResponse, "hsnCode">, "reorderLevel"> & { scheduleClass: string; register?: string | null; genericName?: string | null; inHouse: boolean; reorderLevel?: number | null };
 type DispensingQueueEntry = Omit<Full<DispensingQueueEntryResponse>, "items" | "token"> & {
   token?: number | null; items: Full<DispensingQueueItem, "stockQty" | "dosage" | "frequency" | "duration" | "instructions">[];
 };
@@ -225,7 +225,7 @@ export default function PharmacyPanel() {
   const itemBody = (i: PharmacyItem) => ({
     name: i.name, isRx: i.isRx, hsnCode: i.hsnCode || null, price: i.price, taxRatePercent: i.taxRatePercent,
     scheduleClass: i.scheduleClass, genericName: i.genericName || null, inHouse: i.inHouse,
-    priceInclusiveOfTax: i.priceInclusiveOfTax ?? null, zeroRated: !!i.zeroRated, mrp: i.mrp ?? null,
+    priceInclusiveOfTax: i.priceInclusiveOfTax ?? null, zeroRated: !!i.zeroRated, mrp: i.mrp ?? null, reorderLevel: i.reorderLevel ?? null,
   });
 
   const openAdjust = (item: PharmacyItem, direction: 1 | -1) => {
@@ -532,6 +532,12 @@ export default function PharmacyPanel() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-generic">Generic name</label>
               <input id="pe-generic" className={styles.input} maxLength={200} value={editing.genericName ?? ""} onChange={(e) => setEditing({ ...editing, genericName: e.target.value })} />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pe-reorder">Reorder level</label>
+              <input id="pe-reorder" className={styles.input} type="number" min="0" step="1" inputMode="numeric" value={editing.reorderLevel ?? ""}
+                onChange={(e) => setEditing({ ...editing, reorderLevel: e.target.value === "" ? null : Math.max(0, Math.floor(Number(e.target.value))) })} />
+              <p className={ph.sub}>A low-stock alert is raised when stock on hand drops below this.</p>
             </div>
             <label className={ph.check}><input type="checkbox" checked={editing.inHouse !== false} onChange={(e) => setEditing({ ...editing, inHouse: e.target.checked })} /> Dispensed here (untick for &quot;buy outside&quot;)</label>
             <ErrorSummary fe={efe} className={`${ph.notice} ${ph.noticeError}`} />

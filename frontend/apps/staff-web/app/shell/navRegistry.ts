@@ -4,7 +4,7 @@ import type { IconName } from "../components/ui/Icon";
 import { NAV_MODULES, navAllowed, type Entitlements } from "../lib/entitlementRules.ts";
 
 export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing" | "solo";
-export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent";
+export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent" | "stock-alerts";
 export type NavItem = {
   id: string; href: string; label: string; short: string; icon: IconName;
   perms: string[]; // every grant is required
@@ -135,7 +135,8 @@ const PHARMACIST: NavItem[] = [
   { id: "ph-stock", href: "/pharmacy/stock-take", label: "Stock take", short: "Stock", icon: "package", perms: ["pharmacy:view", "pharmacy:edit"], modules: PHARMACY_MODULES, owner: MON, keywords: ["inventory", "stock take", "count", "adjustment"] },
   { id: "ph-purchase", href: "/pharmacy/purchase", label: "Purchase & GRN", short: "Purchase", icon: "plusSquare", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["goods receipt", "supplier"] },
   { id: "ph-registers", href: "/pharmacy/registers", label: "Controlled registers", short: "Registers", icon: "scroll", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
-  { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
+  // PHL-008: stock alerts and the expiry report (pharmacist.insights); the badge counts the open alerts.
+  { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], modules: PHARMACY_MODULES, owner: MON, badge: "stock-alerts", keywords: ["expiry", "near expiry", "low stock", "dead stock", "reorder"] },
 ];
 // No lab permission exists yet: "lab:view" is the placeholder grant the Diagnostics squad defines with the lab screens (absent until then).
 export const LAB_GRANT = "lab:view";

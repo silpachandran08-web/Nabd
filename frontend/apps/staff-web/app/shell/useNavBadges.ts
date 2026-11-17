@@ -3,7 +3,8 @@
 // FEF-020) patches the same cache entries and a badge follows a count change without a reload.
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminOrdersQuery, doctorQueueQuery, prefix, queueQuery } from "../lib/query";
+import { adminOrdersQuery, doctorQueueQuery, prefix, queueQuery, stockAlertsQuery } from "../lib/query";
+import { badgeCount } from "../lib/stockAlerts";
 import { selfStaffId } from "../lib/doctorQueries";
 import type { BadgeSource, RoleContext } from "./navRegistry";
 
@@ -19,6 +20,7 @@ export function useNavBadges(role: RoleContext | null, perms: readonly string[],
   const priority = useQuery({ ...queueQuery(true), enabled: role === "nurse" && q }).data;
   const admin = useQuery({ ...adminOrdersQuery(), enabled: role === "nurse" && perms.includes("nursing:view") }).data;
   const mine = useQuery({ ...doctorQueueQuery(me), enabled: doctor && !!me && q }).data;
+  const stockAlerts = useQuery({ ...stockAlertsQuery(), enabled: role === "pharmacist" && perms.includes("pharmacy:view") }).data; // PHL-008; External mode answers 4xx: no badge
   const qc = useQueryClient();
   // Refresh on every navigation as before; a newer refresh cancels a slower one still in flight (FEF-004).
   useEffect(() => {
@@ -33,6 +35,7 @@ export function useNavBadges(role: RoleContext | null, perms: readonly string[],
     "nurse-priority": count(priority, () => true),
     "triage-urgent": count(priority, (r) => !r.priorityAcknowledgedAt), // a raised flag nobody has acknowledged yet (FEF-055)
     "nurse-admin": count(admin, (o) => o.status === "not_started"),
+    "stock-alerts": badgeCount(stockAlerts?.counts),
   };
   return { badges, me, mine };
 }
