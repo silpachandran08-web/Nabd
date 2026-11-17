@@ -54,11 +54,13 @@ class AttachmentController {
     private final AttachmentService service;
     private final ClinicalReadScope scopes;
     private final FileStore files;
+    private final com.nabd.hms.clinical.derm.DermPhotoService photos;
 
-    AttachmentController(AttachmentService service, ClinicalReadScope scopes, FileStore files) {
+    AttachmentController(AttachmentService service, ClinicalReadScope scopes, FileStore files, com.nabd.hms.clinical.derm.DermPhotoService photos) {
         this.service = service;
         this.scopes = scopes;
         this.files = files;
+        this.photos = photos;
     }
 
     @Transactional
@@ -87,7 +89,9 @@ class AttachmentController {
     @PreAuthorize("hasAuthority('clinical:view')")
     DownloadUrl downloadUrl(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         FileStore.FileInfo f = files.info(id).filter(i -> i.patientId() != null).orElseThrow(ApiException::notFound);
-        scopes.requirePatient(scopes.resolve(jwt), f.patientId());
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, f.patientId());
+        if (photos.hiddenPhoto(scope.tenantId(), id)) throw ApiException.notFound(); // CLN-047: withdrawn photo consent hides the photo
         FileStore.SignedUrl u = files.downloadUrl(id);
         return new DownloadUrl(u.url(), u.expiresAt(), f.patientId());
     }

@@ -36,7 +36,9 @@ class SpecialtyWriteGuard implements WebMvcConfigurer, HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (SAFE.contains(request.getMethod())) return true;
-        String[] parts = request.getRequestURI().substring(request.getContextPath().length()).split("/");
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        if (path.endsWith("/photo-consent/withdraw")) return true; // CLN-047: a patient may always withdraw consent, plan or not
+        String[] parts = path.split("/");
         if (parts.length < 4) return true; // "", "v1", "specialty", "<x>", ...
         String module = "specialty_" + parts[3];
         if (specialties.isProfileModule(module) && !specialties.entitled(module)) {

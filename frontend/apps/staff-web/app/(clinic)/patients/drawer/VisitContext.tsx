@@ -19,7 +19,7 @@ import { TODAY_STATUS_LABEL, VISIT_DONE, selfId, type Perms, type TodayVisit } f
 // DOC-052: the drawer's visit context (wireframe Patient 360: latest vitals + "Start consultation").
 // Only patients the registry shows in today's queue have a visit to look up (`enabled`).
 /** `action` goes in the drawer header beside the patient meta; `below` (error + latest vitals) under it. */
-export function useVisitContext(patientId: string, enabled: boolean, perms: Perms): { action: React.ReactNode; below: React.ReactNode } {
+export function useVisitContext(patientId: string, enabled: boolean, perms: Perms): { action: React.ReactNode; below: React.ReactNode; visitId: string | null } {
   const router = useRouter();
   const qc = useQueryClient();
   const { clinicalView, clinicalEdit } = perms;
@@ -64,7 +64,7 @@ export function useVisitContext(patientId: string, enabled: boolean, perms: Perm
     }
   }
 
-  if (!visit) return { action: null, below: null };
+  if (!visit) return { action: null, below: null, visitId: null };
   const mine = visit.doctorId === selfId();
   const action = mine && clinicalEdit && visit.status === "in_consult" ? (
     <button type="button" className={styles.primaryBtn} onClick={() => router.push(`/consult?entry=${encodeURIComponent(visit.id)}`)}>
@@ -88,5 +88,5 @@ export function useVisitContext(patientId: string, enabled: boolean, perms: Perm
       )}
     </>
   );
-  return { action, below };
+  return { action, below, visitId: visit.id };
 }

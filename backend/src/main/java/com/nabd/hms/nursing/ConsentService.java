@@ -12,6 +12,7 @@ import com.nabd.hms.nursing.dto.ConsentTemplateResponse;
 import com.nabd.hms.nursing.dto.ConsentWithdrawResponse;
 import com.nabd.hms.nursing.dto.ProcedureConsentRequest;
 import com.nabd.hms.patient.api.GuardianLookup;
+import com.nabd.hms.shared.ConsentSignature;
 import com.nabd.hms.shared.FileStore;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;

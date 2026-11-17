@@ -32,6 +32,7 @@ public class FileService implements FileStore {
     static final Set<String> TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
     static final Duration UPLOAD_TTL = Duration.ofMinutes(10);
     static final Duration DOWNLOAD_TTL = Duration.ofMinutes(5);
+    static final String PHOTO = "clinical_photo";
 
     public record Slot(UUID uploadId, String putUrl, long maxBytes) {
     }
@@ -125,8 +126,20 @@ public class FileService implements FileStore {
         } else {
             status = "available";
         }
+        byte[] clean = null;
         if ("available".equals(status)) {
-            byte[] clean = "image/jpeg".equals(detected) ? FileSniffer.stripJpegMetadata(data) : data;
+            if (PHOTO.equals(f.purpose()) && !"application/pdf".equals(detected)) { // CLN-047: <= 1.5 MB, no EXIF/location
+                clean = PhotoCompressor.fit(data, detected);
+                if (clean == null) {
+                    status = "rejected_type";
+                } else {
+                    detected = FileSniffer.detect(clean);
+                }
+            } else {
+                clean = "image/jpeg".equals(detected) ? FileSniffer.stripJpegMetadata(data) : data;
+            }
+        }
+        if ("available".equals(status)) {
             storage.put(ObjectStorage.Bucket.CLEAN, f.storageKey(), clean);
             storage.delete(ObjectStorage.Bucket.QUARANTINE, f.quarantineKey());
             repo.finish(tenantId, id, status, detected, clean.length, sha256(clean), scanner.engine(), clock.instant());
