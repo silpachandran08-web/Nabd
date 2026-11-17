@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
-import { api, errorText } from "../../lib/api";
+import { api, ApiError, errorText } from "../../lib/api";
 import { decodeAccessToken, getIdentity } from "../../lib/session";
 import { usePermissions } from "../../lib/usePermissions";
 import Composer from "./Composer";
 import NotesDialog from "./NotesDialog";
 import TemplatePicker from "./TemplatePicker";
-import { FILTERS, authorLabel, canFreeText, canSendAsSms, isFailed, keyAction, oldestWaiting, previewText, sessionPill, tick, waitingChip, type FilterId } from "./inboxLogic";
+import { FILTERS, authorLabel, canFreeText, canSendAsSms, isFailed, keyAction, oldestWaiting, previewText, sessionPill, smsNotice, tick, waitingChip, type FilterId } from "./inboxLogic";
 import { useMessages, useThreads } from "./useInbox";
 import styles from "./inbox.module.css";
 
@@ -37,6 +37,7 @@ export default function InboxScreen() {
   const [view, setView] = useState<"list" | "thread">("list");
   const [dialog, setDialog] = useState<"templates" | "notes" | null>(null);
   const [notice, setNotice] = useState("");
+  const [smsBusy, setSmsBusy] = useState(false);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const { threads, failed, reload } = useThreads(filter);
@@ -79,11 +80,17 @@ export default function InboxScreen() {
     try { await api.post(`/inbox/threads/${selected?.id}/${path}`, body); setNotice(""); await Promise.all([reload(), reloadMessages()]); } catch (e) { setNotice(errorText(e, fail)); }
   }
   async function sendAsSms(messageId: string) {
+    if (smsBusy) return;
+    setSmsBusy(true);
     try {
       const r = await api.post<{ status?: string }>(`/inbox/messages/${messageId}/sms`, {});
-      setNotice(r?.status === "blocked" ? "Not sent by SMS: this patient has not agreed to messages." : r?.status === "sent" ? "Sent by SMS." : "SMS could not be sent.");
+      setNotice(smsNotice(r?.status));
       await reloadMessages();
-    } catch (e) { setNotice(errorText(e, "Couldn't send the SMS. Nothing was sent.")); }
+    } catch (e) {
+      // the gateway refuses a repeat with 409: the SMS went (or is going) on the first press
+      if (e instanceof ApiError && e.code === "ALREADY_SENT_BY_SMS") { setNotice("This message was already sent by SMS."); await reloadMessages(); }
+      else setNotice(errorText(e, "Couldn't send the SMS. Nothing was sent."));
+    } finally { setSmsBusy(false); }
   }
   const handover = (mode: "bot" | "human") => act("mode", { mode }, "Couldn't change who replies. Nothing changed.");
 
@@ -193,7 +200,7 @@ export default function InboxScreen() {
                           {out && isFailed(m.status) && (
                             <span className={styles.failed} role="alert">Not delivered.
                               {canReply && m.text && canFreeText(selected, now) && <button type="button" className={styles.secondary} onClick={() => void act("replies", { text: m.text }, "Couldn't resend. Nothing was sent.")}>Retry</button>}
-                              {canReply && canSendAsSms(m, region) && <button type="button" className={styles.secondary} onClick={() => void sendAsSms(m.id)}>Send as SMS</button>}
+                              {canReply && canSendAsSms(m, region) && <button type="button" className={styles.secondary} disabled={smsBusy} onClick={() => void sendAsSms(m.id)}>Send as SMS</button>}
                             </span>
                           )}
                         </li>

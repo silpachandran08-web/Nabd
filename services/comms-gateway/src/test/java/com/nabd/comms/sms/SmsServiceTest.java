@@ -179,6 +179,10 @@ class SmsServiceTest {
         var again = service("in").send(tenant, new SmsService.SendRequest(PHONE, otpText("111111"), null, request));
         assertThat(again).isEqualTo(first);
         assertThat(bspRequests).hasSize(1);
+        // S24 T1-BUG-7: the fallback caller is told the SMS is another call's, so the desk's second press is not audited as a send
+        assertThatThrownBy(() -> service("in").send(tenant, new SmsService.SendRequest(PHONE, otpText("111111"), null, request), UUID.randomUUID()))
+                .hasMessage("DUPLICATE_REQUEST");
+        assertThat(bspRequests).hasSize(1);
 
         bspStatus.set(400);
         var rejected = service("in").send(tenant, new SmsService.SendRequest(PHONE, otpText("222222"), null, null));

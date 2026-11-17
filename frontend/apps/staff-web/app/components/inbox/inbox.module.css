@@ -5,7 +5,7 @@
 .filters { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
 .filter, .chip, .secondary, .primary { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-12); border-radius: 999px; font: inherit; font-size: 14px; cursor: pointer; border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); }
 .filterOn, .primary { background: var(--nb-accent-fill); border-color: var(--nb-accent-fill); color: var(--nb-on-accent); font-weight: 600; }
-.primary:disabled { opacity: 0.6; cursor: default; }
+.primary:disabled, .secondary:disabled { opacity: 0.6; cursor: default; }
 .filter:focus-visible, .chip:focus-visible, .secondary:focus-visible, .primary:focus-visible, .thread:focus-visible, .tplItem:focus-visible, .textarea:focus-visible, .select:focus-visible, .back:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
 .threads { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-8); overflow-y: auto; }
 .thread { inline-size: 100%; min-block-size: 44px; display: flex; flex-direction: column; gap: 4px; text-align: start; padding: var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-subtle); background: var(--nb-surface-2); color: inherit; font: inherit; cursor: pointer; }

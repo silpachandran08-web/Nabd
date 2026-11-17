@@ -89,6 +89,17 @@ test("Problem+JSON parsed into ApiError {status, code, title, detail, errors[]} 
 
 test("204 resolves undefined", async () => assert.equal(await make(() => new Response(null, { status: 204 })).c.delete("/a"), undefined));
 
+// S24 T1-BUG-1: the blob PUT answers 200 with no body (BlobController.put); that is "no content", not a failed call.
+test("an empty 2xx body resolves undefined (file PUT answered 200 without a body)", async () => {
+  const { c, calls } = make(() => new Response(null, { status: 200 }));
+  assert.equal(await c.put("/../files-blob/u1", undefined, { rawBody: "bytes", headers: { "Content-Type": "application/octet-stream" } }), undefined);
+  assert.equal(calls[0].init.body, "bytes");
+  assert.equal(h(calls[0], "Content-Type"), "application/octet-stream");
+  assert.equal(await make(() => new Response("", { status: 201 })).c.post("/a", {}), undefined);
+  assert.deepEqual(await make(() => json(200, { id: 1 })).c.get("/a"), { id: 1 }); // a JSON body is still parsed
+  await assert.rejects(make(() => new Response("<html>", { status: 200 })).c.get("/a"), SyntaxError); // a body that is not JSON still fails
+});
+
 test("401 -> one single-flight refresh for parallel calls, then each replays once with the new token", async () => {
   let refreshes = 0, tok = "old"; const calls = [];
   const c = createClient({
