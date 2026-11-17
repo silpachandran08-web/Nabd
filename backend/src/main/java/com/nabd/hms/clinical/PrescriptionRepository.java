@@ -50,20 +50,26 @@ class PrescriptionRepository {
                 .stream().findFirst();
     }
 
+    /** CLN-023: revoked_at comes from this module's prescription_rx_tokens (null = never issued or not revoked). */
+    private static final String COLS = "id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, "
+            + "safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json, "
+            + "(SELECT t.revoked_at FROM prescription_rx_tokens t WHERE t.tenant_id = prescriptions.tenant_id "
+            + "AND t.prescription_id = prescriptions.id) AS revoked_at";
+
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
+        return jdbc.query("SELECT " + COLS + " FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
     Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+        return jdbc.query("SELECT " + COLS + " FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
+        return jdbc.query("SELECT " + COLS + " FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
                         "ORDER BY signed_at DESC",
                 prescriptionMapper(), tenantId, patientId);
     }
@@ -269,7 +275,8 @@ class PrescriptionRepository {
                 rs.getString("allergy_snapshot_json"),
                 rs.getString("safety_dictionary_version"),
                 rs.getString("signed_by") == null ? null : UUID.fromString(rs.getString("signed_by")),
-                rs.getString("signed_by_registration_no"));
+                rs.getString("signed_by_registration_no"),
+                rs.getTimestamp("revoked_at") == null ? null : rs.getTimestamp("revoked_at").toInstant());
     }
 
     private RowMapper<PrescriptionItemRow> itemMapper() {

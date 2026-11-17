@@ -137,7 +137,8 @@ public class PrescriptionController {
     }
 
     /** DOC-035 / DOC-R2: "Repeat last prescription" (the patient's most recent signed Rx from another visit).
-     * CLN-022: optional body { sourcePrescriptionId } pins the previewed one; Idempotency-Key makes a retried tap run once. */
+     * CLN-022: optional body { sourcePrescriptionId } pins the previewed one; Idempotency-Key makes a retried tap run once.
+     * T1-BUG-1: a revoked Rx is never the default source; pinning one is 409 prescription-revoked. */
     @com.nabd.hms.shared.Idempotent
     @PostMapping("/prescriptions/{queueEntryId}/repeat-last")
     @PreAuthorize("hasAuthority('clinical:edit')")

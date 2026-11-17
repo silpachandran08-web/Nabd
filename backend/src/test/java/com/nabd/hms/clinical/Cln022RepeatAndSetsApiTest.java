@@ -169,6 +169,34 @@ class Cln022RepeatAndSetsApiTest extends ApiTestBase {
         assertThat(afterSign.getBody().get("type")).asString().contains("prescription-signed");
     }
 
+    // T1-BUG-1: a revoked Rx (CLN-023) is flagged in the history, skipped by default and refused when pinned.
+    @Test
+    void aRevokedRxIsFlaggedInTheHistorySkippedByDefaultAndRefusedWhenPinned() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff doc = seedStaff(tenant, seedFullAccessRole(tenant.id()), "c22r@a.com", "+919800022009", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = patient(token, "Revoked", "+919999922009", "male");
+        String good = checkIn(token, patientId, doc.id());
+        save(token, good, List.of(Map.of("drugName", "Cetirizine", "dosage", "10mg")));
+        sign(token, good);
+        String wrong = checkIn(token, patientId, doc.id());
+        String wrongRx = (String) save(token, wrong, List.of(Map.of("drugName", "Paracetamol", "dosage", "5000mg"))).getBody().get("id");
+        sign(token, wrong);
+        assertThat(exchange("/v1/clinical/prescriptions/" + wrong + "/revoke", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "Dose entered wrongly")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        List<Map> history = exchange("/v1/clinical/patients/" + patientId + "/prescriptions", HttpMethod.GET, authed(token), List.class).getBody();
+        assertThat(history.get(0).get("id")).isEqualTo(wrongRx);
+        assertThat(history.get(0).get("revokedAt")).isNotNull();
+        assertThat(history.get(1).get("revokedAt")).isNull();
+
+        String today = checkIn(token, patientId, doc.id());
+        assertThat(items(repeat(token, today, null)).get(0).get("drugName")).isEqualTo("Cetirizine");
+        ResponseEntity<Map> pinned = repeat(token, today, Map.of("sourcePrescriptionId", wrongRx));
+        assertThat(pinned.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(pinned.getBody().get("type")).asString().contains("prescription-revoked");
+    }
+
     @Test
     void repeatLastNeedsAnIdempotencyKeyAndARetriedTapRunsOnce() {
         SeededTenant tenant = seedTenant();

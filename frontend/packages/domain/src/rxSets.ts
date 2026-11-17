@@ -59,10 +59,10 @@ export function itemLine(i: RxSetItem): string {
   return i.brandName ? `${i.drugName} (${i.brandName})` : i.drugName;
 }
 
-/** CLN-022 "Repeat last": the patient's most recent signed prescription from another visit (the list comes newest first,
- * as GET /clinical/patients/{id}/prescriptions returns it); null when there is none. Mirrors the server's default source. */
-export function repeatSource<T extends { status: string; queueEntryId?: string }>(prescriptions: T[], entryId: string): T | null {
-  return prescriptions.find((p) => p.status === "signed" && p.queueEntryId !== entryId) ?? null;
+/** CLN-022 "Repeat last": the patient's most recent signed, not revoked prescription from another visit (the list comes newest
+ * first, as GET /clinical/patients/{id}/prescriptions returns it); null when there is none. Mirrors the server's default source. */
+export function repeatSource<T extends { status: string; queueEntryId?: string; revokedAt?: string | null }>(prescriptions: T[], entryId: string): T | null {
+  return prescriptions.find((p) => p.status === "signed" && !p.revokedAt && p.queueEntryId !== entryId) ?? null;
 }
 
 export type RxShortcut = { kind: "repeat" } | { kind: "set"; index: number };
