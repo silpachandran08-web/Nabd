@@ -7,6 +7,8 @@ import com.nabd.hms.engagement.dto.RecallOrderResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,14 +35,15 @@ public class RecallController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public RecallOrderResponse create(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @PathVariable UUID encounterId,
+    public RecallOrderResponse create(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt,
+                                      @PathVariable UUID encounterId,
                                       @Valid @RequestBody RecallOrderRequest req) {
-        return service.create(tenantId, staffId, encounterId, req);
+        return service.create(tenantId, staffId, jwt, encounterId, req);
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
-    public List<RecallOrderResponse> list(@CurrentTenant UUID tenantId, @PathVariable UUID encounterId) {
-        return service.forEncounter(tenantId, encounterId);
+    public List<RecallOrderResponse> list(@CurrentTenant UUID tenantId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID encounterId) {
+        return service.forEncounter(tenantId, jwt, encounterId);
     }
 }

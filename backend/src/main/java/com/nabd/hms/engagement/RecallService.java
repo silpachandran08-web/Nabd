@@ -5,6 +5,7 @@ import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.EventPublisher;
+import com.nabd.hms.common.VisitReadGate;
 import com.nabd.hms.engagement.api.RecallBookings;
 import com.nabd.hms.engagement.dto.RecallOrderRequest;
 import com.nabd.hms.engagement.dto.RecallOrderResponse;
@@ -13,6 +14,7 @@ import com.nabd.hms.shared.notify.CancelReason;
 import com.nabd.hms.shared.notify.NotificationPort;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,9 +42,11 @@ public class RecallService implements RecallBookings {
     private final EventPublisher events;
     private final ActorDirectory actors;
     private final NotificationPort notifications;
+    private final VisitReadGate visits;
 
     RecallService(RecallRepository repo, ClinicClock clock, AuditService audit, EventPublisher events, ActorDirectory actors,
-                  NotificationPort notifications) {
+                  NotificationPort notifications, VisitReadGate visits) {
+        this.visits = visits;
         this.repo = repo;
         this.clock = clock;
         this.audit = audit;
@@ -52,7 +56,8 @@ public class RecallService implements RecallBookings {
     }
 
     @Transactional
-    public RecallOrderResponse create(UUID tenantId, UUID staffId, UUID encounterId, RecallOrderRequest req) {
+    public RecallOrderResponse create(UUID tenantId, UUID staffId, Jwt jwt, UUID encounterId, RecallOrderRequest req) {
+        visits.requireVisit(jwt, encounterId); // IDC-001: out of scope looks like a missing visit, before the doctor-of-record 403
         RecallRepository.Encounter e = repo.encounter(tenantId, encounterId).orElseThrow(ApiException::notFound);
         if (!staffId.equals(e.doctorId())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "not-doctor-of-record", "Not the visit doctor",
@@ -88,7 +93,8 @@ public class RecallService implements RecallBookings {
     }
 
     @Transactional(readOnly = true)
-    public List<RecallOrderResponse> forEncounter(UUID tenantId, UUID encounterId) {
+    public List<RecallOrderResponse> forEncounter(UUID tenantId, Jwt jwt, UUID encounterId) {
+        visits.requireVisit(jwt, encounterId); // IDC-001 own-patients and consent gate, as the clinical reads of this visit
         repo.encounter(tenantId, encounterId).orElseThrow(ApiException::notFound);
         return repo.forEncounter(tenantId, encounterId);
     }
