@@ -42,8 +42,9 @@ public class InboxService {
 
     public record ThreadPage(List<ThreadItem> items, String nextCursor) {}
 
+    /** channel: 'whatsapp', or 'sms' for an SMS fallback (COM-027) linked to the thread. */
     public record MessageItem(UUID id, String direction, String author, String text, String templateName, UUID mediaRef, String status, Instant at,
-                              UUID authorStaffRef) {}
+                              UUID authorStaffRef, String channel) {}
 
     public record MessagePage(List<MessageItem> items, String nextCursor) {}
 
@@ -254,10 +255,10 @@ public class InboxService {
         }
         args.add(lim + 1);
         String sql = """
-                SELECT m.id, m.dir, m.kind, m.text_enc, m.template_name, m.media_ref, m.status, m.at, m.at::text, m.staff FROM (
-                  SELECT id, 'in' dir, kind, text_enc, NULL::text template_name, media_ref, NULL::text status, received_at at, NULL::uuid staff FROM inbound_messages WHERE thread_id = ?
+                SELECT m.id, m.dir, m.kind, m.text_enc, m.template_name, m.media_ref, m.status, m.at, m.at::text, m.staff, m.channel FROM (
+                  SELECT id, 'in' dir, kind, text_enc, NULL::text template_name, media_ref, NULL::text status, received_at at, NULL::uuid staff, 'whatsapp' channel FROM inbound_messages WHERE thread_id = ?
                   UNION ALL
-                  SELECT id, 'out', NULL, free_text_enc, template_name, NULL::uuid, status, created_at, author_staff_ref FROM outbound_messages WHERE thread_id = ?) m
+                  SELECT id, 'out', NULL, free_text_enc, template_name, NULL::uuid, status, created_at, author_staff_ref, channel FROM outbound_messages WHERE thread_id = ?) m
                 %s ORDER BY m.at DESC, m.id DESC LIMIT ?""".formatted(after);
         record Raw(MessageItem item, String at) {}
         List<Raw> rows = tx.execute(s -> {
@@ -270,7 +271,7 @@ public class InboxService {
                 String text = rs.getBytes(4) == null ? null : crypto.decrypt(rs.getBytes(4));
                 UUID staff = rs.getObject(10, UUID.class);
                 return new Raw(new MessageItem(rs.getObject(1, UUID.class), in ? "in" : "out", in ? "patient" : staff != null ? "staff" : "template", text, rs.getString(5),
-                        rs.getObject(6, UUID.class), rs.getString(7), rs.getTimestamp(8).toInstant(), staff), rs.getString(9));
+                        rs.getObject(6, UUID.class), rs.getString(7), rs.getTimestamp(8).toInstant(), staff, rs.getString(11)), rs.getString(9));
             }, args.toArray());
         });
         boolean more = rows.size() > lim;

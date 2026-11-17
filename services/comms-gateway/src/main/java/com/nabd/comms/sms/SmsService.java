@@ -79,6 +79,11 @@ public class SmsService {
     }
 
     public Sent send(UUID tenant, SendRequest r) {
+        return send(tenant, r, null);
+    }
+
+    /** COM-027: {@code fallbackOf} is the WhatsApp message this SMS stands in for; its unique index allows one, before the BSP call. */
+    public Sent send(UUID tenant, SendRequest r, UUID fallbackOf) {
         if (!"in".equalsIgnoreCase(region)) {
             throw refused(HttpStatus.UNPROCESSABLE_ENTITY, "SMS_DISABLED_FOR_REGION");
         }
@@ -91,7 +96,7 @@ public class SmsService {
         UUID id = UUID.randomUUID();
         Prepared prepared;
         try {
-            prepared = prepare(tenant, r, id);
+            prepared = prepare(tenant, r, id, fallbackOf);
         } catch (DuplicateKeyException e) { // the same requestId raced in twice: the other call sends
             throw new InboxException(HttpStatus.CONFLICT, "DUPLICATE_REQUEST");
         }
@@ -117,7 +122,7 @@ public class SmsService {
         return new Sent(id, status);
     }
 
-    private Prepared prepare(UUID tenant, SendRequest r, UUID id) {
+    private Prepared prepare(UUID tenant, SendRequest r, UUID id, UUID fallbackOf) {
         return tx.execute(s -> {
             bind(tenant);
             if (r.requestId() != null) { // same notification request again: answer with the first message, send nothing
@@ -143,10 +148,10 @@ public class SmsService {
             Timestamp now = Timestamp.from(clock.instant());
             jdbc.update("""
                     INSERT INTO outbound_messages (id, tenant_id, request_id, channel, patient_ref, to_address_enc, to_hash, template_id, template_name,
-                      language, status, error_code, created_at, updated_at)
-                    VALUES (?,?,?, 'sms', ?,?,?,?,?, ?,?,?,?,?)""",
+                      language, status, error_code, fallback_of, created_at, updated_at)
+                    VALUES (?,?,?, 'sms', ?,?,?,?,?, ?,?,?,?,?,?)""",
                     id, tenant, r.requestId(), r.patientRef(), crypto.encrypt(r.to()), crypto.hash(r.to()), t.id(), t.key(), t.language(),
-                    status, decision.reason(), now, now);
+                    status, decision.reason(), fallbackOf, now, now);
             return new Prepared(new Sent(id, status), t);
         });
     }
