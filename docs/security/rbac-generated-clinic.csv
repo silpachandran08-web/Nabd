@@ -228,6 +228,7 @@ owner,GET /v1/setup/whatsapp-templates,setup:view,allow
 owner,GET /v1/setup/white-glove,setup:view,allow
 owner,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 owner,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
+owner,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-403
 owner,GET /v1/specialty/profiles,staff:view,allow
 owner,GET /v1/staff,staff:view,allow
 owner,GET /v1/staff/clinician-review,staff:view,allow
@@ -436,6 +437,9 @@ owner,POST /v1/setup/whatsapp-templates,setup:edit,allow
 owner,POST /v1/setup/whatsapp-templates:lint,setup:edit,allow
 owner,POST /v1/setup/white-glove,setup:edit,allow
 owner,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,allow
+owner,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-403
+owner,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-403
+owner,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-403
 owner,POST /v1/staff,staff:create,allow
 owner,POST /v1/staff/{id}/clinical-licence/override,staff:edit,allow
 owner,POST /v1/staff/{id}/invite/resend,staff:create,allow
@@ -698,6 +702,7 @@ owner_doctor,GET /v1/setup/whatsapp-templates,setup:view,allow
 owner_doctor,GET /v1/setup/white-glove,setup:view,allow
 owner_doctor,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 owner_doctor,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
+owner_doctor,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-403
 owner_doctor,GET /v1/specialty/profiles,staff:view,allow
 owner_doctor,GET /v1/staff,staff:view,allow
 owner_doctor,GET /v1/staff/clinician-review,staff:view,allow
@@ -906,6 +911,9 @@ owner_doctor,POST /v1/setup/whatsapp-templates,setup:edit,allow
 owner_doctor,POST /v1/setup/whatsapp-templates:lint,setup:edit,allow
 owner_doctor,POST /v1/setup/white-glove,setup:edit,allow
 owner_doctor,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,allow
+owner_doctor,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-403
+owner_doctor,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-403
+owner_doctor,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-403
 owner_doctor,POST /v1/staff,staff:create,allow
 owner_doctor,POST /v1/staff/{id}/clinical-licence/override,staff:edit,allow
 owner_doctor,POST /v1/staff/{id}/invite/resend,staff:create,allow
@@ -1168,6 +1176,7 @@ doctor,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 doctor,GET /v1/setup/white-glove,setup:view,deny-403
 doctor,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 doctor,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
+doctor,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-403
 doctor,GET /v1/specialty/profiles,staff:view,deny-403
 doctor,GET /v1/staff,staff:view,deny-403
 doctor,GET /v1/staff/clinician-review,staff:view,deny-403
@@ -1376,6 +1385,9 @@ doctor,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 doctor,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
 doctor,POST /v1/setup/white-glove,setup:edit,deny-403
 doctor,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,allow
+doctor,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-403
+doctor,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-403
+doctor,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-403
 doctor,POST /v1/staff,staff:create,deny-403
 doctor,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 doctor,POST /v1/staff/{id}/invite/resend,staff:create,deny-403
@@ -1638,6 +1650,7 @@ nurse,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 nurse,GET /v1/setup/white-glove,setup:view,deny-403
 nurse,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,allow
 nurse,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,allow
+nurse,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-403
 nurse,GET /v1/specialty/profiles,staff:view,deny-403
 nurse,GET /v1/staff,staff:view,deny-403
 nurse,GET /v1/staff/clinician-review,staff:view,deny-403
@@ -1846,6 +1859,9 @@ nurse,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 nurse,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
 nurse,POST /v1/setup/white-glove,setup:edit,deny-403
 nurse,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-403
+nurse,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-403
+nurse,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-403
+nurse,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-403
 nurse,POST /v1/staff,staff:create,deny-403
 nurse,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 nurse,POST /v1/staff/{id}/invite/resend,staff:create,deny-403
@@ -2108,6 +2124,7 @@ receptionist,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 receptionist,GET /v1/setup/white-glove,setup:view,deny-403
 receptionist,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-403
 receptionist,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-403
+receptionist,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-403
 receptionist,GET /v1/specialty/profiles,staff:view,deny-403
 receptionist,GET /v1/staff,staff:view,deny-403
 receptionist,GET /v1/staff/clinician-review,staff:view,deny-403
@@ -2316,6 +2333,9 @@ receptionist,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 receptionist,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
 receptionist,POST /v1/setup/white-glove,setup:edit,deny-403
 receptionist,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-403
+receptionist,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-403
+receptionist,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-403
+receptionist,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-403
 receptionist,POST /v1/staff,staff:create,deny-403
 receptionist,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 receptionist,POST /v1/staff/{id}/invite/resend,staff:create,deny-403
@@ -2578,6 +2598,7 @@ frontdesk_vitals,GET /v1/setup/whatsapp-templates,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/white-glove,setup:view,deny-403
 frontdesk_vitals,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,deny-403
 frontdesk_vitals,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-403
+frontdesk_vitals,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-403
 frontdesk_vitals,GET /v1/specialty/profiles,staff:view,deny-403
 frontdesk_vitals,GET /v1/staff,staff:view,deny-403
 frontdesk_vitals,GET /v1/staff/clinician-review,staff:view,deny-403
@@ -2786,6 +2807,9 @@ frontdesk_vitals,POST /v1/setup/whatsapp-templates,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/whatsapp-templates:lint,setup:edit,deny-403
 frontdesk_vitals,POST /v1/setup/white-glove,setup:edit,deny-403
 frontdesk_vitals,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-403
+frontdesk_vitals,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-403
+frontdesk_vitals,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-403
+frontdesk_vitals,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-403
 frontdesk_vitals,POST /v1/staff,staff:create,deny-403
 frontdesk_vitals,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 frontdesk_vitals,POST /v1/staff/{id}/invite/resend,staff:create,deny-403

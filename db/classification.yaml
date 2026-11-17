@@ -298,6 +298,30 @@ schemas:
       reason_code: operational
       note: operational
       posted_delta: operational
+    clinical_photos:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      queue_entry_id: operational
+      upload_id: operational
+      site: phi
+      note: phi
+      taken_at: phi
+      consent_id: operational
+      hidden_at: phi
+      created_by: operational
+    photo_consents:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      scope: phi
+      status: phi
+      signer_kind: pii
+      signature_file_id: operational
+      recorded_by: operational
+      recorded_at: phi
+      withdrawn_at: phi
+      withdrawn_by: operational
     visit_attachments:
       id: operational
       tenant_id: operational

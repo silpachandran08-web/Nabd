@@ -1,4 +1,4 @@
-package com.nabd.hms.nursing;
+package com.nabd.hms.shared;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,11 +9,12 @@ import java.util.regex.Pattern;
 /**
  * CLN-014: a finger signature as the pad sends it: SVG {@code <path d="M x y L x y ...">} strokes in a 600 x 200 box. Only the
  * path coordinates are kept; the stored SVG is rebuilt from them, so nothing else the client sent (scripts, links, styles) is kept.
+ * Shared kernel since CLN-047 (the dermatology photo consent reuses the same pad).
  */
-final class ConsentSignature {
+public final class ConsentSignature {
 
-    static final float WIDTH = 600f;
-    static final float HEIGHT = 200f;
+    public static final float WIDTH = 600f;
+    public static final float HEIGHT = 200f;
     private static final int MAX_POINTS = 20000;
     private static final Pattern PATH_D = Pattern.compile("\\bd\\s*=\\s*\"([^\"]*)\"");
     private static final Pattern ALLOWED = Pattern.compile("[MLml0-9.,\\s-]*");
@@ -23,7 +24,7 @@ final class ConsentSignature {
     }
 
     /** Strokes of (x, y) points; empty when the SVG has no drawable stroke. Throws IllegalArgumentException on bad path data. */
-    static List<List<float[]>> parse(String svg) {
+    public static List<List<float[]>> parse(String svg) {
         List<List<float[]>> strokes = new ArrayList<>();
         if (svg == null) return strokes;
         int points = 0;
@@ -64,7 +65,7 @@ final class ConsentSignature {
     static final float MIN_SPAN = 40f;
 
     /** At least MIN_POINTS points whose bounding box is at least MIN_SPAN wide or tall (pad units, 600 x 200). */
-    static boolean enoughInk(List<List<float[]>> strokes) {
+    public static boolean enoughInk(List<List<float[]>> strokes) {
         int n = 0;
         float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
         for (List<float[]> s : strokes) {
@@ -77,7 +78,7 @@ final class ConsentSignature {
         return n >= MIN_POINTS && Math.max(maxX - minX, maxY - minY) >= MIN_SPAN;
     }
 
-    static String toSvg(List<List<float[]>> strokes) {
+    public static String toSvg(List<List<float[]>> strokes) {
         StringBuilder b = new StringBuilder("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 600 200\" width=\"600\" height=\"200\">");
         for (List<float[]> s : strokes) {
             b.append("<path fill=\"none\" stroke=\"#000\" stroke-width=\"2\" stroke-linecap=\"round\" d=\"");

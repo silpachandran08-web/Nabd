@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:specialty.photo.added.v1",
+  "title": "specialty.photo.added.v1",
+  "description": "A consented dermatology photo was registered on a patient's timeline (CLN-047). Ids only: never the image, its URL, site or note.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "photoId", "patientRef", "version"],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "photoId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "patientRef": {
+      "type": "string",
+      "description": "The patient's opaque reference (PatientRefs), never the patient id.",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "version": { "type": "integer", "minimum": 1, "description": "Outbox id of this event: monotonic per aggregate." }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "photoId": "33333333-3333-4333-8333-333333333333",
+      "patientRef": "pr_Zm9vYmFy",
+      "version": 1
+    }
+  ]
+}

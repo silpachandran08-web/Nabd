@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.shared.ConsentSignature;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
