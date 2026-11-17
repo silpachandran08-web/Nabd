@@ -18,7 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** COM-023/COM-030/COM-026 wired in the real application context: leader-locked @Scheduled tick, and the internal inbox API behind its token. */
+/** COM-023/COM-030/COM-026/COM-028 wired in the real application context: leader-locked @Scheduled tick, and the internal inbox API behind its token. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "comms.consumer.enabled=false", "comms.region=wire", "comms.core.base-url=http://127.0.0.1:9", "comms.scheduler.tick-ms=200",
         "comms.internal-token=test-internal-token", "comms.sms.bsp.url=http://127.0.0.1:9", "comms.sms.webhook.secret=wire-dlr-secret"})
@@ -89,5 +89,18 @@ class Com023030WiringTest {
         assertThat(su.queryForObject("SELECT count(*) FROM inbound_events WHERE dedupe_key = 'sms:bsp:wire-dlr-1:delivered'", Integer.class)).isEqualTo(1);
         h.set("X-Signature", "sha256=00");
         assertThat(http.exchange("/v1/webhooks/sms/bsp", HttpMethod.POST, new HttpEntity<>(body, h), String.class).getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void theInboundSmsWebhookIsWiredPersistsThenAcks() throws Exception {
+        byte[] body = "{\"id\":\"wire-mo-1\",\"from\":\"919876543210\",\"text\":\"STOP\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new javax.crypto.spec.SecretKeySpec("wire-dlr-secret".getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+        var h = new HttpHeaders();
+        h.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        h.set("X-Signature", "sha256=" + java.util.HexFormat.of().formatHex(mac.doFinal(body)));
+        assertThat(http.exchange("/v1/webhooks/sms/bsp/inbound", HttpMethod.POST, new HttpEntity<>(body, h), String.class).getStatusCode().value()).isEqualTo(200);
+        var su = new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(TestInfra.url("comms_wiring"), TestInfra.PG.getUsername(), TestInfra.PG.getPassword()));
+        assertThat(su.queryForObject("SELECT count(*) FROM inbound_events WHERE dedupe_key = 'sms-mo:bsp:wire-mo-1' AND field = 'sms_mo'", Integer.class)).isEqualTo(1);
     }
 }

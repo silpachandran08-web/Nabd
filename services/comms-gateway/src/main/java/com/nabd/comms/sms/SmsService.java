@@ -18,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +32,9 @@ import java.util.regex.Pattern;
  * tenant or the Nabd-shared registration (DLT_TEMPLATE_MISMATCH). The consent gate runs at send time like WhatsApp. Delivery reports
  * are persisted then acked (inbound_events), and applied here asynchronously: status moves forward on outbound_messages and
  * comms.message.status_changed.v1 (channel sms) is published. Phone numbers are encrypted at rest; text and numbers are never logged.
+ * COM-028: a promotional SMS is also refused (status 'blocked', send_refusals) when the number sent STOP (OPTED_OUT), is on the DND
+ * register (DND), or has no DND answer younger than dndMaxAge and the BSP scrub cannot give one (DND_CACHE_STALE: fail closed).
+ * Service and OTP SMS skip both checks. Inbound SMS (STOP) are persisted here and processed by {@link SmsStopService}.
  */
 public class SmsService {
 
@@ -58,9 +62,10 @@ public class SmsService {
     private final MeterRegistry metrics;
     private final Clock clock;
     private final String region;
+    private final Duration dndMaxAge;
 
     public SmsService(JdbcTemplate jdbc, TransactionTemplate tx, FieldCrypto crypto, SmsProvider provider, SendGate gate, StreamEventPublisher events,
-                      ObjectMapper json, MeterRegistry metrics, Clock clock, String region) {
+                      ObjectMapper json, MeterRegistry metrics, Clock clock, String region, Duration dndMaxAge) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.crypto = crypto;
@@ -72,6 +77,7 @@ public class SmsService {
         this.metrics = metrics;
         this.clock = clock;
         this.region = region;
+        this.dndMaxAge = dndMaxAge;
     }
 
     public SmsProvider provider() {
@@ -104,6 +110,11 @@ public class SmsService {
             return prepared.sent();
         }
         Template t = prepared.template();
+        String refusal = "promotional".equals(t.category()) ? promotionalRefusal(r.to()) : null;
+        if (refusal != null) {
+            block(tenant, id, r.patientRef(), refusal);
+            return new Sent(id, "blocked");
+        }
         var result = provider.send(new SmsProvider.SmsRequest(id, r.to(), t.entityId(), t.header(), t.dltTemplateId(), r.text()));
         String status = result instanceof Provider.Accepted ? "sent" : "failed";
         tx.executeWithoutResult(s -> {
@@ -153,6 +164,53 @@ public class SmsService {
                     id, tenant, r.requestId(), r.patientRef(), crypto.encrypt(r.to()), crypto.hash(r.to()), t.id(), t.key(), t.language(),
                     status, decision.reason(), fallbackOf, now, now);
             return new Prepared(new Sent(id, status), t);
+        });
+    }
+
+    /** COM-028: null = may go. Plain statements: sms_numbers has no tenant (no RLS), and the BSP call stays outside any transaction. */
+    String promotionalRefusal(String to) {
+        byte[] h = crypto.hash(to);
+        var row = jdbc.query("SELECT marketing_opt_out_at IS NOT NULL, dnd, dnd_checked_at > ? FROM sms_numbers WHERE phone_hash = ?",
+                (rs, i) -> new Boolean[] {rs.getBoolean(1), (Boolean) rs.getObject(2), rs.getBoolean(3)}, Timestamp.from(clock.instant().minus(dndMaxAge)), h);
+        if (!row.isEmpty() && row.get(0)[0]) {
+            return "OPTED_OUT";
+        }
+        if (!row.isEmpty() && row.get(0)[1] != null && row.get(0)[2]) {
+            return row.get(0)[1] ? "DND" : null;
+        }
+        boolean dnd;
+        try {
+            dnd = provider.isDnd(to);
+        } catch (RuntimeException e) { // no fresh answer: blocked until a scrub succeeds
+            metrics.counter("comms.sms.dnd.scrub", "outcome", "error").increment();
+            return "DND_CACHE_STALE";
+        }
+        jdbc.update("INSERT INTO sms_numbers (phone_hash, dnd, dnd_checked_at) VALUES (?,?,?) ON CONFLICT (phone_hash) DO UPDATE SET dnd = EXCLUDED.dnd, "
+                + "dnd_checked_at = EXCLUDED.dnd_checked_at", h, dnd, Timestamp.from(clock.instant()));
+        return dnd ? "DND" : null;
+    }
+
+    private void block(UUID tenant, UUID id, UUID patientRef, String reason) {
+        tx.executeWithoutResult(s -> {
+            bind(tenant);
+            jdbc.update("UPDATE outbound_messages SET status = 'blocked', error_code = ?, updated_at = ? WHERE id = ? AND status = 'sending'",
+                    reason, Timestamp.from(clock.instant()), id);
+            jdbc.update("INSERT INTO send_refusals (tenant_id, patient_ref, message_id, category, reason) VALUES (?,?,?, 'MARKETING', ?)", tenant, patientRef, id, reason);
+        });
+        metrics.counter("comms_send_refused_total", "reason", reason).increment();
+    }
+
+    /** COM-028: inbound SMS, persist-then-ack like the delivery reports (field 'sms_mo'); a repeated MO stores nothing new. */
+    public void storeMos(List<SmsProvider.Mo> mos) {
+        tx.executeWithoutResult(s -> {
+            bind(new UUID(0, 0));
+            for (SmsProvider.Mo m : mos) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("from", m.from());
+                body.put("text", m.text());
+                jdbc.update("INSERT INTO inbound_events (source, dedupe_key, field, body_enc) VALUES (?,?, 'sms_mo', ?) ON CONFLICT (dedupe_key) DO NOTHING",
+                        "sms_" + provider.name(), "sms-mo:" + provider.name() + ":" + m.providerMessageId(), crypto.encrypt(json.writeValueAsString(body)));
+            }
         });
     }
 

@@ -94,4 +94,38 @@ public class BspSmsProvider implements SmsProvider {
         }
         return out;
     }
+
+    /** COM-028: one MO or an array: {"id", "from", "text"}. from may be 10 digits or 91 + 10 digits, with or without '+'. */
+    @Override
+    public List<Mo> parseMo(byte[] body) {
+        JsonNode root;
+        try {
+            root = json.readTree(body);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("not json");
+        }
+        List<Mo> out = new ArrayList<>();
+        for (JsonNode n : root.isArray() ? root : List.of(root)) {
+            String id = n.path("id").asString(""), from = n.path("from").asString("").replaceAll("\\D", "");
+            if (id.isBlank() || id.length() > 100 || from.isEmpty() || from.length() > 15) {
+                throw new IllegalArgumentException("no id or sender");
+            }
+            out.add(new Mo(id, "+" + (from.length() == 10 ? "91" + from : from), n.path("text").asString("")));
+        }
+        return out;
+    }
+
+    /**
+     * COM-028.2: POST {base-url}/dnd {"to"} -> {"dnd": true|false}. The number goes in the body, never the URL.
+     * shortcut: any NCPR registration counts as DND (no per-category preferences); map to the BSP's scrub API when its account exists (external).
+     */
+    @Override
+    public boolean isDnd(String to) {
+        JsonNode res = http.post().uri("/dnd").header("Authorization", "Bearer " + apiKey).contentType(MediaType.APPLICATION_JSON)
+                .body(json.writeValueAsString(Map.of("to", to))).retrieve().body(JsonNode.class);
+        if (res == null || !res.path("dnd").isBoolean()) {
+            throw new IllegalStateException("no dnd answer");
+        }
+        return res.path("dnd").asBoolean();
+    }
 }

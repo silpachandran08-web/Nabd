@@ -661,6 +661,8 @@ export type SetupChecklistItemResponse = { doneAt?: string; draft?: JsonNode; sk
 export type SetupDraftRequest = { draft: JsonNode; version: number; };
 export type SetupDraftResponse = { step?: string; version?: number; };
 export type Signer = { guardianId?: string; kind: string; name: string; };
+export type SmsKeywordRequest = { inboundRef: number; phone: string; tenantId?: string; text: string; };
+export type SmsKeywordResponse = { confirm?: boolean; optedOut?: boolean; };
 export type SourceBreakdownResponse = { revenue?: number; source?: string; untaggedCount?: number; visitCount?: number; };
 export type SpecialtyProfileItem = { code: string; configVersion: number; entitled: boolean; name: Record<string, string>; };
 export type SpecialtyProfileList = { items: Array<SpecialtyProfileItem>; };
@@ -796,6 +798,7 @@ export type Operations = {
   BlobController_get: { method: "get"; path: "/files-blob/object"; permission: "public"; pathParams: never; query: { m?: string; b?: string; k?: string; e?: number; x?: number; s?: string; }; body: never; response: string };
   BlobController_put: { method: "put"; path: "/files-blob/object"; permission: "public"; pathParams: never; query: { m?: string; b?: string; k?: string; e?: number; x?: number; s?: string; }; body: string; response: void };
   ConsentExportController_export: { method: "get"; path: "/internal/v1/consents:export"; permission: "public"; pathParams: never; query: { tenantId: string; since?: string; cursor?: string; }; body: never; response: Page };
+  SmsKeywordController_keyword: { method: "post"; path: "/internal/v1/consents:sms-keyword"; permission: "public"; pathParams: never; query: never; body: SmsKeywordRequest; response: SmsKeywordResponse };
   DrugMasterImportController_start: { method: "post"; path: "/internal/v1/drug-master/imports"; permission: "kb_import:edit"; pathParams: never; query: never; body: DrugMasterImportRequest; response: Record<string, Record<string, unknown>> };
   DrugMasterImportController_status: { method: "get"; path: "/internal/v1/drug-master/imports/{importId}"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
   DrugMasterImportController_activate: { method: "post"; path: "/internal/v1/drug-master/imports/{importId}/activate"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: DrugMasterActivateRequest; response: Record<string, Record<string, unknown>> };

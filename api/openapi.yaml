@@ -4752,6 +4752,30 @@ paths:
         "200": { description: "OK: { items: [{ patientId, purpose, granted, version, at }], nextCursor? }", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /consents:sms-keyword:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (comms-gateway service token)" }]
+    post:
+      tags: [Messaging]
+      summary: "COM-028. The Comms Gateway relays an inbound SMS keyword (header X-Internal-Token). Core's COM-002 matcher classifies it; a STOP withdraws marketing (WhatsApp and SMS): an all-clinics phone suppression plus the consent rows in tenantId (the clinic of the latest SMS to the number; null = none). optedOut = it was a STOP; confirm = something changed (the gateway sends one SMS confirmation). Idempotent."
+      x-required-permission: public
+      parameters:
+        - { name: X-Internal-Token, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, text, inboundRef]
+              properties:
+                phone: { type: string, pattern: "^[1-9][0-9]{7,14}$", description: "E.164 digits without '+'" }
+                text: { type: string, maxLength: 64 }
+                tenantId: { type: string, format: uuid, nullable: true }
+                inboundRef: { type: integer, format: int64, minimum: 0 }
+      responses:
+        "200": { description: "OK: { optedOut, confirm }", content: { application/json: { schema: { type: object, properties: { optedOut: { type: boolean }, confirm: { type: boolean } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/drug-knowledge-base:
     get:
       tags: [Clinical]

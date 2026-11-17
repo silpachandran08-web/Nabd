@@ -163,6 +163,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/internal/v1/notification-requests/*").permitAll() // COM-004: its own service token, checked in NotificationClaimController
                         .requestMatchers("/internal/v1/consents:export").permitAll() // COM-008: same service token, checked in ConsentExportController
+                        .requestMatchers("/internal/v1/consents:sms-keyword").permitAll() // COM-028: same service token, checked in SmsKeywordController
                         .requestMatchers("/internal/v1/patients/*/recipients").permitAll() // IDC-014: same service token, checked in InternalRecipientsController
                         .anyRequest().access((authn, ctx) -> authenticated(authn)));
         harden(http);

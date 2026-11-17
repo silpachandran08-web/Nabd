@@ -262,6 +262,37 @@ paths:
       tags:
       - messaging
       x-required-permission: public
+  /internal/v1/consents:sms-keyword:
+    post:
+      operationId: SmsKeywordController_keyword
+      parameters:
+      - in: header
+        name: X-Internal-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsKeywordRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SmsKeywordResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - messaging
+      x-required-permission: public
   /internal/v1/drug-master/imports:
     post:
       operationId: DrugMasterImportController_start
@@ -34184,6 +34215,34 @@ components:
       required:
       - kind
       - name
+    SmsKeywordRequest:
+      type: object
+      properties:
+        inboundRef:
+          type: integer
+          format: int64
+          minimum: 0
+        phone:
+          type: string
+          pattern: "^[1-9][0-9]{7,14}$"
+        tenantId:
+          type: string
+          format: uuid
+        text:
+          type: string
+          maxLength: 64
+          minLength: 0
+      required:
+      - inboundRef
+      - phone
+      - text
+    SmsKeywordResponse:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        optedOut:
+          type: boolean
     SourceBreakdownResponse:
       type: object
       properties:

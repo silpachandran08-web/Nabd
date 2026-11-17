@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
  * body with the shared secret ({@code X-Signature: sha256=<hex>}), or, for a BSP that cannot sign, the shared secret in
  * {@code X-Webhook-Secret} from an allow-listed IP. When an allow-list is set every report must come from it. Anything else is 401
  * BAD_SIGNATURE; no secret configured = reject all. The body is never logged.
+ * COM-028: {@code POST /v1/webhooks/sms/{provider}/inbound}: inbound SMS (MO, e.g. STOP), same proof, persist-then-ack; SmsStopService acts on them.
  * shortcut: exact IPs, no CIDR, and the socket peer address (no X-Forwarded-For): put the allow-list on the ingress if a proxy fronts this.
  */
 @RestController
@@ -92,6 +93,31 @@ class SmsController {
         }
         sms.storeDlrs(dlrs);
         return ResponseEntity.ok().build(); // anything but 2xx makes the BSP retry
+    }
+
+    /** COM-028: same checks as the delivery reports; a replayed MO id stores nothing new (idempotent). */
+    @PostMapping("/v1/webhooks/sms/{provider}/inbound")
+    ResponseEntity<Void> inbound(@PathVariable String provider, @RequestBody byte[] body, HttpServletRequest request,
+                                 @RequestHeader(value = "X-Signature", required = false) String signature,
+                                 @RequestHeader(value = "X-Webhook-Secret", required = false) String shared) {
+        if (!sms.provider().name().equals(provider)) {
+            return ResponseEntity.notFound().build();
+        }
+        if (body.length > MAX_BODY_BYTES) {
+            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).build();
+        }
+        if (!authentic(request.getRemoteAddr(), body, signature, shared)) {
+            meters.counter("comms.sms.webhook.rejected", "reason", "bad_signature").increment();
+            throw new InboxException(HttpStatus.UNAUTHORIZED, "BAD_SIGNATURE");
+        }
+        List<SmsProvider.Mo> mos;
+        try {
+            mos = sms.provider().parseMo(body);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        sms.storeMos(mos);
+        return ResponseEntity.ok().build();
     }
 
     boolean authentic(String ip, byte[] body, String signature, String shared) {
