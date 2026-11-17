@@ -99,7 +99,9 @@ class Com021QualityDbTest {
     List<JsonNode> published(UUID s) {
         List<JsonNode> out = new ArrayList<>();
         for (var r : valkey.opsForStream().range("ev:in:comms", Range.unbounded())) {
-            JsonNode ce = JSON.readTree(String.valueOf(r.getValue().get("ce")));
+            String raw = String.valueOf(r.getValue().get("ce"));
+            if (!raw.startsWith("{")) continue; // CommsConsumerTest leaves a "not json" poison entry on the shared stream
+            JsonNode ce = JSON.readTree(raw);
             if (ce.path("subject").asString().equals(s.toString())) out.add(ce);
         }
         return out;

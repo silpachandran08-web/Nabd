@@ -149,7 +149,9 @@ class Com041ReverificationTest extends BookingTestBase {
         assertTrue(text().contains("verified"), text());
         tap(c, "My appointment");                // now served as before (reception answers until ACC-041's own screen)
         assertTrue(text().contains("person from the clinic"), text());
-        assertFalse(superuser().queryForObject("select string_agg(c::text, ' ') from conversations c", String.class).contains("1988"),
+        // this clinic's conversation only, ids and hashes removed: other tests' rows and random ids can contain the digits by chance
+        assertFalse(superuser().queryForObject("select string_agg(regexp_replace(c::text, '[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}', '', 'g'), ' ') "
+                        + "from conversations c where tenant_id = ?::uuid and contact_hash = ?", String.class, c.tenant().toString(), c.hash()).contains("1988"),
                 "the date of birth is never stored");
     }
 
