@@ -114,7 +114,7 @@ public class PlanService {
     private static List<String> validModules(List<String> modules) {
         if (modules == null) return List.of();
         for (String m : modules) {
-            if (!PlanEntitlements.MODULES.contains(m)) {
+            if (!PlanEntitlements.MODULES.contains(m) && !PlanEntitlements.isSpecialty(m)) {
                 throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "unknown-module", "UNKNOWN_MODULE", "Unknown module code.");
             }
         }

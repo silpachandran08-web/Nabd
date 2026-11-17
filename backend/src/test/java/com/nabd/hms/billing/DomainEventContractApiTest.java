@@ -250,6 +250,11 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         // organization.calendar.changed (ADM-028: a holiday added)
         call(e, HttpMethod.POST, "/v1/setup/holidays", Map.of("holidayDate", "2031-01-02", "name", "Contract day", "recurring", false));
 
+        // organization.messaging_settings.changed (COM-024)
+        call(e, HttpMethod.PUT, "/v1/setup/messaging-settings", Map.of("quietHours", Map.of("enabled", true, "start", "21:00", "end", "09:00"),
+                "prayerWindows", Map.of("enabled", true, "method", "umm_al_qura", "bufferMinutes", 20,
+                        "fridayBlock", Map.of("start", "11:30", "end", "13:30"), "latitude", 24.7136, "longitude", 46.6753)));
+
         // organization.config.changed, billing.catalogue.changed
         call(e, HttpMethod.PATCH, "/v1/setup/policies/session.idle_lock_minutes", Map.of("value", "10"));
         Map<String, Object> charge = new HashMap<>(Map.of("code", "ECG", "name", "ECG", "category", "Procedure", "baseAmount", 300,
@@ -299,6 +304,11 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.ORGANIZATION_EXPORT_READY.type()); // ADM-015: Adm015DataExportApiTest
         expected.remove(DomainEventType.TEMPLATE_STATUS_CHANGED.type()); // COM-013: Com013TemplateLifecycleApiTest
         expected.remove(DomainEventType.APPOINTMENT_CONFIRMED.type()); // COM-043: Com043ReminderApiTest
+        expected.remove(DomainEventType.RECALL_CREATED.type()); // COM-052: Com052RecallOrderApiTest
+        expected.remove(DomainEventType.SPECIALTY_PROFILE_ASSIGNED.type()); // CLN-042: Cln042SpecialtyProfilesApiTest
+        expected.remove(DomainEventType.PATIENT_NOTIFICATION_PREFERENCES_CHANGED.type()); // COM-025: Com025NotificationPreferencesApiTest
+        expected.remove(DomainEventType.RX_REVOKED.type()); // CLN-023: Cln023RxPdfApiTest
+        expected.remove(DomainEventType.BREAK_GLASS_REVIEWED.type()); // PLT-013: Plt013BreakGlassReviewApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

@@ -18,7 +18,7 @@ public class ScheduledSendStore {
     public record NewSend(UUID id, UUID tenantId, UUID requestId, UUID senderAccountId, byte[] toAddressEnc, byte[] toHash,
                           String templateName, String language, String priority, Instant notBefore, Instant notAfter) {}
 
-    public record Row(UUID id, UUID requestId, Instant notAfter, String status) {}
+    public record Row(UUID id, UUID requestId, Instant notAfter, String status, String priority, String templateName) {}
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -60,10 +60,44 @@ public class ScheduledSendStore {
     public Optional<Row> find(UUID tenantId, UUID id) {
         return tx.execute(st -> {
             bind(tenantId);
-            return jdbc.query("SELECT id, request_id, not_after, status FROM outbound_messages WHERE id = ?",
+            return jdbc.query("SELECT id, request_id, not_after, status, priority, template_name FROM outbound_messages WHERE id = ?",
                     (rs, i) -> new Row(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                            rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toInstant(), rs.getString(4)), id).stream().findFirst();
+                            rs.getTimestamp(3) == null ? null : rs.getTimestamp(3).toInstant(), rs.getString(4), rs.getString(5), rs.getString(6)),
+                    id).stream().findFirst();
         });
+    }
+
+    /** COM-024: the clinic's send holds from the settings mirror (V23); empty when the clinic never saved them. */
+    public Optional<SendWindows.Settings> windows(UUID tenantId) {
+        return tx.execute(st -> {
+            bind(tenantId);
+            return jdbc.query("""
+                    SELECT time_zone, quiet_enabled, quiet_start, quiet_end, prayer_enabled, prayer_method, prayer_buffer_min,
+                      friday_start, friday_end, latitude, longitude FROM tenant_messaging_settings WHERE tenant_id = ?
+                    """, (rs, i) -> {
+                boolean prayer = rs.getBoolean(5) && rs.getBigDecimal(10) != null && rs.getBigDecimal(11) != null;
+                return new SendWindows.Settings(java.time.ZoneId.of(rs.getString(1)),
+                        rs.getBoolean(2) ? rs.getObject(3, java.time.LocalTime.class) : null, rs.getObject(4, java.time.LocalTime.class),
+                        prayer ? PrayerTimes.Method.of(rs.getString(6)) : null, rs.getInt(7),
+                        rs.getObject(8, java.time.LocalTime.class), rs.getObject(9, java.time.LocalTime.class),
+                        prayer ? rs.getBigDecimal(10).doubleValue() : 0, prayer ? rs.getBigDecimal(11).doubleValue() : 0);
+            }, tenantId).stream().findFirst();
+        });
+    }
+
+    /** COM-024: a held send waits for the next allowed minute; still 'scheduled', so the claim check and settle run then. */
+    public boolean defer(UUID tenantId, UUID id, Instant until, Instant at) {
+        Boolean moved = tx.execute(st -> {
+            bind(tenantId);
+            return jdbc.update("UPDATE outbound_messages SET not_before = ?, updated_at = ? WHERE id = ? AND status = 'scheduled'",
+                    ts(until), ts(at), id) == 1;
+        });
+        if (Boolean.TRUE.equals(moved)) {
+            index.add(tenantId, id, until); // ZADD moves the score
+        } else {
+            index.remove(tenantId, id);
+        }
+        return Boolean.TRUE.equals(moved);
     }
 
     /**

@@ -7,6 +7,7 @@ import { can } from "../../../lib/permissions";
 import type { AuthedFetch, PatientDetail, PrescriptionItem, Row } from "../shared";
 import DoctorOrders from "../DoctorOrders";
 import FollowUpPanel from "../FollowUpPanel";
+import type { Recall } from "../recall";
 import PackageSessionCard from "../PackageSessionCard";
 import RxSummary from "../rx/RxSummary";
 import PanelBoundary from "../visit/PanelBoundary";
@@ -16,16 +17,19 @@ import p from "../consultParts.module.css";
 type Props = {
   entry: Row; patient: PatientDetail | null; authedFetch: AuthedFetch; rxItems: PrescriptionItem[]; rxStatus: "draft" | "signed";
   onOpenRx: () => void; onFollowUp: (label: string | null | undefined) => void;
+  /** COM-052: the visit doctor may set the recall; its state feeds the close summary. */
+  canSetRecall: boolean; onRecall: (r: Recall | null | undefined) => void;
 };
 
-export default function ToolsAside({ entry, patient, authedFetch, rxItems, rxStatus, onOpenRx, onFollowUp }: Props) {
+export default function ToolsAside({ entry, patient, authedFetch, rxItems, rxStatus, onOpenRx, onFollowUp, canSetRecall, onRecall }: Props) {
   const t = useTranslations("consult.toolsAside");
   return (
     <aside className={styles.tools} aria-label={t("contextualTools")}>
       <PanelBoundary panel="rxSummary"><RxSummary items={rxItems} status={rxStatus} onOpen={onOpenRx} /></PanelBoundary>
       <PanelBoundary panel="orders"><DoctorOrders authedFetch={authedFetch} queueEntryId={entry.id} /></PanelBoundary>
       <PanelBoundary panel="followUp">
-        <FollowUpPanel key={entry.id} authedFetch={authedFetch} entryId={entry.id} doctorId={entry.doctorId} patientId={entry.patientId} onBooked={onFollowUp} canBook={can("queue:create")} />
+        <FollowUpPanel key={entry.id} authedFetch={authedFetch} entryId={entry.id} doctorId={entry.doctorId} patientId={entry.patientId} onBooked={onFollowUp} canBook={can("queue:create")}
+          recall={{ canSet: canSetRecall, canView: can("clinical:view"), onChange: onRecall }} />
       </PanelBoundary>
       <section className={p.card} aria-label={t("package")}>
         <h3 className={p.cardTitle}>{t("package")}</h3>

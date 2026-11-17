@@ -57,10 +57,13 @@ public class PatientService {
 
     private final ActorDirectory actors;
     private final com.nabd.hms.organization.api.DataGatePort dataGate; // ADM-002
+    private final com.nabd.hms.patient.internal.PhoneReverificationService reverifications; // COM-041
 
     PatientService(PatientRepository repo, TenantContext tenantContext, FieldCipher cipher,
                     StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock,
-                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors, com.nabd.hms.organization.api.DataGatePort dataGate) {
+                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors, com.nabd.hms.organization.api.DataGatePort dataGate,
+                    com.nabd.hms.patient.internal.PhoneReverificationService reverifications) {
+        this.reverifications = reverifications;
         this.dataGate = dataGate;
         this.events = events;
         this.actors = actors;
@@ -354,6 +357,11 @@ public class PatientService {
         if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(tenantId, id, req.nationalId()));
         repo.update(tenantId, id, changes);
         auditUpdate(tenantId, callerStaffId, id, before, req, changes.get("phone"), hadNationalId);
+        if (changes.get("phone") != null && !Objects.equals(before.phone(), changes.get("phone"))) {
+            // COM-041: a desk-recorded number change; the old and the new number re-verify in chat before records are served on them
+            reverifications.deskChanged(tenantId, before.phone(), (String) changes.get("phone"));
+            audit(tenantId, callerStaffId, "phone.reverify.flagged", id, null, Map.of("reason", "desk_change"));
+        }
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
         // the one place that needs to keep guardian_access consent (and the audit trail) in step —
         // covers grant, revoke (new guardianId is null) and reassignment alike.

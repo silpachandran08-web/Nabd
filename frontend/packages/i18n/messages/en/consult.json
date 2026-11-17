@@ -243,7 +243,6 @@
     "freeSlots": "Free slots",
     "booking": "Booking…",
     "bookFollowUp": "Book follow-up",
-    "reminderNotAvailableYetNo": "Reminder: not available yet. No WhatsApp reminder or booking link is sent; the follow-up appears on the schedule and in Follow-ups.",
     "interval": {
       "3d": "3 days",
       "1w": "1 week",
@@ -489,7 +488,24 @@
     "couldnTLoadTheClinic": "Couldn't load the clinic and prescriber details.",
     "couldnTLoadThePatient": "Couldn't load the patient details.",
     "couldnTConfirmTheAllergy": "Couldn't confirm the allergy register, so the prescription can't be printed yet.",
-    "couldnTReachTheServer": "Couldn't reach the server. Check your connection and retry."
+    "couldnTReachTheServer": "Couldn't reach the server. Check your connection and retry.",
+    "pdfA4": "PDF (A4)",
+    "pdfA5": "PDF (A5)",
+    "pdfFailed": "Couldn't open the prescription PDF. Try again.",
+    "sendToPatient": "Send to patient",
+    "sentToPatient": "Sent. The patient gets a secure link on WhatsApp and opens it with a code.",
+    "sendFailed": "Couldn't send the prescription.",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke this prescription",
+    "revokeHint": "A revoked prescription can no longer be dispensed. Anyone who scans its QR sees that it was revoked. This cannot be undone.",
+    "revokeReason": "Reason for revoking",
+    "revokeReasonHint": "Give a reason of 5 to 500 characters.",
+    "revokeConfirm": "Revoke prescription",
+    "revokeFailed": "Couldn't revoke the prescription.",
+    "revokedOn": "Revoked on {date}.",
+    "revokedReason": "Reason: {reason}",
+    "validUntil": "Valid until",
+    "noExpiry": "No expiry set"
   },
   "rxWarnings": {
     "sourceSafetyDictionaryVersionUnavailable": "Source: safety dictionary version unavailable",
@@ -651,7 +667,10 @@
       "noDiagnosis": "No diagnosis is entered.",
       "noteEmpty": "The note is empty.",
       "rxUnsigned": "The prescription is not signed, so the patient would leave without it."
-    }
+    },
+    "recall": "Recall",
+    "recallSet": "Due {date}",
+    "recallBooked": "Due {date} · booked"
   },
   "noteBanners": {
     "youReOfflineTheNote": "You're offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect. Prescriptions, orders and follow-ups need a connection.",
@@ -926,5 +945,52 @@
     "decideLater": "Decide later",
     "keepServer": "Keep server",
     "keepMine": "Keep mine"
+  },
+  "recallChips": {
+    "recall": "Recall",
+    "reviewIn": "Review in",
+    "chip": {
+      "1w": "1 week",
+      "2w": "2 weeks",
+      "4w": "4 weeks",
+      "3m": "3 months",
+      "6m": "6 months"
+    },
+    "customDays": "Or in (days)",
+    "setCustom": "Set recall",
+    "notSet": "Not set",
+    "duePending": "Due {date}",
+    "dueBooked": "Due {date} · follow-up booked",
+    "loading": "Checking for a recall",
+    "saving": "Setting the recall…",
+    "couldNotLoad": "Couldn't check for a recall on this visit.",
+    "couldNotSet": "Couldn't set the recall. Try again.",
+    "outOfRange": "Enter a whole number of days from 1 to {max}.",
+    "retry": "Retry",
+    "reminderNote": "The patient is due back on this date; booking the follow-up closes the recall.",
+    "noReminderBooked": "The follow-up is booked, so no recall reminder is sent."
+  },
+  "rxQuickActions": {
+    "repeatLast": "Repeat last · {date}",
+    "repeatLastBy": "Repeat last · {date} · {doctor}",
+    "applySet": "Apply set {n}: {name}",
+    "applySetStale": "Apply set {n}: {name} ({count, plural, one {# stale item} other {# stale items}})",
+    "previewTitle": "Repeat last prescription",
+    "previewFrom": "Signed {date}. These lines will be copied:",
+    "previewFromBy": "Signed {date} by {doctor}. These lines will be copied:",
+    "checksRunAgain": "Allergy, pregnancy and controlled-substance checks run again against today's record. Earlier decisions are not carried over.",
+    "replacesPad": "This replaces the {count, plural, one {# medicine} other {# medicines}} now on the pad.",
+    "repeat": "Repeat",
+    "apply": "Apply",
+    "applyTitle": "Apply {name}?",
+    "cancel": "Cancel",
+    "replacement": "Suggested instead: {display}",
+    "couldntRepeat": "Couldn't repeat the last prescription.",
+    "couldntApply": "Couldn't apply set.",
+    "stale": {
+      "retired": "retired from the drug list",
+      "out_of_stock": "out of stock in the clinic pharmacy",
+      "not_in_master": "not in the active pharmacy list"
+    }
   }
 }

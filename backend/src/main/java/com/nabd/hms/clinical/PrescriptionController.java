@@ -8,6 +8,7 @@ import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetUpdateRequest;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionUpsertRequest;
+import com.nabd.hms.clinical.dto.RepeatLastRequest;
 import com.nabd.hms.common.RequestMeta;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -135,11 +136,16 @@ public class PrescriptionController {
         return service.applySet(tenantId, queueEntryId, setId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
     }
 
-    /** DOC-035 / DOC-R2: "Repeat last prescription" (the patient's most recent signed Rx from another visit). */
+    /** DOC-035 / DOC-R2: "Repeat last prescription" (the patient's most recent signed Rx from another visit).
+     * CLN-022: optional body { sourcePrescriptionId } pins the previewed one; Idempotency-Key makes a retried tap run once.
+     * T1-BUG-1: a revoked Rx is never the default source; pinning one is 409 prescription-revoked. */
+    @com.nabd.hms.shared.Idempotent
     @PostMapping("/prescriptions/{queueEntryId}/repeat-last")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public PrescriptionResponse repeatLast(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
-        return service.repeatLast(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
+    public PrescriptionResponse repeatLast(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+                                            @Valid @RequestBody(required = false) RepeatLastRequest req, HttpServletRequest http) {
+        return service.repeatLast(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http),
+                req == null ? null : req.sourcePrescriptionId());
     }
 
     /** V1-007: the explicit permission that lets someone other than the visit's doctor record a warning decision

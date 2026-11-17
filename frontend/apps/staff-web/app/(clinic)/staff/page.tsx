@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "../../components/ui/Icon";
 import RegistrationNoDialog from "../../components/staff/RegistrationNoDialog";
+import SpecialtyProfileDialog from "../../components/staff/SpecialtyProfileDialog";
 import styles from "./staff.module.css";
 import { staffKpis } from "./staffKpis";
 import type { Staff } from "./staffModel";
@@ -25,6 +26,7 @@ export default function StaffAccessPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [lastInvite, setLastInvite] = useState<{ name: string; link: string } | null>(null);
   const [regEdit, setRegEdit] = useState<Staff | null>(null);
+  const [specEdit, setSpecEdit] = useState<Staff | null>(null);
   // ADM-018: tabs, seat tile, one-tap invite resend and MFA reminder.
   const [tab, setTab] = useState<StaffTab>("people");
   const su = useStepUp({ setError: d.setError, setStaff: d.setStaff });
@@ -83,7 +85,7 @@ export default function StaffAccessPage() {
 
       {tab === "invites" && !loading && !forbidden && <InvitesTab pending={pending} roles={roles} canInvite={g.canInvite} rows={rows} />}
 
-      <PeopleCard d={d} hidden={tab !== "people"} g={g} rows={rows} su={su} onRegEdit={setRegEdit} />
+      <PeopleCard d={d} hidden={tab !== "people"} g={g} rows={rows} su={su} onRegEdit={setRegEdit} onSpecEdit={setSpecEdit} />
 
       {!loading && !forbidden && tab === "roles" && <RolesTab d={d} selectedRole={selectedRole} setSelectedRoleId={setSelectedRoleId} g={g} rows={rows} rb={rb} />}
 
@@ -94,6 +96,8 @@ export default function StaffAccessPage() {
           onSave={(v) => rows.saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)}
           onClinicianSaved={(on) => rows.clinicianSaved(regEdit.id, on)} />
       )}
+
+      {specEdit && d.owner && g.canEditRoles && <SpecialtyProfileDialog staffId={specEdit.id} staffName={specEdit.name} onClose={() => setSpecEdit(null)} />}
 
       {inviteOpen && g.canInvite && <InviteDialog f={invite} roles={roles} departments={d.departments} onClose={() => setInviteOpen(false)} />}
 

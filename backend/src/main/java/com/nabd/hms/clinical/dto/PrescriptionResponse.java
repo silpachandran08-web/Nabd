@@ -17,5 +17,9 @@ public record PrescriptionResponse(UUID id, UUID queueEntryId, UUID patientId, U
                                     int unresolvedWarnings, PrescriptionAllergySnapshotResponse allergySnapshot,
                                     List<PrescriptionWarningResponse> warnings, String safetyDictionaryVersion,
                                     // CLN-005: stored signer and the registration number signed under; null on a draft
-                                    UUID signedBy, String signedByRegistrationNo) {
+                                    UUID signedBy, String signedByRegistrationNo,
+                                    // CLN-022: the signer's name, for the Rx pad's "Repeat last (date, doctor)"; null on a draft
+                                    String signedByName,
+                                    // T1-BUG-1 (CLN-023): when the prescriber revoked it; null when not revoked. Never a repeat source.
+                                    Instant revokedAt) {
 }

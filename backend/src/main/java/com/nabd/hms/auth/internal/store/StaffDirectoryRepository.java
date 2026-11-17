@@ -91,6 +91,11 @@ public class StaffDirectoryRepository {
 
     // ── break-glass (NB-048) ─────────────────────────────────────────────
 
+    /** PLT-013: an owner removed clinical:breakGlass from this staff member after a 'not justified' review. */
+    public boolean breakGlassRevoked(UUID staffId) {
+        return jdbc.queryForList("SELECT 1 FROM staff WHERE id = ? AND break_glass_revoked_at IS NOT NULL", Integer.class, staffId).size() == 1;
+    }
+
     /** Same "detect and close on next read" shape as delegation expiry — see AuthService.mintTokenPair. */
     public List<UUID> expireStaleBreakGlass(UUID staffId) {
         return jdbc.query(
@@ -138,6 +143,14 @@ public class StaffDirectoryRepository {
                 "UPDATE role_delegations SET revoked_at = expires_at, revoked_reason = 'expired' " +
                         "WHERE staff_id = ? AND revoked_at IS NULL AND expires_at <= now() RETURNING id",
                 (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
+    }
+
+    /** CLN-042: the staff member's specialty profiles, primary first: [code, entitlement/permission module]. */
+    public List<String[]> findSpecialtyProfiles(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.code, p.config->>'module' FROM staff_specialty_profiles s JOIN specialty_profiles p ON p.code = s.code " +
+                        "JOIN staff st ON st.id = s.staff_id AND st.is_clinician " + // T1-BUG-2: a non-clinician's old row grants nothing
+                        "WHERE s.tenant_id = ? AND s.staff_id = ? ORDER BY s.is_primary DESC",
+                (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, tenantId, staffId);
     }
 
     /** PLT-005: an owner's shadow staff row (staff.owner_id set) is reached only through the owner account's own MFA. */

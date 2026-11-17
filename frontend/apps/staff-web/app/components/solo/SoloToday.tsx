@@ -6,6 +6,7 @@ import styles from "./solo.module.css";
 import StatusPill from "../ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
+import { navAllowed, useEntitlements } from "../../lib/entitlements";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { nextWaiting, useCallNext } from "./callNext";
 import { useSoloQueue, type SoloRow } from "./useSoloQueue";
@@ -13,7 +14,8 @@ import { useSoloQueue, type SoloRow } from "./useSoloQueue";
 const STAGE: Record<string, string> = { checked_in: "Arrived", waiting: "Waiting", vitals_pending: "Vitals", vitals_done: "Ready", in_consult: "In consult", procedures_pending: "Procedures" };
 const waitMin = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 
-// CLN-008 solo.today: the doctor's queue on a phone. Call next and Start sit in the bottom bar (thumb zone).
+// CLN-008 solo.today: the doctor's queue on a phone. Call next and Start sit in the bottom bar (thumb zone); FEF-056 adds Rx and
+// Take payment there, so the three primary actions are one thumb away (each absent without its grant or, for payment, the billing module).
 export default function SoloToday() {
   const router = useRouter();
   const mounted = useHasMounted();
@@ -24,6 +26,10 @@ export default function SoloToday() {
   const call = useCallNext(next, refetch);
   const canMove = mounted && can("queue:edit");
   const canConsult = mounted && can("clinical:view");
+  const ent = useEntitlements();
+  const canRx = mounted && can("clinical:edit");
+  const canPay = mounted && can("billing:view") && navAllowed("/billing", ent);
+  const payNext = rows.find((r) => r.status === "checkout_pending") ?? null;
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -52,12 +58,14 @@ export default function SoloToday() {
           </section>
         )}
 
-      {(canMove || inRoom) && (
+      {(canMove || inRoom || canPay) && (
         <nav className={styles.bar} aria-label="Queue actions">
           {canMove && <button type="button" className={`${styles.barBtn} ${styles.barPrimary}`} disabled={!next || call.busy || !!inRoom} onClick={() => void call.callNext()}>
             {call.busy ? "Calling…" : "Call next"}
           </button>}
           {inRoom && canConsult && <button type="button" className={styles.barBtn} onClick={() => router.push(`/solo/consult?entry=${encodeURIComponent(inRoom.id)}`)}>Start</button>}
+          {inRoom && canRx && <button type="button" className={styles.barBtn} onClick={() => router.push(`/consult?entry=${encodeURIComponent(inRoom.id)}&step=plan`)}>Rx</button>}
+          {canPay && <button type="button" className={styles.barBtn} onClick={() => router.push(payNext ? `/checkout/${encodeURIComponent(payNext.id)}` : "/billing")}>Take payment</button>}
         </nav>
       )}
     </main>

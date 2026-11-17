@@ -315,6 +315,7 @@ schemas:
       owner_staff_id: operational
       message: pii  # uncertain: names actor and patient; no clinical content expected
       created_at: operational
+      kind: operational
     break_glass_grants:
       id: operational
       tenant_id: operational
@@ -331,6 +332,12 @@ schemas:
       notified_at: operational
       session_id: operational
       deactivated_by: operational
+      device_label: operational
+      reviewed_by: operational
+      reviewed_at: operational
+      review_outcome: operational
+      review_note: phi  # free-text review / incident note may name a condition
+      review_reminded_at: operational
     charge_catalogue:
       drug_id: operational
       id: operational
@@ -403,6 +410,16 @@ schemas:
       enabled: operational
       from_time: operational
       to_time: operational
+      updated_at: operational
+    tenant_messaging_settings:
+      tenant_id: operational
+      prayer_enabled: operational
+      prayer_method: operational
+      prayer_buffer_min: operational
+      friday_start: operational
+      friday_end: operational
+      latitude: operational
+      longitude: operational
       updated_at: operational
     holiday_templates:
       code: operational
@@ -1610,6 +1627,21 @@ schemas:
       tenant_id: operational
       source: operational
       created_at: operational
+    prescription_rx_tokens:
+      prescription_id: operational
+      tenant_id: operational
+      rx_token: operational
+      payload_sha256: operational
+      signing_kid: operational
+      valid_until: operational
+      pdf_a4_file_id: operational
+      pdf_a4_sha256: operational
+      pdf_a5_file_id: operational
+      pdf_a5_sha256: operational
+      revoked_at: operational
+      revoke_reason: phi
+      revoked_by: operational
+      created_at: operational
     prescriptions:
       id: operational
       tenant_id: operational
@@ -1640,6 +1672,18 @@ schemas:
       hfr_id: operational
       hip_id: operational
       verified_at: operational
+      updated_by: operational
+      updated_at: operational
+    patient_notification_preferences:
+      tenant_id: operational
+      patient_id: pii
+      language: pii  # COM-025: the patient's chosen language
+      channel: operational
+      categories: operational
+      quiet_start: operational
+      quiet_end: operational
+      caregiver_recipients: pii  # caregiver patient ids and their message categories
+      version: operational
       updated_by: operational
       updated_at: operational
     patient_proxies:
@@ -1716,6 +1760,13 @@ schemas:
       proxy_scope: operational
       proxy_status: operational
       created_at: operational
+    phone_reverifications:
+      tenant_id: operational
+      phone_hash: pii
+      state: operational
+      reason: operational
+      locked_until: operational
+      updated_at: operational
     patient_desk_tasks:
       id: operational
       tenant_id: operational
@@ -1768,6 +1819,25 @@ schemas:
       effective_from: operational
       created_by: operational
       created_at: operational
+    recall_orders:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      source_encounter_id: operational
+      doctor_id: operational
+      rule_id: operational
+      source: operational
+      reason_code: phi
+      interval_days: phi
+      due_date: phi
+      status: phi
+      messages_sent: operational
+      last_messaged_at: operational
+      booked_appointment_id: operational
+      callback_after: operational
+      created_by: operational
+      created_at: operational
+      updated_at: operational
     procedure_consents:
       id: operational
       tenant_id: operational
@@ -1909,6 +1979,8 @@ schemas:
       active: operational
       display_languages: operational
       einvoice_scheme: operational
+      prayer_method: operational
+      prayer_windows_default: operational
     price_templates:
       id: operational
       specialty: operational
@@ -2083,10 +2155,13 @@ schemas:
       mfa_pending_created_at: operational
       mfa_reset_required: operational
       is_clinician: operational
+      break_glass_revoked_at: operational
       licence_expires_on: pii
       licence_override_until: operational
       hpr_id: pii
       hpr_verified_at: operational
+      registration_council: operational
+      signature_file_id: operational
     staff_clinician_review:
       tenant_id: operational
       staff_id: operational
@@ -2156,6 +2231,18 @@ schemas:
       created_at: operational
       last_success_at: operational
       failure_count: operational
+    specialty_profiles:
+      code: operational
+      name: operational
+      config: operational
+      config_version: operational
+    staff_specialty_profiles:
+      tenant_id: operational
+      staff_id: operational
+      code: operational
+      is_primary: operational
+      assigned_by: operational
+      assigned_at: operational
     staff_onboarding_progress:
       tenant_id: operational
       staff_id: operational
@@ -2260,6 +2347,7 @@ schemas:
       dedupe_key: operational
       status: operational
       created_at: operational
+      about_patient_id: pii  # COM-025: the patient a caregiver's copy is about
     whatsapp_messages:
       id: operational
       tenant_id: operational

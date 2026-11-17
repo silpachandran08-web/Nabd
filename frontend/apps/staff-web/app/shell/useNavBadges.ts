@@ -13,11 +13,12 @@ const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isA
 
 export function useNavBadges(role: RoleContext | null, perms: readonly string[], pathname: string | null, refresh = true) {
   const me = role ? selfStaffId() : "";
+  const doctor = role === "doctor" || role === "solo"; // FEF-056: the solo Today badge is the doctor's own waiting count
   const q = perms.includes("queue:view");
-  const reception = useQuery({ ...queueQuery(), enabled: (role === "reception" || role === "owner" || role === "billing") && q }).data; // FEF-058/057: owner and billing navs show the same counts
+  const reception = useQuery({ ...queueQuery(), enabled: (role === "reception" || role === "owner" || role === "billing" || role === "solo") && q }).data; // FEF-058/057/056: owner, billing and solo navs show the same counts
   const priority = useQuery({ ...queueQuery(true), enabled: role === "nurse" && q }).data;
   const admin = useQuery({ ...adminOrdersQuery(), enabled: role === "nurse" && perms.includes("nursing:view") }).data;
-  const mine = useQuery({ ...doctorQueueQuery(me), enabled: role === "doctor" && !!me && q }).data;
+  const mine = useQuery({ ...doctorQueueQuery(me), enabled: doctor && !!me && q }).data;
   const qc = useQueryClient();
   // Refresh on every navigation as before; a newer refresh cancels a slower one still in flight (FEF-004).
   useEffect(() => {

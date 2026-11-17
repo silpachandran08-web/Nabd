@@ -65,6 +65,10 @@ public class BreakGlassService {
         requireStepUp(stepUpToken, staffId, caller.getClaimAsString("sid"));
         tenantContext.set(tenantId);
         Staff staff = staffDir.findStaffById(staffId).orElseThrow(() -> forbidden("Not allowed."));
+        // PLT-013: an owner's 'not justified' review removed it from this person; an access token minted before that still carries the grant
+        if (staffDir.breakGlassRevoked(staffId)) {
+            throw forbidden("Emergency access was removed from your account after a review. Ask the clinic owner.");
+        }
 
         staffDir.expireStaleBreakGlass(staffId);
         if (repo.hasActive(staffId)) {
@@ -75,7 +79,7 @@ public class BreakGlassService {
         UUID sessionId = UUID.randomUUID();
         UUID grantId;
         try {
-            grantId = repo.insert(tenantId, staffId, req.reasonCode(), req.reasonText(), req.patientId(), expiresAt, sessionId);
+            grantId = repo.insert(tenantId, staffId, req.reasonCode(), req.reasonText(), req.patientId(), expiresAt, sessionId, device);
         } catch (org.springframework.dao.DuplicateKeyException e) { // uq_break_glass_one_active: lost the race
             throw new ApiException(HttpStatus.CONFLICT, "already-active", "Emergency access already active",
                     "You already have an active emergency access grant.");

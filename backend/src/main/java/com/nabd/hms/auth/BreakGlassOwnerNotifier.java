@@ -82,13 +82,15 @@ final class BreakGlassOwnerNotifier {
             JsonNode p = mapper.readTree(e.payloadJson());
             String name = repo.staffName(UUID.fromString(p.path("staffId").asString()));
             String time = when(clock, e, p);
+            // PLT-013: the 24 h review reminder reuses this template and consumer, under its own dedupe key
+            String key = p.path("reminder").asBoolean(false) ? "break-glass-reminder:" : "break-glass:";
             for (BreakGlassRepository.Owner o : repo.owners(e.tenantId())) {
                 if (o.phone() != null && !o.phone().isBlank()) {
                     // COM-004: one request per owner and grant (the dedupe key makes the outbox retry harmless). Throws if the tenant
                     // has no approved emergency_access_used template: the outbox retries, then dead-letters visibly
                     notifications.request(new NotificationRequest(NotificationPurpose.EMERGENCY_ACCESS_USED,
                             "break_glass_grant", UUID.fromString(p.path("grantId").asString()), null, o.phone(), "en", List.of(name, time),
-                            null, null, null, "break-glass:" + p.path("grantId").asString() + ":" + o.id()));
+                            null, null, null, key + p.path("grantId").asString() + ":" + o.id()));
                 }
             }
         }

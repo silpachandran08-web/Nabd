@@ -3,6 +3,7 @@ package com.nabd.hms.organization.setup;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -17,6 +18,10 @@ class CalendarRepository {
     }
 
     record Quiet(boolean enabled, LocalTime from, LocalTime to) {
+    }
+
+    /** COM-024: the clinic's prayer-window settings (V3220). */
+    record Prayer(boolean enabled, String method, int bufferMinutes, LocalTime fridayFrom, LocalTime fridayTo, BigDecimal latitude, BigDecimal longitude) {
     }
 
     private final JdbcTemplate jdbc;
@@ -68,5 +73,30 @@ class CalendarRepository {
                 INSERT INTO clinic_quiet_hours (tenant_id, enabled, from_time, to_time) VALUES (?,?,?,?)
                 ON CONFLICT (tenant_id) DO UPDATE SET enabled = EXCLUDED.enabled, from_time = EXCLUDED.from_time, to_time = EXCLUDED.to_time, updated_at = now()""",
                 tenantId, enabled, from, to);
+    }
+
+    /** COM-024: the region's default (regions table, V3221) for a clinic that never saved prayer settings. */
+    Prayer prayerDefault(String region) {
+        return jdbc.query("SELECT prayer_windows_default, prayer_method FROM regions WHERE code = ?",
+                (rs, i) -> new Prayer(rs.getBoolean(1), rs.getString(2), 20, LocalTime.of(11, 30), LocalTime.of(13, 30), null, null), region)
+                .stream().findFirst().orElse(new Prayer(false, "mwl", 20, LocalTime.of(11, 30), LocalTime.of(13, 30), null, null));
+    }
+
+    Optional<Prayer> prayer(UUID tenantId) {
+        return jdbc.query("""
+                SELECT prayer_enabled, prayer_method, prayer_buffer_min, friday_start, friday_end, latitude, longitude
+                FROM tenant_messaging_settings WHERE tenant_id = ?""",
+                (rs, i) -> new Prayer(rs.getBoolean(1), rs.getString(2), rs.getInt(3), rs.getObject(4, LocalTime.class), rs.getObject(5, LocalTime.class),
+                        rs.getBigDecimal(6), rs.getBigDecimal(7)), tenantId).stream().findFirst();
+    }
+
+    void putPrayer(UUID tenantId, Prayer p) {
+        jdbc.update("""
+                INSERT INTO tenant_messaging_settings (tenant_id, prayer_enabled, prayer_method, prayer_buffer_min, friday_start, friday_end, latitude, longitude)
+                VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT (tenant_id) DO UPDATE SET prayer_enabled = EXCLUDED.prayer_enabled, prayer_method = EXCLUDED.prayer_method,
+                  prayer_buffer_min = EXCLUDED.prayer_buffer_min, friday_start = EXCLUDED.friday_start, friday_end = EXCLUDED.friday_end,
+                  latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude, updated_at = now()""",
+                tenantId, p.enabled(), p.method(), p.bufferMinutes(), p.fridayFrom(), p.fridayTo(), p.latitude(), p.longitude());
     }
 }

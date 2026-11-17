@@ -2,6 +2,7 @@
 import { createClient, ApiError, TimeoutError } from "@nabd/api-client";
 import type { Problem } from "@nabd/api-client/types";
 import { goLogin, needsRefresh, refreshSession } from "./apiClient.ts";
+import { deviceLabelHeader } from "./deviceLabel.ts";
 
 export { ApiError, TimeoutError };
 export { intentKeys } from "@nabd/api-client";
@@ -17,6 +18,7 @@ export const api = createClient({
   refresh: refreshSession,
   shouldRefresh: needsRefresh,
   stepUp: (problem) => (stepUpHandler ? stepUpHandler(problem) : Promise.resolve(null)),
+  defaultHeaders: deviceLabelHeader, // PLT-013: break-glass activation, workspace select
 });
 
 /** Calls made before sign-in (owner portal, invite, MFA enrolment): no token, no refresh, a 401 is just the answer. */
@@ -25,6 +27,7 @@ export const publicApi = createClient({
   getToken: () => null,
   onAuthFailure: () => {},
   timeoutMs: 20_000, // LIVE-01: a cold-starting host gets 20 s before the sign-in screens give up
+  defaultHeaders: deviceLabelHeader, // PLT-013: owner sign-in, invite accept
 });
 
 // ACC-003: a second check-in of the same appointment names the token already issued.

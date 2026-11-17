@@ -52,10 +52,12 @@ class BookingFlow {
     private final MeterRegistry meters;
     private final Clock clock;
     private final ContactLanguage languages;
+    private final PhoneVerifications phones;
 
     BookingFlow(CoreClient core, SlotHolds holds, AvailabilityProjection projection, EdgeProperties props, MeterRegistry meters, Clock clock,
-                ContactLanguage languages) {
+                ContactLanguage languages, PhoneVerifications phones) {
         this.languages = languages;
+        this.phones = phones;
         this.core = core;
         this.holds = holds;
         this.projection = projection;
@@ -221,12 +223,14 @@ class BookingFlow {
 
     // ---- who is this for (ACC-042) -----------------------------------------------------------------------------------
 
-    /** Me = the oldest adult on the phone (Core lists oldest first); children are the minors linked to a guardian. Other adults are never listed. */
-    private record Family(CoreClient.Member me, List<CoreClient.Member> children) {
-        static Family of(List<CoreClient.Member> members) {
+    /** Me = the oldest adult on the phone (Core lists oldest first); children are the minors linked to a guardian. Other adults are never listed.
+     * COM-041: while the phone needs re-verification (verified false) no family member is listed or added; booking for "Me" still works. */
+    private record Family(CoreClient.Member me, List<CoreClient.Member> children, boolean verified) {
+        static Family of(List<CoreClient.Member> members, boolean verified) {
             CoreClient.Member me = members.stream().filter(m -> m.years() >= 18).findFirst().orElse(members.isEmpty() ? null : members.get(0));
-            List<CoreClient.Member> kids = members.stream().filter(m -> m != me && m.years() < 18 && "dependent".equals(m.relation())).limit(ROWS - 3).toList();
-            return new Family(me, kids);
+            List<CoreClient.Member> kids = !verified ? List.of()
+                    : members.stream().filter(m -> m != me && m.years() < 18 && "dependent".equals(m.relation())).limit(ROWS - 3).toList();
+            return new Family(me, kids, verified);
         }
 
         boolean lists(String ref) {
@@ -234,8 +238,13 @@ class BookingFlow {
         }
     }
 
+    private Family family(Conversation c) {
+        List<CoreClient.Member> members = core.household(c.tenantId(), c.contactHash());
+        return Family.of(members, members.isEmpty() || phones.status(c.tenantId(), c.contactHash()) == PhoneVerifications.Status.VERIFIED);
+    }
+
     private Outcome beginBooking(Conversation c, Map<String, String> ctx) {
-        Family f = Family.of(core.household(c.tenantId(), c.contactHash()));
+        Family f = family(c);
         if (f.me() == null) {
             meters.counter("edge_handoff_total", "reason", "unknown_phone").increment();
             return handoff(c, "unknown.phone");
@@ -245,14 +254,16 @@ class BookingFlow {
 
     private Outcome askWho(Conversation c, Map<String, String> ctx) {
         String l = lang(ctx);
-        Family f = Family.of(core.household(c.tenantId(), c.contactHash()));
+        Family f = family(c);
         if (f.me() == null) {
             return handoff(c, "unknown.phone");
         }
         List<Button> b = new ArrayList<>();
         b.add(new Button("who:" + f.me().patientRef(), BookingCopy.t(l, "who.me")));
         f.children().forEach(k -> b.add(new Button("who:" + k.patientRef(), cut(BookingCopy.t(l, "who.child", k.firstName(), k.years())))));
-        b.add(new Button("who_add", BookingCopy.t(l, "who.add")));
+        if (f.verified()) {
+            b.add(new Button("who_add", BookingCopy.t(l, "who.add")));
+        }
         b.add(new Button("who_other", BookingCopy.t(l, "who.other")));
         return new Outcome(State.WHO, ctx, BookingCopy.t(l, "who.ask"), b);
     }
@@ -260,7 +271,7 @@ class BookingFlow {
     private Outcome who(Conversation c, Message m) {
         String a = m.buttonAction();
         Map<String, String> ctx = new HashMap<>(c.context());
-        if ("who_add".equals(a)) {
+        if ("who_add".equals(a) && family(c).verified()) {
             return new Outcome(State.CHILD_NAME, ctx, BookingCopy.t(lang(ctx), "child.name"));
         }
         if ("who_other".equals(a)) {
@@ -269,7 +280,7 @@ class BookingFlow {
         if (a == null || !a.startsWith("who:")) {
             return null;
         }
-        Family f = Family.of(core.household(c.tenantId(), c.contactHash()));
+        Family f = family(c);
         String ref = a.substring(4);
         if (!f.lists(ref)) { // revoked or aged out since the list was shown: show the current one
             return askWho(c, ctx);
@@ -473,7 +484,7 @@ class BookingFlow {
             return null;
         }
         String l = lang(ctx);
-        if (!Family.of(core.household(c.tenantId(), c.contactHash())).lists(ctx.get("who"))) { // access ended since the choice was made
+        if (!family(c).lists(ctx.get("who"))) { // access ended since the choice was made
             holds.release(c.tenantId(), c.id());
             return beginBooking(c, ctx);
         }

@@ -132,7 +132,7 @@ export function refreshOnce(rt: string, deps: Deps, fwd: Headers): Promise<Refre
   if (hit) return hit;
   const p = (async (): Promise<Refreshed> => {
     const h = new Headers({ "content-type": "application/json" });
-    for (const k of ["x-forwarded-for", "user-agent", "x-request-id"]) { const v = fwd.get(k); if (v) h.set(k, v); }
+    for (const k of ["x-forwarded-for", "user-agent", "x-request-id", "x-device-label"]) { const v = fwd.get(k); if (v) h.set(k, v); }
     const res = await deps.fetch(`${deps.core}/auth/refresh`, { method: "POST", headers: h, body: JSON.stringify({ refreshToken: rt }) });
     if (!res.ok) return { ok: false, status: res.status };
     const pair = (await res.json()) as Pair;

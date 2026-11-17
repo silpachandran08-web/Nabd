@@ -16,7 +16,7 @@ import java.util.UUID;
  * PHL-001 (hazard H-04): the counter and the visit checkout may bill a prescription-only item (charge_catalogue.is_rx,
  * set by the clinic) only against a signed prescription line of the same tenant and patient with quantity left.
  * Which items are prescription-only is the clinic's data, not decided here. A refusal is 422 Problem+JSON with a
- * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted, PHL-012 rx-expired) plus an audit row and event
+ * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted, PHL-012 rx-expired, CLN-023 rx-revoked) plus an audit row and event
  * that survive the rolled-back checkout. The outside-prescription path (paper/photo Rx) is PHL-020.
  */
 @Service
@@ -26,7 +26,7 @@ public class RxGate {
     public record Line(String chargeCode, UUID catalogueId, boolean isRx, int quantity, UUID prescriptionItemId) {
     }
 
-    record RxItemRow(UUID id, UUID patientId, String status, BigDecimal quantity) {
+    record RxItemRow(UUID id, UUID patientId, String status, BigDecimal quantity, boolean revoked) {
     }
 
     public record RxLineResponse(UUID prescriptionItemId, UUID patientId, String patientName, String drugName, String dosage,
@@ -80,6 +80,10 @@ public class RxGate {
             if (!"signed".equals(row.status())) {
                 block(tenantId, staffId, ip, l, "rx-not-signed", "Prescription not signed",
                         "The linked prescription for " + l.chargeCode() + " is still a draft. The doctor must sign it first.");
+            }
+            if (row.revoked()) { // CLN-023: the prescriber revoked it after signing
+                block(tenantId, staffId, ip, l, "rx-revoked", "Prescription revoked",
+                        "The prescription for " + l.chargeCode() + " was revoked by the prescriber and can no longer be dispensed.");
             }
             if (owner == null) owner = row.patientId();
             else if (!owner.equals(row.patientId())) {

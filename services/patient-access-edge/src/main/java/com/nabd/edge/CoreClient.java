@@ -335,4 +335,28 @@ public class CoreClient {
         JsonNode n = json.readTree(http.post(base + "/internal/v1/tenants/" + tenantId + "/patients/" + caregiverRef + "/members", json.writeValueAsString(body)));
         return new AddedMember(n.path("memberRef").asString(""), n.path("proxyStatus").asString(""));
     }
+
+    /** COM-041: Core's view of the phone (verified | needs_reverify | locked); the desk recording a number change sets it there. */
+    public String reverification(UUID tenantId, String phoneHash) {
+        return json.readTree(http.get(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash + "/reverification"))
+                .path("state").asString("verified");
+    }
+
+    /** COM-041: tells Core a step (flagged, failed, locked, verified): Core audits it, alerts the desk on locked and holds secure links meanwhile. */
+    public void reportReverification(UUID tenantId, String phoneHash, java.util.Map<String, Object> step) {
+        http.post(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash + "/reverification", json.writeValueAsString(step));
+    }
+
+    /** COM-041: does the date of birth match a patient registered on this phone? Core answers a yes/no only and audits the check. */
+    public boolean secondFactorMatches(UUID tenantId, String phoneHash, LocalDate dob) {
+        return json.readTree(http.post(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash + "/reverification/check",
+                json.writeValueAsString(java.util.Map.of("dob", dob.toString())))).path("match").asBoolean(false);
+    }
+
+    /** COM-025: the patient chose a message language in the Settings menu; Core sets it for everyone on the verified phone. Throws
+     * Http.UpstreamStatusException 404 when the phone has no patient record. Idempotent at Core (the same language changes nothing). */
+    public void saveLanguage(UUID tenantId, String phoneHash, String language, String idempotencyKey) {
+        http.patch(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash + "/notification-preferences",
+                json.writeValueAsString(java.util.Map.of("language", language)), idempotencyKey);
+    }
 }

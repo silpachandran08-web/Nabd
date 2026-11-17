@@ -114,7 +114,7 @@ public class FeatureSwitchController {
     }
 
     private static void requireFeature(String code) {
-        if (!PlanEntitlements.FEATURES.contains(code)) {
+        if (!PlanEntitlements.FEATURES.contains(code) && !PlanEntitlements.isSpecialty(code)) { // CLN-042: specialty trials are overrides with an expiry
             throw new ApiException(HttpStatus.NOT_FOUND, "unknown-feature", "UNKNOWN_FEATURE", "Unknown feature code.");
         }
     }

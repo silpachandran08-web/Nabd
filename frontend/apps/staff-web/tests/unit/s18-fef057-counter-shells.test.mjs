@@ -177,7 +177,7 @@ test("badges: checkout follows the live queue (SSE 'queue' resource); items with
   assert.equal(findItem("billing-checkout").badge, "checkout");
   for (const r of COUNTER_ROLES) for (const i of NAV[r]) if (i.id !== "billing-checkout") assert.equal(i.badge, undefined, i.id);
   const hook = src("shell/useNavBadges.ts");
-  assert.match(hook, /enabled: \(role === "reception" \|\| role === "owner" \|\| role === "billing"\) && q/);
+  assert.match(hook, /enabled: \(role === "reception" \|\| role === "owner" \|\| role === "billing" \|\| role === "solo"\) && q/); // FEF-056 adds the solo shell
   assert.match(hook, /checkout: count\(reception, \(r\) => r\.status === "checkout_pending"\)/);
   const sse = readFileSync(new URL("../../../../packages/api-client/sse/patch.ts", import.meta.url), "utf8");
   assert.match(sse, /if \(type\.startsWith\("queue\."\)\) return \["queue", "wait-estimate"\]/);

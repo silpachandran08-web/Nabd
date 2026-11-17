@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
 import styles from "../../(clinic)/staff/staff.module.css";
 import { api, reasonText } from "../../lib/api";
+import { can } from "../../lib/permissions";
+import { uploadSignature } from "./signatureUpload";
 
 // DOC-N1: edit one staff member's professional registration number (printed on signed prescriptions).
 // PATCH /staff/{id} { professionalRegistrationNo } needs staff:edit; the caller only renders this for holders of it.
 // Empty input clears the number. The pattern mirrors the server's (letters, digits, space . / -, 1 to 40).
 // CLN-005: the same dialog marks the person as a registered clinician (who may sign) and records the licence expiry:
 // GET/PUT /staff/{id}/clinical-licence. Marking a clinician needs a registration number (the server refuses otherwise).
+// CLN-023: the same PUT records the registration council and the signature image printed on the Rx PDF (null = unchanged).
 const PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$/;
 
-type Licence = { isClinician: boolean; licenceExpiresOn: string | null; licenceOverrideUntil: string | null };
+type Licence = { isClinician: boolean; licenceExpiresOn: string | null; licenceOverrideUntil: string | null; registrationCouncil?: string | null; hasSignature?: boolean };
 
 export default function RegistrationNoDialog({ staffId, staffName, current, onSave, onClose, onClinicianSaved }: {
   staffId: string;
@@ -28,6 +31,9 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
   const [licence, setLicence] = useState<Licence | null | "error">(null);
   const [clinician, setClinician] = useState(false);
   const [expires, setExpires] = useState("");
+  const [council, setCouncil] = useState("");
+  const [signature, setSignature] = useState<File | null>(null);
+  const canUpload = can("clinical:create"); // the upload pipeline's permission; absent for anyone without it
 
   useEffect(() => {
     let live = true;
@@ -38,6 +44,7 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
         setLicence(l);
         setClinician(l.isClinician);
         setExpires(l.licenceExpiresOn ?? "");
+        setCouncil(l.registrationCouncil ?? "");
       } catch {
         if (live) setLicence("error");
       }
@@ -59,7 +66,8 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
     setSaving(true);
     setError(null);
     const lic = licence !== null && licence !== "error" ? licence : null;
-    const licenceChanged = lic !== null && (lic.isClinician !== clinician || (lic.licenceExpiresOn ?? "") !== expires);
+    const licenceChanged = lic !== null && (lic.isClinician !== clinician || (lic.licenceExpiresOn ?? "") !== expires
+      || (lic.registrationCouncil ?? "") !== council.trim() || signature !== null);
     // Unmarking first, then the number, then marking: the server never sees "clinician without a number".
     let err = licenceChanged && !clinician ? await saveLicence() : null;
     if (!err && v !== (current ?? "")) err = await onSave(v);
@@ -71,7 +79,10 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
 
   async function saveLicence(): Promise<string | null> {
     try {
-      await api.put(`/staff/${staffId}/clinical-licence`, { isClinician: clinician, licenceExpiresOn: expires === "" ? null : expires });
+      const signatureFileId = signature ? await uploadSignature(signature) : undefined;
+      await api.put(`/staff/${staffId}/clinical-licence`, { isClinician: clinician, licenceExpiresOn: expires === "" ? null : expires,
+        registrationCouncil: council.trim(), ...(signatureFileId ? { signatureFileId } : {}) });
+      setSignature(null);
       onClinicianSaved?.(clinician);
       return null;
     } catch (e) {
@@ -103,6 +114,16 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="licExp">Registration valid until (optional)</label>
                 <input id="licExp" type="date" className={styles.input} value={expires} onChange={(e) => setExpires(e.target.value)} />
+              </div>
+            )}
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="regCouncil">Registration council (printed beside the number)</label>
+              <input id="regCouncil" className={styles.input} value={council} maxLength={80} autoComplete="off" onChange={(e) => setCouncil(e.target.value)} />
+            </div>
+            {canUpload && (
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="sigFile">Signature image for e-prescriptions (PNG or JPEG){lic.hasSignature ? " (one is on file; choose a file to replace it)" : ""}</label>
+                <input id="sigFile" type="file" accept="image/png,image/jpeg" className={styles.input} onChange={(e) => setSignature(e.target.files?.[0] ?? null)} />
               </div>
             )}
             {clinician && expired && <p className={styles.formError} role="status">This registration has expired, so this person cannot sign{lic.licenceOverrideUntil ? ` (owner override until ${new Date(lic.licenceOverrideUntil).toLocaleString()})` : ""}.</p>}

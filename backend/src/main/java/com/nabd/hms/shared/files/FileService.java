@@ -26,8 +26,8 @@ import java.util.UUID;
 @Service
 public class FileService implements FileStore {
 
-    static final Set<String> PURPOSES = Set.of("outside_report", "clinical_photo", "xray", "consent_form");
-    static final Set<String> GENERATED_PURPOSES = Set.of("claim_pack", "consent_form"); // FIN-035 / CLN-014: server-rendered documents
+    static final Set<String> PURPOSES = Set.of("outside_report", "clinical_photo", "xray", "consent_form", "signature"); // CLN-023: the prescriber's signature image
+    static final Set<String> GENERATED_PURPOSES = Set.of("claim_pack", "consent_form", "prescription"); // FIN-035 / CLN-014 / CLN-023: server-rendered documents
     static final Set<String> GENERATED_TYPES = Set.of("application/pdf", "text/csv", "image/svg+xml");
     static final Set<String> TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
     static final Duration UPLOAD_TTL = Duration.ofMinutes(10);

@@ -10,6 +10,7 @@ import com.nabd.hms.common.OutboxRetryLaterException;
 import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.TenantScope;
+import com.nabd.hms.patient.api.NotificationPreferences;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.nabd.hms.shared.notify.CancelReason;
@@ -20,6 +21,7 @@ import com.nabd.hms.shared.notify.NotificationPurpose;
 import com.nabd.hms.shared.notify.NotificationRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -36,6 +38,8 @@ import java.util.UUID;
  */
 @Service
 public class NotificationService implements NotificationPort {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NotificationService.class);
 
     private static final String NOT_FOUND = "No such notification request.";
 
@@ -55,11 +59,14 @@ public class NotificationService implements NotificationPort {
     private final CommsCutover cutover;
     private final com.nabd.hms.organization.api.QuietHours quietHours;
     private final com.nabd.hms.patient.api.CareRecipients care;
+    private final NotificationPreferences preferences;
 
     NotificationService(NotificationRequestRepository repo, WhatsAppTemplateRepository templates, WhatsAppMessageService whatsApp,
                         EventPublisher publisher, TenantContext tenantContext, FieldCipher cipher, ObjectMapper json, ClinicClock clock,
                         TenantScope tenantScope, PlatformTransactionManager txManager, CommsCutover cutover,
-                        com.nabd.hms.organization.api.QuietHours quietHours, com.nabd.hms.patient.api.CareRecipients care) {
+                        com.nabd.hms.organization.api.QuietHours quietHours, com.nabd.hms.patient.api.CareRecipients care,
+                        NotificationPreferences preferences) {
+        this.preferences = preferences;
         this.quietHours = quietHours;
         this.care = care;
         this.cutover = cutover;
@@ -78,9 +85,24 @@ public class NotificationService implements NotificationPort {
     @Override
     @Transactional
     public NotificationOutcome request(NotificationRequest r) {
+        NotificationOutcome own = create(r, r.recipientPatientId(), null, r.dedupeKey());
+        String category = r.purpose().preferenceCategory();
+        if (category != null && r.recipientPatientId() != null) {
+            // COM-025 (CGV-05): each chosen, still authorised caregiver gets an own request (own delivery status), one per phone (NB-133)
+            for (UUID caregiver : preferences.copiesFor(r.recipientPatientId(), category)) {
+                create(r, caregiver, r.recipientPatientId(), r.dedupeKey() + ":cg:" + caregiver);
+            }
+        }
+        return own;
+    }
+
+    /** One request row. {@code about} is the patient a caregiver's copy is about (null for the patient's own message). */
+    @Transactional(propagation = Propagation.MANDATORY) // only ever called from request(), inside its transaction
+    private NotificationOutcome create(NotificationRequest r, UUID recipient, UUID about, String dedupeKey) {
         UUID tenantId = tenantContext.current();
         NotificationPurpose purpose = r.purpose();
-        String language = r.language() == null ? "en" : r.language();
+        NotificationPreferences.Prefs prefs = recipient == null ? null : preferences.of(recipient);
+        String language = language(tenantId, purpose, r.language(), prefs);
         var template = templates.findByName(tenantId, purpose.templateKey(), language)
                 .filter(WhatsAppTemplateRepository.Template::queueable)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "template-not-sendable",
@@ -88,17 +110,24 @@ public class NotificationService implements NotificationPort {
                         "No approved template for " + purpose.code() + " in " + language + ".", Map.of("code", "TEMPLATE_NOT_SENDABLE")));
         TemplateRules.checkParams(r.params(), template.paramCount());
 
-        boolean consented = purpose.consentClass() == ConsentClass.NONE
-                || repo.hasConsent(tenantId, r.recipientPatientId(), purpose.consentClass().consentType());
+        String category = purpose.preferenceCategory();
+        // COM-025: a kind of message the patient switched off is kept as 'blocked' and never sent (a caregiver's copy follows the patient's choice for them)
+        boolean wanted = about != null || category == null || prefs == null || prefs.wants(category);
+        boolean consented = wanted && (purpose.consentClass() == ConsentClass.NONE
+                || repo.hasConsent(tenantId, recipient, purpose.consentClass().consentType()));
         String status = consented ? "requested" : "blocked";
         UUID id = UUID.randomUUID();
         var priority = r.priority() == null ? purpose.defaultPriority() : r.priority();
         Instant notBefore = QuietHoursRule.releaseAt(quietHours.window(tenantId).orElse(null), clock.zone(tenantId), clock.now(), r.notBefore(), priority); // ADM-028
-        boolean inserted = repo.insert(id, tenantId, purpose.code(), r.subjectType(), r.subjectId(), r.recipientPatientId(),
+        if (prefs != null && prefs.quietStart() != null) { // COM-025: the recipient's own extra quiet hours, on top of the clinic's
+            notBefore = QuietHoursRule.releaseAt(new com.nabd.hms.organization.api.QuietHours.Window(prefs.quietStart(), prefs.quietEnd()),
+                    clock.zone(tenantId), clock.now(), notBefore, priority);
+        }
+        boolean inserted = repo.insert(id, tenantId, purpose.code(), r.subjectType(), r.subjectId(), recipient,
                 seal(tenantId, id, r), language, priority.name(), purpose.channelPolicy().name(), notBefore, r.notAfter(),
-                r.dedupeKey(), status);
+                dedupeKey, status, about);
         if (!inserted) {
-            var existing = repo.byDedupeKey(tenantId, r.dedupeKey());
+            var existing = repo.byDedupeKey(tenantId, dedupeKey);
             return new NotificationOutcome(existing.id(), existing.status(), true);
         }
         if (consented) {
@@ -112,6 +141,20 @@ public class NotificationService implements NotificationPort {
             publisher.publish(tenantId, DomainEventType.NOTIFICATION_REQUESTED, id, data);
         }
         return new NotificationOutcome(id, status, false);
+    }
+
+    /** COM-025: the caller's language, else the recipient's choice; a choice with no approved template yet falls back to English (logged). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    private String language(UUID tenantId, NotificationPurpose purpose, String requested, NotificationPreferences.Prefs prefs) {
+        if (requested != null) {
+            return requested;
+        }
+        String chosen = prefs == null || prefs.language() == null ? "en" : prefs.language();
+        if (!"en".equals(chosen) && templates.findByName(tenantId, purpose.templateKey(), chosen).filter(WhatsAppTemplateRepository.Template::queueable).isEmpty()) {
+            log.info("template language fallback: {} has no approved '{}' version in this clinic, English is used", purpose.code(), chosen);
+            return "en";
+        }
+        return chosen;
     }
 
     @Override
@@ -222,8 +265,12 @@ public class NotificationService implements NotificationPort {
     }
 
     /** IDC-014: subject_type care_&lt;class&gt; marks a delivery about patient subject_id (CareFanoutService); its recipient must still
-     * be on that patient's list for the class. Every other request passes. */
+     * be on that patient's list for the class; a COM-025 caregiver copy (about_patient_id) must still be chosen and authorised. Every other request passes. */
     private boolean careAllowed(NotificationRequestRepository.Row row) {
+        if (row.aboutPatientId() != null && row.recipientPatientId() != null) { // COM-025: still chosen and still authorised, read now
+            String category = NotificationPurpose.ofCode(row.purpose()).preferenceCategory();
+            return category != null && preferences.copiesFor(row.aboutPatientId(), category).contains(row.recipientPatientId());
+        }
         if (row.subjectType() == null || !row.subjectType().startsWith("care_") || row.subjectId() == null || row.recipientPatientId() == null) {
             return true;
         }

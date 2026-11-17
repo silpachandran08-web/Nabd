@@ -23,5 +23,138 @@
     "in": "In stock · {qty}",
     "low": "Low · {qty}",
     "out": "Out of stock"
+  },
+  "notifPrefs": {
+    "title": "Message preferences",
+    "language": "Message language",
+    "languageDefault": "Clinic default (English)",
+    "channel": "Preferred channel",
+    "channels": {
+      "whatsapp": "WhatsApp",
+      "sms": "SMS",
+      "email": "Email"
+    },
+    "receives": "Receives",
+    "categories": {
+      "careReminders": "Care reminders",
+      "recalls": "Recalls",
+      "feedback": "Feedback requests",
+      "reviews": "Review requests"
+    },
+    "quietHours": "Extra quiet hours",
+    "quietHoursOn": "Do not message this patient at night",
+    "quietFrom": "From",
+    "quietTo": "Until",
+    "caregivers": "Family who also get messages",
+    "caregiversEmpty": "No family member can receive this patient's messages yet. A guardian or linked family member with their own number and messaging consent appears here.",
+    "caregiversNone": "None",
+    "caregiverUnnamed": "Family member",
+    "caregiverCategories": {
+      "careReminders": "Care reminders",
+      "recalls": "Recalls"
+    },
+    "on": "On",
+    "off": "Off",
+    "saving": "Saving…",
+    "loadError": "Couldn't load the message preferences.",
+    "errors": {
+      "notAuthorised": "This family member can no longer receive the patient's messages. The list has been refreshed.",
+      "forbidden": "Your role can't change message preferences.",
+      "generic": "Couldn't save. The preferences shown are the ones saved."
+    }
+  },
+  "messagingSettings": {
+    "title": "Quiet hours and prayer times",
+    "lead": "Reminders, recalls and review requests wait outside these times, in the clinic's own clock. A message that would only go out after its last useful moment is not sent.",
+    "loading": "Loading messaging settings",
+    "loadFailed": "Could not load the messaging settings.",
+    "saveFailed": "Could not save the messaging settings.",
+    "saved": "Messaging settings saved.",
+    "quiet": "Quiet hours",
+    "prayer": "Prayer windows",
+    "enabled": "On",
+    "off": "Off",
+    "from": "From",
+    "to": "To",
+    "window": "{start} to {end}",
+    "prayerOn": "On ({method}, {buffer} min after each adhan)",
+    "methodLabel": "Calculation method",
+    "method": {
+      "umm_al_qura": "Umm al-Qura (Saudi Arabia)",
+      "qatar": "Qatar",
+      "dubai": "UAE (Dubai)",
+      "mwl": "Muslim World League"
+    },
+    "buffer": "Minutes held after the adhan",
+    "fridayFrom": "Friday block from",
+    "fridayTo": "Friday block to",
+    "latitude": "Clinic latitude",
+    "longitude": "Clinic longitude",
+    "urgentNote": "One-time codes, doctor delay notices and secure links the patient asked for are never held.",
+    "localCheck": "Prayer times are calculated from the clinic's location; check them against your local timetable.",
+    "invalid": {
+      "sameQuiet": "Quiet hours must start and end at different times.",
+      "friday": "The Friday block must start before it ends.",
+      "buffer": "The minutes after the adhan must be 0 to 60.",
+      "coords": "Give a valid latitude (-66 to 66) and longitude (-180 to 180) together.",
+      "needCoords": "Prayer windows need the clinic's latitude and longitude."
+    },
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "breakGlassReview": {
+    "title": "Emergency access reviews",
+    "intro": "Every use of emergency (break-glass) access, once it has ended. Check what was opened and record whether it was justified.",
+    "showUnreviewed": "Waiting for review",
+    "showReviewed": "Reviewed",
+    "loading": "Loading emergency access uses",
+    "loadError": "Couldn't load emergency access uses. Try again.",
+    "emptyUnreviewed": "Nothing waiting for review",
+    "emptyUnreviewedHint": "When someone uses emergency access you will see it here after it ends.",
+    "emptyReviewed": "No reviewed emergency access yet",
+    "reminder": "{count, plural, one {# use has} other {# uses have}} waited more than 24 hours for your review.",
+    "overdue": "Over 24 h",
+    "window": "{start} to {end}",
+    "device": "Device: {device}",
+    "reads": "{count, plural, one {# record opened} other {# records opened}}",
+    "review": "Review",
+    "view": "View",
+    "loadMore": "Load more",
+    "dialogTitle": "Emergency access by {name}",
+    "reason": "Reason",
+    "timeline": "What was opened",
+    "readsLoading": "Loading what was opened",
+    "readsError": "Couldn't load what was opened. Try again.",
+    "noReads": "No patient records were opened during this access.",
+    "readRow": "{time}: {patient} ({ref}), {type}",
+    "unknownPatient": "Unknown patient",
+    "outcome": "Outcome",
+    "justified": "Justified",
+    "notJustified": "Not justified",
+    "incidentNote": "Incident note",
+    "incidentNoteHint": "Required. Say what was wrong; this opens an incident.",
+    "noteOptional": "Note (optional)",
+    "revoke": "Also remove emergency access from {name}",
+    "save": "Save review",
+    "noteRequired": "Write an incident note when the access was not justified.",
+    "alreadyReviewed": "This emergency access was already reviewed.",
+    "saveError": "Couldn't save the review. Try again.",
+    "outcomeLabel": {
+      "justified": "Justified",
+      "not_justified": "Not justified"
+    },
+    "reasons": {
+      "unconscious_patient": "Unconscious patient",
+      "life_threatening": "Life-threatening",
+      "no_treating_clinician_available": "No treating clinician available",
+      "other": "Other"
+    }
+  },
+  "deviceLabel": {
+    "title": "This device's name",
+    "hint": "The clinic owner sees it on your sessions and emergency access, for example \"Front desk PC 2\". English letters, numbers and spaces, up to 64 characters.",
+    "label": "Device name",
+    "save": "Save name",
+    "saved": "Saved. It is used from your next sign-in."
   }
 }

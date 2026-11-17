@@ -5,7 +5,7 @@ import { COUNTER_ROLES, type NavItem, type RoleContext } from "./navRegistry";
 type T = { (key: string): string; has(key: string): boolean };
 
 export function navText(t: T, item: NavItem, role: RoleContext, field: "label" | "short" = "label"): string {
-  const model = item.section && role === "owner" ? "ownerNav" : COUNTER_ROLES.includes(role) ? "counterNav" : "clinicNav";
+  const model = item.section && role === "owner" ? "ownerNav" : COUNTER_ROLES.includes(role) ? "counterNav" : role === "solo" ? "soloNav" : "clinicNav";
   const key = `${model}.${item.id}.${field}`;
   return t.has(key) ? t(key) : item[field];
 }

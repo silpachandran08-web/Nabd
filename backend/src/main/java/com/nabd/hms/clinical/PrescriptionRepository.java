@@ -50,20 +50,26 @@ class PrescriptionRepository {
                 .stream().findFirst();
     }
 
+    /** CLN-023: revoked_at comes from this module's prescription_rx_tokens (null = never issued or not revoked). */
+    private static final String COLS = "id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, "
+            + "safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json, "
+            + "(SELECT t.revoked_at FROM prescription_rx_tokens t WHERE t.tenant_id = prescriptions.tenant_id "
+            + "AND t.prescription_id = prescriptions.id) AS revoked_at";
+
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
+        return jdbc.query("SELECT " + COLS + " FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
     Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+        return jdbc.query("SELECT " + COLS + " FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
+        return jdbc.query("SELECT " + COLS + " FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
                         "ORDER BY signed_at DESC",
                 prescriptionMapper(), tenantId, patientId);
     }
@@ -218,9 +224,11 @@ class PrescriptionRepository {
 
     /** Sets visible to this doctor: their own, other doctors' shared sets, and every clinic standard (doctor_id is null). */
     List<FavouriteSetRow> listSets(UUID tenantId, UUID doctorId) {
+        // CLN-022: the caller's own sets first, then other doctors' shared sets, then clinic standards; each by last use.
         return jdbc.query(SET_SELECT + "WHERE s.tenant_id = ? AND (s.doctor_id = ? OR s.doctor_id IS NULL OR s.shared) " +
-                        "ORDER BY s.name, s.created_at",
-                (rs, i) -> mapSet(rs), tenantId, doctorId);
+                        "ORDER BY CASE WHEN s.doctor_id = ? THEN 0 WHEN s.doctor_id IS NOT NULL THEN 1 ELSE 2 END, " +
+                        "s.last_used_at DESC NULLS LAST, s.name, s.created_at",
+                (rs, i) -> mapSet(rs), tenantId, doctorId, doctorId);
     }
 
     Optional<FavouriteSetRow> findSet(UUID tenantId, UUID setId) {
@@ -246,6 +254,15 @@ class PrescriptionRepository {
                 String.class, tenantId));
     }
 
+    /** CLN-022: units in stock across the tenant's active, stocked, in-house items coded to this drug (PHL-018's in-house
+     * rule); null when the clinic does not dispense it (it is bought outside, so stock says nothing). */
+    Integer inHouseStock(UUID tenantId, String drugId) {
+        return jdbc.queryForObject("SELECT sum(c.stock_qty)::int FROM charge_catalogue c " +
+                        "LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id " +
+                        "WHERE c.tenant_id = ? AND c.drug_id = ? AND c.active AND c.stock_qty IS NOT NULL AND COALESCE(p.in_house, true)",
+                Integer.class, tenantId, drugId);
+    }
+
     private RowMapper<PrescriptionRow> prescriptionMapper() {
         return (rs, i) -> new PrescriptionRow(
                 UUID.fromString(rs.getString("id")),
@@ -258,7 +275,8 @@ class PrescriptionRepository {
                 rs.getString("allergy_snapshot_json"),
                 rs.getString("safety_dictionary_version"),
                 rs.getString("signed_by") == null ? null : UUID.fromString(rs.getString("signed_by")),
-                rs.getString("signed_by_registration_no"));
+                rs.getString("signed_by_registration_no"),
+                rs.getTimestamp("revoked_at") == null ? null : rs.getTimestamp("revoked_at").toInstant());
     }
 
     private RowMapper<PrescriptionItemRow> itemMapper() {

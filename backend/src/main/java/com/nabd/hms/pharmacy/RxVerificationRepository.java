@@ -13,7 +13,7 @@ import java.util.UUID;
 @Repository
 class RxVerificationRepository {
 
-    record Rx(UUID id, String status, UUID queueEntryId, Instant signedAt, String signerName, String signerRegistrationNo) {
+    record Rx(UUID id, String status, UUID queueEntryId, Instant signedAt, String signerName, String signerRegistrationNo, String signerCouncil) {
     }
 
     record Line(UUID prescriptionItemId, String drugName, BigDecimal quantity, BigDecimal dispensed) {
@@ -30,11 +30,17 @@ class RxVerificationRepository {
     }
 
     Optional<Rx> find(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT p.id, p.status, p.queue_entry_id, p.signed_at, s.name, p.signed_by_registration_no " +
+        return jdbc.query("SELECT p.id, p.status, p.queue_entry_id, p.signed_at, s.name, p.signed_by_registration_no, s.registration_council " +
                         "FROM prescriptions p LEFT JOIN staff s ON s.id = p.signed_by WHERE p.tenant_id = ? AND p.id = ?",
                 (rs, i) -> new Rx(rs.getObject("id", UUID.class), rs.getString("status"), rs.getObject("queue_entry_id", UUID.class),
                         rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(), rs.getString("name"),
-                        rs.getString("signed_by_registration_no")), tenantId, prescriptionId).stream().findFirst();
+                        rs.getString("signed_by_registration_no"), rs.getString("registration_council")), tenantId, prescriptionId).stream().findFirst();
+    }
+
+    /** CLN-023: when the prescriber revoked the prescription (prescription_rx_tokens), empty when not revoked. */
+    Optional<Instant> revokedAt(UUID tenantId, UUID prescriptionId) {
+        return jdbc.query("SELECT revoked_at FROM prescription_rx_tokens WHERE tenant_id = ? AND prescription_id = ? AND revoked_at IS NOT NULL",
+                (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, prescriptionId).stream().findFirst();
     }
 
     /** Every line with what non-void invoices have billed against it, in prescription order. */

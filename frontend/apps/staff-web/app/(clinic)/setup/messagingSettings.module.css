@@ -1,0 +1,16 @@
+/* COM-024: messaging settings card on Setup > WhatsApp (own module: features do not share CSS). Tokens only, logical properties, 44 px targets. */
+.card { display: flex; flex-direction: column; gap: var(--nb-space-12); padding: var(--nb-space-12) var(--nb-space-16); margin-block-end: var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-1); }
+.h3 { margin: 0; font-size: var(--nb-fs-md); color: var(--nb-text-primary); }
+.muted { margin: 0; color: var(--nb-text-secondary); }
+.fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: var(--nb-space-16); align-items: flex-end; }
+.legend { padding: 0; margin-block-end: var(--nb-space-8); font-weight: 600; color: var(--nb-text-primary); }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); }
+.check { display: inline-flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; }
+.input { min-block-size: 44px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; }
+.notice { padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); background: var(--nb-info-tint); color: var(--nb-text-primary); }
+.error { padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); background: var(--nb-danger-tint); color: var(--nb-danger-500); }
+.actions { display: flex; justify-content: flex-end; gap: var(--nb-space-8); }
+.btn { min-block-size: 44px; padding-inline: var(--nb-space-16); border: 0; border-radius: var(--nb-radius-md); background: var(--nb-accent-fill); color: var(--nb-on-accent); font: inherit; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--nb-space-4) var(--nb-space-16); margin: 0; }
+.dl dd { margin: 0; }

@@ -178,6 +178,10 @@ public class TokenService {
             }
         }
 
+        if (permissions.contains("clinical:breakGlass") && staffDir.breakGlassRevoked(staff.id())) {
+            permissions.remove("clinical:breakGlass"); // PLT-013: removed from this person only, their role (and any loan) keeps it
+        }
+
         // NB-048: same lazy expire-and-audit shape as delegation above.
         for (UUID expiredId : staffDir.expireStaleBreakGlass(staff.id())) {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
@@ -185,6 +189,19 @@ public class TokenService {
         }
         if (bg != null) {
             for (String p : BreakGlassPolicy.BREAK_GLASS_GRANTS) {
+                if (!permissions.contains(p)) {
+                    permissions.add(p);
+                }
+            }
+        }
+
+        // CLN-042: the assigned specialty profiles grant <module>:view|edit (the emergency token: view only). Whether the
+        // clinic's plan still includes the profile is checked on each write (403 ENTITLEMENT_EXPIRED), so history stays readable.
+        // T1-BUG-2: only a clinician's profiles count, and never beyond the clinical access the token already holds.
+        List<String[]> specialties = staffDir.findSpecialtyProfiles(staff.tenantId(), staff.id());
+        boolean clinicalView = permissions.contains("clinical:view"), clinicalEdit = bg == null && permissions.contains("clinical:edit");
+        for (String[] sp : specialties) {
+            for (String p : clinicalEdit ? List.of(sp[1] + ":view", sp[1] + ":edit") : clinicalView ? List.of(sp[1] + ":view") : List.<String>of()) {
                 if (!permissions.contains(p)) {
                     permissions.add(p);
                 }
@@ -218,6 +235,9 @@ public class TokenService {
                 .claim("pinChange", guard.pinChangeRequired(staff.id()));
         if (bg != null) {
             claimsB.claim("bg", bg.grantId().toString());
+        }
+        if (!specialties.isEmpty()) {
+            claimsB.claim("specialty", specialties.get(0)[0]); // the primary profile code, e.g. DERM
         }
         TokenType.ACCESS.stamp(claimsB, Audience.STAFF_API);
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue();

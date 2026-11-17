@@ -7,7 +7,11 @@ export type RxSetItem = {
   stale: boolean | null;
   /** CLN-021: drug master code; codeSuggestion = best match for an uncoded item ("code this"), never applied automatically */
   drugId?: string | null; genericName?: string | null; codeSuggestion?: { drugId: string; display: string } | null;
+  /** CLN-022: why it is stale (retired product, in-house item out of stock, not in the pharmacy list); null when it is not.
+   * replacement = an active product with the same ingredients, shown to the doctor and never applied automatically. */
+  staleReason?: RxStaleReason | null; replacement?: { drugId: string; display: string } | null;
 };
+export type RxStaleReason = "retired" | "out_of_stock" | "not_in_master";
 export type RxSet = {
   id: string; doctorId: string | null; ownerName: string | null; name: string; scope: RxSetScope; shared: boolean;
   createdAt: string; updatedAt: string; lastUsedAt: string | null;
@@ -53,4 +57,21 @@ export function lastUsedLabel(iso: string | null): string {
 
 export function itemLine(i: RxSetItem): string {
   return i.brandName ? `${i.drugName} (${i.brandName})` : i.drugName;
+}
+
+/** CLN-022 "Repeat last": the patient's most recent signed, not revoked prescription from another visit (the list comes newest
+ * first, as GET /clinical/patients/{id}/prescriptions returns it); null when there is none. Mirrors the server's default source. */
+export function repeatSource<T extends { status: string; queueEntryId?: string; revokedAt?: string | null }>(prescriptions: T[], entryId: string): T | null {
+  return prescriptions.find((p) => p.status === "signed" && !p.revokedAt && p.queueEntryId !== entryId) ?? null;
+}
+
+export type RxShortcut = { kind: "repeat" } | { kind: "set"; index: number };
+
+/** CLN-022 Rx pad keys: R = repeat last, 1-9 = apply that set chip. Never while typing in a field or with a modifier held,
+ * and never for a set number that has no chip. */
+export function rxShortcut(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; typing: boolean }, setCount: number): RxShortcut | null {
+  if (e.typing || e.ctrlKey || e.metaKey || e.altKey) return null;
+  if (e.key === "r" || e.key === "R") return { kind: "repeat" };
+  const n = /^[1-9]$/.test(e.key) ? Number(e.key) : 0;
+  return n > 0 && n <= Math.min(setCount, 9) ? { kind: "set", index: n - 1 } : null;
 }

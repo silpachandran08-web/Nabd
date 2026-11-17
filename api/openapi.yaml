@@ -954,6 +954,8 @@ paths:
               properties:
                 isClinician: { type: boolean }
                 licenceExpiresOn: { type: [string, "null"], format: date }
+                registrationCouncil: { type: [string, "null"], maxLength: 80, description: "CLN-023. Printed beside the registration number on the Rx PDF; null = unchanged, empty clears it." }
+                signatureFileId: { type: [string, "null"], format: uuid, description: "CLN-023. A scanned, available PNG/JPEG upload (purpose signature) belonging to no patient, printed on the Rx PDF; null = unchanged (400 signature-not-usable otherwise)." }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -1904,7 +1906,7 @@ paths:
       responses:
         "202": { description: "Code sent" }
         "410": { description: "link-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "423": { description: "link-locked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "423": { description: "link-locked, or phone-reverify-required while the recipient's number must re-verify in chat (COM-041) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "429": { description: "otp-rate-limited (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /public/links/{token}/open:
     post:
@@ -1922,7 +1924,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { description: "otp-invalid (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "410": { description: "link-expired (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "423": { description: "link-locked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "423": { description: "link-locked, or phone-reverify-required while the recipient's number must re-verify in chat (COM-041) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /secure-links:
     post:
       tags: [Patients]
@@ -2011,6 +2013,24 @@ paths:
       responses:
         "200": { description: "Saved", content: { application/json: { schema: { $ref: "#/components/schemas/QuietHours" } } } }
         "422": { description: "Problem `out-of-range`: same start and end", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/messaging-settings:
+    get:
+      tags: [Setup]
+      summary: "COM-024 - quiet hours (every clinic) and prayer windows (KSA default on, UAE/Qatar opt in; methods NEED LOCAL CHECK) for non-urgent patient messages, in the clinic clock"
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/MessagingSettings" } } } }
+    put:
+      tags: [Setup]
+      summary: "COM-024 - save quiet hours and prayer windows (audited). Publishes organization.messaging_settings.changed.v1; the Comms Gateway scheduler defers non-urgent sends to the next allowed minute, or expires them past notAfter. OTP, doctor delay and secure link never wait."
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MessagingSettings" } } }
+      responses:
+        "200": { description: "Saved", content: { application/json: { schema: { $ref: "#/components/schemas/MessagingSettings" } } } }
+        "422": { description: "Problem `invalid-window`, code INVALID_WINDOW: same quiet start and end, Friday block not start < end, unknown method, buffer outside 0-60, prayer windows on without the clinic's coordinates", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /setup/holidays/{id}:
     patch:
@@ -2508,6 +2528,91 @@ paths:
                   nextCursor: { type: string, nullable: true }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /patients/{patientId}/notification-preferences:
+    get:
+      tags: [Patients]
+      summary: Message preferences (COM-025) - language, channel, message categories, extra quiet hours and caregiver recipients, plus the caregivers who may be added now (guardian or live proxy with their own number and messaging consent; first name and relation only). Defaults when never saved (version 0).
+      x-required-permission: patients:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: The preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  language: { type: string, nullable: true, enum: [en, hi, ar, kn, te], description: "null = the clinic default (English); a language with no approved template yet falls back to English at send time (logged)" }
+                  channel: { type: string, enum: [whatsapp, sms, email] }
+                  categories:
+                    type: object
+                    description: "true = receives it; omitted in a PUT = on"
+                    properties:
+                      careReminders: { type: boolean }
+                      recalls: { type: boolean }
+                      feedback: { type: boolean }
+                      reviews: { type: boolean }
+                  quietHours:
+                    type: object
+                    nullable: true
+                    properties:
+                      start: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                      end: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                  caregivers:
+                    type: array
+                    maxItems: 10
+                    items:
+                      type: object
+                      properties:
+                        personRef: { type: string, format: uuid, description: "caregiver patient id, one of eligibleCaregivers" }
+                        categories: { type: array, items: { type: string, enum: [careReminders, recalls] } }
+                  eligibleCaregivers: { type: array, items: { type: object, properties: { personRef: { type: string, format: uuid }, firstName: { type: string }, relation: { type: string } } } }
+                  version: { type: integer, format: int64 }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Patients]
+      summary: Replace the message preferences (COM-025). Idempotent (an unchanged set writes nothing); a change is audited and publishes patient.notification_preferences.changed.v1.
+      x-required-permission: patients:edit
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language: { type: string, nullable: true, enum: [en, hi, ar, kn, te], description: "null = the clinic default (English); a language with no approved template yet falls back to English at send time (logged)" }
+                channel: { type: string, enum: [whatsapp, sms, email] }
+                categories:
+                  type: object
+                  description: "true = receives it; omitted in a PUT = on"
+                  properties:
+                    careReminders: { type: boolean }
+                    recalls: { type: boolean }
+                    feedback: { type: boolean }
+                    reviews: { type: boolean }
+                quietHours:
+                  type: object
+                  nullable: true
+                  properties:
+                    start: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                    end: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+                caregivers:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    properties:
+                      personRef: { type: string, format: uuid, description: "caregiver patient id, one of eligibleCaregivers" }
+                      categories: { type: array, items: { type: string, enum: [careReminders, recalls] } }
+      responses:
+        "200": { description: The saved preferences (same shape as GET) }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "CAREGIVER_NOT_AUTHORISED - the caregiver is not (or no longer) the patient's guardian or live proxy with messaging consent" }
 
   /patients/{id}/merge:
     post:
@@ -3973,7 +4078,7 @@ paths:
   /clinical/rx-sets:
     get:
       tags: [Clinical]
-      summary: "DOC-035. Favourite Rx sets visible to the caller: their own, other doctors' shared sets, and clinic standards. scope is relative to the caller. Each item carries stale (true = the tenant has an active pharmacy item master and neither drug nor brand is in it; null = no master to compare with, nothing guessed)."
+      summary: "DOC-035. Favourite Rx sets visible to the caller: their own, other doctors' shared sets, and clinic standards. scope is relative to the caller. Each item carries stale (true = the tenant has an active pharmacy item master and neither drug nor brand is in it; null = no master to compare with, nothing guessed). CLN-022 - a coded item (drugId) is stale when its drug master product is retired or when the clinic dispenses it in-house and has none in stock (staleReason retired | out_of_stock | not_in_master), with a replacement suggestion (same ingredients, active) that is never applied automatically. Order - the caller's own sets, then other doctors' shared sets, then clinic standards, each by lastUsedAt (most recent first, never-used last)."
       x-required-permission: clinical:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FavouriteRxSet" } } } } }
@@ -4040,9 +4145,19 @@ paths:
   /clinical/prescriptions/{queueEntryId}/repeat-last:
     post:
       tags: [Clinical]
-      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last)."
+      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last). CLN-022 - optional body sourcePrescriptionId pins the previewed prescription (must be this patient's signed Rx from another visit, else the same 404); needs an Idempotency-Key header (a retried tap runs once)."
       x-required-permission: clinical:edit
-      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourcePrescriptionId: { type: [string, "null"], format: uuid }
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -4083,6 +4198,73 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PrescriptionPrintHeader" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Prescription not signed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/pdf:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "CLN-023. The signed Rx PDF (A4 or A5): clinic, doctor, registration number and council, signature image, patient name/age/sex, generic-first lines (CLN-021), allergies at signing, issue date, valid-until and the QR (the public verify link). Rendered and stored once per size (file store, SHA-256 recorded, audited prescription.pdf_stored); every later download is the same bytes, re-checked against the stored hash (409 PDF_INTEGRITY_FAILED otherwise). PHI read logged."
+      x-required-permission: clinical:view
+      parameters: [{ name: size, in: query, required: false, schema: { type: string, enum: [a4, a5], default: a4 } }]
+      responses:
+        "200": { description: "application/pdf; header X-Content-SHA256 = hex SHA-256 of the body", content: { application/pdf: { schema: { type: string, format: binary } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_SIGNED for a draft (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/pdf/send:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-023. Sends the stored A4 PDF to the patient as an IDC-015 OTP secure link (same recipient rules as POST /secure-links). 409 prescription-revoked once revoked. Audited (prescription.pdf_sent)."
+      x-required-permission: "hasAuthority('clinical:view') and hasAuthority('patients:edit')"
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { language: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$" } } } } }
+      responses:
+        "201": { description: "{ linkId, expiresAt }", content: { application/json: { schema: { type: object, properties: { linkId: { type: string, format: uuid }, expiresAt: { type: string, format: date-time } } } } } }
+        "403": { description: "Forbidden (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_SIGNED or prescription-revoked (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/revoke:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-023. Revokes a signed prescription, once, with a reason (5-500 characters). Same authority as signing: the visit's doctor or a clinical:approve holder who is a licensed clinician (403 not-prescriber, not-licensed-clinician, licence-expired). The signed prescription is unchanged (V51); the verify page then answers revoked, the pharmacy scan invalid/revoked and checkout 422 rx-revoked. Audited (prescription.revoked, with the reason) and clinical.prescription.revoked.v1 (ids only)."
+      x-required-permission: "clinical:edit | clinical:approve"
+      x-permission-check: "visit doctor or clinical:approve, plus clinical:edit and CLN-005 licence"
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 5, maxLength: 500 } } } } }
+      responses:
+        "200": { description: "{ status: revoked, revokedAt }", content: { application/json: { schema: { type: object, properties: { status: { type: string, const: revoked }, revokedAt: { type: string, format: date-time } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_SIGNED or prescription-revoked (already revoked) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/rx/verify/{token}:
+    get:
+      tags: [Clinical]
+      summary: "CLN-023. Public verification of a scanned Rx QR (patient-web /rx/<token> renders it). Only a token signed by one of the Rx keys is looked up, in the clinic it names. Doctor, validity and counts only: no patient details, medicines or diagnosis. status valid | expired | dispensed | revoked (revoked first, then fully dispensed, then past validUntil). 30 calls a minute per IP (per replica). No cache."
+      security: []
+      x-required-permission: public
+      parameters: [{ name: token, in: path, required: true, schema: { type: string, maxLength: 1000 } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, required: [status, doctor, issuedAt, lineCount], properties: {
+          status: { type: string, enum: [valid, expired, dispensed, revoked] },
+          doctor: { type: object, properties: { name: { type: [string, "null"] }, registrationNo: { type: [string, "null"] }, council: { type: [string, "null"] } } },
+          issuedAt: { type: string, format: date-time }, validUntil: { type: [string, "null"], format: date-time }, lineCount: { type: integer },
+          dispensedAt: { type: [string, "null"], format: date-time } } } } } }
+        "404": { description: "UNKNOWN_TOKEN: malformed, altered, unknown key or no signed prescription (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "RATE_LIMITED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/rx/keys:
+    get:
+      tags: [Clinical]
+      summary: "CLN-023. The Rx signing keys' public JWKS (EC P-256, ES256, kid per key; every key verifies, the first signs) for offline verification. Cacheable 5 minutes."
+      security: []
+      x-required-permission: public
+      responses:
+        "200": { description: "{ keys: [{ kty: EC, crv: P-256, kid, x, y, use?, alg? }] }", content: { application/json: { schema: { type: object, properties: { keys: { type: array, items: { type: object } } } } } } }
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
@@ -4197,6 +4379,49 @@ paths:
         "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "POSSIBLE_DUPLICATE { patientRef } (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/households/{phoneHash}/reverification:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Patients]
+      summary: "COM-041. Core's view of the phone's re-verification: verified (also when Core has no row), needs_reverify (the desk recorded a number change, or the Edge flagged it) or locked. A lock past its time reads as needs_reverify."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ state }", content: { application/json: { schema: { type: object, properties: { state: { type: string, enum: [verified, needs_reverify, locked] } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    post:
+      tags: [Patients]
+      summary: "COM-041. The Edge reports a re-verification step. flagged (reason) and verified (method) and locked (attempt, lockedUntil) update Core's state; every step is audited as phone.reverify.<step> by 'patient via edge'; locked opens a phone_reverify_locked desk task for the oldest patient on the phone. Secure links to a patient whose number is not verified are held (no code sent or accepted)."
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [step], properties: { step: { type: string, enum: [flagged, failed, locked, verified] }, reason: { type: string, enum: [changed_number, wa_id_changed, silence, desk_change] }, method: { type: string, enum: ["otp+dob"] }, attempt: { type: integer, minimum: 1 }, lockedUntil: { type: string, format: date-time } } } } }
+      responses:
+        "204": { description: "Recorded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/households/{phoneHash}/reverification/check:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    post:
+      tags: [Patients]
+      summary: "COM-041. Second factor: does the date of birth match an active patient registered on the phone? Answers yes or no only (no name, no record); false while the phone is locked. Audited as phone.reverify.second_factor with the outcome, never the date."
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [dob], properties: { dob: { type: string, format: date } } } } }
+      responses:
+        "200": { description: "{ match }", content: { application/json: { schema: { type: object, properties: { match: { type: boolean } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /tenants/{tid}/booking-profile:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
     parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
@@ -6985,6 +7210,8 @@ components:
               drugId: { type: [string, "null"], description: "CLN-021. Drug master id when the item is coded." }
               genericName: { type: [string, "null"] }
               codeSuggestion: { type: [object, "null"], description: "CLN-021. Best drug master match for an uncoded item ('code this'); never applied automatically.", properties: { drugId: { type: string }, display: { type: string } } }
+              staleReason: { type: [string, "null"], enum: [retired, out_of_stock, not_in_master, null], description: "CLN-022. Why the item is stale; null when it is not." }
+              replacement: { type: [object, "null"], description: "CLN-022. For a stale coded item - an active product with exactly the same ingredients (in-house stock first, then same strength and form); never applied automatically.", properties: { drugId: { type: string }, display: { type: string } } }
     RxWarning:
       type: object
       properties:
@@ -7453,6 +7680,12 @@ components:
         prescriberName: { type: [string, "null"] }
         professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
         genericFirst: { type: boolean, description: "CLN-021. The region prints the generic (salt) name first, the brand in brackets only if one was chosen." }
+        qrPayload: { type: [string, "null"], description: "PHL-013/CLN-023. The prescription's one signed token (NRX1...), issued at sign" }
+        qrSvg: { type: [string, "null"], description: "CLN-023. QR of the public verify link <patient-web>/rx/<qrPayload>, as an SVG document" }
+        registrationCouncil: { type: [string, "null"] }
+        validUntil: { type: [string, "null"], format: date-time, description: "null = no expiry set" }
+        revokedAt: { type: [string, "null"], format: date-time }
+        revokeReason: { type: [string, "null"] }
     StaffClinicalLicence:
       type: object
       required: [staffId, isClinician, hasRegistrationNo]
@@ -7462,6 +7695,8 @@ components:
         hasRegistrationNo: { type: boolean }
         licenceExpiresOn: { type: [string, "null"], format: date }
         licenceOverrideUntil: { type: [string, "null"], format: date-time }
+        registrationCouncil: { type: [string, "null"] }
+        hasSignature: { type: boolean, description: "CLN-023. A signature image is on file for the Rx PDF" }
     Prescription:
       type: object
       properties:
@@ -7474,6 +7709,7 @@ components:
         signedAt: { type: [string, "null"], format: date-time }
         signedBy: { type: [string, "null"], format: uuid, description: "CLN-005: staff id of the signer; null on a draft" }
         signedByRegistrationNo: { type: [string, "null"], description: "CLN-005: the registration number the signer signed under" }
+        signedByName: { type: [string, "null"], description: "CLN-022: the signer's name (Repeat last preview); null on a draft" }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
         warnings:
@@ -8695,6 +8931,24 @@ components:
         name: { type: string }
         year: { type: integer }
         source: { type: string }
+    MessagingSettings:
+      type: object
+      required: [quietHours, prayerWindows]
+      properties:
+        quietHours:
+          type: object
+          required: [enabled, start, end]
+          properties: { enabled: { type: boolean }, start: { type: string, example: "21:00" }, end: { type: string, example: "09:00" } }
+        prayerWindows:
+          type: object
+          required: [enabled, method, bufferMinutes, fridayBlock]
+          properties:
+            enabled: { type: boolean }
+            method: { type: string, enum: [umm_al_qura, qatar, dubai, mwl] }
+            bufferMinutes: { type: integer, minimum: 0, maximum: 60, description: "minutes held after each adhan" }
+            fridayBlock: { type: object, required: [start, end], properties: { start: { type: string, example: "11:30" }, end: { type: string, example: "13:30" } } }
+            latitude: { type: number, nullable: true }
+            longitude: { type: number, nullable: true }
     QuietHours:
       type: object
       required: [enabled]

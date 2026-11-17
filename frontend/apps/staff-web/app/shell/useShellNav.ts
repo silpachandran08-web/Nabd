@@ -6,6 +6,7 @@ import { useEntitlements } from "../lib/entitlements";
 import { decodeAccessToken } from "../lib/session";
 import { navFor } from "./navRegistry";
 import { useRoleOverride } from "./roleContext";
+import { soloMode } from "./soloMode";
 
 /** The resolved nav for the signed-in staff member: role context, switchable contexts, permitted items. */
 export function useShellNav() {
@@ -13,17 +14,17 @@ export function useShellNav() {
   const { permissions } = usePermissions();
   const ent = useEntitlements();
   const override = useRoleOverride();
-  const [claims, setClaims] = useState<{ owner: boolean; specialty: string | null; tenantId: string | null }>({ owner: false, specialty: null, tenantId: null });
+  const [claims, setClaims] = useState<{ owner: boolean; specialty: string | null; tenantId: string | null; solo: boolean }>({ owner: false, specialty: null, tenantId: null, solo: false });
   useEffect(() => {
-    let c = { owner: false, specialty: null as string | null, tenantId: null as string | null };
+    let c = { owner: false, specialty: null as string | null, tenantId: null as string | null, solo: false };
     try {
       const t = localStorage.getItem("nabd_access_token");
       const d = t ? decodeAccessToken(t) : null;
-      c = { owner: d?.owner === true, specialty: d?.specialty ?? null, tenantId: d?.tenantId ?? null };
+      c = { owner: d?.owner === true, specialty: d?.specialty ?? null, tenantId: d?.tenantId ?? null, solo: soloMode(d?.tenantId ?? null) };
     } catch { /* no storage: treated as signed out */ }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setClaims(c);
   }, [pathname, permissions]);
-  const input = { perms: permissions, owner: claims.owner, ent, override, specialty: claims.specialty };
+  const input = { perms: permissions, owner: claims.owner, ent, override, specialty: claims.specialty, solo: claims.solo };
   return { input, owner: claims.owner, tenantId: claims.tenantId, ...navFor(input) };
 }
