@@ -137,7 +137,8 @@ export function createClient(o: ClientOptions) {
     if (res.status === 204) return undefined as T;
     if (opts.as === "blob") return (await res.blob()) as T;
     if (opts.as === "text") return (await res.text()) as T;
-    return (await res.json()) as T;
+    const text = await res.text(); // an empty 2xx body (a file PUT answered 200 with none) is "no content", not a parse error
+    return (text ? JSON.parse(text) : undefined) as T;
   }
 
   return {
