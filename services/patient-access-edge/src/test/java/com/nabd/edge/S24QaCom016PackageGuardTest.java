@@ -33,8 +33,11 @@ class S24QaCom016PackageGuardTest extends BookingTestBase {
     @Autowired ContactLanguage languages;
     @Autowired ObjectMapper json;
     @Autowired MeterRegistry meters;
+    @Autowired OutputGuard guard;
 
-    record Doc(UUID id, String name) {
+    /** tenant: the clinic whose staff this doctor is. The fake Core says so on every profile row (S24 fix: without it the two clinics'
+     * profiles in C16-E01d are identical about the shared doctor, and nothing can tell whose he is); null = a Core that does not say. */
+    record Doc(UUID id, String name, UUID tenant) {
     }
 
     record Clinic(UUID tenant, String name, List<Doc> doctors, String hash) {
@@ -44,7 +47,7 @@ class S24QaCom016PackageGuardTest extends BookingTestBase {
         UUID t = UUID.randomUUID();
         List<Doc> docs = new ArrayList<>();
         for (int i = 0; i < doctorNames.length; i++) {
-            Doc d = new Doc(UUID.randomUUID(), doctorNames[i]);
+            Doc d = new Doc(UUID.randomUUID(), doctorNames[i], t);
             docs.add(d);
             UP.rawSessions.put(d.id().toString(), sessions(i));
         }
@@ -58,7 +61,8 @@ class S24QaCom016PackageGuardTest extends BookingTestBase {
     private void profile(UUID t, String name, List<Doc> docs) {
         StringBuilder list = new StringBuilder();
         for (Doc d : docs) {
-            list.append(list.isEmpty() ? "" : ",").append("{\"doctorId\":\"").append(d.id()).append("\",\"name\":\"").append(d.name()).append("\"}");
+            list.append(list.isEmpty() ? "" : ",").append("{\"doctorId\":\"").append(d.id()).append("\",\"name\":\"").append(d.name()).append('"')
+                    .append(d.tenant() == null ? "" : ",\"tenantId\":\"" + d.tenant() + "\"").append('}');
         }
         UP.profiles.put(t.toString(), "{\"clinicName\":\"" + name + "\",\"timeZone\":\"" + ZONE + "\",\"doctors\":[" + list + "]}");
     }
@@ -251,6 +255,66 @@ class S24QaCom016PackageGuardTest extends BookingTestBase {
                 + " bReply='" + bReply + "' bState=" + state(b) + " guardOnB=" + (afterB - afterA));
         assertFalse(aLeaked, "clinic A's patient must not be offered clinic B's doctor");
         assertFalse(bReply.contains("Let me connect you"), "clinic B's own patient must not be blocked for B's own doctor");
+    }
+
+    // C16-E01e (S24 fix): the package step lands on a cold instance that has never read clinic B at all: still stopped, and B is untouched
+    @Test
+    void c16e01e_aColdInstanceThatNeverServedTheOtherClinicStopsThePackageLeak() {
+        Clinic b = clinic("Qa Fig Dental", "Dr Qa Farooqui"); // never served before the leak
+        Clinic a = clinic("Qa Fern Clinic", "Dr Qa Fernandes");
+        List<Doc> wrong = new ArrayList<>(a.doctors());
+        wrong.add(b.doctors().get(0));
+        profile(a.tenant(), a.name(), wrong);
+        pkg(a, UUID.randomUUID(), b.doctors().get(0));
+        guard.forget(); // restart
+        int calls = UP.bookCalls.size();
+        double before = blocked();
+        say(a, "Hi");
+        tap(a, "Book");
+        tap(a, "Me");
+        assertEquals(List.of("Book session 3 of 6", "A regular visit"), titles(a));
+        guard.forget(); // the next step is taken by a new replica
+        tap(a, "Book session 3 of 6");
+        assertEquals("Let me connect you to the clinic.", last(a).path("text").asString());
+        assertEquals("HANDOFF", state(a));
+        assertEquals(before + 1, blocked(), "alert raised");
+        assertFalse(leaks(shown(a), b), "nothing of clinic B reached clinic A's patient");
+        assertEquals(calls, UP.bookCalls.size(), "no booking with another clinic's doctor");
+        say(b, "Hi");
+        tap(b, "Book");
+        tap(b, "Me");
+        assertTrue(last(b).path("text").asString().contains("Which day"), "clinic B's own patient goes on with B's own doctor: " + last(b));
+        assertEquals(before + 1, blocked(), "the guard did not fire on clinic B");
+    }
+
+    // C16-E01f (S24 fix): a doctor who works at two clinics (the same id and name in both profiles) is booked from both
+    @Test
+    void c16e01f_aDoctorOfTwoClinicsIsBookedFromBoth() {
+        Clinic a = clinic("Qa Gulmohar Skin", "Dr Qa Gupta");
+        Clinic b = clinic("Qa Guava Kids", "Dr Qa Ghosh");
+        UUID both = UUID.randomUUID();
+        UP.rawSessions.put(both.toString(), sessions(7));
+        List<Doc> da = new ArrayList<>(a.doctors()), db = new ArrayList<>(b.doctors());
+        da.add(new Doc(both, "Dr Qa Gill", a.tenant())); // Core says: staff of A
+        db.add(new Doc(both, "Dr Qa Gill", null));       // B's Core does not say whose row it is
+        profile(a.tenant(), a.name(), da);
+        profile(b.tenant(), b.name(), db);
+        double before = blocked();
+        serve(b);
+        serve(a);
+        for (Clinic c : List.of(a, b)) {
+            say(c, "Hi");
+            tap(c, "Book");
+            tap(c, "Me");
+            tap(c, "Dr Qa Gill");
+            tapAt(c, 0);
+            tapAt(c, c == a ? 0 : 1); // a different time in each clinic
+            assertTrue(last(c).path("text").asString().contains("Dr Qa Gill"), last(c).toString());
+            tap(c, "Confirm");
+            assertTrue(UP.bookCalls.get(UP.bookCalls.size() - 1).contains("\"doctorId\":\"" + both + "\""));
+            assertFalse("HANDOFF".equals(state(c)), "not handed to reception");
+        }
+        assertEquals(before, blocked(), "the guard never fired for the shared doctor");
     }
 
     // C44-E01b: the package is used up between the offer and the tap: no package is sent to Core, the regular choice follows
