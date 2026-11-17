@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:billing.invoice.settled.v1",
+  "title": "billing.invoice.settled.v1",
+  "description": "PLT-035: a visit's bill was settled at its terminal billing stop (checkout); any balance left is carried as dues. Consumer core.visit completes the visit if it is still waiting at that stop.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "invoiceId",
+    "visitId",
+    "settledAt",
+    "settledBy",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "invoiceId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "visitId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "The queue entry (visit leg) the invoice belongs to."
+    },
+    "settledAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    },
+    "settledBy": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Staff id of the cashier who checked the visit out."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "invoiceId": "33333333-3333-4333-8333-333333333333",
+      "visitId": "44444444-4444-4444-8444-444444444444",
+      "settledAt": "2026-11-17T06:30:00Z",
+      "settledBy": "55555555-5555-4555-8555-555555555555",
+      "version": 1
+    }
+  ]
+}

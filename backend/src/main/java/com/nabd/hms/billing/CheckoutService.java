@@ -19,8 +19,7 @@ import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.organization.api.OrganizationConfig;
 import com.nabd.hms.organization.api.SeriesAllocator;
 import com.nabd.hms.shared.money.Money;
-import com.nabd.hms.queue.QueueService;
-import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
+import com.nabd.hms.queue.api.VisitCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -55,8 +54,7 @@ public class CheckoutService {
 
     private final CheckoutRepository repo;
     private final TenantContext tenantContext;
-    private final QueueService queueService;
-    private final com.nabd.hms.queue.VisitCommands visitCommands;
+    private final VisitCommands visitCommands; // PLT-035: billing moves a visit only through the visit module's API
     private final OrganizationConfig departmentService;
 
     private final ClinicClock clock;
@@ -75,9 +73,9 @@ public class CheckoutService {
     private final com.nabd.hms.organization.api.ClinicPolicies policies;
     private final DiscountApprovalService approvals; // FIN-018
 
-    CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
+    CheckoutService(CheckoutRepository repo, TenantContext tenantContext,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
-                     AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
+                     AuditService auditService, VisitCommands visitCommands,
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
                      com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies,
@@ -98,7 +96,6 @@ public class CheckoutService {
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
-        this.queueService = queueService;
         this.departmentService = departmentService;
     }
 
@@ -229,11 +226,15 @@ public class CheckoutService {
         // checkout_pending; billing finishing at the TERMINAL checkpoint is what finally moves it
         // to completed. An interim (billing_pending) checkpoint advances to whatever this
         // department's configured flow puts next — the visit continues, it doesn't end here.
+        // PLT-035 / MF-28: at the terminal stop the bill is settled first (billing.invoice.settled.v1, same transaction), then the
+        // visit is completed through VisitCommands; both commit or neither does. Any balance left is carried as dues (FIN-014).
         String nextStatus = sequence.get(currentIndex + 1);
         if ("completed".equals(nextStatus)) {
-            visitCommands.completeAfterPayment(tenantId, staffId, queueEntryId, ctx.queueStatus());
+            eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.INVOICE_SETTLED, invoiceId, java.util.Map.of(
+                    "invoiceId", invoiceId, "visitId", queueEntryId, "settledAt", clock.now(), "settledBy", staffId));
+            visitCommands.completeVisit(tenantId, staffId, queueEntryId, ctx.queueStatus());
         } else {
-            queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest(nextStatus, ctx.queueStatus()));
+            visitCommands.advanceAfterBilling(tenantId, staffId, queueEntryId, ctx.queueStatus(), nextStatus);
         }
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());

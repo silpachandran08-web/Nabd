@@ -180,7 +180,35 @@ class Gate(unittest.TestCase):
         self.assertTrue(any(x["rule"] == "report-missing" for x in vs))
 
 
+class Blocking(unittest.TestCase):
+    """PLT-035: sql_ownership_blocking pairs fail in every mode, whatever the baseline says."""
+    def test_blocked_pair_fails_in_report_mode_even_when_baselined(self):
+        vs = arch.scan(fixture_repo())
+        rules = {"billing": {"queue"}}
+        hard = arch.blocked(vs, rules)
+        self.assertTrue(hard)
+        self.assertTrue(all(x["module"] == "billing" and "owned by queue" in x["detail"] for x in hard))
+        base = collections.Counter(arch.key(x) for x in vs)
+        for m in ("report", "new"):
+            self.assertTrue(any("PLT-035" in f for f in arch.evaluate(vs, base, m, rules)[2]), m)
+        self.assertEqual(arch.evaluate(vs, base, "report")[2], [])  # without the rule the baseline excuses them
+    def test_other_pairs_and_unowned_tables_are_not_blocked(self):
+        vs = arch.scan(fixture_repo())
+        self.assertEqual(arch.blocked(vs, {"queue": {"billing"}}), [])  # queue touches only its own tables
+        self.assertEqual(arch.blocked(vs, {"billing": {"platform"}}), [])  # audit_trail has no owner: report only
+    def test_rules_come_from_the_gate_file_and_skip_notes(self):
+        d = tempfile.mkdtemp(); os.makedirs(f"{d}/ci")
+        json.dump({"new_code_blocking_from": None, "all_blocking_from": None,
+                   "sql_ownership_blocking": {"_note": "x", "billing": ["queue"]}}, open(f"{d}/{arch.GATE}", "w"))
+        self.assertEqual(arch.blocking(d), {"billing": {"queue"}})
+
+
 class Committed(unittest.TestCase):
+    def test_plt035_queue_billing_packages_cycle_is_blocking_and_clean(self):
+        rules = arch.blocking()
+        self.assertEqual(rules, {"queue": {"billing", "packages"}, "billing": {"queue", "packages"}})
+        self.assertEqual([f"{x['file']}:{x['line']} {x['detail']}" for x in arch.blocked(arch.scan(), rules)], [])
+
     def test_every_table_has_exactly_one_owner(self):
         tables, _ = arch.schema()
         owned = [arch.norm(t) for m in yaml.safe_load(open(arch.OWNERSHIP))["modules"].values() for t in m["owns"]]

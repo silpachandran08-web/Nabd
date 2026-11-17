@@ -5,6 +5,8 @@
   arch.py gate    JAVA_JSON        exit 1 when the current mode blocks (see ci/architecture-gate.json)
   arch.py freeze  JAVA_JSON        rewrite ci/architecture-baseline.json from the current violations
 JAVA_JSON is backend/target/architecture-violations.json written by ArchitectureRulesTest (Modulith + ArchUnit).
+PLT-035: ci/architecture-gate.json `sql_ownership_blocking` {module: [owner modules]} makes those sql-ownership findings fail in
+every mode, baseline or not (the queue-billing-packages SQL cycle stays broken).
 SQL scans: tenant-predicate (SQL on a tenant_id/RLS table without a tenant_id predicate) and sql-ownership
 (writes only own tables, reads only own + allow-listed tables, docs/architecture/table-ownership.yaml; PLT-033: every
 table in public/identity/consent has exactly one owner, a module may span several packages via `packages:`).
@@ -190,7 +192,19 @@ def mode(root="."):
     return "all" if on(g["all_blocking_from"]) else "new" if on(g["new_code_blocking_from"]) else "report"
 
 
-def evaluate(vs, base, m):
+def blocking(root="."):
+    """PLT-035: {module: owner modules} whose sql-ownership findings always fail (keys starting with _ are notes)."""
+    rules = json.load(open(f"{root}/{GATE}")).get("sql_ownership_blocking") or {}
+    return {mod: set(owners) for mod, owners in rules.items() if not mod.startswith("_")}
+
+
+def blocked(vs, rules):
+    """sql-ownership findings of a module on a table owned by one of its blocked owner modules."""
+    owner = lambda x: (re.search(r"\bowned by (\w+)", x["detail"]) or [None, None])[1]
+    return [x for x in vs if x["rule"] == "sql-ownership" and owner(x) in rules.get(x["module"], ())]
+
+
+def evaluate(vs, base, m, rules=None):
     cur = collections.Counter(key(x) for x in vs)
     seen, new = collections.Counter(), []
     for x in vs:  # the n-th occurrence of a key beyond its baseline count is new
@@ -203,6 +217,10 @@ def evaluate(vs, base, m):
         if base: fails.append(f"baseline still lists {sum(base.values())} violation(s); it must be empty at the Phase 1 exit")
     elif m == "new" and new:
         fails.append(f"{len(new)} new violation(s) not in {BASELINE}")
+    hard = blocked(vs, rules or {})
+    if hard:
+        fails.append(f"{len(hard)} blocking sql-ownership violation(s) (sql_ownership_blocking, PLT-035): "
+                     + "; ".join(f"{where(x)} {x['detail']}" for x in hard[:20]))
     return new, fixed, fails
 
 
@@ -210,8 +228,8 @@ def where(x): return f"{x['file']}:{x['line']}" if x.get("file") else x["module"
 LABEL = {"report": "report only (S2-S4), never fails", "new": "new violations fail (S5-S7)", "all": "any violation fails (Phase 1 exit, S8)"}
 
 
-def summary(vs, base, m):
-    new, fixed, fails = evaluate(vs, base, m)
+def summary(vs, base, m, rules=None):
+    new, fixed, fails = evaluate(vs, base, m, rules)
     by = collections.defaultdict(collections.Counter)
     for x in vs: by[x["module"]][check_of(x)] += 1
     o = ["<!-- architecture-report -->", f"### Architecture checks (stage 2): mode {m}, {LABEL[m]}", "",
@@ -237,11 +255,11 @@ def main(a):
         return
     vs = collect(a[1])
     if a[0] == "summary":
-        md, _ = summary(vs, load_baseline(), mode())
+        md, _ = summary(vs, load_baseline(), mode(), blocking())
         print(md)
         if len(a) > 2: json.dump({"date": today().isoformat(), "mode": mode(), "violations": vs}, open(a[2], "w"), indent=1)
     elif a[0] == "gate":
-        _, _, fails = evaluate(vs, load_baseline(), mode())
+        _, _, fails = evaluate(vs, load_baseline(), mode(), blocking())
         print("\n".join(fails) or "architecture gate: pass"); sys.exit(1 if fails else 0)
     elif a[0] == "freeze":
         json.dump({"_note": "OPS-033 frozen baseline of existing architecture violations. Shrinks only; must be empty at Phase 1 exit (S8). "

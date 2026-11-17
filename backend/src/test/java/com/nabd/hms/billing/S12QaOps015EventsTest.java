@@ -69,6 +69,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
             Map.entry("clinical.rx.signed.v1", List.of("prescriptionId", "queueEntryId", "signedBy", "status")),
             Map.entry("clinical.allergy.changed.v1", List.of("patientId", "allergyId?", "change", "status")),
             Map.entry("billing.invoice.paid.v1", List.of("invoiceId", "totalMinor", "currency", "status")),
+            Map.entry("billing.invoice.settled.v1", List.of("invoiceId", "visitId", "settledAt", "settledBy")), // PLT-035
             Map.entry("billing.payment.recorded.v1", List.of("invoiceId", "paymentId", "method", "amountMinor", "currency", "balanceMinor", "status")),
             Map.entry("billing.refund.approved.v1", List.of("refundRequestId", "invoiceId", "amountMinor", "methods")),
             Map.entry("consent.changed.v1", List.of("patientId", "consentType", "status")),

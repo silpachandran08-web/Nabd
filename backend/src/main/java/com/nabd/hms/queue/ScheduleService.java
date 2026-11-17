@@ -50,10 +50,13 @@ public class ScheduleService {
     private final com.nabd.hms.common.EventPublisher events;
     private final ActorDirectory actors;
     private final EtaTrigger etaTrigger;
+    private final com.nabd.hms.queue.api.LeaveImpact leaveImpact; // PLT-035: package holders come from the packages module
 
     ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
-                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors, EtaTrigger etaTrigger) {
+                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors, EtaTrigger etaTrigger,
+                    com.nabd.hms.queue.api.LeaveImpact leaveImpact) {
         this.etaTrigger = etaTrigger;
+        this.leaveImpact = leaveImpact;
         this.events = events;
         this.actors = actors;
         this.clock = clock;
@@ -190,7 +193,7 @@ public class ScheduleService {
         }
         checkLeaveWindow(req);
         UUID id = repo.insertLeave(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.reason(), req.startTime(), req.endTime());
-        List<String> affected = repo.findAffectedPackagePatientNames(tenantId, doctorId);
+        List<String> affected = leaveImpact.packageHolders(tenantId, doctorId);
         List<DoctorLeaveResponse.AffectedAppointment> bookings = affectedAppointments(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.startTime(), req.endTime());
         repo.flagNeedsReschedule(tenantId, bookings.stream().map(DoctorLeaveResponse.AffectedAppointment::id).toList(), "doctor_leave"); // ACC-006
         log.info("leave {} added for doctor {} by {} ({} to {}); {} package patient(s), {} booking(s) potentially affected",

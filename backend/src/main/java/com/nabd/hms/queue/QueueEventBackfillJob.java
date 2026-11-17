@@ -12,8 +12,8 @@ import java.util.UUID;
 
 /**
  * ACC-015: gives visits that predate queue_entry_events approximate history so the ETA has data from day one.
- * Per entry with no event at all: a check-in event at created_at and, for completed visits, an end event at the invoice
- * time (updated_at when there is no invoice). Rows are marked source='backfill'. Batches of BATCH entries, one transaction
+ * Per entry with no event at all: a check-in event at created_at and, for completed visits, an end event at updated_at (the
+ * completing move; PLT-035: no longer billing's invoice time, queue SQL does not read invoices). Rows are marked source='backfill'. Batches of BATCH entries, one transaction
  * each; re-runnable: an entry that has any event is skipped and a partial unique index backs that up.
  */
 @Component
@@ -53,7 +53,7 @@ public class QueueEventBackfillJob {
                       SELECT tenant_id, id, encounter_id, doctor_id, queue_date, NULL, 'checked_in', 'transition', created_at, 'backfill' FROM todo
                       UNION ALL
                       SELECT t.tenant_id, t.id, t.encounter_id, t.doctor_id, t.queue_date, NULL, 'completed', 'transition',
-                             GREATEST(t.created_at, COALESCE((SELECT i.created_at FROM invoices i WHERE i.queue_entry_id = t.id), t.updated_at)), 'backfill'
+                             GREATEST(t.created_at, t.updated_at), 'backfill'
                       FROM todo t WHERE t.status = 'completed'
                       ON CONFLICT (queue_entry_id, kind, to_status) WHERE source = 'backfill' DO NOTHING
                       RETURNING 1)
