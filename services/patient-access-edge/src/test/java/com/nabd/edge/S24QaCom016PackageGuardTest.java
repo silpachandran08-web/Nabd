@@ -317,6 +317,48 @@ class S24QaCom016PackageGuardTest extends BookingTestBase {
         assertEquals(before, blocked(), "the guard never fired for the shared doctor");
     }
 
+    // C16-E02g (round 2, record only): TODAY's Core sends no tenantId on profile rows (InternalBookingProfileController.Doctor = doctorId, name).
+    // Clinic B is served first, then A's profile wrongly lists B's doctor: what A's patient sees on the doctor list and on the package path.
+    // Disclosed decision (s24-fix-guard.md), so nothing is asserted about block or pass: the behaviour is printed for the report.
+    @Test
+    void c16e02g_todaysCoreShapeWithoutTenantIdOnProfileRows_recorded() {
+        Clinic b = clinic("Qa Hazel Dental", "Dr Qa Hegde");
+        Clinic a = clinic("Qa Holly Clinic", "Dr Qa Hora");
+        List<Doc> honestB = b.doctors().stream().map(d -> new Doc(d.id(), d.name(), null)).toList();
+        List<Doc> wrongA = new ArrayList<>(a.doctors().stream().map(d -> new Doc(d.id(), d.name(), null)).toList());
+        wrongA.add(honestB.get(0));
+        profile(b.tenant(), b.name(), honestB);
+        profile(a.tenant(), a.name(), wrongA);
+        guard.forget();
+        serve(b); // the true owner is known to this instance before the leak (the case e10's guard caught on the doctor list)
+        double before = blocked();
+        say(a, "Hi");
+        tap(a, "Book");
+        tap(a, "Me");
+        List<String> list = "HANDOFF".equals(state(a)) ? List.of() : titles(a);
+        boolean listLeak = list.contains("Dr Qa Hegde");
+        double afterList = blocked();
+        // the package path, a fresh patient of A whose package names B's doctor as the only eligible one
+        Clinic a2 = new Clinic(a.tenant(), a.name(), a.doctors(), "s24qa-" + UUID.randomUUID());
+        UP.households.put(a2.hash(), new CopyOnWriteArrayList<>(List.of(FakeUpstreams.member("ref-me", "Asha", 36, "self"))));
+        languages.save(a2.tenant(), "whatsapp", a2.hash(), "en");
+        pkg(a2, UUID.randomUUID(), honestB.get(0));
+        say(a2, "Hi");
+        tap(a2, "Book");
+        tap(a2, "Me");
+        tap(a2, "Book session 3 of 6");
+        List<String> steps = new ArrayList<>();
+        steps.add(last(a2).path("text").asString());
+        for (int i = 0; i < 2 && !"HANDOFF".equals(state(a2)) && !options(last(a2)).isEmpty(); i++) {
+            tapAt(a2, 0);
+            steps.add(last(a2).path("text").asString().replace('\n', ' '));
+        }
+        boolean pkgLeak = sentTo(a2).toString().toLowerCase().contains("dr qa hegde");
+        System.out.println("C16-E02g noTenantIdOnRows doctorList=" + list + " listShowsForeignDoctor=" + listLeak + " guardOnList=" + (afterList - before)
+                + " | packagePath steps=" + steps + " state=" + state(a2) + " foreignNameShown=" + pkgLeak + " guardOnPackage=" + (blocked() - afterList));
+        assertTrue(state(a) != null && state(a2) != null, "no crash");
+    }
+
     // C44-E01b: the package is used up between the offer and the tap: no package is sent to Core, the regular choice follows
     @Test
     void c44e01b_aPackageUsedUpAfterTheOfferIsNotBooked() {

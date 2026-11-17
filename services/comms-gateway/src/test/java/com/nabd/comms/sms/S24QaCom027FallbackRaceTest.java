@@ -278,6 +278,52 @@ class S24QaCom027FallbackRaceTest {
         assertThat(audits).as("one send_as_sms audit row for one SMS").isEqualTo(1);
     }
 
+    private UUID failedReminderInAThread(UUID tenant, UUID thread) {
+        UUID patient = UUID.randomUUID();
+        su.update("INSERT INTO inbox_threads (id, tenant_id, sender_account_id, phone_hash, phone_enc) VALUES (?,?,?,?,?)",
+                thread, tenant, UUID.randomUUID(), crypto.hash(PHONE), crypto.encrypt(PHONE));
+        su.update("INSERT INTO channel_consent_snapshot (tenant_id, patient_ref, purpose, granted, version) VALUES (?,?, 'messaging', true, 1)", tenant, patient);
+        return whatsapp(tenant, UUID.randomUUID(), "REMINDER", "failed", "appt_reminder", List.of("https://nabd.in/s/Qa24r2"), clock.instant(), patient, thread);
+    }
+
+    private int audits(UUID thread) {
+        return su.queryForObject("SELECT count(*) FROM inbox_audit WHERE thread_id = ? AND action = 'send_as_sms'", Integer.class, thread);
+    }
+
+    // C27-G05 (round 2, T1-BUG-7 fix): the timer fallback already sent the SMS; the desk then presses 'Send as SMS'
+    @Test
+    void c27g05_deskPressAfterTheTimerFallbackIs409WithNoSecondSmsAndNoAuditRow() {
+        UUID tenant = UUID.randomUUID(), thread = UUID.randomUUID();
+        UUID wa = failedReminderInAThread(tenant, thread);
+        var fb = instance();
+        clock.advance(Duration.ofSeconds(5));
+        int ticked = fb.tick();
+        String desk = press(instance(), tenant, wa, UUID.randomUUID());
+        System.out.println("C27-G05 timerSent=" + ticked + " desk=" + desk + " smsRows=" + smsFor(wa) + " bspRequests=" + bspRequests.size() + " deskAuditRows=" + audits(thread));
+        assertThat(ticked).isEqualTo(1);
+        assertThat(desk).isEqualTo("409 ALREADY_SENT_BY_SMS");
+        assertThat(smsFor(wa)).isEqualTo(1);
+        assertThat(bspRequests).hasSize(1);
+        assertThat(audits(thread)).as("the desk sent nothing, so it audits nothing").isZero();
+    }
+
+    // C27-G06 (round 2): three presses at the same instant from three instances, slow BSP: one send, two 409, one audit row
+    @Test
+    void c27g06_threeSimultaneousPressesSendOnce() throws Exception {
+        UUID tenant = UUID.randomUUID(), thread = UUID.randomUUID(), staff = UUID.randomUUID();
+        UUID wa = failedReminderInAThread(tenant, thread);
+        bspDelayMs = 300;
+        SmsFallback a = instance(), b = instance(), c = instance();
+        List<String> answers = together(List.<Callable<String>>of(() -> press(a, tenant, wa, staff), () -> press(b, tenant, wa, staff), () -> press(c, tenant, wa, staff)));
+        System.out.println("C27-G06 answers=" + answers.stream().map(x -> x.length() > 24 ? x.substring(0, 24) : x).toList() + " smsRows=" + smsFor(wa)
+                + " bspRequests=" + bspRequests.size() + " auditRows=" + audits(thread));
+        assertThat(smsFor(wa)).isEqualTo(1);
+        assertThat(bspRequests).hasSize(1);
+        assertThat(answers.stream().filter(x -> x.startsWith("201")).count()).isEqualTo(1);
+        assertThat(answers.stream().filter(x -> x.equals("409 ALREADY_SENT_BY_SMS")).count()).isEqualTo(2);
+        assertThat(audits(thread)).isEqualTo(1);
+    }
+
     private static String press(SmsFallback f, UUID tenant, UUID wa, UUID staff) {
         try {
             var s = f.sendAsSms(tenant, wa, staff);
