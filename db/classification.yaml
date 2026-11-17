@@ -257,6 +257,20 @@ schemas:
       owner_staff_id: operational
       reason: operational
       created_at: operational
+    stock_alerts:
+      id: operational
+      tenant_id: operational
+      type: operational
+      item_id: operational
+      batch_id: operational
+      value_at_risk: financial
+      status: operational
+      action: operational
+      note: pii # uncertain: free text typed by staff about a stock action; strictest plausible tier
+      acknowledged_by: operational
+      acknowledged_at: operational
+      created_on: operational
+      created_at: operational
     stock_batches:
       id: operational
       tenant_id: operational
@@ -1543,6 +1557,7 @@ schemas:
       mrp: financial
       returnable: operational
       cold_chain: operational
+      reorder_level: operational
     pharmacy_schedule_rules:
       market: operational
       schedule_class: operational
@@ -1563,6 +1578,10 @@ schemas:
       drug_licence_numbers: operational
       pharmacist_in_charge_staff_id: operational
       alert_recipient_staff_id: operational
+      expiry_alert_days: operational
+      dead_stock_days: operational
+      digest_local_time: operational
+      last_digest_day: operational
     pharmacy_stock_movements:
       batch_id: operational
       source_type: operational

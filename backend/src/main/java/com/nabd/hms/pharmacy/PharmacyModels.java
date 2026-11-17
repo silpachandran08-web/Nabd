@@ -9,7 +9,8 @@ class PharmacyModels {
     record PharmacyItemRow(UUID id, String code, String name, boolean isRx, String hsnCode, BigDecimal price,
                             BigDecimal taxRatePercent, int stockQty, boolean active, String drugId,
                             String scheduleClass, String registerType, String genericName, Integer packSize, String unit, boolean inHouse,
-                            Boolean priceInclusiveOfTax, boolean zeroRated, BigDecimal mrp, boolean coldChain, boolean returnable) {
+                            Boolean priceInclusiveOfTax, boolean zeroRated, BigDecimal mrp, boolean coldChain, boolean returnable,
+                            Integer reorderLevel) {
     }
 
     record RuleRow(String code, String label, boolean requiresRx, String register, boolean duplicateRxCopy, Integer retentionYears,

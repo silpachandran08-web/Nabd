@@ -1,0 +1,46 @@
+/* PHL-008: stock alerts screen. 44 px targets, logical properties (RTL). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  margin-block-end: var(--nb-space-16);
+}
+
+.tab {
+  min-block-size: 44px;
+  padding-inline: var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabOn {
+  composes: tab;
+  background: var(--nb-accent-tint);
+  border-color: var(--nb-accent-500);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nb-space-12);
+  margin-block: var(--nb-space-12);
+}
+
+.target {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+}
+
+.num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.section {
+  margin-block-start: var(--nb-space-32);
+}

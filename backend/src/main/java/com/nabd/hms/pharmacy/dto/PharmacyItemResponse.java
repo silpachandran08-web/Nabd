@@ -28,6 +28,8 @@ public record PharmacyItemResponse(
         BigDecimal mrp,
         /** PHL-011: customer returns of a cold-chain or not-returnable item are refused. */
         boolean coldChain,
-        boolean returnable
+        boolean returnable,
+        /** PHL-008: null = no reorder level (no low-stock alert). */
+        Integer reorderLevel
 ) {
 }

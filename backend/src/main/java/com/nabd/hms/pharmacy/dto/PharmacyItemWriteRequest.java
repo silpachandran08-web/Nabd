@@ -33,11 +33,13 @@ public record PharmacyItemWriteRequest(
         /** PHL-011: a cold-chain item is never taken back from a customer. Omitted = unchanged (false on create). */
         Boolean coldChain,
         /** PHL-011: false = customer returns are refused. Omitted = unchanged (true on create). */
-        Boolean returnable
+        Boolean returnable,
+        /** PHL-008: on hand below this raises a low-stock alert. Omitted = unchanged (none on create). */
+        @PositiveOrZero Integer reorderLevel
 ) {
     public PharmacyItemWriteRequest withTaxRatePercent(BigDecimal rate) {
         return new PharmacyItemWriteRequest(name, isRx, hsnCode, price, rate, stockQty, scheduleClass, drugMasterId, genericName, packSize,
-                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp, coldChain, returnable);
+                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp, coldChain, returnable, reorderLevel);
     }
 
     public BigDecimal taxRatePercentOrZero() {

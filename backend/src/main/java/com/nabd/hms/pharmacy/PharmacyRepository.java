@@ -72,7 +72,7 @@ class PharmacyRepository {
                     "(SELECT max(r.register_type) FROM pharmacy_schedule_rules r WHERE r.schedule_class = p.schedule_class) AS register_type, " +
                     "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house, " +
                     "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp, " +
-                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable " +
+                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable, p.reorder_level " +
                     "FROM charge_catalogue c LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id ";
 
     /** @param scheduleClass optional PHL-002 filter (index on tenant_id, schedule_class) */
@@ -148,10 +148,11 @@ class PharmacyRepository {
                 itemId, tenantId, scheduleClass, genericName, packSize, unit, inHouse, genericName, packSize, unit, inHouse);
     }
 
-    /** PHL-011: null leaves the stored flag. */
-    void setReturnFlags(UUID tenantId, UUID itemId, Boolean coldChain, Boolean returnable) {
-        jdbc.update("UPDATE pharmacy_item_profiles SET cold_chain = COALESCE(?, cold_chain), returnable = COALESCE(?, returnable) WHERE tenant_id = ? AND item_id = ?",
-                coldChain, returnable, tenantId, itemId);
+    /** PHL-011 / PHL-008: null leaves the stored value. */
+    void setReturnFlags(UUID tenantId, UUID itemId, Boolean coldChain, Boolean returnable, Integer reorderLevel) {
+        jdbc.update("UPDATE pharmacy_item_profiles SET cold_chain = COALESCE(?, cold_chain), returnable = COALESCE(?, returnable), " +
+                        "reorder_level = COALESCE(?, reorder_level) WHERE tenant_id = ? AND item_id = ?",
+                coldChain, returnable, reorderLevel, tenantId, itemId);
     }
 
     List<RuleRow> rulesForMarket(String market) {
@@ -272,6 +273,6 @@ class PharmacyRepository {
                 rs.getString("schedule_class"), rs.getString("register_type"), rs.getString("generic_name"),
                 (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"),
                 (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"),
-                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"));
+                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"), (Integer) rs.getObject("reorder_level"));
     }
 }
