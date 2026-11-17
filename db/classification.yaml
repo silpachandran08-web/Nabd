@@ -678,6 +678,39 @@ schemas:
       after: phi
       actor_id: operational
       occurred_at: operational
+    dental_chair_notes:  # CLN-050: chair-side preset notes per tooth + visit
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      queue_entry_id: operational
+      tooth: phi
+      preset_code: phi
+      text: phi
+      la_drug_id: phi
+      la_lot: phi
+      created_by: operational
+      created_at: operational
+    dental_images:  # CLN-050: X-ray / intra-oral photo linked to teeth or the whole case
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      queue_entry_id: operational
+      upload_id: operational
+      kind: phi
+      teeth: phi
+      created_by: operational
+      created_at: operational
+    dental_preset_overrides:  # CLN-050: a dentist's own chair-side phrases (no patient data)
+      tenant_id: operational
+      staff_id: operational
+      presets: operational
+      updated_at: operational
+    dental_settings:  # CLN-050: clinic tooth numbering and chair-side phrases (no patient data)
+      tenant_id: operational
+      numbering: operational
+      presets: operational
+      updated_by: operational
+      updated_at: operational
     department_transfers:
       id: operational
       tenant_id: operational

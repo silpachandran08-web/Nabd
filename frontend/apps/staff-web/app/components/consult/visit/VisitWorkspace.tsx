@@ -218,7 +218,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
           onClose={() => dispatch({ type: "allergies", open: false })}
           onChanged={() => { reloadCtx(); void authedFetch(`/patients/${patient.id}`).then(async (r) => { if (r?.ok) setPatient(await r.json()); }); }} />
       )}
-      {wf.showDental && patient && <DentalDrawer authedFetch={authedFetch} patientId={patient.id} patientName={patient.name} onClose={() => dispatch({ type: "dental", open: false })} />}
+      {wf.showDental && patient && <DentalDrawer patientId={patient.id} patientName={patient.name} visitId={entry.id} onClose={() => dispatch({ type: "dental", open: false })} />}
     </main>
   );
 }

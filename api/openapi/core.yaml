@@ -21437,6 +21437,132 @@ paths:
       tags:
       - platform
       x-required-permission: setup:edit
+  /v1/specialty/dental/la-lots:
+    get:
+      operationId: DentalCaseController_laLots
+      parameters:
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DentalLaLot"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
+  /v1/specialty/dental/patients/{patientId}/chair-notes:
+    get:
+      operationId: DentalCaseController_chairNotes
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: tooth
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalChairNoteList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:view
+    post:
+      operationId: DentalCaseController_addChairNote
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalChairNoteRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalChairNoteCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
   /v1/specialty/dental/patients/{patientId}/chart:
     get:
       operationId: DentalController_chart
@@ -21684,6 +21810,197 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ToothResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
+  /v1/specialty/dental/patients/{patientId}/images:
+    get:
+      operationId: DentalCaseController_images
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: tooth
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalImageList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:view
+    post:
+      operationId: DentalCaseController_attachImage
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalImageRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalImageCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
+  /v1/specialty/dental/settings:
+    get:
+      operationId: DentalCaseController_settings
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:view
+    put:
+      operationId: DentalCaseController_updateSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: setup:edit
+  /v1/specialty/dental/settings/my-presets:
+    put:
+      operationId: DentalCaseController_updateMyPresets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalMyPresetsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalSettingsResponse"
           description: OK
         "401":
           content:
@@ -25599,6 +25916,217 @@ components:
         startsAt:
           type: string
           format: date-time
+    DentalChairNoteCreated:
+      type: object
+      properties:
+        noteId:
+          type: string
+          format: uuid
+    DentalChairNoteItem:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        laDrugId:
+          type: string
+          format: uuid
+        laLot:
+          type: string
+        noteId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        presetCode:
+          type: string
+        queueEntryId:
+          type: string
+          format: uuid
+        text:
+          type: string
+        tooth:
+          type: integer
+          format: int32
+    DentalChairNoteList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalChairNoteItem"
+    DentalChairNoteRequest:
+      type: object
+      properties:
+        laBatch:
+          $ref: "#/components/schemas/DentalLaBatch"
+        presetCode:
+          type: string
+          maxLength: 40
+          minLength: 0
+        queueEntryId:
+          type: string
+          format: uuid
+        tooth:
+          type: integer
+          format: int32
+      required:
+      - presetCode
+      - queueEntryId
+      - tooth
+    DentalImageCreated:
+      type: object
+      properties:
+        imageId:
+          type: string
+          format: uuid
+    DentalImageItem:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        fileId:
+          type: string
+          format: uuid
+        imageId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        patientId:
+          type: string
+          format: uuid
+        queueEntryId:
+          type: string
+          format: uuid
+        teeth:
+          type: array
+          items:
+            type: integer
+            format: int32
+    DentalImageList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalImageItem"
+    DentalImageRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          pattern: iopa|bitewing|opg|intraoral_photo
+        queueEntryId:
+          type: string
+          format: uuid
+        teeth:
+          type: array
+          items:
+            type: integer
+            format: int32
+          maxItems: 32
+          minItems: 0
+        uploadId:
+          type: string
+          format: uuid
+      required:
+      - kind
+      - queueEntryId
+      - uploadId
+    DentalLaBatch:
+      type: object
+      properties:
+        drugId:
+          type: string
+          format: uuid
+        lot:
+          type: string
+          maxLength: 80
+          minLength: 0
+      required:
+      - drugId
+      - lot
+    DentalLaLot:
+      type: object
+      properties:
+        drugId:
+          type: string
+          format: uuid
+        drugName:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        lot:
+          type: string
+    DentalMyPresetsRequest:
+      type: object
+      properties:
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+          maxItems: 24
+          minItems: 0
+      required:
+      - presets
+    DentalPreset:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          pattern: "^[A-Z0-9_]{1,40}$"
+        drugQuery:
+          type: string
+          maxLength: 60
+          minLength: 0
+        la:
+          type: boolean
+        label:
+          type: string
+          maxLength: 60
+          minLength: 0
+      required:
+      - code
+      - label
+    DentalSettingsRequest:
+      type: object
+      properties:
+        numbering:
+          type: string
+          pattern: FDI|UNIVERSAL
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+          maxItems: 24
+          minItems: 0
+      required:
+      - numbering
+    DentalSettingsResponse:
+      type: object
+      properties:
+        clinicPresets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+        myPresets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+        numbering:
+          type: string
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
     DepartmentResponse:
       type: object
       properties:

@@ -9,7 +9,6 @@
   "app/IdleLockGuard.tsx",
   "app/TopBar.tsx",
   "app/components/consult/AllergyRegister.tsx",
-  "app/components/consult/DentalDrawer.tsx",
   "app/components/consult/DoctorOrders.tsx",
   "app/components/consult/DoseCalculator.tsx",
   "app/components/consult/DrugCombobox.tsx",
