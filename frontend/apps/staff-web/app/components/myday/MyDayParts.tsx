@@ -1,27 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import styles from "./myDay.module.css";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
 import { EmptyState } from "../ui/StateViews";
-import { age, minutesSince, queueStatusLabel as statusLabel } from "@nabd/domain";
+import { minutesSince, queueStatusLabel as statusLabel } from "@nabd/domain";
 import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clinicTime";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchVisit } from "../../lib/doctorQueries";
 import { can } from "../../lib/permissions";
 import type { AppointmentPage, DayRow, DueCondition, MyDayData, Part } from "./useMyDay";
+import { ageText, NO_MY_DAY, visitChip, type MyDayOptions } from "../../(clinic)/specialty/specialtyModel";
 
 const hhmm = (iso: string) => formatClinicTime(iso);
 const consultHref = (id: string) => `/consult?entry=${encodeURIComponent(id)}`;
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const nameOf = (r: DayRow) => r.patientName ?? `Token T-${r.tokenNumber}`;
 
-function meta(r: DayRow): string {
+// CLN-043: a PED profile shows ages in months under 2 years.
+function meta(r: DayRow, opts: MyDayOptions): string {
   const p = r.patient;
   if (!p) return "";
   const parts: string[] = [];
-  if (p.dob) { const a = age(p.dob); if (Number.isFinite(a)) parts.push(`${a}y`); }
+  const a = ageText(p.dob, clinicToday(), opts.ageInMonthsUnder2);
+  if (a) parts.push(a);
   const g = (p.gender ?? "").trim();
   if (g) parts.push(g.charAt(0).toUpperCase() + g.slice(1));
   return parts.join(" · ");
@@ -35,6 +39,13 @@ function Fact({ r }: { r: DayRow }) {
   }
   if (r.presentingComplaint) return <span className={styles.complaint}>{r.presentingComplaint}</span>;
   return null;
+}
+
+/** CLN-043 (DERM): the visit-type chip, only when the profile asks for it and the visit's type is known. */
+function VisitTypePill({ v, opts }: { v: { visitType?: string | null; isFollowUp?: boolean | null }; opts: MyDayOptions }) {
+  const t = useTranslations("shell.specialty.myDay");
+  const chip = opts.visitTypeChips ? visitChip(v) : null;
+  return chip ? <StatusPill tone={chip === "followUp" ? "info" : "neutral"} label={t(chip === "followUp" ? "chipFollowUp" : "chipNew")} /> : null;
 }
 
 export function SessionStrip({ data, seen, total }: { data: MyDayData; seen: number; total: number }) {
@@ -68,7 +79,7 @@ export function SessionStrip({ data, seen, total }: { data: MyDayData; seen: num
   );
 }
 
-export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: DayRow | null; now: number | null }) {
+export function NowNext({ inRoom, next, now, opts = NO_MY_DAY }: { inRoom: DayRow | null; next: DayRow | null; now: number | null; opts?: MyDayOptions }) {
   const qc = useQueryClient();
   // FEF-016: pointing at (hover / focus) the next patient reads their visit ahead, so Start consultation opens from cache.
   const warm = (r: DayRow) => () => prefetchVisit(qc, r.id, r.patientId, can("clinical:view"));
@@ -80,8 +91,8 @@ export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: Da
           {inRoom ? (
             <>
               <div className={styles.bigName}>{nameOf(inRoom)} <span className={styles.token}>T-{inRoom.tokenNumber}</span></div>
-              <div className={styles.metaLine}>{meta(inRoom)}</div>
-              <div className={styles.rowFlags}><StatusPill tone="sync" icon="stethoscope" label="In consultation" /><Fact r={inRoom} /></div>
+              <div className={styles.metaLine}>{meta(inRoom, opts)}</div>
+              <div className={styles.rowFlags}><StatusPill tone="sync" icon="stethoscope" label="In consultation" /><VisitTypePill v={inRoom} opts={opts} /><Fact r={inRoom} /></div>
               <Link href={consultHref(inRoom.id)} className={styles.primary}><Icon name="stethoscope" size={16} /> Resume consultation</Link>
             </>
           ) : <div className={styles.quiet}>Nobody in the room.</div>}
@@ -91,9 +102,10 @@ export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: Da
           {next ? (
             <>
               <div className={styles.bigName}>{nameOf(next)} <span className={styles.token}>T-{next.tokenNumber}</span></div>
-              <div className={styles.metaLine}>{meta(next)}</div>
+              <div className={styles.metaLine}>{meta(next, opts)}</div>
               <div className={styles.rowFlags}>
                 <StatusPill tone={next.status === "vitals_done" ? "info" : "neutral"} icon={next.status === "vitals_done" ? "check" : "clock"} label={cap(statusLabel(next.status))} />
+                <VisitTypePill v={next} opts={opts} />
                 {now !== null && minutesSince(next.createdAt, now) !== null && <span className={styles.stat}><Icon name="clock" size={14} /> waiting {minutesSince(next.createdAt, now)} min</span>}
                 <Fact r={next} />
               </div>
@@ -106,7 +118,7 @@ export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: Da
   );
 }
 
-export function QueueList({ rows, now }: { rows: DayRow[]; now: number | null }) {
+export function QueueList({ rows, now, opts = NO_MY_DAY }: { rows: DayRow[]; now: number | null; opts?: MyDayOptions }) {
   const qc = useQueryClient();
   const warm = (r: DayRow) => () => prefetchVisit(qc, r.id, r.patientId, can("clinical:view"));
   return (
@@ -122,9 +134,10 @@ export function QueueList({ rows, now }: { rows: DayRow[]; now: number | null })
                   <span className={styles.token}>T-{r.tokenNumber}</span>
                   <span className={styles.qmain}>
                     <span className={styles.qname}>{nameOf(r)}</span>
-                    <span className={styles.metaLine}>{[meta(r), r.source ? r.source.replace(/_/g, " ") : ""].filter(Boolean).join(" · ")}</span>
+                    <span className={styles.metaLine}>{[meta(r, opts), r.source ? r.source.replace(/_/g, " ") : ""].filter(Boolean).join(" · ")}</span>
                   </span>
                   <span className={styles.qflags}>
+                    <VisitTypePill v={r} opts={opts} />
                     {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? `Urgent: ${r.priorityReason}` : "Urgent"} />}
                     <Fact r={r} />
                   </span>
@@ -180,7 +193,7 @@ export function ChronicDueCard({ part }: { part: Part<DueCondition[]> }) {
   );
 }
 
-export function AppointmentsCard({ part, names }: { part: Part<AppointmentPage>; names: Record<string, string> }) {
+export function AppointmentsCard({ part, names, opts = NO_MY_DAY }: { part: Part<AppointmentPage>; names: Record<string, string>; opts?: MyDayOptions }) {
   const list = part.state === "ok" ? part.data.data.filter((a) => a.status !== "cancelled") : [];
   return (
     <section className={styles.card} aria-label="Today's appointments">
@@ -192,7 +205,8 @@ export function AppointmentsCard({ part, names }: { part: Part<AppointmentPage>;
             {list.map((a) => (
               <li key={a.id} className={styles.drow}>
                 <span className={styles.time}>{hhmm(a.startTime)}</span>
-                <span className={styles.qmain}><span className={styles.qname}>{names[a.patientId] ?? "Patient"}</span>{a.isFollowUp && <span className={styles.metaLine}>Follow-up</span>}</span>
+                <span className={styles.qmain}><span className={styles.qname}>{names[a.patientId] ?? "Patient"}</span>{a.isFollowUp && !opts.visitTypeChips && <span className={styles.metaLine}>Follow-up</span>}</span>
+                <VisitTypePill v={a} opts={opts} />
                 <span className={styles.apptStatus}>{statusLabel(a.status)}</span>
               </li>
             ))}

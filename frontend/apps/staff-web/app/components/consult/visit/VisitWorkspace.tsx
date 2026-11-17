@@ -14,6 +14,7 @@ import { useClinicalContext } from "../clinical";
 import ConflictDialog from "../ConflictDialog";
 import DentalDrawer from "../DentalDrawer";
 import SafetyStrip from "../SafetyStrip";
+import QuickActionBar from "../specialty/QuickActionBar";
 import { signBlockCode } from "../signAuthority";
 import { AmendForm, AmendHistory, SignedBanner } from "../amend/AmendPanel";
 import { useAmendments } from "../amend/useAmendments";
@@ -169,6 +170,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
         <TodayAside rows={w.rows} activeId={entry.id} onSwitch={(r) => void switchTo(r)} />
 
         <div className={styles.centerCol}>
+          <QuickActionBar />
           <StepRail step={wf.step} onGoto={(step) => dispatch({ type: "goto", step })} />
           <PanelBoundary panel="timeline">
             <TimelinePanel entry={entry} ctx={ctx} lastSavedAt={n.lastSavedAt} dirty={n.dirty} saveState={n.saveState} online={n.online} signedAt={n.signedAt} noteSigned={locked} amendments={amend.amendments} />

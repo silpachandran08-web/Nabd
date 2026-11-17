@@ -9,6 +9,7 @@ import com.nabd.hms.common.VisitReadGate;
 import com.nabd.hms.engagement.api.RecallBookings;
 import com.nabd.hms.engagement.dto.RecallOrderRequest;
 import com.nabd.hms.engagement.dto.RecallOrderResponse;
+import com.nabd.hms.engagement.dto.VaccineDueResponse;
 import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.shared.notify.CancelReason;
 import com.nabd.hms.shared.notify.NotificationPort;
@@ -97,6 +98,13 @@ public class RecallService implements RecallBookings {
         visits.requireVisit(jwt, encounterId); // IDC-001 own-patients and consent gate, as the clinical reads of this visit
         repo.encounter(tenantId, encounterId).orElseThrow(ApiException::notFound);
         return repo.forEncounter(tenantId, encounterId);
+    }
+
+    /** CLN-043 'Vaccines due today' (PED my-day): the caller's booked/arrived patients of the clinic day with a vaccine recall due. */
+    @Transactional(readOnly = true)
+    public List<VaccineDueResponse> vaccinesDueToday(UUID tenantId, UUID staffId) {
+        LocalDate today = clock.clinicDate(tenantId);
+        return repo.vaccinesDue(tenantId, staffId, today, clock.dayStart(tenantId, today), clock.dayStart(tenantId, today.plusDays(1)));
     }
 
     @Override

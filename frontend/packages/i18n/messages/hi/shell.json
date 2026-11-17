@@ -548,6 +548,24 @@
     "quickActions": "क्विक एक्शन",
     "tools": "विशेषज्ञता टूल",
     "openTool": "खोलें",
-    "notBuilt": "अभी बना नहीं है।"
+    "notBuilt": "अभी बना नहीं है।",
+    "myDay": {
+      "loading": "{name} लोड हो रहा है",
+      "failed": "अभी यह लोड नहीं हो सका।",
+      "patient": "मरीज़",
+      "arrived": "पहुँच गए",
+      "booked": "बुक",
+      "due": "{date} को देय",
+      "overdue": "{date} से ओवरड्यू",
+      "vaccinesDueToday": "आज देय टीके",
+      "vaccinesHint": "आज बुक या पहुँचे आपके मरीज़ जिनका टीका रिकॉल देय है।",
+      "vaccinesEmpty": "आज के मरीज़ों में कोई टीका देय नहीं है।",
+      "followUpsDue": "देय फ़ॉलो-अप",
+      "followUpsHint": "आज से बुक फ़ॉलो-अप विज़िट, पूरे क्लिनिक की।",
+      "followUpsEmpty": "आज से कोई फ़ॉलो-अप विज़िट बुक नहीं है।",
+      "seeAll": "सभी फ़ॉलो-अप देखें",
+      "chipNew": "नई विज़िट",
+      "chipFollowUp": "फ़ॉलो-अप"
+    }
   }
 }

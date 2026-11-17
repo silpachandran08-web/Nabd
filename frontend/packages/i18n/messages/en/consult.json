@@ -1047,5 +1047,8 @@
       "out_of_stock": "out of stock in the clinic pharmacy",
       "not_in_master": "not in the active pharmacy list"
     }
+  },
+  "quickActionBar": {
+    "title": "Quick actions"
   }
 }
