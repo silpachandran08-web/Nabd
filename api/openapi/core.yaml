@@ -1437,11 +1437,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/HouseholdMember"
+                $ref: "#/components/schemas/InternalHousehold"
           description: OK
         "401":
           content:
@@ -26747,6 +26743,8 @@ components:
           format: date
         instanceId:
           type: string
+        lastReminderStatus:
+          type: string
         packageName:
           type: string
         patientName:
@@ -27754,6 +27752,8 @@ components:
         createdAt:
           type: string
           format: date-time
+        deliveryStatus:
+          type: string
         delta:
           type: integer
           format: int32
@@ -27915,6 +27915,9 @@ components:
           type: string
           maxLength: 280
           minLength: 0
+        packageInstanceId:
+          type: string
+          format: uuid
         patientRef:
           type: string
           minLength: 1
@@ -27961,6 +27964,36 @@ components:
         v:
           type: integer
           format: int64
+    InternalHousehold:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/HouseholdMember"
+        packageSessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalHouseholdPackageSession"
+    InternalHouseholdPackageSession:
+      type: object
+      properties:
+        eligibleDoctorIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        instanceId:
+          type: string
+          format: uuid
+        nextSession:
+          type: integer
+          format: int32
+        patientRef:
+          type: string
+        totalSessions:
+          type: integer
+          format: int32
     InternalProfileDoctor:
       type: object
       properties:
@@ -29584,6 +29617,48 @@ components:
           format: int32
         workspaceToken:
           type: string
+    PackageCard:
+      type: object
+      properties:
+        currency:
+          type: string
+        due:
+          type: number
+        graceUntil:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageCardItem"
+        packageName:
+          type: string
+        paid:
+          type: number
+        saved:
+          type: number
+        sessionsTotal:
+          type: integer
+          format: int32
+        sessionsUsed:
+          type: integer
+          format: int32
+        status:
+          type: string
+        validUntil:
+          type: string
+          format: date
+    PackageCardItem:
+      type: object
+      properties:
+        name:
+          type: string
+        total:
+          type: integer
+          format: int32
+        used:
+          type: integer
+          format: int32
     PackageItemInput:
       type: object
       properties:
@@ -32926,6 +33001,8 @@ components:
           type: string
         mime:
           type: string
+        packageCard:
+          $ref: "#/components/schemas/PackageCard"
         title:
           type: string
     SelfCheckInCandidate:
@@ -33009,6 +33086,11 @@ components:
     SellPackageRequest:
       type: object
       properties:
+        nudgeIntervalDays:
+          type: integer
+          format: int32
+          maximum: 365
+          minimum: 1
         packageId:
           type: string
           format: uuid

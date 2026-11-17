@@ -37,7 +37,11 @@
         "doctor_delay",
         "queue_paused",
         "otp",
-        "emergency_access_used"
+        "emergency_access_used",
+        "package_card",
+        "package_session_nudge",
+        "package_expiry",
+        "package_grace"
       ]
     },
     "priority": {

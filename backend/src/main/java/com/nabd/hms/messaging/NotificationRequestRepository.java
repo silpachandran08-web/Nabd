@@ -62,6 +62,16 @@ class NotificationRequestRepository {
                 to, tenantId, id) == 1;
     }
 
+    /** COM-044: the WhatsApp message an in-process send became, so its status events map back to the request. */
+    void setMessage(UUID tenantId, UUID id, UUID messageId) {
+        jdbc.update("UPDATE notification_requests SET message_id = ? WHERE tenant_id = ? AND id = ?", messageId, tenantId, id);
+    }
+
+    Optional<UUID> byMessage(UUID tenantId, UUID messageId) {
+        return jdbc.query("SELECT id FROM notification_requests WHERE tenant_id = ? AND message_id = ?",
+                (rs, i) -> rs.getObject(1, UUID.class), tenantId, messageId).stream().findFirst();
+    }
+
     /** Latest consent row of the type decides, like WhatsAppMessageRepository.hasMessagingConsent. */
     boolean hasConsent(UUID tenantId, UUID patientId, String consentType) {
         return jdbc.query("""

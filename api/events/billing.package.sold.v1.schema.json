@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:billing.package.sold.v1",
+  "title": "billing.package.sold.v1",
+  "description": "A treatment package was sold and paid at the desk (COM-044). Core billing (packages) requests the package card message. Read the instance for details.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "packageInstanceId",
+    "patientId",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "packageInstanceId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "patientId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "packageInstanceId": "55555555-5555-4555-8555-555555555555",
+      "patientId": "33333333-3333-4333-8333-333333333333",
+      "version": 1
+    }
+  ]
+}

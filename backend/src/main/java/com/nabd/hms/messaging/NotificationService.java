@@ -166,6 +166,12 @@ public class NotificationService implements NotificationPort {
 
     @Override
     @Transactional
+    public java.util.Optional<UUID> requestOfMessage(UUID messageId) {
+        return repo.byMessage(tenantContext.current(), messageId);
+    }
+
+    @Override
+    @Transactional
     public int cancelBySubject(String subjectType, UUID subjectId, CancelReason reason) {
         UUID tenantId = tenantContext.current();
         List<UUID> ids = repo.cancelBySubject(tenantId, subjectType, subjectId);
@@ -225,8 +231,9 @@ public class NotificationService implements NotificationPort {
             return;
         }
         NotificationClaim c = render(row, () -> repo.patientPhone(tenantId, row.recipientPatientId()));
-        whatsApp.queueTemplate(c.recipient().patientId(), c.recipient().phoneE164(), c.templateKey(), c.language(), c.params(), row.notAfter());
+        UUID messageId = whatsApp.queueTemplate(c.recipient().patientId(), c.recipient().phoneE164(), c.templateKey(), c.language(), c.params(), row.notAfter());
         repo.move(tenantId, id, "dispatched");
+        repo.setMessage(tenantId, id, messageId); // COM-044: status events of the message map back to this request
     }
 
     private NotificationClaim render(NotificationRequestRepository.Row row, java.util.function.Supplier<java.util.Optional<String>> patientPhone) {

@@ -333,9 +333,13 @@ class PackageApiTest extends ApiTestBase {
         new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).update(
                 "UPDATE package_instances SET validity_end = ? WHERE id = ?::uuid",
                 java.sql.Date.valueOf(LocalDate.now(ZoneOffset.UTC).plusDays(10)), instanceId);
+        // COM-044: the reminder is a real send, so the clinic needs an approved package_expiry template
+        inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO whatsapp_templates (tenant_id, name, meta_name, language, category, header_text, body, param_count, status) "
+                + "VALUES (?, 'package_expiry', ?, 'en', 'UTILITY', 'Clinic', 'Hello {{1}}, valid until {{2}}. Please book.', 2, 'approved')",
+                tenant.id(), "m_" + UUID.randomUUID().toString().replace("-", "")));
         ResponseEntity<Map> ok = exchange(base + "/send-reminder", HttpMethod.POST, authed(token), Map.class);
         assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(ok.getBody().toString()).contains("expiry_warning_sent", "recorded only, no message sent");
+        assertThat(ok.getBody().toString()).contains("expiry_warning_sent", "14-day reminder (desk)");
     }
 
     @Test

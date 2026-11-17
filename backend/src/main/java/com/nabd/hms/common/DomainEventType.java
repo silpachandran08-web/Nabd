@@ -60,7 +60,9 @@ public enum DomainEventType {
     PATIENT_NOTIFICATION_PREFERENCES_CHANGED("patient.notification_preferences.changed.v1", "core/patient"),
     RX_REVOKED("clinical.prescription.revoked.v1", "core/clinical"),
     MESSAGING_SETTINGS_CHANGED("organization.messaging_settings.changed.v1", "core/organization"),
-    BREAK_GLASS_REVIEWED("iam.break_glass.reviewed.v1", "core/iam");
+    BREAK_GLASS_REVIEWED("iam.break_glass.reviewed.v1", "core/iam"),
+    /** COM-044: a package was sold and paid at the desk; core.billing (packages) requests the package card message. Ids only. */
+    PACKAGE_SOLD("billing.package.sold.v1", "core/billing");
 
     private final String type;
     private final String source;

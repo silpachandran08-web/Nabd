@@ -14,4 +14,12 @@ public interface SecureDocumentLinks {
     }
 
     Issued issueForFile(UUID staffId, String ip, UUID fileId, UUID recipientPatientId, String language);
+
+    /** COM-044: a link to the patient's package card (document type package_card), sent to the patient only. The caller sends it
+     * (purpose package_card), so nothing is messaged here. Empty when the patient has no phone, is not active or has no
+     * processing consent. {@code url} carries the one-time-shown token: put it only in the message. */
+    record CardLink(UUID linkId, String url, String firstName) {
+    }
+
+    java.util.Optional<CardLink> issuePackageCard(UUID staffId, UUID instanceId, UUID patientId);
 }

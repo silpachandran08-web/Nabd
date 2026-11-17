@@ -79,11 +79,14 @@ class BookingRequestService {
     private final EventPublisher events;
     private final ClinicClock clock;
     private final com.nabd.hms.shared.notify.NotificationPort notifications;
+    private final com.nabd.hms.shared.booking.PackageSessionPort packageSessions;
 
     BookingRequestService(TenantScope tenantScope, TenantContext tenantContext, BookingRequestRepository repo, AppointmentService appointments,
                           AppointmentRepository appointmentRepo, QueueRepository queueRepo, ScheduleRepository scheduleRepo, SlotValidator slotValidator,
                           SlotAlternatives alternatives, WaitlistService waitlist, PatientRefs patientRefs, ActorDirectory actors, AuditService audit,
-                          EventPublisher events, ClinicClock clock, com.nabd.hms.shared.notify.NotificationPort notifications) {
+                          EventPublisher events, ClinicClock clock, com.nabd.hms.shared.notify.NotificationPort notifications,
+                          com.nabd.hms.shared.booking.PackageSessionPort packageSessions) {
+        this.packageSessions = packageSessions;
         this.tenantScope = tenantScope;
         this.tenantContext = tenantContext;
         this.repo = repo;
@@ -105,7 +108,7 @@ class BookingRequestService {
     // ---- ACC-009: a booking from a patient channel ------------------------------------------------------------------------
 
     Map<String, Object> route(UUID tid, ServiceIdentity edge, String patientRef, UUID doctorId, Instant slotStart, String visitType, String channel,
-                              List<String> triageFlags, boolean group, String note) {
+                              List<String> triageFlags, boolean group, String note, UUID packageInstanceId) {
         if (!CHANNELS.contains(channel)) throw invalid("channel must be one of " + String.join(", ", CHANNELS) + ".");
         if (visitType != null && !VISIT_TYPES.contains(visitType)) throw invalid("visitType must be new, follow_up, procedure or tele.");
         List<String> flags = triageFlags == null ? List.of() : triageFlags;
@@ -116,6 +119,9 @@ class BookingRequestService {
         return tenantScope.run(tid, () -> {
             UUID patientId = patientRefs.patientIdFor(patientRef).orElseThrow(BookingRequestService::notOwner);
             AppointmentService.requirePatientAndDoctor(appointmentRepo, tid, patientId, doctorId);
+            if (packageInstanceId != null) { // COM-044: 'Book session N of M': the patient's own package, a session left, an eligible doctor
+                packageSessions.requireBookable(patientId, packageInstanceId, doctorId);
+            }
             Instant now = clock.now();
             int minutes = slotValidator.validate(tid, doctorId, slotStart, now);
             ZoneId zone = clock.zone(tid);
@@ -134,6 +140,9 @@ class BookingRequestService {
                         o.confirmed() ? "auto" : null, policy.version(), o.confirmed() ? now : null);
             } catch (DataIntegrityViolationException | PessimisticLockingFailureException e) {
                 throw SlotValidator.slotTakenOrRethrow(e);
+            }
+            if (packageInstanceId != null) {
+                packageSessions.linkAppointment(patientId, packageInstanceId, id);
             }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("appointmentId", id);

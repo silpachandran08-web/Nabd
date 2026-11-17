@@ -15,12 +15,17 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** S9 QA (COM-005, independent): the reminder endpoint records only; wording, boundary, permission and tenant isolation. */
+/** S9 QA (COM-005, independent): reminder wording, boundary, permission and tenant isolation. COM-044 made the reminder a real send
+ * (package_expiry through the notification contract), so the first test now checks the request instead of "recorded only". */
 class PackageReminderS9QaTest extends ApiTestBase {
 
     private String instance(String token, String suffix) {
         String patientId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Qa Reminder " + suffix, "phone", "+91998" + (7100000 + Math.abs(suffix.hashCode() % 90000)), "dob", "1980-01-01", "gender", "female")), Map.class).getBody().get("id");
+        new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).update( // COM-044: the reminder needs an approved template
+                "INSERT INTO whatsapp_templates (tenant_id, name, meta_name, language, category, header_text, body, param_count, status) "
+                        + "SELECT tenant_id, 'package_expiry', ?, 'en', 'UTILITY', 'Clinic', 'Hello {{1}}, valid until {{2}}. Please book.', 2, 'approved' "
+                        + "FROM patients WHERE id = ?::uuid ON CONFLICT DO NOTHING", "m_" + UUID.randomUUID().toString().replace("-", ""), patientId);
         ResponseEntity<Map> pkg = exchange("/v1/packages", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Qa Pkg", "packageType", "combination", "speciality", "Dermatology", "description", "d", "price", 2400.00,
                 "taxInclusive", false, "validityDays", 90, "validityStarts", "purchase_date", "graceDays", 7,
@@ -45,7 +50,7 @@ class PackageReminderS9QaTest extends ApiTestBase {
     }
 
     @Test
-    void markedReminderRecordsOnlyAndNeverClaimsDispatch() {
+    void reminderIsARealRequestAndTheLedgerNamesTheTier() {
         SeededTenant tenant = seedTenant();
         String token = loginAndGetAccessToken(seedStaff(tenant, seedFullAccessRole(tenant.id()), "qa-rem1@a.com", "+919500001001", false));
         String id = instance(token, "one");
@@ -55,19 +60,15 @@ class PackageReminderS9QaTest extends ApiTestBase {
         List<Map<String, Object>> ev = events(tenant.id(), id);
         Map<String, Object> last = ev.get(ev.size() - 1);
         assertThat(last.get("event_type")).isEqualTo("expiry_warning_sent");
-        assertThat((String) last.get("note")).startsWith("30-day").containsIgnoringCase("no message sent").doesNotContain("template");
+        assertThat((String) last.get("note")).startsWith("30-day").doesNotContain("template");
+        assertThat(new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).queryForObject(
+                "SELECT count(*) FROM notification_requests WHERE subject_id = ?::uuid AND purpose = 'package_expiry'", Integer.class, id)).isEqualTo(1);
         // the expiring list now reports the tier as marked
         List<Map<String, Object>> exp = exchange("/v1/packages/expiring-soon", HttpMethod.GET, authed(token), List.class).getBody();
         assertThat(exp).anySatisfy(e -> {
             assertThat(e.get("instanceId")).isEqualTo(id);
             assertThat(e.get("reminderSentForTier")).isEqualTo(true);
         });
-        // no outbound-message row is created by the endpoint
-        Integer outbound = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
-                "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'outbound_messages'", Integer.class));
-        if (outbound != null && outbound > 0) {
-            assertThat(inTenantTx(tenant.id(), () -> jdbc.queryForObject("SELECT COUNT(*) FROM outbound_messages", Integer.class))).isZero();
-        }
     }
 
     @Test
