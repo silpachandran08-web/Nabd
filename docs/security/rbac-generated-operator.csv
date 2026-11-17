@@ -236,6 +236,7 @@ super_admin,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental
 super_admin,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 super_admin,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 super_admin,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+super_admin,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 super_admin,GET /v1/specialty/profiles,staff:view,deny-401
 super_admin,GET /v1/staff,staff:view,deny-401
 super_admin,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -447,6 +448,9 @@ super_admin,POST /v1/setup/white-glove,setup:edit,deny-401
 super_admin,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 super_admin,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 super_admin,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+super_admin,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+super_admin,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+super_admin,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 super_admin,POST /v1/staff,staff:create,deny-401
 super_admin,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 super_admin,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
@@ -719,6 +723,7 @@ implementation,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_den
 implementation,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 implementation,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 implementation,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+implementation,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 implementation,GET /v1/specialty/profiles,staff:view,deny-401
 implementation,GET /v1/staff,staff:view,deny-401
 implementation,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -930,6 +935,9 @@ implementation,POST /v1/setup/white-glove,setup:edit,deny-401
 implementation,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 implementation,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 implementation,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+implementation,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+implementation,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+implementation,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 implementation,POST /v1/staff,staff:create,deny-401
 implementation,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 implementation,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
@@ -1202,6 +1210,7 @@ support_engineer,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_d
 support_engineer,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 support_engineer,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 support_engineer,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+support_engineer,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 support_engineer,GET /v1/specialty/profiles,staff:view,deny-401
 support_engineer,GET /v1/staff,staff:view,deny-401
 support_engineer,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -1413,6 +1422,9 @@ support_engineer,POST /v1/setup/white-glove,setup:edit,deny-401
 support_engineer,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 support_engineer,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 support_engineer,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+support_engineer,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+support_engineer,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+support_engineer,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 support_engineer,POST /v1/staff,staff:create,deny-401
 support_engineer,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 support_engineer,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
@@ -1685,6 +1697,7 @@ billing,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:vie
 billing,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 billing,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 billing,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+billing,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 billing,GET /v1/specialty/profiles,staff:view,deny-401
 billing,GET /v1/staff,staff:view,deny-401
 billing,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -1896,6 +1909,9 @@ billing,POST /v1/setup/white-glove,setup:edit,deny-401
 billing,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 billing,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 billing,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+billing,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+billing,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+billing,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 billing,POST /v1/staff,staff:create,deny-401
 billing,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 billing,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
@@ -2168,6 +2184,7 @@ sre,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:view,de
 sre,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 sre,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 sre,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+sre,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 sre,GET /v1/specialty/profiles,staff:view,deny-401
 sre,GET /v1/staff,staff:view,deny-401
 sre,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -2379,6 +2396,9 @@ sre,POST /v1/setup/white-glove,setup:edit,deny-401
 sre,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 sre,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 sre,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+sre,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+sre,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+sre,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 sre,POST /v1/staff,staff:create,deny-401
 sre,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 sre,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
@@ -2651,6 +2671,7 @@ commercial,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_dental:
 commercial,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 commercial,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 commercial,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+commercial,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 commercial,GET /v1/specialty/profiles,staff:view,deny-401
 commercial,GET /v1/staff,staff:view,deny-401
 commercial,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -2862,6 +2883,9 @@ commercial,POST /v1/setup/white-glove,setup:edit,deny-401
 commercial,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 commercial,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 commercial,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+commercial,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+commercial,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+commercial,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 commercial,POST /v1/staff,staff:create,deny-401
 commercial,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 commercial,POST /v1/staff/{id}/invite/resend,staff:create,deny-401
@@ -3134,6 +3158,7 @@ compliance_dpo,GET /v1/specialty/dental/patients/{patientId}/chart,specialty_den
 compliance_dpo,GET /v1/specialty/dental/patients/{patientId}/chart/entries/{id}/history,specialty_dental:view,deny-401
 compliance_dpo,GET /v1/specialty/dental/patients/{patientId}/images,specialty_dental:view,deny-401
 compliance_dpo,GET /v1/specialty/dental/settings,specialty_dental:view,deny-401
+compliance_dpo,GET /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:view,deny-401
 compliance_dpo,GET /v1/specialty/profiles,staff:view,deny-401
 compliance_dpo,GET /v1/staff,staff:view,deny-401
 compliance_dpo,GET /v1/staff/clinician-review,staff:view,deny-401
@@ -3345,6 +3370,9 @@ compliance_dpo,POST /v1/setup/white-glove,setup:edit,deny-401
 compliance_dpo,POST /v1/specialty/dental/patients/{patientId}/chair-notes,specialty_dental:edit,deny-401
 compliance_dpo,POST /v1/specialty/dental/patients/{patientId}/chart/supernumerary,specialty_dental:edit,deny-401
 compliance_dpo,POST /v1/specialty/dental/patients/{patientId}/images,specialty_dental:edit,deny-401
+compliance_dpo,POST /v1/specialty/derm/patients/{patientId}/photo-consent,specialty_derm:edit,deny-401
+compliance_dpo,POST /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw,specialty_derm:edit,deny-401
+compliance_dpo,POST /v1/specialty/derm/patients/{patientId}/photos,specialty_derm:edit,deny-401
 compliance_dpo,POST /v1/staff,staff:create,deny-401
 compliance_dpo,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-401
 compliance_dpo,POST /v1/staff/{id}/invite/resend,staff:create,deny-401

@@ -202,6 +202,16 @@ export type DepartmentResponse = { active?: boolean; id?: string; isDefault?: bo
 export type DepartmentWorkflowRequest = { templateCode: string; toggles?: Record<string, boolean>; };
 export type DepartmentWorkflowResponse = { availableTemplates?: Array<WorkflowTemplateResponse>; resolvedSteps?: Array<string>; templateCode?: string; toggles?: Record<string, boolean>; };
 export type DepartmentWriteRequest = { active?: boolean; name: string; };
+export type DermPhoto = { consentBadge: "record_only" | "record_and_teaching"; id: string; note?: string | null; queueEntryId: string; site: DermPhotoSite; takenAt: string; url: string; urlExpiresAt: string; visitDate?: string | null; };
+export type DermPhotoConsent = { consentId: string; recordedAt: string; scope: "record_only" | "record_and_teaching"; signerKind: string; status: string; } | null;
+export type DermPhotoConsentCreated = { consentId: string; };
+export type DermPhotoConsentRequest = { scope: string; signatureSvg?: string; signerKind: string; };
+export type DermPhotoConsentWithdrawn = { photosHidden: number; };
+export type DermPhotoCreateRequest = { note?: string; queueEntryId: string; site: DermPhotoSite; uploadId: string; };
+export type DermPhotoCreated = { photoId: string; };
+export type DermPhotoSite = { mapPointId?: string; region: string; side: string; };
+export type DermPhotoSiteGroup = { photos: Array<DermPhoto>; site: DermPhotoSite; };
+export type DermPhotoTimeline = { consent?: DermPhotoConsent; hiddenCount: number; sites: Array<DermPhotoSiteGroup>; };
 export type DeskExceptionActionResponse = { id?: string; status?: string; };
 export type DeskExceptionItem = { actions?: Array<string>; createdAt?: string; id?: string; kind?: string; params?: Record<string, Record<string, unknown>>; refId?: string; refType?: string; severity?: string; summary?: string; };
 export type DeskExceptionPage = { items?: Array<DeskExceptionItem>; nextCursor?: string; };
@@ -268,6 +278,8 @@ export type EtaItem = { appointmentId?: string; p50At?: string; p80At?: string; 
 export type EtaResponse = { items?: Array<EtaItem>; v?: number; };
 export type ExpiredWithValue = { expiredOn?: string; instanceId?: string; packageName?: string; patientName?: string; remainingValue?: number; };
 export type ExpiringSoonResponse = { alertTier?: number; expiresOn?: string; instanceId?: string; lastReminderStatus?: string; packageName?: string; patientName?: string; quantityConsumed?: number; quantityTotal?: number; reminderSentForTier?: boolean; valueLeft?: number; };
+export type ExpiryReport = { asOf?: string; lines?: Array<ExpiryReportLine>; totalValueAtRisk?: number; withinDays?: number; };
+export type ExpiryReportLine = { batchId?: string; batchNo?: string; daysToExpiry?: number; expiryDate?: string; itemId?: string; itemName?: string; purchaseRate?: number; qtyOnHand?: number; suggestedAction?: string; valueAtRisk?: number; };
 export type ExportJobResponse = { createdAt?: string; errorMessage?: string; exportType?: string; id?: string; resultUrl?: string; status?: string; };
 export type ExtendRequest = { newValidityEnd: string; reason: string; };
 export type FacilityCheckInConfig = { checkinCode?: string; geofenceRadiusM?: number; geofenceRequired?: boolean; lat?: number; lng?: number; walkinAllowed?: boolean; whatsappNumber?: string; };
@@ -481,9 +493,9 @@ export type PaymentSplit = { amount?: number; method?: string; };
 export type PayrollExportRowResponse = { days?: number; hours?: number; notes?: string; role?: string; salary?: number; staffId?: string; staffName?: string; };
 export type PendingChange = { direction?: string; effectiveAt?: string; id?: string; toPlanCode?: string; };
 export type PharmacyCapabilitiesResponse = { features?: Array<string>; mode?: string; };
-export type PharmacyItemResponse = { active?: boolean; code?: string; coldChain?: boolean; drugId?: string; genericName?: string; hsnCode?: string; id?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name?: string; packSize?: number; price?: number; priceInclusiveOfTax?: boolean; register?: string; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
+export type PharmacyItemResponse = { active?: boolean; code?: string; coldChain?: boolean; drugId?: string; genericName?: string; hsnCode?: string; id?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name?: string; packSize?: number; price?: number; priceInclusiveOfTax?: boolean; register?: string; reorderLevel?: number; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
 export type PharmacyItemStatusRequest = { active: boolean; reason?: string; };
-export type PharmacyItemWriteRequest = { coldChain?: boolean; drugMasterId?: string; genericName?: string; hsnCode?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name: string; packSize?: number; price: number; priceInclusiveOfTax?: boolean; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
+export type PharmacyItemWriteRequest = { coldChain?: boolean; drugMasterId?: string; genericName?: string; hsnCode?: string; inHouse?: boolean; isRx?: boolean; mrp?: number; name: string; packSize?: number; price: number; priceInclusiveOfTax?: boolean; reorderLevel?: number; returnable?: boolean; scheduleClass?: string; stockQty?: number; taxRatePercent?: number; unit?: string; zeroRated?: boolean; };
 export type PharmacyReturnLine = { condition: string; invoiceLineId: string; qty?: number; };
 export type PharmacyReturnRequest = { invoiceId: string; lines: Array<PharmacyReturnLine>; note?: string; refundMethod?: string; };
 export type PharmacyReturnResponse = { amount: number; currency: string; refundId: string; refundTo: Array<RefundTarget>; status: string; };
@@ -688,6 +700,10 @@ export type Started = { estimateMinutes?: number; id?: string; status?: string; 
 export type StepCount = { completed?: number; reached?: number; step?: string; };
 export type StepUpTokenResponse = { expiresIn?: number; stepUpToken?: string; };
 export type StockAdjustmentLine = { batchId?: string; delta?: number; itemId?: string; qtyAfter?: number; qtyBefore?: number; reasonCode?: string; };
+export type StockAlert = { action?: string; batchId?: string; batchNo?: string; createdOn?: string; daysToExpiry?: number; expiryDate?: string; id?: string; itemId?: string; itemName?: string; onHand?: number; reorderLevel?: number; status?: string; type?: string; valueAtRisk?: number; };
+export type StockAlertAcknowledgeRequest = { action: string; note?: string; };
+export type StockAlertCounts = { dead?: number; expiry?: number; low?: number; };
+export type StockAlertPage = { counts?: StockAlertCounts; items?: Array<StockAlert>; nextCursor?: string; };
 export type StockBatch = { batchId?: string; batchNo?: string; expiryDate?: string; expiryUnknown?: boolean; location?: string; mrp?: number; purchaseRate?: number; qtyOnHand?: number; status?: string; };
 export type StockBatchMovement = { delta?: number; id?: string; kind?: string; occurredAt?: string; qtyAfter?: number; qtyBefore?: number; reason?: string; };
 export type StockBatchPatchRequest = { batchNo?: string; expiryDate?: string; location?: string; reason: string; };
@@ -1127,6 +1143,8 @@ export type Operations = {
   NoticeController_status: { method: "get"; path: "/v1/patients/{patientId}/privacy-notice"; permission: "patients:view"; pathParams: { patientId: string; }; query: never; body: never; response: PrivacyNoticeStatus };
   NoticeController_acknowledge: { method: "post"; path: "/v1/patients/{patientId}/privacy-notice/acknowledge"; permission: "patients:edit"; pathParams: { patientId: string; }; query: never; body: never; response: PrivacyNoticeStatus };
   StockTakeController_approvers: { method: "get"; path: "/v1/pharmacy/adjustment-approvers"; permission: "pharmacy:edit"; pathParams: never; query: never; body: never; response: Array<AdjustmentApprover> };
+  StockAlertController_alerts: { method: "get"; path: "/v1/pharmacy/alerts"; permission: "pharmacy:view"; pathParams: never; query: { type?: string; cursor?: string; limit?: number; }; body: never; response: StockAlertPage };
+  StockAlertController_acknowledge: { method: "post"; path: "/v1/pharmacy/alerts/{id}/acknowledge"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: StockAlertAcknowledgeRequest; response: StockAlert };
   PharmacyController_patchBatch: { method: "patch"; path: "/v1/pharmacy/batches/{id}"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: StockBatchPatchRequest; response: StockBatch };
   StockTakeController_adjust: { method: "post"; path: "/v1/pharmacy/batches/{id}/adjustments"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: BatchAdjustmentRequest; response: BatchAdjustmentResponse };
   PharmacyController_batchMovements: { method: "get"; path: "/v1/pharmacy/batches/{id}/movements"; permission: "pharmacy:view"; pathParams: { id: string; }; query: never; body: never; response: Array<StockBatchMovement> };
@@ -1143,6 +1161,7 @@ export type Operations = {
   PharmacyController_stockMovements: { method: "get"; path: "/v1/pharmacy/items/{id}/stock-movements"; permission: "pharmacy:view"; pathParams: { id: string; }; query: never; body: never; response: Array<PharmacyStockMovementResponse> };
   PharmacyController_picks: { method: "post"; path: "/v1/pharmacy/picks"; permission: "pharmacy:view"; pathParams: never; query: never; body: FefoPickRequest; response: FefoPickResponse };
   GoodsReceiptController_post: { method: "post"; path: "/v1/pharmacy/receipts"; permission: "pharmacy:edit"; pathParams: never; query: never; body: GoodsReceiptRequest; response: GoodsReceiptResponse };
+  StockAlertController_expiryReport: { method: "get"; path: "/v1/pharmacy/reports/expiry"; permission: "pharmacy:view"; pathParams: never; query: { withinDays?: number; format?: string; }; body: never; response: ExpiryReport };
   PharmacyReturnController_create: { method: "post"; path: "/v1/pharmacy/returns"; permission: "billing:edit"; pathParams: never; query: never; body: PharmacyReturnRequest; response: PharmacyReturnResponse };
   PharmacyReturnController_bill: { method: "get"; path: "/v1/pharmacy/returns/bill"; permission: "billing:edit"; pathParams: never; query: { invoiceId?: string; number?: string; }; body: never; response: ReturnableBill };
   RxLineController_search: { method: "post"; path: "/v1/pharmacy/rx-lines/search"; permission: "billing:create"; pathParams: never; query: never; body: RxLineSearchRequest; response: Array<RxLineResponse> };
@@ -1361,6 +1380,10 @@ export type Operations = {
   DentalCaseController_settings: { method: "get"; path: "/v1/specialty/dental/settings"; permission: "specialty_dental:view"; pathParams: never; query: never; body: never; response: DentalSettingsResponse };
   DentalCaseController_updateSettings: { method: "put"; path: "/v1/specialty/dental/settings"; permission: "setup:edit"; pathParams: never; query: never; body: DentalSettingsRequest; response: DentalSettingsResponse };
   DentalCaseController_updateMyPresets: { method: "put"; path: "/v1/specialty/dental/settings/my-presets"; permission: "specialty_dental:edit"; pathParams: never; query: never; body: DentalMyPresetsRequest; response: DentalSettingsResponse };
+  DermPhotoController_recordConsent: { method: "post"; path: "/v1/specialty/derm/patients/{patientId}/photo-consent"; permission: "specialty_derm:edit"; pathParams: { patientId: string; }; query: never; body: DermPhotoConsentRequest; response: DermPhotoConsentCreated };
+  DermPhotoController_withdrawConsent: { method: "post"; path: "/v1/specialty/derm/patients/{patientId}/photo-consent/withdraw"; permission: "specialty_derm:edit"; pathParams: { patientId: string; }; query: never; body: never; response: DermPhotoConsentWithdrawn };
+  DermPhotoController_timeline: { method: "get"; path: "/v1/specialty/derm/patients/{patientId}/photos"; permission: "specialty_derm:view"; pathParams: { patientId: string; }; query: { site?: string; }; body: never; response: DermPhotoTimeline };
+  DermPhotoController_addPhoto: { method: "post"; path: "/v1/specialty/derm/patients/{patientId}/photos"; permission: "specialty_derm:edit"; pathParams: { patientId: string; }; query: never; body: DermPhotoCreateRequest; response: DermPhotoCreated };
   SpecialtyController_me: { method: "get"; path: "/v1/specialty/me"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MySpecialtyProfile };
   SpecialtyController_profiles: { method: "get"; path: "/v1/specialty/profiles"; permission: "staff:view"; pathParams: never; query: never; body: never; response: SpecialtyProfileList };
   StaffController_list: { method: "get"; path: "/v1/staff"; permission: "staff:view"; pathParams: never; query: { limit?: number; cursor?: string; }; body: never; response: StaffPage };
@@ -1446,6 +1469,8 @@ export type Permission =
   | "setup:view"
   | "specialty_dental:edit"
   | "specialty_dental:view"
+  | "specialty_derm:edit"
+  | "specialty_derm:view"
   | "staff:create"
   | "staff:delete"
   | "staff:edit"
