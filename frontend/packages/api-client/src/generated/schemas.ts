@@ -214,6 +214,16 @@ export const DepartmentWorkflowRequestSchema = z.object({ templateCode: z.string
 export const WorkflowTemplateResponseSchema = z.object({ code: z.string().optional(), name: z.string().optional(), steps: z.array(z.string()).optional(), toggleKeys: z.array(z.string()).optional() });
 export const DepartmentWorkflowResponseSchema = z.object({ availableTemplates: z.array(WorkflowTemplateResponseSchema).optional(), resolvedSteps: z.array(z.string()).optional(), templateCode: z.string().optional(), toggles: z.record(z.string(), z.boolean()).optional() });
 export const DepartmentWriteRequestSchema = z.object({ active: z.boolean().optional(), name: z.string().min(1) });
+export const DermPhotoSiteSchema = z.object({ mapPointId: z.string().optional(), region: z.string(), side: z.string() });
+export const DermPhotoSchema = z.object({ consentBadge: z.enum(["record_only", "record_and_teaching"]), id: z.string(), note: z.string().nullable().optional(), queueEntryId: z.string(), site: DermPhotoSiteSchema, takenAt: z.string(), url: z.string(), urlExpiresAt: z.string(), visitDate: z.string().nullable().optional() });
+export const DermPhotoConsentSchema = z.object({ consentId: z.string(), recordedAt: z.string(), scope: z.enum(["record_only", "record_and_teaching"]), signerKind: z.string(), status: z.string() }).nullable();
+export const DermPhotoConsentCreatedSchema = z.object({ consentId: z.string() });
+export const DermPhotoConsentRequestSchema = z.object({ scope: z.string(), signatureSvg: z.string().min(0).max(200000).optional(), signerKind: z.string() });
+export const DermPhotoConsentWithdrawnSchema = z.object({ photosHidden: z.number().int() });
+export const DermPhotoCreateRequestSchema = z.object({ note: z.string().min(0).max(500).optional(), queueEntryId: z.string(), site: DermPhotoSiteSchema, uploadId: z.string() });
+export const DermPhotoCreatedSchema = z.object({ photoId: z.string() });
+export const DermPhotoSiteGroupSchema = z.object({ photos: z.array(DermPhotoSchema), site: DermPhotoSiteSchema });
+export const DermPhotoTimelineSchema = z.object({ consent: DermPhotoConsentSchema.optional(), hiddenCount: z.number().int(), sites: z.array(DermPhotoSiteGroupSchema) });
 export const DeskExceptionActionResponseSchema = z.object({ id: z.string().optional(), status: z.string().optional() });
 export const DeskExceptionItemSchema = z.object({ actions: z.array(z.string()).optional(), createdAt: z.string().optional(), id: z.string().optional(), kind: z.string().optional(), params: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), refId: z.string().optional(), refType: z.string().optional(), severity: z.string().optional(), summary: z.string().optional() });
 export const DeskExceptionPageSchema = z.object({ items: z.array(DeskExceptionItemSchema).optional(), nextCursor: z.string().optional() });
@@ -1327,6 +1337,10 @@ export const operationSchemas = {
   DentalController_updateSupernumerary: { body: ToothWriteRequestSchema, response: ToothResponseSchema },
   DentalController_removeSupernumerary: {  },
   DentalController_upsertTooth: { body: ToothWriteRequestSchema, response: ToothResponseSchema },
+  DermPhotoController_recordConsent: { body: DermPhotoConsentRequestSchema, response: DermPhotoConsentCreatedSchema },
+  DermPhotoController_withdrawConsent: { response: DermPhotoConsentWithdrawnSchema },
+  DermPhotoController_timeline: { response: DermPhotoTimelineSchema },
+  DermPhotoController_addPhoto: { body: DermPhotoCreateRequestSchema, response: DermPhotoCreatedSchema },
   SpecialtyController_me: { response: MySpecialtyProfileSchema },
   SpecialtyController_profiles: { response: SpecialtyProfileListSchema },
   StaffController_list: { response: StaffPageSchema },

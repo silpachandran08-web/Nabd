@@ -188,6 +188,16 @@ export type DepartmentResponse = { active?: boolean; id?: string; isDefault?: bo
 export type DepartmentWorkflowRequest = { templateCode: string; toggles?: Record<string, boolean>; };
 export type DepartmentWorkflowResponse = { availableTemplates?: Array<WorkflowTemplateResponse>; resolvedSteps?: Array<string>; templateCode?: string; toggles?: Record<string, boolean>; };
 export type DepartmentWriteRequest = { active?: boolean; name: string; };
+export type DermPhoto = { consentBadge: "record_only" | "record_and_teaching"; id: string; note?: string | null; queueEntryId: string; site: DermPhotoSite; takenAt: string; url: string; urlExpiresAt: string; visitDate?: string | null; };
+export type DermPhotoConsent = { consentId: string; recordedAt: string; scope: "record_only" | "record_and_teaching"; signerKind: string; status: string; } | null;
+export type DermPhotoConsentCreated = { consentId: string; };
+export type DermPhotoConsentRequest = { scope: string; signatureSvg?: string; signerKind: string; };
+export type DermPhotoConsentWithdrawn = { photosHidden: number; };
+export type DermPhotoCreateRequest = { note?: string; queueEntryId: string; site: DermPhotoSite; uploadId: string; };
+export type DermPhotoCreated = { photoId: string; };
+export type DermPhotoSite = { mapPointId?: string; region: string; side: string; };
+export type DermPhotoSiteGroup = { photos: Array<DermPhoto>; site: DermPhotoSite; };
+export type DermPhotoTimeline = { consent?: DermPhotoConsent; hiddenCount: number; sites: Array<DermPhotoSiteGroup>; };
 export type DeskExceptionActionResponse = { id?: string; status?: string; };
 export type DeskExceptionItem = { actions?: Array<string>; createdAt?: string; id?: string; kind?: string; params?: Record<string, Record<string, unknown>>; refId?: string; refType?: string; severity?: string; summary?: string; };
 export type DeskExceptionPage = { items?: Array<DeskExceptionItem>; nextCursor?: string; };
@@ -1325,6 +1335,10 @@ export type Operations = {
   DentalController_updateSupernumerary: { method: "patch"; path: "/v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id}"; permission: "specialty_dental:edit"; pathParams: { patientId: string; id: string; }; query: never; body: ToothWriteRequest; response: ToothResponse };
   DentalController_removeSupernumerary: { method: "delete"; path: "/v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id}"; permission: "specialty_dental:edit"; pathParams: { patientId: string; id: string; }; query: never; body: never; response: void };
   DentalController_upsertTooth: { method: "patch"; path: "/v1/specialty/dental/patients/{patientId}/chart/{toothNumber}"; permission: "specialty_dental:edit"; pathParams: { patientId: string; toothNumber: number; }; query: never; body: ToothWriteRequest; response: ToothResponse };
+  DermPhotoController_recordConsent: { method: "post"; path: "/v1/specialty/derm/patients/{patientId}/photo-consent"; permission: "specialty_derm:edit"; pathParams: { patientId: string; }; query: never; body: DermPhotoConsentRequest; response: DermPhotoConsentCreated };
+  DermPhotoController_withdrawConsent: { method: "post"; path: "/v1/specialty/derm/patients/{patientId}/photo-consent/withdraw"; permission: "specialty_derm:edit"; pathParams: { patientId: string; }; query: never; body: never; response: DermPhotoConsentWithdrawn };
+  DermPhotoController_timeline: { method: "get"; path: "/v1/specialty/derm/patients/{patientId}/photos"; permission: "specialty_derm:view"; pathParams: { patientId: string; }; query: { site?: string; }; body: never; response: DermPhotoTimeline };
+  DermPhotoController_addPhoto: { method: "post"; path: "/v1/specialty/derm/patients/{patientId}/photos"; permission: "specialty_derm:edit"; pathParams: { patientId: string; }; query: never; body: DermPhotoCreateRequest; response: DermPhotoCreated };
   SpecialtyController_me: { method: "get"; path: "/v1/specialty/me"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MySpecialtyProfile };
   SpecialtyController_profiles: { method: "get"; path: "/v1/specialty/profiles"; permission: "staff:view"; pathParams: never; query: never; body: never; response: SpecialtyProfileList };
   StaffController_list: { method: "get"; path: "/v1/staff"; permission: "staff:view"; pathParams: never; query: { limit?: number; cursor?: string; }; body: never; response: StaffPage };
@@ -1410,6 +1424,8 @@ export type Permission =
   | "setup:view"
   | "specialty_dental:edit"
   | "specialty_dental:view"
+  | "specialty_derm:edit"
+  | "specialty_derm:view"
   | "staff:create"
   | "staff:delete"
   | "staff:edit"

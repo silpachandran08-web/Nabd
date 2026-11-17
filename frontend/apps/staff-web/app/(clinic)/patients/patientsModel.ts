@@ -34,8 +34,8 @@ export const TODAY_STATUS_LABEL: Record<string, string> = {
 export const FILTERS: [string, string][] = [["all", "All"], ["recent", "Recently visited"], ["followup", "Follow-up due"],
   ["package", "Active package"], ["balance", "Outstanding balance"], ["duplicate", "Duplicate review"], ["archived", "Archived"]];
 // Financial and duplicate-review filters are absent (not disabled) for roles that don't hold the grant.
-export type Perms = { clinicalView: boolean; clinicalEdit: boolean; dentalView: boolean; dentalEdit: boolean; billingView: boolean; checkIn: boolean; register: boolean; patientsEdit: boolean; merge: boolean };
-export const NO_PERMS: Perms = { clinicalView: false, clinicalEdit: false, dentalView: false, dentalEdit: false, billingView: false, checkIn: false, register: false, patientsEdit: false, merge: false };
+export type Perms = { clinicalView: boolean; clinicalEdit: boolean; dentalView: boolean; dentalEdit: boolean; dermView: boolean; dermEdit: boolean; billingView: boolean; checkIn: boolean; register: boolean; patientsEdit: boolean; merge: boolean };
+export const NO_PERMS: Perms = { clinicalView: false, clinicalEdit: false, dentalView: false, dentalEdit: false, dermView: false, dermEdit: false, billingView: false, checkIn: false, register: false, patientsEdit: false, merge: false };
 
 /** "+91 ••••• 4412" — only the last four digits; used in the list and, until revealed, in the drawer. */
 export function maskPhone(phone: string): string {
@@ -79,5 +79,6 @@ export const selfId = () => decodeAccessToken(localStorage.getItem("nabd_access_
 export const readPerms = (): Perms => ({
   clinicalView: can("clinical:view"), clinicalEdit: can("clinical:edit"),
   dentalView: can("specialty_dental:view"), dentalEdit: can("specialty_dental:edit"),
+  dermView: can("specialty_derm:view"), dermEdit: can("specialty_derm:edit"), // CLN-047 photo timeline
   billingView: can("billing:view"), checkIn: can("queue:create"), register: can("patients:create"), patientsEdit: can("patients:edit"), merge: can("patients:delete"),
 });

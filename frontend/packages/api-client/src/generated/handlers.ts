@@ -570,6 +570,10 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.patch(`${baseUrl}/v1/specialty/dental/patients/:patientId/chart/supernumerary/:id`, () => HttpResponse.json({"id":"00000000-0000-7000-8000-000000000000","isSupernumerary":false,"note":"string","patientId":"00000000-0000-7000-8000-000000000000","status":"string","toothNumber":0,"updatedAt":"2026-01-01T00:00:00Z","updatedBy":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // DentalController_updateSupernumerary
     http.delete(`${baseUrl}/v1/specialty/dental/patients/:patientId/chart/supernumerary/:id`, () => new HttpResponse(null, { status: 200 })), // DentalController_removeSupernumerary
     http.patch(`${baseUrl}/v1/specialty/dental/patients/:patientId/chart/:toothNumber`, () => HttpResponse.json({"id":"00000000-0000-7000-8000-000000000000","isSupernumerary":false,"note":"string","patientId":"00000000-0000-7000-8000-000000000000","status":"string","toothNumber":0,"updatedAt":"2026-01-01T00:00:00Z","updatedBy":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // DentalController_upsertTooth
+    http.post(`${baseUrl}/v1/specialty/derm/patients/:patientId/photo-consent`, () => HttpResponse.json({"consentId":"00000000-0000-7000-8000-000000000000"}, { status: 201 })), // DermPhotoController_recordConsent
+    http.post(`${baseUrl}/v1/specialty/derm/patients/:patientId/photo-consent/withdraw`, () => HttpResponse.json({"photosHidden":0}, { status: 200 })), // DermPhotoController_withdrawConsent
+    http.get(`${baseUrl}/v1/specialty/derm/patients/:patientId/photos`, () => HttpResponse.json({"consent":{"consentId":"00000000-0000-7000-8000-000000000000","recordedAt":"2026-01-01T00:00:00Z","scope":"record_only","signerKind":"string","status":"string"},"hiddenCount":0,"sites":[{"photos":[],"site":{"mapPointId":"string","region":"string","side":"string"}}]}, { status: 200 })), // DermPhotoController_timeline
+    http.post(`${baseUrl}/v1/specialty/derm/patients/:patientId/photos`, () => HttpResponse.json({"photoId":"00000000-0000-7000-8000-000000000000"}, { status: 201 })), // DermPhotoController_addPhoto
     http.get(`${baseUrl}/v1/specialty/me`, () => HttpResponse.json({"config":{},"configVersion":0,"name":{},"primary":"string","secondary":"string","writable":false}, { status: 200 })), // SpecialtyController_me
     http.get(`${baseUrl}/v1/specialty/profiles`, () => HttpResponse.json({"items":[{"code":"string","configVersion":0,"entitled":false,"name":{}}]}, { status: 200 })), // SpecialtyController_profiles
     http.get(`${baseUrl}/v1/staff`, () => HttpResponse.json({"data":[{"clinician":false,"departmentId":"00000000-0000-7000-8000-000000000000","email":"string","emailVerified":false,"fieldGrants":[],"id":"00000000-0000-7000-8000-000000000000","lastSeenAt":"2026-01-01T00:00:00Z","loginFactors":[],"loginMethod":"string","mobilePhone":"string","mobileVerified":false,"name":"string","professionalRegistrationNo":"string","roleId":"00000000-0000-7000-8000-000000000000","scope":"string","status":"string"}],"page":{"limit":0,"nextCursor":"string"}}, { status: 200 })), // StaffController_list
@@ -602,4 +606,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 588;
+export const operationCount = 592;

@@ -16,7 +16,7 @@ export type MySpecialty = {
 export type ProfileItem = { code: string; name: Localized; entitled: boolean; configVersion: number };
 
 /** Widgets with a built tool in staff-web (the dental chart lives in the patient drawer). Everything else is a plain card. */
-export const BUILT_WIDGETS: Record<string, string> = { toothChart: "/patients" };
+export const BUILT_WIDGETS: Record<string, string> = { toothChart: "/patients", photoTimeline: "/patients" }; // CLN-047: Photos tab of the patient drawer
 
 /** The label in the UI language, else English, else the raw id. */
 export const localized = (l: Localized | null | undefined, locale: string, fallback = ""): string =>
