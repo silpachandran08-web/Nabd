@@ -23,7 +23,7 @@ import java.util.UUID;
 /**
  * CLN-042: doctor specialty profiles. The registry (specialty_profiles) is Nabd-defined; which profiles a clinic may use is
  * its plan entitlement (organization.api.Entitlements, code = config.module, e.g. specialty_derm; a plan listing no specialty
- * keeps them all). The owner assigns a primary and optional secondary profile (staff:edit); the access token then carries
+ * keeps them all). The owner (built-in Owner role, staff:edit) assigns a primary and optional secondary profile to a clinician; the access token then carries
  * specialty=&lt;primary&gt; and &lt;module&gt;:view|edit (TokenService). When the entitlement lapses (trial end) history stays
  * readable and writes under /v1/specialty/&lt;x&gt;/** get 403 ENTITLEMENT_EXPIRED (SpecialtyWriteGuard).
  */
@@ -31,6 +31,7 @@ import java.util.UUID;
 public class SpecialtyService {
 
     static final long TTL_MILLIS = 60_000;
+    static final String OWNER_ROLE = "Owner"; // the built-in role (RefundService.OWNER_ROLE)
 
     record Profile(String code, Map<String, String> name, Map<String, Object> config, int configVersion) {
         String module() {
@@ -128,7 +129,15 @@ public class SpecialtyService {
 
     @Transactional
     public Assignment assign(UUID tenantId, UUID callerId, UUID staffId, String primary, String secondary, String ip) {
-        actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
+        // T1-BUG-2: a profile mints <module>:view|edit, so staff:edit alone must not hand it out (no grant beyond your own):
+        // only the built-in Owner (holds every grant; role names are unique per tenant) assigns, and only to a clinician.
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerId).filter(a -> OWNER_ROLE.equals(a.role()))
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "owner-only", "OWNER_ONLY",
+                        "Only the clinic owner can assign specialty profiles.", Map.of("code", "OWNER_ONLY")));
+        if (!actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound).clinician()) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "not-clinician", "NOT_CLINICIAN",
+                    "Specialty profiles are for clinicians. Mark this staff member as a clinician first.", Map.of("code", "NOT_CLINICIAN"));
+        }
         if (primary.equals(secondary)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "same-profile", "SAME_PROFILE",
                     "The secondary profile must differ from the primary one.", Map.of("code", "SAME_PROFILE"));
@@ -147,7 +156,6 @@ public class SpecialtyService {
         Assignment after = new Assignment(primary, secondary);
         if (before.equals(after)) return after; // idempotent repeat: no audit, no event
         repo.replace(tenantId, staffId, primary, secondary, callerId);
-        ActorDirectory.Actor actor = actors.findActor(tenantId, callerId).orElseThrow(ApiException::notFound);
         audit.record(tenantId, "staff", callerId, actor.name(), actor.role(), ip, "specialty.profile_assigned",
                 "staff_specialty_profiles", staffId, snapshot(staffId, before), snapshot(staffId, after));
         Map<String, Object> data = new HashMap<>();

@@ -48,6 +48,7 @@ class Cln042SpecialtyProfilesApiTest extends ApiTestBase {
                 new ModuleGrant("clinical", true, true, true, false, false, false, false),
                 new ModuleGrant("patients", true, false, false, false, false, false, false));
         SeededStaff doctor = seedStaff(t, doctorRole, "d" + SEQ.incrementAndGet() + "@c42.test", phone(), false);
+        inTenantTx(t.id(), () -> jdbc.update("UPDATE staff SET is_clinician = true WHERE id = ?", doctor.id())); // profiles are for clinicians (T1-BUG-2)
         return new Clinic(t, owner, loginAndGetAccessToken(owner), doctor);
     }
 

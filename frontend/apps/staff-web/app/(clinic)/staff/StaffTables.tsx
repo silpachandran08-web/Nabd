@@ -116,8 +116,8 @@ export function PeopleCard({ d, hidden, g, rows, su, onRegEdit, onSpecEdit }: { 
                         {s.professionalRegistrationNo ? "Reg. no. & clinician" : "Add reg. no. & clinician"}
                       </button>
                     )}
-                    {/* CLN-042: primary/secondary specialty profile, limited to what the plan unlocks. */}
-                    {g.canEditRoles && s.status !== "suspended" && (
+                    {/* CLN-042: primary/secondary specialty profile, limited to what the plan unlocks; owner only, clinicians only (T1-BUG-2). */}
+                    {d.owner && g.canEditRoles && s.clinician && s.status !== "suspended" && (
                       <button className={styles.actionBtn} onClick={() => onSpecEdit(s)}>Specialty profile</button>
                     )}
                     {g.canResetMfa && needsMfaReminder(s) && (

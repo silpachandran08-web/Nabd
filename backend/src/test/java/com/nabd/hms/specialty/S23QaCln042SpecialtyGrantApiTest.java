@@ -91,5 +91,46 @@ class S23QaCln042SpecialtyGrantApiTest extends ApiTestBase {
                 + " dentalRead=" + read.getStatusCode() + " dentalWrite=" + write.getStatusCode());
         assertThat(read.getStatusCode().is2xxSuccessful() || write.getStatusCode().is2xxSuccessful())
                 .as("a receptionist must not read or write a dental chart because of a specialty profile").isFalse();
+        // fix: the receiver must be a clinician
+        assertThat(put.getStatusCode().value()).isEqualTo(422);
+        assertThat(put.getBody()).containsEntry("code", "NOT_CLINICIAN");
+    }
+
+    // fix T1-BUG-2: only the Owner assigns (a clinician admin with staff:edit and clinical:edit cannot, not even to a doctor), the owner
+    // needs to be a clinician to take a profile, and the minted permissions never exceed the holder's clinical grants or outlive the flag
+    @Test
+    void c42a03_onlyTheOwnerAssigns_toClinicians_andTokenPermissionsFollowTheClinicalGrants() {
+        SeededTenant t = seedTenant();
+        SeededStaff ownerStaff = seedStaff(t, seedFullAccessRole(t.id()), "q42q" + SEQ.incrementAndGet() + "@q.com", phone(), false);
+        String owner = loginAndGetAccessToken(ownerStaff);
+        UUID adminRole = seedRole(t.id(), "Clinical admin", false, new ModuleGrant("staff", true, true, true, false, false, false, false),
+                new ModuleGrant("clinical", true, true, true, false, false, false, false));
+        SeededStaff admin = seedStaff(t, adminRole, "q42c" + SEQ.incrementAndGet() + "@q.com", phone(), false);
+        UUID viewerRole = seedRole(t.id(), "Visiting doctor", false, new ModuleGrant("clinical", true, false, false, false, false, false, false));
+        SeededStaff viewer = seedStaff(t, viewerRole, "q42v" + SEQ.incrementAndGet() + "@q.com", phone(), false);
+        for (UUID id : List.of(admin.id(), viewer.id())) {
+            inTenantTx(t.id(), () -> jdbc.update("UPDATE staff SET is_clinician = true WHERE id = ?", id));
+        }
+        String adminToken = loginAndGetAccessToken(admin);
+
+        ResponseEntity<Map> bySelf = assign(adminToken, admin.id(), "DENT");
+        ResponseEntity<Map> byAdmin = assign(adminToken, viewer.id(), "DENT");
+        assertThat(bySelf.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(bySelf.getBody()).containsEntry("code", "OWNER_ONLY");
+        assertThat(byAdmin.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(inTenantTx(t.id(), () -> jdbc.queryForObject("SELECT count(*) FROM staff_specialty_profiles", Integer.class))).isZero();
+
+        // the owner is not a clinician here: no profile for themselves either
+        assertThat(assign(owner, ownerStaff.id(), "DENT").getBody()).containsEntry("code", "NOT_CLINICIAN");
+
+        // a clinician whose role reads clinical records only gets the profile's view, not edit
+        assertThat(assign(owner, viewer.id(), "DENT").getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(permissions(loginAndGetAccessToken(viewer))).contains("specialty_dental:view").doesNotContain("specialty_dental:edit");
+        assertThat(assign(owner, admin.id(), "DENT").getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(permissions(loginAndGetAccessToken(admin))).contains("specialty_dental:view", "specialty_dental:edit");
+
+        // no longer a clinician: the stored profile grants nothing at the next sign-in
+        inTenantTx(t.id(), () -> jdbc.update("UPDATE staff SET is_clinician = false WHERE id = ?", admin.id()));
+        assertThat(permissions(loginAndGetAccessToken(admin))).noneMatch(p -> p.startsWith("specialty_"));
     }
 }

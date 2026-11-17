@@ -46,3 +46,10 @@ test("the owner's picker offers only the profiles the plan unlocks", () => {
   const items = ["DERM", "GP", "DENT", "PED"].map((code) => ({ code, name: { en: code }, entitled: code === "DERM" || code === "GP", configVersion: 1 }));
   assert.deepEqual(pickable(items).map((p) => p.code), ["DERM", "GP"]);
 });
+
+test("T1-BUG-2: the Specialty profile button and dialog are absent unless the viewer is the owner and the row is a clinician", () => {
+  const tables = readFileSync(new URL("../../app/(clinic)/staff/StaffTables.tsx", import.meta.url), "utf8");
+  assert.match(tables, /\{d\.owner && g\.canEditRoles && s\.clinician && s\.status !== "suspended" && \(\s*<button className=\{styles\.actionBtn\} onClick=\{\(\) => onSpecEdit\(s\)\}/);
+  const page = readFileSync(new URL("../../app/(clinic)/staff/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /\{specEdit && d\.owner && g\.canEditRoles && <SpecialtyProfileDialog/);
+});

@@ -197,9 +197,11 @@ public class TokenService {
 
         // CLN-042: the assigned specialty profiles grant <module>:view|edit (the emergency token: view only). Whether the
         // clinic's plan still includes the profile is checked on each write (403 ENTITLEMENT_EXPIRED), so history stays readable.
+        // T1-BUG-2: only a clinician's profiles count, and never beyond the clinical access the token already holds.
         List<String[]> specialties = staffDir.findSpecialtyProfiles(staff.tenantId(), staff.id());
+        boolean clinicalView = permissions.contains("clinical:view"), clinicalEdit = bg == null && permissions.contains("clinical:edit");
         for (String[] sp : specialties) {
-            for (String p : bg != null ? List.of(sp[1] + ":view") : List.of(sp[1] + ":view", sp[1] + ":edit")) {
+            for (String p : clinicalEdit ? List.of(sp[1] + ":view", sp[1] + ":edit") : clinicalView ? List.of(sp[1] + ":view") : List.<String>of()) {
                 if (!permissions.contains(p)) {
                     permissions.add(p);
                 }
