@@ -139,4 +139,43 @@ class S23QaCln022RepeatLastApiTest extends ApiTestBase {
         assertThat(d.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(o.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
+    // Round 2 (T1-BUG-1 fix): the default source is the newest NON-revoked Rx, a pinned revoked one is 409 prescription-revoked,
+    // and the history marks the revoked one so the pad chip can skip it
+    @Test
+    void c22a05_round2_defaultFallsBackToTheOlderRx_pinnedRevokedIs409_historyCarriesRevokedAt() {
+        Clinic c = clinic();
+        String p = patient(c);
+        String v1 = checkIn(c, p);
+        signRx(c, v1, "QaDrug Good", "10 mg");
+        String v2 = checkIn(c, p);
+        String revokedRx = signRx(c, v2, "QaDrug Wrong", "1000 mg");
+        assertThat(exchange("/v1/clinical/prescriptions/" + v2 + "/revoke", HttpMethod.POST,
+                authedJsonBody(c.token(), Map.of("reason", "Dose entered wrongly")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map> history = exchange("/v1/clinical/patients/" + p + "/prescriptions", HttpMethod.GET, authed(c.token()), List.class).getBody();
+        String v3 = checkIn(c, p);
+        ResponseEntity<Map> def = repeat(c.token(), v3, null);
+        ResponseEntity<Map> pinned = repeat(c.token(), v3, Map.of("sourcePrescriptionId", revokedRx));
+        String line = items(def).isEmpty() ? null : items(def).get(0).get("drugName") + " " + items(def).get(0).get("dosage");
+        System.out.println("C22-A05 default=" + def.getStatusCode() + " line=" + line + " pinned=" + pinned.getStatusCode() + " " + (pinned.getBody() == null ? null : pinned.getBody().get("type"))
+                + " history=" + history.stream().map(h -> h.get("id") + ":revokedAt=" + h.get("revokedAt")).toList());
+        assertThat(def.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(line).isEqualTo("QaDrug Good 10 mg");
+        assertThat(pinned.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(String.valueOf(pinned.getBody().get("type"))).contains("prescription-revoked");
+        assertThat(history).anySatisfy(h -> { assertThat(h.get("id")).isEqualTo(revokedRx); assertThat(h.get("revokedAt")).isNotNull(); });
+        assertThat(history).filteredOn(h -> !revokedRx.equals(h.get("id"))).allSatisfy(h -> assertThat(h.get("revokedAt")).isNull());
+    }
+
+    // Round 2: with every earlier Rx revoked there is nothing to repeat (404, not the revoked one)
+    @Test
+    void c22a06_round2_onlyRevokedHistoryIs404() {
+        Clinic c = clinic();
+        String p = patient(c);
+        String v1 = checkIn(c, p);
+        signRx(c, v1, "QaDrug Only", "5 mg");
+        exchange("/v1/clinical/prescriptions/" + v1 + "/revoke", HttpMethod.POST, authedJsonBody(c.token(), Map.of("reason", "Wrong patient selected")), Map.class);
+        ResponseEntity<Map> r = repeat(c.token(), checkIn(c, p), null);
+        System.out.println("C22-A06 only revoked=" + r.getStatusCode() + " " + (r.getBody() == null ? null : r.getBody().get("type")));
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }
