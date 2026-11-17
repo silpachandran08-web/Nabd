@@ -62,11 +62,42 @@ final class SafetyDictionaryBundles {
         if (total > MAX_ENTRIES) {
             errors.add("bundle: more than " + MAX_ENTRIES + " entries");
         }
+        validityRules(errors, b.validityRules());
         String en = labels(b).get("en");
         if (en == null || en.isBlank() || en.length() > 120) {
             errors.add("labels.controlled.en: required, at most 120 characters");
         }
         return errors;
+    }
+
+    private static final Pattern RULE_CLASS = Pattern.compile("\\*|controlled|schedule:[A-Za-z0-9-]{1,32}|[a-z0-9][a-z0-9-]{0,63}");
+
+    /** CLN-024: the same limits as the rx_validity_rules CHECKs, reported per rule instead of a 500. */
+    private static void validityRules(List<String> errors, List<SafetyDictionaryBundle.ValidityRule> rules) {
+        if (rules == null) {
+            return;
+        }
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < rules.size(); i++) {
+            SafetyDictionaryBundle.ValidityRule r = rules.get(i);
+            String at = "validityRules[" + i + "]";
+            if (r == null || r.classId() == null || !RULE_CLASS.matcher(r.classId()).matches()) {
+                errors.add(at + ": classId must be a class id, 'schedule:<flag>', 'controlled' or '*'");
+                continue;
+            }
+            if (!seen.add(r.classId())) {
+                errors.add(at + ": duplicate classId " + r.classId());
+            }
+            if (r.defaultDays() == null || r.maxDays() == null || r.defaultDays() < 1 || r.maxDays() > 365 || r.defaultDays() > r.maxDays()) {
+                errors.add(at + ": defaultDays and maxDays are required, 1 <= defaultDays <= maxDays <= 365");
+            }
+            if (r.maxRefills() == null || r.maxRefills() < 0 || r.maxRefills() > 5) {
+                errors.add(at + ": maxRefills is required, 0 to 5");
+            }
+            if (Boolean.TRUE.equals(r.fixed()) && (!Integer.valueOf(0).equals(r.maxRefills()) || !java.util.Objects.equals(r.defaultDays(), r.maxDays()))) {
+                errors.add(at + ": a fixed rule has maxRefills 0 and maxDays equal to defaultDays");
+            }
+        }
     }
 
     private static int items(List<String> errors, String field, List<Item> list, Set<String> classIds, boolean stem,

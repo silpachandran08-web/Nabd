@@ -69,6 +69,7 @@ super_admin,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,deny
 super_admin,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 super_admin,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 super_admin,GET /v1/clinical/rx-sets,clinical:view,deny-401
+super_admin,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 super_admin,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
@@ -539,6 +540,7 @@ implementation,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,d
 implementation,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 implementation,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 implementation,GET /v1/clinical/rx-sets,clinical:view,deny-401
+implementation,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 implementation,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
@@ -1009,6 +1011,7 @@ support_engineer,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view
 support_engineer,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 support_engineer,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 support_engineer,GET /v1/clinical/rx-sets,clinical:view,deny-401
+support_engineer,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 support_engineer,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
@@ -1479,6 +1482,7 @@ billing,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,deny-401
 billing,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 billing,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 billing,GET /v1/clinical/rx-sets,clinical:view,deny-401
+billing,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 billing,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
@@ -1949,6 +1953,7 @@ sre,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,deny-401
 sre,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 sre,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 sre,GET /v1/clinical/rx-sets,clinical:view,deny-401
+sre,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 sre,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
@@ -2419,6 +2424,7 @@ commercial,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,deny-
 commercial,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 commercial,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 commercial,GET /v1/clinical/rx-sets,clinical:view,deny-401
+commercial,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 commercial,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
@@ -2889,6 +2895,7 @@ compliance_dpo,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,d
 compliance_dpo,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/rx-sets,clinical:view,deny-401
+compliance_dpo,GET /v1/clinical/rx-validity-rules,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401

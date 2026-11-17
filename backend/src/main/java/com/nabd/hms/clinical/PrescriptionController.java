@@ -9,6 +9,7 @@ import com.nabd.hms.clinical.dto.FavouriteRxSetUpdateRequest;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionUpsertRequest;
 import com.nabd.hms.clinical.dto.RepeatLastRequest;
+import com.nabd.hms.clinical.dto.RxValidityRulesResponse;
 import com.nabd.hms.common.RequestMeta;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -66,6 +67,14 @@ public class PrescriptionController {
     @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve', 'clinical:view')")
     public PrescriptionResponse sign(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
         return service.sign(tenantId, queueEntryId, staffId, canApprove(jwt), RequestMeta.clientIp(http));
+    }
+
+    /** CLN-024: the validity / refill rules by drug class in effect for the clinic's region (reference data, no patient data). */
+    @GetMapping("/rx-validity-rules")
+    @ClinicalReadScope.NoPatientData
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public RxValidityRulesResponse rxValidityRules(@CurrentTenant UUID tenantId) {
+        return service.validityRules(tenantId);
     }
 
     /** CLN-005: whether the caller may sign this visit's prescription; reason is the 403 code sign would return. */

@@ -71,11 +71,13 @@ class SafetyDictionaryRepository {
                 versionId);
     }
 
-    ImportResult importVersion(String region, List<SafetyDictionary.Entry> entries, Map<String, Map<String, String>> labels, String createdBy) {
-        return jdbc.queryForObject("SELECT * FROM safety_dictionary_import(?, ?::jsonb, ?::jsonb, ?)",
+    /** CLN-024: validityRules (null or empty = none) are stored with the version (V3320). */
+    ImportResult importVersion(String region, List<SafetyDictionary.Entry> entries, Map<String, Map<String, String>> labels, String createdBy,
+                               List<com.nabd.hms.clinical.dto.SafetyDictionaryBundle.ValidityRule> validityRules) {
+        return jdbc.queryForObject("SELECT * FROM safety_dictionary_import(?, ?::jsonb, ?::jsonb, ?, ?::jsonb)",
                 (rs, i) -> new ImportResult(UUID.fromString(rs.getString("version_id")), rs.getInt("version"), rs.getString("checksum"),
                         rs.getString("status"), rs.getBoolean("created")),
-                region, json(entries), json(labels), createdBy);
+                region, json(entries), json(labels), createdBy, json(validityRules == null ? List.of() : validityRules));
     }
 
     boolean approve(UUID versionId, String csoApprovalRef, String approvedBy) {

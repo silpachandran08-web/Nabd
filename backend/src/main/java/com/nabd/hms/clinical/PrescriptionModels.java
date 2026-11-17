@@ -17,7 +17,9 @@ final class PrescriptionModels {
     record PrescriptionItemRow(UUID id, UUID prescriptionId, String drugName, String dosage, String frequency,
                                 String duration, String instructions, String allergyOverrideReason, int displayOrder,
                                 String overridesJson, String brandName, String sigPattern, String route,
-                                java.math.BigDecimal quantity, String quantityUnit, String drugId, String genericName) {
+                                java.math.BigDecimal quantity, String quantityUnit, String drugId, String genericName,
+                                // CLN-024: requested (draft) or applied (signed) validity days, null = class default / none; refills after the first dispense
+                                Integer validityDays, int refillsAllowed) {
     }
 
     /** DOC-033: tenant-scoped drug name suggestion (see DrugSuggestionResponse). */

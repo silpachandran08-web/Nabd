@@ -123,7 +123,7 @@ public class SafetyDictionaryService {
         }
         List<SafetyDictionary.Entry> entries = SafetyDictionaryBundles.toEntries(bundle);
         SafetyDictionaryRepository.ImportResult r = repo.importVersion(region, entries,
-                Map.of("controlled", SafetyDictionaryBundles.labels(bundle)), "operator:" + operatorId);
+                Map.of("controlled", SafetyDictionaryBundles.labels(bundle)), "operator:" + operatorId, bundle.validityRules());
         Map<String, Object> diff = repo.findActive(region)
                 .map(a -> diff(region + " v" + a.version(), repo.entries(a.id()), entries))
                 .orElse(Map.of("comparedTo", "none"));
@@ -138,6 +138,7 @@ public class SafetyDictionaryService {
         if (r.created()) {
             platformAudit.record(null, operatorId, ip, "safety_dictionary.uploaded", "safety_dictionary_version", r.versionId(),
                     Map.of("region", region, "version", r.version(), "checksum", r.checksum(), "entries", entries.size(),
+                            "validityRules", bundle.validityRules() == null ? 0 : bundle.validityRules().size(),
                             "added", diff.getOrDefault("added", Map.of()), "removed", diff.getOrDefault("removed", Map.of())));
         }
         return out;

@@ -173,7 +173,10 @@ public class RxDocumentService {
         for (PrescriptionPrintRepository.Item i : repo.items(tenantId, h.prescriptionId())) {
             String details = RxPdf.join("   ", i.route() == null ? null : "Route: " + i.route(), i.dosage() == null ? null : "Dose: " + i.dosage(),
                     i.frequency() == null ? null : "Frequency: " + i.frequency(), i.duration() == null ? null : "Duration: " + i.duration(),
-                    i.quantity() == null ? null : "Qty: " + i.quantity().stripTrailingZeros().toPlainString() + (i.quantityUnit() == null ? "" : " " + i.quantityUnit()));
+                    i.quantity() == null ? null : "Qty: " + i.quantity().stripTrailingZeros().toPlainString() + (i.quantityUnit() == null ? "" : " " + i.quantityUnit()),
+                    // CLN-024: the line's own validity from signing, and its refills when it has any
+                    i.validityDays() == null ? null : "Valid until " + DAY.format(h.signedAt().plus(java.time.Duration.ofDays(i.validityDays())).atZone(zone)),
+                    i.refillsAllowed() == 0 ? null : "Refills: " + i.refillsAllowed());
             meds.add(RxPdf.medicine(i.drugName(), i.brandName(), details, i.instructions(), genericFirst));
         }
         String reg = h.signerRegistrationNo() == null || h.signerRegistrationNo().isBlank() ? null : h.signerRegistrationNo();
