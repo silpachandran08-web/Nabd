@@ -48,8 +48,7 @@ import static com.nabd.hms.packages.PackageModels.RefundRow;
  *
  * Deliberately NOT built here (all "Phase 2" in the wireframe's own Package settings panel, agreeing
  * with the xlsx's Delivery Phase column): scheduled instalments (NB-156) and transfer/gifting (NB-159).
- * Expiry alerts and next-session nudges are a computed list + a manual "mark as reminded" action; this
- * service sends no message (automatic dispatch is COM-044, see sendReminder).
+ * Messages (package card, Send reminder, expiry warnings, next-session nudges) go through PackageMessagingService (COM-044).
  */
 @Service
 public class PackageInstanceService {
@@ -69,11 +68,13 @@ public class PackageInstanceService {
     private final ActorDirectory actors;
 
     private final com.nabd.hms.organization.api.SeriesAllocator series;
+    private final PackageMessagingService messaging;
 
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
                             AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors,
                             com.nabd.hms.billing.DayCloseService dayClose,
-                            com.nabd.hms.organization.api.SeriesAllocator series) {
+                            com.nabd.hms.organization.api.SeriesAllocator series, PackageMessagingService messaging) {
+        this.messaging = messaging;
         this.series = series;
         this.actors = actors;
         this.dayClose = dayClose;
@@ -146,6 +147,7 @@ public class PackageInstanceService {
         repo.insertEvent(tenantId, instanceId, "sold", pkg.name() + " · " + pkg.price(), null, staffId);
         repo.insertEvent(tenantId, instanceId, "payment_received", req.paymentMethod(), null, staffId);
         repo.insertEvent(tenantId, instanceId, "invoice_issued", "GST invoice · " + invoice.invoiceNumber(), null, staffId);
+        messaging.sold(tenantId, instanceId, req.patientId(), req.nudgeIntervalDays()); // COM-044: the card goes out from the event
 
         return detail(tenantId, instanceId);
     }
@@ -206,6 +208,7 @@ public class PackageInstanceService {
         if (repo.allItemsConsumed(tenantId, instanceId)) {
             repo.updateInstanceStatus(tenantId, instanceId, "completed");
         }
+        messaging.redeemed(tenantId, instanceId); // COM-044: completed = no more nudges; else the next session nudge
         return detail(tenantId, instanceId);
     }
 
@@ -243,6 +246,7 @@ public class PackageInstanceService {
                     "The new validity end must be after " + floor + ".");
         }
         repo.extendValidity(tenantId, id, req.newValidityEnd());
+        messaging.extended(tenantId, id);
         repo.insertEvent(tenantId, id, "extended",
                 "from " + currentEnd + " to " + req.newValidityEnd() + " · " + req.reason(), null, staffId);
         return detail(tenantId, id);
@@ -264,15 +268,14 @@ public class PackageInstanceService {
             int tier = currentAlertTier(row, today);
             boolean alreadySent = row.lastAlertTier() != null && row.lastAlertTier() <= tier;
             out.add(new ExpiringSoonResponse(row.id().toString(), row.patientName(), row.packageName(), consumed,
-                    total, row.validityEnd(), valueLeft, tier, alreadySent));
+                    total, row.validityEnd(), valueLeft, tier, alreadySent, messaging.lastReminderStatus(tenantId, row.id()).orElse(null)));
         }
         return out;
     }
 
-    /** Records that staff marked the package as reminded (ledger + dedupe). NO message is sent: real
-     * dispatch waits for COM-044. The event type stays expiry_warning_sent (DB check constraint); the UI
-     * labels it "Marked as reminded". The tier
-     * is computed server-side from the instance's own dates, never trusted from the caller. */
+    /** COM-044: the desk's Send reminder really sends (the package_expiry message through the notification contract); the ledger
+     * event carries the request id and its delivery status. The tier is computed server-side from the instance's own dates,
+     * never trusted from the caller. A completed, refunded or cancelled package is not reminded. */
     @Transactional
     public InstanceResponse sendReminder(UUID tenantId, UUID staffId, UUID id) {
         tenantContext.set(tenantId);
@@ -282,12 +285,15 @@ public class PackageInstanceService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-expiring-soon", "Not due for a reminder",
                     "This package isn't within 30 days of expiry.");
         }
-        repo.updateLastAlertTier(tenantId, id, tier);
-        repo.insertEvent(tenantId, id, "expiry_warning_sent", tier + "-day: recorded only, no message sent", null, staffId);
+        if (!List.of("active", "grace").contains(effectiveStatus(instance, clock.today(tenantId)))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "package-not-actionable", "Package not available",
+                    "This package is " + effectiveStatus(instance, clock.today(tenantId)) + " and is not reminded.");
+        }
+        messaging.sendReminder(tenantId, staffId, instance, tier);
         return detail(tenantId, id);
     }
 
-    private int currentAlertTier(InstanceRow row, LocalDate today) {
+    static int currentAlertTier(InstanceRow row, LocalDate today) {
         if (row.validityEnd() == null) {
             return 0;
         }
@@ -376,6 +382,7 @@ public class PackageInstanceService {
         repo.updateInstanceStatus(tenantId, refund.instanceId(), "refunded");
         repo.insertEvent(tenantId, refund.instanceId(), "refunded",
                 "credit note " + creditNoteNumber + " · " + current.refundAmount(), null, staffId);
+        messaging.stop(tenantId, refund.instanceId()); // COM-044: no nudges after a refund
         RefundResponse approved = toRefundResponse(repo.findRefund(tenantId, refundId).orElseThrow());
         audit(tenantId, staffId, "packages.refund_approved", refundId, refund, approved);
         eventPublisher.publish(tenantId, PackageRefundApprovedHandler.EVENT_TYPE, java.util.Map.of(
@@ -428,7 +435,7 @@ public class PackageInstanceService {
                 repo.potentialExpiryLoss(tenantId), repo.countPendingRefunds(tenantId));
     }
 
-    private String effectiveStatus(InstanceRow row, LocalDate today) {
+    static String effectiveStatus(InstanceRow row, LocalDate today) {
         if (!"active".equals(row.status())) {
             return row.status();
         }
@@ -451,7 +458,7 @@ public class PackageInstanceService {
                 .toList();
         List<InstanceEventResponse> events = withEvents
                 ? repo.listEvents(tenantId, row.id()).stream()
-                        .map(e -> new InstanceEventResponse(e.eventType(), e.note(), e.delta(), e.actorName(), e.createdAt()))
+                        .map(e -> new InstanceEventResponse(e.eventType(), e.note(), e.delta(), e.actorName(), e.createdAt(), e.deliveryStatus()))
                         .toList()
                 : null;
         return new InstanceResponse(row.id().toString(), row.packageId().toString(), row.packageName(),

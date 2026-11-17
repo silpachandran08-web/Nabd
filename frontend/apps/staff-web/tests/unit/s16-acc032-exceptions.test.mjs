@@ -41,3 +41,9 @@ test("a desk.exception.* event refreshes the desk-exceptions resource", () => {
   assert.ok(LIVE_RESOURCES.includes("desk-exceptions"));
   assert.ok(resourcesFor("desk.exception.changed").includes("desk-exceptions"));
 });
+
+test("COM-044: a blocked package message is explained and links to packages only for packages:view", () => {
+  assert.match(headline({ kind: "package_nudge_blocked", params: { reason: "no_consent", purpose: "package_expiry" } }), /not agreed to messages/);
+  assert.equal(actionHref({ kind: "package_nudge_blocked", refId: "x" }, "open_package"), "/packages");
+  assert.equal(actionPermission("open_package"), "packages:view");
+});

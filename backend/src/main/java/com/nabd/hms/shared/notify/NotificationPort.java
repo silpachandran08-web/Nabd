@@ -18,6 +18,11 @@ public interface NotificationPort {
      * @return how many requests were cancelled */
     int cancelBySubject(String subjectType, UUID subjectId, CancelReason reason);
 
+    /** COM-044: the request an in-process WhatsApp message was sent for (status events from the Comms Gateway carry requestId themselves). */
+    default java.util.Optional<UUID> requestOfMessage(UUID messageId) {
+        return java.util.Optional.empty();
+    }
+
     /** IDC-014: does this clinic have an approved template for the purpose? Lets an event consumer skip quietly instead of failing. */
     default boolean sendable(NotificationPurpose purpose, String language) {
         return true;

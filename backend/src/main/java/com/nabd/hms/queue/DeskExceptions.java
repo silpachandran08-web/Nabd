@@ -39,6 +39,8 @@ public class DeskExceptions {
     public static final String REQUEST_SLA = "request_sla";
     public static final String CHECKOUT_UNPAID = "checkout_unpaid";
     public static final String HANDOFF = "handoff";
+    /** COM-044: a package card / nudge / expiry warning was not sent because the patient has no messaging consent (ref: the package instance). */
+    public static final String PACKAGE_NUDGE_BLOCKED = "package_nudge_blocked";
 
     private static final Logger log = LoggerFactory.getLogger(DeskExceptions.class);
     private static final Map<String, List<String>> ACTIONS = Map.of(
@@ -46,7 +48,8 @@ public class DeskExceptions {
             UNCONFIRMED, List.of("call", "message", "resolve", "snooze"),
             REQUEST_SLA, List.of("review_request", "resolve", "snooze"),
             CHECKOUT_UNPAID, List.of("open_checkout", "resolve", "snooze"),
-            HANDOFF, List.of("open_inbox", "resolve", "snooze"));
+            HANDOFF, List.of("open_inbox", "resolve", "snooze"),
+            PACKAGE_NUDGE_BLOCKED, List.of("open_package", "resolve", "snooze"));
 
     @Schema(name = "DeskExceptionItem")
     public record Item(UUID id, String kind, String severity, String refType, UUID refId, String summary, Map<String, Object> params,

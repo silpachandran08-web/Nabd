@@ -1263,6 +1263,8 @@ schemas:
       delta: operational
       actor_id: operational
       created_at: operational
+      notification_request_id: operational  # COM-044
+      delivery_status: operational
     package_instance_items:
       id: operational
       tenant_id: operational
@@ -1290,6 +1292,8 @@ schemas:
       grace_days: operational
       status: operational
       last_alert_tier: operational
+      nudge_interval_days: operational  # COM-044
+      next_session_nudge_at: operational
       sold_by: operational
       created_at: operational
       updated_at: operational
@@ -1314,6 +1318,7 @@ schemas:
       booked_by: operational
       created_at: operational
       redeemed_at: operational
+      appointment_id: operational  # COM-044: 'Book session N of M'
     package_refunds:
       id: operational
       tenant_id: operational
@@ -2381,6 +2386,7 @@ schemas:
       status: operational
       created_at: operational
       about_patient_id: pii  # COM-025: the patient a caregiver's copy is about
+      message_id: operational  # COM-044: the in-process WhatsApp message of the request
     whatsapp_messages:
       id: operational
       tenant_id: operational

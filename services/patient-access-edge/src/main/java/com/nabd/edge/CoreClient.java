@@ -190,6 +190,33 @@ public class CoreClient {
         return out;
     }
 
+    /** COM-044: a bookable session of a member's treatment package (ids and counts only); doctorIds empty = any doctor. */
+    public record PackageSession(UUID instanceId, int nextSession, int totalSessions, java.util.List<UUID> doctorIds) {
+    }
+
+    /** COM-044: the member's bookable package sessions, from the same household read. Empty when Core lists none (or knows nobody). */
+    public java.util.List<PackageSession> packageSessions(UUID tenantId, String phoneHash, String patientRef) {
+        String body;
+        try {
+            body = http.get(base + "/internal/v1/tenants/" + tenantId + "/households/" + phoneHash);
+        } catch (Http.UpstreamStatusException e) {
+            if (e.status == 404) {
+                return java.util.List.of();
+            }
+            throw e;
+        }
+        java.util.List<PackageSession> out = new java.util.ArrayList<>();
+        for (JsonNode s : json.readTree(body).path("packageSessions")) {
+            if (!patientRef.equals(s.path("patientRef").asString(""))) {
+                continue;
+            }
+            java.util.List<UUID> docs = new java.util.ArrayList<>();
+            s.path("eligibleDoctorIds").forEach(d -> docs.add(UUID.fromString(d.asString())));
+            out.add(new PackageSession(UUID.fromString(s.path("instanceId").asString()), s.path("nextSession").asInt(), s.path("totalSessions").asInt(), docs));
+        }
+        return out;
+    }
+
     /** One of: the booking, or a refusal Core explains with a code. */
     public record Booking(String status, java.time.Instant slaDueAt) {
     }
@@ -203,7 +230,16 @@ public class CoreClient {
     /** ACC-009 route. Same Idempotency-Key = same answer, so a retry after a timeout cannot book twice.
      * @throws SlotTaken on 409 SLOT_TAKEN / SESSION_FULL; any other failure (outage, timeout, in-progress 409) is an IllegalStateException. */
     public Booking book(UUID tenantId, String idempotencyKey, String patientRef, UUID doctorId, java.time.Instant slot, java.util.List<String> triageFlags) {
+        return book(tenantId, idempotencyKey, patientRef, doctorId, slot, triageFlags, null);
+    }
+
+    /** COM-044: {@code packageInstanceId} books the next session of that package (Core checks it is the patient's and the doctor is eligible). */
+    public Booking book(UUID tenantId, String idempotencyKey, String patientRef, UUID doctorId, java.time.Instant slot, java.util.List<String> triageFlags,
+                        UUID packageInstanceId) {
         java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        if (packageInstanceId != null) {
+            m.put("packageInstanceId", packageInstanceId.toString());
+        }
         m.put("patientRef", patientRef);
         m.put("doctorId", doctorId.toString());
         m.put("slotStart", slot.toString());

@@ -85,6 +85,7 @@ class BookingFlow {
     @Bean FlowHandler bookingDay() { return new Step(State.CHOOSING_DAY, this, this::chooseDay); }
     @Bean FlowHandler bookingSlot() { return new Step(State.CHOOSING_SLOT, this, this::chooseSlot); }
     @Bean FlowHandler bookingConfirm() { return new Step(State.CONFIRMING, this, this::confirming); }
+    @Bean FlowHandler bookingPackage() { return new Step(State.CHOOSING_PACKAGE, this, this::choosePackage); }
     @Bean FlowHandler bookingHandoff() { return new Step(State.HANDOFF, this, (c, m) -> new Outcome(State.HANDOFF, c.context(), null)); }
 
     // ---- the frame every step runs in ---------------------------------------------------------------------------------
@@ -152,6 +153,7 @@ class BookingFlow {
             case CHILD_DOB -> new Outcome(State.CHILD_DOB, ctx, BookingCopy.t(lang(ctx), "child.dob"));
             case CHILD_SEX -> askSex(ctx);
             case CHOOSING_DOCTOR -> askDoctor(c, ctx);
+            case CHOOSING_PACKAGE -> afterWho(c, ctx);
             case CHOOSING_DAY -> askDay(c, ctx);
             case CHOOSING_SLOT -> askSlots(c, ctx, "time.ask");
             case CONFIRMING -> askConfirm(c, ctx);
@@ -354,8 +356,24 @@ class BookingFlow {
 
     // ---- doctor, day, time ---------------------------------------------------------------------------------------------
 
+    /** COM-044: the chosen person's bookable package sessions (Core decides what is bookable; read again at every step, never kept). */
+    private List<CoreClient.PackageSession> packages(Conversation c, Map<String, String> ctx) {
+        return ctx.get("who") == null ? List.of() : core.packageSessions(c.tenantId(), c.contactHash(), ctx.get("who")).stream().limit(2).toList();
+    }
+
+    /** COM-044: with a package of sessions left the patient picks 'Book session N of M' (or a regular visit) first. */
     private Outcome afterWho(Conversation c, Map<String, String> ctx) {
-        List<CoreClient.Doctor> docs = content(c).profile().doctors();
+        if (ctx.get("pkg") == null) {
+            List<CoreClient.PackageSession> pk = packages(c, ctx);
+            if (!pk.isEmpty()) {
+                String l = lang(ctx);
+                List<Button> b = new ArrayList<>();
+                pk.forEach(p -> b.add(new Button("pkg:" + p.instanceId(), cut(BookingCopy.t(l, "pkg.book", p.nextSession(), p.totalSessions())))));
+                b.add(new Button("pkg:none", cut(BookingCopy.t(l, "pkg.regular"))));
+                return new Outcome(State.CHOOSING_PACKAGE, ctx, BookingCopy.t(l, "pkg.ask"), b);
+            }
+        }
+        List<CoreClient.Doctor> docs = doctors(c, ctx);
         if (docs.isEmpty()) {
             return handoff(c, "day.none");
         }
@@ -366,14 +384,45 @@ class BookingFlow {
         return askDoctor(c, ctx);
     }
 
+    private Outcome choosePackage(Conversation c, Message m) {
+        String a = m.buttonAction();
+        if (a == null || !a.startsWith("pkg:")) {
+            return null;
+        }
+        Map<String, String> ctx = new HashMap<>(c.context());
+        String id = a.substring(4);
+        if (!"none".equals(id) && packages(c, ctx).stream().noneMatch(p -> p.instanceId().toString().equals(id))) {
+            return afterWho(c, ctx); // used up or refunded since it was offered: show the current choice
+        }
+        ctx.put("pkg", id);
+        return afterWho(c, ctx);
+    }
+
+    /** The clinic's bookable doctors; for a package session only its eligible ones (none listed = any doctor). */
+    private List<CoreClient.Doctor> doctors(Conversation c, Map<String, String> ctx) {
+        List<CoreClient.Doctor> all = content(c).profile().doctors(); // COM-016: tenant-bound content only
+        String pkg = ctx.get("pkg");
+        if (pkg == null || "none".equals(pkg)) {
+            return all;
+        }
+        List<UUID> eligible = packages(c, ctx).stream().filter(p -> p.instanceId().toString().equals(pkg)).findFirst()
+                .map(CoreClient.PackageSession::doctorIds).orElse(List.of());
+        return eligible.isEmpty() ? all : all.stream().filter(d -> eligible.contains(d.id())).toList();
+    }
+
+    private UUID packageId(Map<String, String> ctx) {
+        String pkg = ctx.get("pkg");
+        return pkg == null || "none".equals(pkg) ? null : UUID.fromString(pkg);
+    }
+
     private Outcome askDoctor(Conversation c, Map<String, String> ctx) {
         return new Outcome(State.CHOOSING_DOCTOR, ctx, BookingCopy.t(lang(ctx), "doc.ask"),
-                content(c).profile().doctors().stream().limit(ROWS).map(d -> new Button("doc:" + d.id(), cut(d.name()))).toList());
+                doctors(c, ctx).stream().limit(ROWS).map(d -> new Button("doc:" + d.id(), cut(d.name()))).toList());
     }
 
     private Outcome chooseDoctor(Conversation c, Message m) {
         String a = m.buttonAction();
-        if (a == null || !a.startsWith("doc:") || content(c).profile().doctors().stream().noneMatch(d -> a.equals("doc:" + d.id()))) {
+        if (a == null || !a.startsWith("doc:") || doctors(c, c.context()).stream().noneMatch(d -> a.equals("doc:" + d.id()))) {
             return null;
         }
         Map<String, String> ctx = new HashMap<>(c.context());
@@ -491,11 +540,11 @@ class BookingFlow {
         UUID doctor = UUID.fromString(ctx.get("doctorId"));
         Instant slot = Instant.parse(ctx.get("slotStart"));
         // One key per (conversation, doctor, slot, person): a second tap, a retry after a timeout or a re-run all replay the first answer.
-        String key = key(c, "book", doctor.toString(), slot.toString(), ctx.get("who"));
+        String key = key(c, "book", doctor.toString(), slot.toString(), ctx.get("who"), ctx.getOrDefault("pkg", "none"));
         List<String> flags = ctx.containsKey("urgent") ? List.of("red_flag") : List.of();
         CoreClient.Booking b;
         try {
-            b = book(c, key, ctx.get("who"), doctor, slot, flags);
+            b = book(c, key, ctx.get("who"), doctor, slot, flags, packageId(ctx));
         } catch (CoreClient.SlotTaken e) {
             meters.counter("edge_book_conflict_total").increment(); // ACC-045: the 409-rate panel
             holds.release(c.tenantId(), c.id());
@@ -521,14 +570,14 @@ class BookingFlow {
     }
 
     /** A timeout is not a refusal: ask Core again with the same Idempotency-Key (it answers from the stored result) before saying anything. */
-    private CoreClient.Booking book(Conversation c, String key, String who, UUID doctor, Instant slot, List<String> flags) {
+    private CoreClient.Booking book(Conversation c, String key, String who, UUID doctor, Instant slot, List<String> flags, UUID pkg) {
         try {
-            return core.book(c.tenantId(), key, who, doctor, slot, flags);
+            return core.book(c.tenantId(), key, who, doctor, slot, flags, pkg);
         } catch (Http.UpstreamStatusException | CoreClient.SlotTaken e) {
             throw e;
         } catch (IllegalStateException first) {
             meters.counter("edge_book_retry_total").increment();
-            return core.book(c.tenantId(), key, who, doctor, slot, flags);
+            return core.book(c.tenantId(), key, who, doctor, slot, flags, pkg);
         }
     }
 

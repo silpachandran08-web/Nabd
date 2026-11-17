@@ -39,6 +39,14 @@ public enum NotificationPurpose {
     EXPORT_READY("export_ready", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** FIN-020: UPI payment link; slots are clinic name, amount and link only (no line items, no diagnosis). */
     PAYMENT_LINK("payment_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: the package card after a sale; 2 params: first name, the OTP-protected card link (no package name, no amounts). */
+    PACKAGE_CARD("package_card", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: time to book the next package session (doctor-set interval); 1 param: first name. */
+    PACKAGE_SESSION_NUDGE("package_session_nudge", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: the 30/14/7-day expiry warning (job or the desk's Send reminder); 2 params: first name, validity end date. */
+    PACKAGE_EXPIRY("package_expiry", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: validity ended, sessions usable until the grace end; 2 params: first name, grace end date. */
+    PACKAGE_GRACE("package_grace", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
     EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),

@@ -6,6 +6,7 @@ import styles from "./packages.module.css";
 import type { FormErrors } from "../../lib/formErrors";
 import { STATUS_PILL, money, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundT } from "./packagesModel";
 import type { Deciding } from "./useInstanceActions";
+import { deliveryLabel } from "./eventLabel";
 
 export type CatalogueFilter = "all" | "on_sale" | "draft" | "inactive";
 
@@ -111,8 +112,8 @@ export function ExpiringTab({ expiring, canEdit, reminderNotice, onRemind }: {
               <td>{e.quantityTotal - e.quantityConsumed}/{e.quantityTotal}</td>
               <td>{e.expiresOn}</td>
               <td>{money(e.valueLeft)}</td>
-              <td><span className={`${styles.pill} ${e.reminderSentForTier ? styles.pillDone : styles.pillWarn}`}>{e.reminderSentForTier ? "Marked reminded" : `${e.alertTier}-day reminder due`}</span></td>
-              <td>{canEdit && <button className={styles.btnSmall} onClick={() => onRemind(e.instanceId)} disabled={e.reminderSentForTier}>Mark reminded</button>}</td>
+              <td><span className={`${styles.pill} ${e.lastReminderStatus === "blocked" || e.lastReminderStatus === "failed" ? styles.pillDanger : e.reminderSentForTier ? styles.pillDone : styles.pillWarn}`} data-testid="reminder-tick">{deliveryLabel(e.lastReminderStatus) ?? `${e.alertTier}-day reminder due`}</span></td>
+              <td>{canEdit && <button className={styles.btnSmall} onClick={() => onRemind(e.instanceId)}>Send reminder</button>}</td>
             </tr>
           ))}
         </tbody>

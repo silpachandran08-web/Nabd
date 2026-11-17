@@ -253,13 +253,13 @@ class PackageRepository {
 
     List<EventRow> listEvents(UUID tenantId, UUID instanceId) {
         return jdbc.query(
-                "SELECT e.event_type, e.note, e.delta, s.name AS actor_name, e.created_at " +
+                "SELECT e.event_type, e.note, e.delta, s.name AS actor_name, e.created_at, e.delivery_status " +
                         "FROM package_instance_events e LEFT JOIN staff s ON s.id = e.actor_id " +
                         "WHERE e.tenant_id = ? AND e.instance_id = ? ORDER BY e.created_at",
                 (rs, i) -> new EventRow(rs.getString("event_type"), rs.getString("note"),
                         rs.getObject("delta") == null ? null : rs.getInt("delta"),
                         rs.getString("actor_name") == null ? "system" : rs.getString("actor_name"),
-                        rs.getTimestamp("created_at").toInstant()),
+                        rs.getTimestamp("created_at").toInstant(), rs.getString("delivery_status")),
                 tenantId, instanceId);
     }
 

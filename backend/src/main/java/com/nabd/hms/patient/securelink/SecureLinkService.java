@@ -62,7 +62,8 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
 
     public enum Refusal { EXPIRED, LOCKED, RATE_LIMITED, OTP_INVALID, REVERIFY }
 
-    public record Opened(String fileUrl, String mime, String title) {
+    /** {@code packageCard} is set (and fileUrl/mime null) for a package_card link (COM-044). */
+    public record Opened(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard) {
     }
 
     public record Result<T>(T value, Refusal refusal) {
@@ -89,11 +90,14 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     private final ActorDirectory actors;
     private final String baseUrl;
     private final com.nabd.hms.patient.internal.PhoneReverificationService reverifications;
+    private final com.nabd.hms.patient.api.PackageCards packageCards;
 
     SecureLinkService(JdbcTemplate jdbc, TenantContext tenantContext, Clock clock, FileStore files, NotificationPort notifications,
                       SecureLinkOtpDelivery otpSender, AuditService audit, ActorDirectory actors,
                       @Value("${app.secure-links.base-url:http://localhost:3810}") String baseUrl,
-                      com.nabd.hms.patient.internal.PhoneReverificationService reverifications) {
+                      com.nabd.hms.patient.internal.PhoneReverificationService reverifications,
+                      com.nabd.hms.patient.api.PackageCards packageCards) {
+        this.packageCards = packageCards;
         this.reverifications = reverifications;
         this.jdbc = jdbc;
         this.tenantContext = tenantContext;
@@ -134,22 +138,45 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         if (days < 1 || days > 30) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "ttlDays must be between 1 and 30.");
         }
+        Minted m = mint(staffId, ip, req.documentType(), req.documentId(), patient, req.recipientPatientId(), days);
+        if (!Boolean.FALSE.equals(req.sendMessage())) { // the body carries the first name and the link only: no document name, no drug, no amount
+            notifications.request(new NotificationRequest(NotificationPurpose.SECURE_LINK, "secure_link", m.id(), req.recipientPatientId(), null,
+                    req.language() == null ? "en" : req.language(), List.of(firstName, m.url()), null, null, null, "secure-link:" + m.id()));
+        }
+        return new Issued(m.id(), m.expires());
+    }
+
+    private record Minted(UUID id, String url, Instant expires) {
+    }
+
+    /** Stores a new link (token shown once: only its hash is kept) and audits the issue. */
+    private Minted mint(UUID staffId, String ip, String documentType, UUID documentId, UUID patient, UUID recipient, int days) {
+        UUID tenant = tenantContext.current();
         byte[] tenantBytes = ByteBuffer.allocate(16).putLong(tenant.getMostSignificantBits()).putLong(tenant.getLeastSignificantBits()).array();
         byte[] rnd = new byte[32];
         RANDOM.nextBytes(rnd);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteBuffer.allocate(48).put(tenantBytes).put(rnd).array());
         Instant expires = clock.instant().plus(Duration.ofDays(days));
         UUID id = jdbc.queryForObject("INSERT INTO secure_links (tenant_id, token_hash, document_type, document_id, patient_id, recipient_patient_id, expires_at, created_by) "
-                        + "VALUES (?,?,?,?,?,?,?,?) RETURNING id", UUID.class, tenant, sha256(token), req.documentType(), req.documentId(), patient, req.recipientPatientId(),
+                        + "VALUES (?,?,?,?,?,?,?,?) RETURNING id", UUID.class, tenant, sha256(token), documentType, documentId, patient, recipient,
                 java.sql.Timestamp.from(expires), staffId);
         ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Forbidden"));
         audit.record(tenant, "staff", staffId, actor.name(), actor.role(), ip, "secure_link.issued", "secure_link", id, null,
-                Map.of("documentType", req.documentType(), "ttlDays", days));
-        if (!Boolean.FALSE.equals(req.sendMessage())) { // the body carries the first name and the link only: no document name, no drug, no amount
-            notifications.request(new NotificationRequest(NotificationPurpose.SECURE_LINK, "secure_link", id, req.recipientPatientId(), null,
-                    req.language() == null ? "en" : req.language(), List.of(firstName, baseUrl + "/l/" + token), null, null, null, "secure-link:" + id));
+                Map.of("documentType", documentType, "ttlDays", days));
+        return new Minted(id, baseUrl + "/l/" + token, expires);
+    }
+
+    /** COM-044: the package card link, to the patient only, with the clinic's default lifetime. Nothing is sent here. */
+    @Override
+    @Transactional
+    public Optional<com.nabd.hms.patient.api.SecureDocumentLinks.CardLink> issuePackageCard(UUID staffId, UUID instanceId, UUID patientId) {
+        Optional<String> firstName = recipient(patientId);
+        if (firstName.isEmpty() || !processable(patientId)) {
+            return Optional.empty();
         }
-        return new Issued(id, expires);
+        Integer days = jdbc.queryForObject("SELECT secure_link_ttl_days FROM tenants WHERE id = ?", Integer.class, tenantContext.current());
+        Minted m = mint(staffId, null, "package_card", instanceId, patientId, patientId, days);
+        return Optional.of(new com.nabd.hms.patient.api.SecureDocumentLinks.CardLink(m.id(), m.url(), firstName.get()));
     }
 
     @Override
@@ -251,6 +278,18 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
             logOpen(tenant, l.id(), ip, userAgent, "otp_failed");
             return Result.no(Refusal.OTP_INVALID);
         }
+        if ("package_card".equals(l.documentType())) { // COM-044: the card is read now (sessions, expiry, paid/due), there is no file
+            Optional<com.nabd.hms.patient.api.PackageCards.Card> card = packageCards.card(l.documentId(), l.patientId());
+            if (card.isEmpty()) {
+                logOpen(tenant, l.id(), ip, userAgent, "expired");
+                return Result.no(Refusal.EXPIRED);
+            }
+            jdbc.update("UPDATE secure_links SET otp_hash = NULL, otp_expires_at = NULL, failed_otps = 0, open_count = open_count + 1 WHERE id = ?", l.id());
+            logOpen(tenant, l.id(), ip, userAgent, "opened");
+            audit.record(tenant, "system", null, "patient via secure link", "Patient", ip, "secure_link.opened", "secure_link", l.id(), null,
+                    Map.of("documentType", l.documentType()));
+            return Result.ok(new Opened(null, null, "Package card", card.get()));
+        }
         Optional<FileStore.FileInfo> f = files.info(l.documentId()).filter(i -> "available".equals(i.status()) && l.patientId().equals(i.patientId()));
         if (f.isEmpty()) {
             logOpen(tenant, l.id(), ip, userAgent, "expired");
@@ -261,7 +300,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         audit.record(tenant, "system", null, "patient via secure link", "Patient", ip, "secure_link.opened", "secure_link", l.id(), null,
                 Map.of("documentType", l.documentType()));
         FileStore.SignedUrl url = files.downloadUrl(l.documentId(), FILE_URL_TTL);
-        return Result.ok(new Opened(url.url(), f.get().contentType(), "report".equals(l.documentType()) ? "Report" : "Document"));
+        return Result.ok(new Opened(url.url(), f.get().contentType(), "report".equals(l.documentType()) ? "Report" : "Document", null));
     }
 
     // ---------------------------------------------------------------- helpers
