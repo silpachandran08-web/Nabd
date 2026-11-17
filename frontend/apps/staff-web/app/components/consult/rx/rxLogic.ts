@@ -17,4 +17,5 @@ export const openWarningCount = (items: PrescriptionItem[]) => items.reduce((n, 
 /** FEF-035: the lines as the API would store them (blank lines and display-only fields dropped), for change and conflict detection. */
 export const rxFingerprint = (items: PrescriptionItem[]) => JSON.stringify(items.filter((i) => i.drugName.trim() !== "").map((i) => [
   i.drugName, i.dosage ?? "", i.frequency ?? "", i.duration ?? "", i.instructions ?? "", i.brandName?.trim() || "", i.sigPattern || "", i.route || "", i.quantity ?? null, i.quantityUnit?.trim() || "", i.drugId || "",
+  i.validityDays ?? null, i.refills ?? 0,
 ]));

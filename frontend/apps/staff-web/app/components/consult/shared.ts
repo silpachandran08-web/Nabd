@@ -28,6 +28,13 @@ export type PrescriptionItem = {
   brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
   // CLN-021: drug master code (null/absent = uncoded free text) and the generic name snapshot taken when it was saved
   drugId?: string | null; coded?: boolean; genericName?: string | null;
+  // CLN-024: what the doctor asked for (null = the class default) and what applies (server-computed, read-only)
+  validityDays?: number | null; refills?: number | null; validity?: RxLineValidity | null;
+};
+/** CLN-024: a line's validity. Draft: the values signing would apply now and the class limits (fixed = a controlled class whose values
+ * apply whatever is entered). Signed: the applied days/refills and validUntil; the limits are null. days null = no class rule. */
+export type RxLineValidity = {
+  days: number | null; maxDays: number | null; refills: number; maxRefills: number | null; fixed: boolean | null; classId: string | null; validUntil: string | null;
 };
 export type DrugSuggestion = {
   name: string; source: "master" | "pharmacy" | "history"; code: string | null; inStock: boolean | null; prescriptionOnly: boolean | null;

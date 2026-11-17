@@ -7,7 +7,7 @@ import Dialog from "../ui/Dialog";
 import { api, ApiError, errorText } from "../../lib/api";
 import { usePermissions } from "../../lib/usePermissions";
 import { getTenantId } from "../../lib/session";
-import { cacheKeys, cachedKeys, headline, isOffline, tone, verifyOffline, type Jwks, type OfflineResult } from "./rxScan";
+import { cacheKeys, cachedKeys, headline, isOffline, lineTerms, tone, verifyOffline, type Jwks, type OfflineResult } from "./rxScan";
 import styles from "./rxScan.module.css";
 
 type Result = { kind: "server"; v: RxVerification } | { kind: "offline"; r: OfflineResult };
@@ -135,7 +135,7 @@ export default function RxScanOverlay({ onClose }: { onClose: () => void }) {
                   {(result.v.remaining ?? []).length > 0 && (
                     <ul className={styles.lines} aria-label="Still to dispense">
                       {(result.v.remaining ?? []).map((l) => (
-                        <li key={l.prescriptionItemId}>{l.drug}{l.qtyPrescribed != null ? ` × ${l.remaining} of ${l.qtyPrescribed}` : " (no quantity)"}</li>
+                        <li key={l.prescriptionItemId}>{l.drug}{l.qtyPrescribed != null ? ` × ${l.remaining} left` : " (no quantity)"}{lineTerms(l, day)}</li>
                       ))}
                     </ul>
                   )}

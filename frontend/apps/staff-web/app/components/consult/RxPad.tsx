@@ -10,6 +10,48 @@ import s from "./RxPad.module.css";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
+/** CLN-024: another drug means another class rule, so the doctor's validity and refills go back to the class default. */
+const NEW_DRUG = { validityDays: null, refills: null } as const;
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** CLN-024: the line's validity chip and, for a class that allows refills, the refills stepper. The server applies the class rule
+ * (422 above the class maximum); a controlled class shows its fixed values with no control at all. */
+function ValidityCell({ item, index, locked, onChange }: {
+  item: PrescriptionItem; index: number; locked: boolean; onChange: (patch: Partial<PrescriptionItem>) => void;
+}) {
+  const tx = useTranslations("consult.rxPad");
+  const v = item.validity!;
+  const id = (k: string) => `rx-${index}-${k}`;
+  const editable = !locked && !v.fixed && v.maxDays != null;
+  const refills = item.refills ?? v.refills;
+  const chip = v.validUntil ? tx("validUntil", { date: shortDate(v.validUntil) })
+    : v.days == null ? tx("noValidityRule") : v.fixed ? tx("validDaysFixed", { days: v.days }) : tx("validDays", { days: v.days });
+  return (
+    <div className={`${s.cell} ${s.c6}`} data-testid={`rx-${index}-validity`}>
+      <span className={s.label} id={id("val-l")}>{tx("validity")}</span>
+      <p className={s.hint}><StatusPill tone={v.fixed ? "warn" : "neutral"} label={chip} /></p>
+      {editable && (
+        <div className={s.qtyRow} role="group" aria-labelledby={id("val-l")}>
+          <input className={s.field} type="number" inputMode="numeric" min={1} max={v.maxDays ?? undefined}
+            aria-label={tx("validForDays", { max: v.maxDays ?? 0 })} value={item.validityDays ?? v.days ?? ""}
+            onChange={(e) => { const n = Number(e.target.value); onChange({ validityDays: e.target.value === "" || !Number.isInteger(n) || n < 1 ? null : n }); }} />
+          {(v.maxRefills ?? 0) > 0 && (
+            <div className={s.stepper} role="group" aria-label={tx("refillsOf", { max: v.maxRefills ?? 0 })}>
+              <button type="button" className={s.stepBtn} aria-label={tx("fewerRefills")} disabled={refills <= 0}
+                onClick={() => onChange({ refills: refills - 1 })}>−</button>
+              <output aria-live="polite" data-testid={`rx-${index}-refills`}>{tx("refillsCount", { count: refills })}</output>
+              <button type="button" className={s.stepBtn} aria-label={tx("moreRefills")} disabled={refills >= (v.maxRefills ?? 0)}
+                onClick={() => onChange({ refills: refills + 1 })}>+</button>
+            </div>
+          )}
+        </div>
+      )}
+      {!editable && v.refills > 0 && <p className={s.hint} data-testid={`rx-${index}-refills`}>{tx("refillsCount", { count: v.refills })}</p>}
+    </div>
+  );
+}
+
 /** One prescription line (DOC-033): generic name first, brand second, structured sig (morning-noon-night), route,
  * duration, quantity, instructions. It only edits the line; the server still runs every safety check on the
  * generic AND brand text and gates signing. Nothing here clears, hides or pre-empts a warning, and no unit or
@@ -81,10 +123,10 @@ export default function RxPad({
             id={`rx-drug-${index}`} label={tx("genericName")} placeholder={tx("typeTheGenericName")} disabled={locked}
             authedFetch={authedFetch} value={item.drugName}
             hint={tx("suggestionsComeFromTheDrug")}
-            onType={(t) => onChange({ drugName: t, drugId: null, genericName: null })}
+            onType={(t) => onChange({ drugName: t, drugId: null, genericName: null, ...NEW_DRUG })}
             onPick={(n, it) => onChange(it.drugId
-              ? { drugName: [it.generic ?? it.brand, it.strength, it.form].filter(Boolean).join(" "), brandName: it.brand ?? "", drugId: it.drugId, genericName: it.generic ?? null }
-              : { drugName: n, drugId: null, genericName: null })}
+              ? { drugName: [it.generic ?? it.brand, it.strength, it.form].filter(Boolean).join(" "), brandName: it.brand ?? "", drugId: it.drugId, genericName: it.generic ?? null, ...NEW_DRUG }
+              : { drugName: n, drugId: null, genericName: null, ...NEW_DRUG })}
           />
           {item.drugName.trim() !== "" && !item.drugId && (
             <p className={s.hint} data-testid="uncoded-badge"><StatusPill tone="neutral" label={tx("uncoded")} /> {" "}{tx("notLinkedToTheDrug")}</p>
@@ -167,6 +209,8 @@ export default function RxPad({
           )}
           {item.quantity != null && !item.quantityUnit?.trim() && <p className={s.hint}>{tx("addTheUnitSoThe")}</p>}
         </div>
+
+        {item.validity && <ValidityCell item={item} index={index} locked={locked} onChange={onChange} />}
 
         <div className={`${s.cell} ${s.c12}`}>
           <label className={s.label} htmlFor={id("ins")}>{g("rx.instructions")}</label>
