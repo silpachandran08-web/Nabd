@@ -735,6 +735,7 @@ export const UiPreferencesReadSchema = z.object({ clinicDefaultLocale: z.string(
 export const UiPreferencesWriteSchema = z.object({ digitStyle: z.string().optional(), uiLocale: z.string().optional(), uiTheme: z.string() });
 export const UnlockRequestSchema = z.object({ pin: z.string().min(1) });
 export const UpdateRequestSchema = z.object({ assessment: z.string().optional(), favourite: z.boolean().optional(), name: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), subjective: z.string().optional(), tags: z.array(z.string()).optional() });
+export const VaccineDueResponseSchema = z.object({ arrived: z.boolean().optional(), dueDate: z.string().optional(), patientId: z.string().optional(), reasonCode: z.string().optional(), recallId: z.string().optional() });
 export const VaccineRecordRequestSchema = z.object({ dose: z.string().min(0).max(100), expiryDate: z.string().optional(), lotNumber: z.string().min(0).max(100).optional(), notes: z.string().min(0).max(1000).optional(), patientId: z.string(), queueEntryId: z.string().optional(), route: z.string(), site: z.string().min(0).max(100).optional(), vaccineName: z.string().min(0).max(200) });
 export const VaccineRecordResponseSchema = z.object({ administeredAt: z.string().optional(), dose: z.string().optional(), expiryDate: z.string().optional(), id: z.string().optional(), lotNumber: z.string().optional(), notes: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), queueEntryId: z.string().optional(), recordedByName: z.string().optional(), route: z.string().optional(), site: z.string().optional(), vaccineName: z.string().optional() });
 export const VerifyRequestSchema = z.object({ otp: z.string().optional() });
@@ -1217,6 +1218,7 @@ export const operationSchemas = {
   QueueController_transfer: { body: TransferRequestSchema, response: TransferResponseSchema },
   ReasonCodeController_list: { response: ReasonCodeListSchema },
   ReasonCodeController_add: { body: ReasonCodeAddRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  RecallController_vaccinesDueToday: { response: z.array(VaccineDueResponseSchema) },
   RegionController_list_1: { response: RegionListResponseSchema },
   ReportsController_billingLeakage: { response: BillingLeakageResponseSchema },
   BookingReasonsReportController_report: { response: BookingReasonsResponseSchema },

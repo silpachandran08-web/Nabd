@@ -730,6 +730,7 @@ export type Unbilled = { doctorName?: string; endedAt?: string; patientName?: st
 export type UnlockRequest = { pin: string; };
 export type UpdateRequest = { assessment?: string; favourite?: boolean; name?: string; objective?: string; plan?: string; subjective?: string; tags?: Array<string>; };
 export type Usage = { aiChecks?: number; branchesLimit?: number; branchesUsed?: number; seatsLimit?: number; seatsUsed?: number; whatsappPassThroughMinor?: number; whatsappUtilityMessages?: number; };
+export type VaccineDueResponse = { arrived?: boolean; dueDate?: string; patientId?: string; reasonCode?: string; recallId?: string; };
 export type VaccineRecordRequest = { dose: string; expiryDate?: string; lotNumber?: string; notes?: string; patientId: string; queueEntryId?: string; route: string; site?: string; vaccineName: string; };
 export type VaccineRecordResponse = { administeredAt?: string; dose?: string; expiryDate?: string; id?: string; lotNumber?: string; notes?: string; patientId?: string; patientName?: string; queueEntryId?: string; recordedByName?: string; route?: string; site?: string; vaccineName?: string; };
 export type VerifyRequest = { otp?: string; };
@@ -1215,6 +1216,7 @@ export type Operations = {
   QueueController_transfer: { method: "post"; path: "/v1/queue/{id}/transfer"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: TransferRequest; response: TransferResponse };
   ReasonCodeController_list: { method: "get"; path: "/v1/reason-codes"; permission: "queue:view | billing:create"; pathParams: never; query: { kind: string; locale?: string; }; body: never; response: ReasonCodeList };
   ReasonCodeController_add: { method: "post"; path: "/v1/reason-codes"; permission: "setup:edit"; pathParams: never; query: never; body: ReasonCodeAddRequest; response: Record<string, Record<string, unknown>> };
+  RecallController_vaccinesDueToday: { method: "get"; path: "/v1/recall-orders/vaccines-due-today"; permission: "clinical:view"; pathParams: never; query: never; body: never; response: Array<VaccineDueResponse> };
   RegionController_list_1: { method: "get"; path: "/v1/regions"; permission: "authenticated"; pathParams: never; query: never; body: never; response: RegionListResponse };
   ReportsController_billingLeakage: { method: "get"; path: "/v1/reports/billing-leakage"; permission: "reports:view"; pathParams: never; query: { thresholdAmount?: number; }; body: never; response: BillingLeakageResponse };
   BookingReasonsReportController_report: { method: "get"; path: "/v1/reports/booking-reasons"; permission: "reports:view"; pathParams: never; query: { from: string; to: string; }; body: never; response: BookingReasonsResponse };
