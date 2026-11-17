@@ -57,11 +57,14 @@ class NoShowService {
     private final EtaTrigger eta;
     private final BookingRules rules;
     private final com.nabd.hms.shared.notify.NotificationPort notifications;
+    private final com.nabd.hms.shared.booking.PackageSessionPort packageSessions;
 
     NoShowService(AppointmentRepository repo, AppointmentService appointments, QueueService queue, QueueRepository queueRepo,
                   JdbcTemplate jdbc, TenantContext tenantContext, ClinicClock clock, EventPublisher events, AuditService audit,
                   ActorDirectory actors, ReasonCodes reasons, EtaTrigger eta, BookingRules rules,
-                  com.nabd.hms.shared.notify.NotificationPort notifications) {
+                  com.nabd.hms.shared.notify.NotificationPort notifications,
+                  com.nabd.hms.shared.booking.PackageSessionPort packageSessions) {
+        this.packageSessions = packageSessions;
         this.repo = repo;
         this.appointments = appointments;
         this.queue = queue;
@@ -191,6 +194,8 @@ class NoShowService {
     @Transactional(propagation = Propagation.MANDATORY)
     private void marked(UUID tenant, AppointmentRow a, UUID staffId) {
         notifications.cancelBySubject("appointment", a.id(), com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED); // reminders about it are void
+        // shortcut: undo() does not take the session back (the patient can book it again in WhatsApp; the desk redeems as usual). Re-link there if that is reported.
+        packageSessions.releaseAppointment(a.id()); // COM-044
         events.publish(tenant, DomainEventType.APPOINTMENT_NO_SHOW, a.id(),
                 Map.of("appointmentId", a.id(), "doctorId", a.doctorId(), "markedBy", staffId == null ? "system" : "staff"));
         askEta(tenant, a);

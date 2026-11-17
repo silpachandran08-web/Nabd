@@ -65,6 +65,20 @@ class PackageSessionService implements PackageSessionPort {
                 "Session " + b.nextSession() + " of " + b.totalSessions() + " booked in WhatsApp · no entitlement consumed on booking", 0, null);
     }
 
+    @Override
+    @Transactional
+    public void releaseAppointment(UUID appointmentId) {
+        UUID tenantId = tenantContext.current();
+        repo.releaseBooked(tenantId, appointmentId).ifPresent(instanceId -> packages.insertEvent(tenantId, instanceId, "session_released",
+                "Appointment cancelled or missed · the session can be booked again", 0, null));
+    }
+
+    @Override
+    @Transactional
+    public void moveAppointment(UUID fromAppointmentId, UUID toAppointmentId) {
+        repo.moveBooked(tenantContext.current(), fromAppointmentId, toAppointmentId);
+    }
+
     @Transactional(propagation = Propagation.MANDATORY) // only from bookable(), inside its transaction
     private boolean actionable(UUID tenantId, UUID instanceId) {
         return packages.findInstance(tenantId, instanceId)

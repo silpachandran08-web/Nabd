@@ -159,7 +159,7 @@ class ChangeOfferService {
                 alternatives.nearest(tid, old.doctorId(), slotStart).ifPresent(n -> extras.put("nextAlternative", n.toString()));
                 throw new ApiException(HttpStatus.CONFLICT, "slot-taken", "Slot no longer available", "That time is no longer free.", extras);
             }
-            appointments.cancelClinicInitiated(tid, old);
+            appointments.cancelClinicInitiated(tid, old, newId);
             repo.close(tid, offerId, "accepted", slotStart, newId);
             audit.record(tid, "system", null, InternalSchedulingService.ACTOR, edge.serviceId(), null, "appointment.change_offer_accepted", "appointment",
                     o.appointmentId(), null, Map.of("offerId", offerId, "newAppointmentId", newId));

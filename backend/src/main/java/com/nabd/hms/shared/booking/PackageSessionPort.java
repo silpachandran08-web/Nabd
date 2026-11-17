@@ -19,4 +19,11 @@ public interface PackageSessionPort {
 
     /** Records the booked session (no entitlement consumed, NB-154) linked to the appointment, under the instance lock. */
     void linkAppointment(UUID patientId, UUID instanceId, UUID appointmentId);
+
+    /** The appointment was cancelled, declined or marked a no-show: its booked session can be booked again. A redeemed session
+     * is never released. Nothing happens for an appointment without a booked session, so a repeat is safe. */
+    void releaseAppointment(UUID appointmentId);
+
+    /** The appointment was rescheduled: its booked session follows it to the new appointment (the old one no longer holds it). */
+    void moveAppointment(UUID fromAppointmentId, UUID toAppointmentId);
 }

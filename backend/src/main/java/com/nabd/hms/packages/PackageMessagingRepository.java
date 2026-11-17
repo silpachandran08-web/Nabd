@@ -116,6 +116,19 @@ class PackageMessagingRepository {
                 tenantId, instanceItemId, appointmentId);
     }
 
+    /** booked -> cancelled for the appointment's session; the instance it belongs to, empty when there was nothing to release
+     * (no package booking, already released, or redeemed: a redeemed session is never given back). */
+    Optional<UUID> releaseBooked(UUID tenantId, UUID appointmentId) {
+        return jdbc.query("UPDATE package_redemptions r SET status = 'cancelled' FROM package_instance_items x "
+                        + "WHERE x.id = r.instance_item_id AND r.tenant_id = ? AND r.appointment_id = ? AND r.status = 'booked' RETURNING x.instance_id",
+                (rs, i) -> rs.getObject(1, UUID.class), tenantId, appointmentId).stream().findFirst();
+    }
+
+    void moveBooked(UUID tenantId, UUID fromAppointmentId, UUID toAppointmentId) {
+        jdbc.update("UPDATE package_redemptions SET appointment_id = ? WHERE tenant_id = ? AND appointment_id = ? AND status = 'booked'",
+                toAppointmentId, tenantId, fromAppointmentId);
+    }
+
     // ── the card behind the secure link ────────────────────────────────────────
 
     record Money(BigDecimal total, BigDecimal paid, String currency) {

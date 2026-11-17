@@ -52,12 +52,15 @@ public class AppointmentService {
     private final AppointmentChangeNotifier changeNotifier;
     private final com.nabd.hms.patient.api.ProxyAccess proxy; // IDC-011
     private final com.nabd.hms.engagement.api.RecallBookings recalls; // COM-052
+    private final com.nabd.hms.shared.booking.PackageSessionPort packageSessions; // COM-044: a booking that ends gives its package session back
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
                         SlotValidator slotValidator, EventPublisher events,
                         com.nabd.hms.shared.notify.NotificationPort notifications, com.nabd.hms.queue.api.ReasonCodes reasons, AppointmentChangeNotifier changeNotifier,
-                        com.nabd.hms.patient.api.ProxyAccess proxy, com.nabd.hms.engagement.api.RecallBookings recalls) {
+                        com.nabd.hms.patient.api.ProxyAccess proxy, com.nabd.hms.engagement.api.RecallBookings recalls,
+                        com.nabd.hms.shared.booking.PackageSessionPort packageSessions) {
+        this.packageSessions = packageSessions;
         this.recalls = recalls;
         this.reasons = reasons;
         this.changeNotifier = changeNotifier;
@@ -174,6 +177,7 @@ public class AppointmentService {
         AppointmentRow current = requireScheduled(tenantId, id);
         String note = reasons.require("cancel", req.reasonCode(), req.note() != null ? req.note() : req.reason());
         repo.cancel(tenantId, id, req.reasonCode(), note);
+        packageSessions.releaseAppointment(id);
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED); // COM-004: reminders about it are void
         log.info("appointment {} cancelled by {}", id, callerStaffId);
         published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled",
@@ -187,8 +191,9 @@ public class AppointmentService {
 
     /** ACC-006: the old booking after the patient took an offered alternative. No notice: the patient just chose the new time. */
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
-    void cancelClinicInitiated(UUID tenantId, AppointmentRow current) {
+    void cancelClinicInitiated(UUID tenantId, AppointmentRow current, UUID newAppointmentId) {
         repo.cancel(tenantId, current.id(), "clinic_initiated");
+        packageSessions.moveAppointment(current.id(), newAppointmentId);
         notifications.cancelBySubject("appointment", current.id(), com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED);
         published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, current.id(), current.doctorId(), current.startTime(), "cancelled",
                 Map.of("by", "system", "reasonCode", "clinic_initiated"));
@@ -208,6 +213,7 @@ public class AppointmentService {
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
             UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp(), callerStaffId == null ? "system" : "staff");
+            packageSessions.moveAppointment(id, newId); // COM-044: the booked package session follows the appointment
             log.info("appointment {} rescheduled to {} (new id {}) by {}", id, req.newStartTime(), newId, callerStaffId);
             published(tenantId, DomainEventType.APPOINTMENT_RESCHEDULED, newId, current.doctorId(), req.newStartTime(), "scheduled",
                     Map.of("previousAppointmentId", id, "previousStartTime", current.startTime(),
@@ -238,6 +244,9 @@ public class AppointmentService {
 
     void markTerminal(UUID tenantId, UUID appointmentId, String status) {
         repo.markTerminal(tenantId, appointmentId, status);
+        if ("no_show".equals(status)) {
+            packageSessions.releaseAppointment(appointmentId);
+        }
     }
 
     /** NB-116: front-desk callback list — missed follow-ups only, not every no-show. */
