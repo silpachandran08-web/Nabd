@@ -41,7 +41,7 @@ const OWNER_ITEMS: NavItem[] = [
   { id: "overview", href: "/overview", label: "Overview", short: "Overview", icon: "home", perms: ["reports:view"], owner: "Data & Infra + Patient Access", section: "run", active: (p) => p === "/overview" },
   { id: "ops", href: "/schedule", label: "Clinic Operations", short: "Clinic", icon: "calendar", perms: ["queue:view"], owner: "Data & Infra + Patient Access", section: "run", badge: "waiting", active: (p) => p === "/schedule" || p === "/arrivals" },
   { id: "workflows", href: "/workflows", label: "Workflows", short: "Workflows", icon: "refresh", perms: ["setup:view"], owner: ACC, section: "run", planned: { module: ["whatsapp_booking", "queue_eta"] } },
-  { id: "integrations", href: "/integrations", label: "Integrations", short: "Integrations", icon: "globe", perms: ["setup:view"], owner: DI, section: "run", planned: { module: ["lab", "insurance", "patient_app"] } },
+  { id: "integrations", href: "/integrations", label: "Integrations", short: "Integrations", icon: "globe", perms: ["setup:view"], owner: DI, section: "run", planned: { module: ["whatsapp_booking", "lab", "insurance", "patient_app"] } }, // COM-016: the WhatsApp channel policy lives here
   { id: "setup", href: "/setup", label: "Clinic Setup", short: "Setup", icon: "settings", perms: ["setup:view"], owner: PT, section: "run",
     active: (p, t) => p.startsWith("/setup") && setupTabOf(p, t) !== "licences" && setupTabOf(p, t) !== "subscription" },
   { id: "reports", href: "/reports", label: "Reports", short: "Reports", icon: "chart", perms: ["reports:view"], owner: "Data & Infra + Patient Access", section: "run" },
