@@ -91,7 +91,7 @@ class AttachmentController {
         FileStore.FileInfo f = files.info(id).filter(i -> i.patientId() != null).orElseThrow(ApiException::notFound);
         ReadScope scope = scopes.resolve(jwt);
         scopes.requirePatient(scope, f.patientId());
-        if (photos.hiddenPhoto(scope.tenantId(), id)) throw ApiException.notFound(); // CLN-047: withdrawn photo consent hides the photo
+        if (photos.hidden(scope.tenantId(), id)) throw ApiException.notFound(); // CLN-047: withdrawn photo consent hides the photo
         FileStore.SignedUrl u = files.downloadUrl(id);
         return new DownloadUrl(u.url(), u.expiresAt(), f.patientId());
     }
