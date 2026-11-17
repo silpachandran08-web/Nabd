@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { PatientApiError, type patientApi } from "../lib/patientApi";
+import { isCoreLink, PatientApiError, type patientApi, type Resolved } from "../lib/patientApi";
 import type { T } from "./util";
 import styles from "./linkflow.module.css";
 
 type Step = "ask" | "enter";
 
 /** The code is only sent when the patient taps (a link preview or a virus scanner opening the page must not burn an OTP). */
-export default function OtpGate({ linkId, clinic, api, t, onVerified, onExpired }: {
-  linkId: string; clinic: string; api: ReturnType<typeof patientApi>; t: T; onVerified: (token: string) => void; onExpired: () => void;
+export default function OtpGate({ linkId, clinic, api, t, onVerified, onOpened, onExpired }: {
+  linkId: string; clinic: string; api: ReturnType<typeof patientApi>; t: T; onVerified: (token: string) => void; onOpened: (resolved: Resolved) => void; onExpired: () => void;
 }) {
+  const core = isCoreLink(linkId); // IDC-015: Core checks the code and answers with the content in one call
   const [step, setStep] = useState<Step>("ask");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,15 +27,18 @@ export default function OtpGate({ linkId, clinic, api, t, onVerified, onExpired 
     } finally { setBusy(false); }
   }
 
-  const send = () => run(async () => { await api.requestOtp(linkId); setCode(""); setStep("enter"); });
-  const verify = (e: React.FormEvent) => { e.preventDefault(); void run(async () => onVerified((await api.verifyOtp(linkId, code)).accessToken)); };
+  const send = () => run(async () => { await (core ? api.coreLinkOtp(linkId) : api.requestOtp(linkId)); setCode(""); setStep("enter"); });
+  const verify = (e: React.FormEvent) => {
+    e.preventDefault();
+    void run(async () => { if (core) onOpened(await api.coreLinkOpen(linkId, code)); else onVerified((await api.verifyOtp(linkId, code)).accessToken); });
+  };
 
   return (
     <section className={styles.card}>
       <h1 className={styles.h1}>{t("otpTitle")}</h1>
       {step === "ask" ? (
         <>
-          <p className={styles.muted}>{t("otpHint", { clinic })}</p>
+          <p className={styles.muted}>{clinic ? t("otpHint", { clinic }) : t("otpHintPlain")}</p>
           <button type="button" className={styles.btn} disabled={busy} onClick={() => void send()}>{t("otpSend")}</button>
         </>
       ) : (

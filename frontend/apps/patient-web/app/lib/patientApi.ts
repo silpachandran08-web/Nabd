@@ -8,6 +8,11 @@
 //   GET  {base}/patient-links/{linkId}/document        -> file bytes         (Bearer)
 //   POST {base}/exchange/consents/{id}/patient-decision -> 200 {status}      (Bearer, Idempotency-Key; 409 ARTEFACT_CHANGED, 410 EXPIRED)
 //   GET  {base}/public/rx/verify/{token}                -> RxVerification     (CLN-023, public; 404 unknown, 429 rate limited)
+//
+// IDC-015 (in this tree, Core): a link Core minted is opened on Core's own two public calls; the code is checked by `open`, which
+// answers with the content, so there is no session token.
+//   POST {base}/public/links/{token}/otp                -> 202 (no body)      (410 link-expired, 423 link-locked, 429)
+//   POST {base}/public/links/{token}/open {otp}         -> 200 {fileUrl, mime, title, packageCard}   (401 otp-invalid, 410, 423)
 //   GET  {base}/public/rx/keys                          -> JWKS               (CLN-023, public)
 //
 // The access token lives in component state only: never in a URL, storage or cookie.
@@ -40,6 +45,9 @@ export type PackageCard = {
 export type Resolved =
   | { kind: "document"; contentType: string; fileName?: string | null }
   | { kind: "package"; card: PackageCard }
+  // shortcut: a Core file link (report, document) is not shown: this origin may not fetch Core's signed file URL (no CORS on the blob
+  // path, CSP allows blob: frames only). Render it in DocumentView once security has decided how patient-web loads that URL.
+  | { kind: "unsupported" }
   | { kind: "consent"; consent: ConsentSummary }
   | { kind: "booking"; booking: Booking };
 
@@ -59,7 +67,7 @@ export function failureOf(status: number, code: string | null): Failure {
   if (status === 409 && code === "ARTEFACT_CHANGED") return "changed";
   if (status === 409 && code === "claim-not-open") return "not_open";
   if (status === 422 && code === "own-phone-required") return "own_phone";
-  if (status === 429) return "too_many";
+  if (status === 429 || (status === 423 && code === "Link locked")) return "too_many"; // IDC-015: five wrong codes lock the link for 30 minutes
   if (status === 401 || status === 403) return code === "EXPIRED" ? "expired" : "wrong_code";
   return "network";
 }
@@ -87,6 +95,9 @@ async function call(f: Fetch, path: string, init: RequestInit & { token?: string
 
 const enc = encodeURIComponent;
 
+/** IDC-015: a link Core minted. Its token is exactly 48 bytes in base64url (SecureLinkService.tenantOf refuses anything else). */
+export const isCoreLink = (linkId: string) => /^[A-Za-z0-9_-]{64}$/.test(linkId);
+
 export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
   linkInfo: async (linkId: string): Promise<LinkInfo> => (await call(f, `/patient-links/${enc(linkId)}`)).json(),
   requestOtp: async (linkId: string): Promise<{ resendAfterSeconds: number }> => (await call(f, `/patient-links/${enc(linkId)}/otp`, { method: "POST" })).json(),
@@ -94,6 +105,12 @@ export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
     (await call(f, `/patient-links/${enc(linkId)}/otp/verify`, { method: "POST", body: JSON.stringify({ code }) })).json(),
   content: async (linkId: string, token: string): Promise<Resolved> => (await call(f, `/patient-links/${enc(linkId)}/content`, { token })).json(),
   document: async (linkId: string, token: string): Promise<Blob> => (await call(f, `/patient-links/${enc(linkId)}/document`, { token })).blob(),
+  // IDC-015 / COM-044: Core's secure-link calls (see the header). Limits, lock and expiry are Core's; nothing is kept here.
+  coreLinkOtp: async (token: string): Promise<void> => { await call(f, `/public/links/${enc(token)}/otp`, { method: "POST" }); },
+  coreLinkOpen: async (token: string, otp: string): Promise<Resolved> => {
+    const r = (await (await call(f, `/public/links/${enc(token)}/open`, { method: "POST", body: JSON.stringify({ otp }) })).json()) as { packageCard?: PackageCard | null };
+    return r.packageCard ? { kind: "package", card: r.packageCard } : { kind: "unsupported" };
+  },
   proxyInvite: async (token: string): Promise<ProxyInvite> => (await call(f, `/proxy-invites/${enc(token)}`)).json(),
   proxyOtp: async (token: string): Promise<void> => { await call(f, `/proxy-invites/${enc(token)}/otp`, { method: "POST" }); },
   proxyAccept: async (token: string, otp: string, scope: ProxyScope): Promise<{ status: string; scope: ProxyScope }> =>
