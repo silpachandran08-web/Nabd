@@ -11,7 +11,7 @@ final class PrescriptionModels {
     /** allergySnapshotJson (DOC-R3): prescriptions.allergy_snapshot as text; null for drafts and pre-V79 signed rows. */
     record PrescriptionRow(UUID id, UUID queueEntryId, UUID patientId, UUID doctorId, String status,
                             Instant createdAt, Instant signedAt, String allergySnapshotJson, String safetyDictionaryVersion,
-                            UUID signedBy, String signedByRegistrationNo) {
+                            UUID signedBy, String signedByRegistrationNo, Instant revokedAt) {
     }
 
     record PrescriptionItemRow(UUID id, UUID prescriptionId, String drugName, String dosage, String frequency,

@@ -11,6 +11,12 @@ test("repeat source: newest signed prescription from another visit, never this v
   expect(repeatSource([], "today")).toBeNull();
 });
 
+test("repeat source: a revoked prescription is never offered (T1-BUG-1)", () => {
+  const revoked = { ...rx("w", "v2"), revokedAt: "2026-11-01T10:00:00Z" };
+  expect(repeatSource([revoked, rx("b", "v1")], "today")?.id).toBe("b");
+  expect(repeatSource([revoked], "today")).toBeNull();
+});
+
 test("shortcuts: R repeats, 1-9 pick an existing chip, nothing while typing or with a modifier", () => {
   expect(rxShortcut({ key: "r", typing: false }, 0)).toEqual({ kind: "repeat" });
   expect(rxShortcut({ key: "R", typing: false }, 0)).toEqual({ kind: "repeat" });

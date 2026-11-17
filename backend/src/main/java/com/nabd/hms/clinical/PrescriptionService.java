@@ -357,7 +357,8 @@ public class PrescriptionService {
      * over: upsert() re-runs every allergy, pregnancy and controlled-substance check against the current register, so a
      * line that needs a decision needs a fresh one on this prescription. 404 no-previous-prescription when there is none.
      * CLN-022: sourcePrescriptionId (optional) pins the one the doctor previewed; it must be one of this patient's signed
-     * prescriptions from another visit, otherwise the same 404 (no probing of other patients' prescriptions). */
+     * prescriptions from another visit, otherwise the same 404 (no probing of other patients' prescriptions).
+     * T1-BUG-1: a revoked prescription (CLN-023) is never a source: the default skips it, a pinned one is 409 prescription-revoked. */
     @Transactional
     public PrescriptionResponse repeatLast(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
                                             String ipAddress, UUID sourcePrescriptionId) {
@@ -365,10 +366,15 @@ public class PrescriptionService {
         QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(ApiException::notFound);
         PrescriptionRow last = repo.findSignedByPatient(tenantId, owner.patientId()).stream()
                 .filter(p -> !p.queueEntryId().equals(queueEntryId))
-                .filter(p -> sourcePrescriptionId == null || p.id().equals(sourcePrescriptionId))
+                // T1-BUG-1: the default source skips a revoked Rx; a pinned one is found and refused below
+                .filter(p -> sourcePrescriptionId == null ? p.revokedAt() == null : p.id().equals(sourcePrescriptionId))
                 .findFirst()
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no-previous-prescription", "No previous prescription",
                         "This patient has no signed prescription from an earlier visit to repeat."));
+        if (last.revokedAt() != null) {
+            throw new ApiException(HttpStatus.CONFLICT, "prescription-revoked", "Prescription revoked",
+                    "This prescription was revoked by the prescriber and cannot be repeated.");
+        }
         List<PrescriptionItemRequest> items = repo.findItems(tenantId, last.id()).stream()
                 .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
                         i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(), i.drugId()))
@@ -605,7 +611,7 @@ public class PrescriptionService {
         String signedByName = p.signedBy() == null ? null : actors.findActor(tenantId, p.signedBy()).map(ActorDirectory.Actor::name).orElse(null);
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
                 p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat,
-                p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo(), signedByName);
+                p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo(), signedByName, p.revokedAt());
     }
 
     // ── DOC-R3: allergy statement snapshotted at signing ─────────────────

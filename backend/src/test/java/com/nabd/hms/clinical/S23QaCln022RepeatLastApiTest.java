@@ -61,7 +61,8 @@ class S23QaCln022RepeatLastApiTest extends ApiTestBase {
     }
 
     private static List<Map> items(ResponseEntity<Map> rx) {
-        return rx.getBody() == null ? List.of() : (List<Map>) rx.getBody().get("items");
+        // an error (problem+json) body has no items
+        return rx.getBody() == null || rx.getBody().get("items") == null ? List.of() : (List<Map>) rx.getBody().get("items");
     }
 
     // C22-A01: the last Rx was revoked (dose entered wrongly): Repeat last must not bring the wrong dose back

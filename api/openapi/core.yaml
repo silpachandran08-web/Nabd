@@ -31067,6 +31067,9 @@ components:
         queueEntryId:
           type: string
           format: uuid
+        revokedAt:
+          type: string
+          format: date-time
         safetyDictionaryVersion:
           type: string
         signedAt:
