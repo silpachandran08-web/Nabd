@@ -111,9 +111,13 @@ class S24QaCln047DermPhotosApiTest extends ApiTestBase {
 
     /** init + PUT + complete + scan; the upload (= file) id. */
     private String upload(String token) throws Exception {
+        return upload(token, "clinical_photo");
+    }
+
+    private String upload(String token, String purpose) throws Exception {
         byte[] data = small();
         ResponseEntity<Map> s = exchange("/v1/files/uploads", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "purpose", "clinical_photo", "contentType", "image/jpeg", "sizeBytes", data.length)), Map.class);
+                "purpose", purpose, "contentType", "image/jpeg", "sizeBytes", data.length)), Map.class);
         assertThat(s.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_OCTET_STREAM);
@@ -265,5 +269,68 @@ class S24QaCln047DermPhotosApiTest extends ApiTestBase {
         // and a visit of patient B cannot carry a photo of patient A
         Map<String, Object> body = new HashMap<>(Map.of("uploadId", upload(c.doctorToken()), "queueEntryId", v2, "site", Map.of("region", "cheek", "side", "left")));
         assertThat(exchange(base(c.patientId()) + "/photos", HttpMethod.POST, authedJsonBody(c.doctorToken(), body), Map.class).getStatusCode().value()).isEqualTo(404);
+    }
+
+    private int get(String signedUrl) {
+        return http.exchange(URI.create(url(signedUrl)), HttpMethod.GET, null, byte[].class).getStatusCode().value();
+    }
+
+    // C47-A10 (round 2, T1-BUG-4 fix): after a withdrawal, a NEW consent and a NEW photo: the new link serves, the old links stay dead
+    @Test
+    void c47a10_newConsentAndNewPhotoServe_oldLinksStayHidden() throws Exception {
+        Clinic c = clinic();
+        consent(c.doctorToken(), c.patientId());
+        String old = upload(c.doctorToken());
+        assertThat(addPhoto(c.doctorToken(), c.patientId(), old, c.visitId()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        List<Map<String, Object>> first = photos(timeline(c.doctorToken(), c.patientId()).getBody());
+        String oldTimelineUrl = (String) first.get(0).get("url");
+        String oldDownloadUrl = (String) downloadUrl(c.doctorToken(), old).getBody().get("url");
+        int before = get(oldTimelineUrl);
+        assertThat(exchange(base(c.patientId()) + "/photo-consent/withdraw", HttpMethod.POST, authed(c.doctorToken()), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(consent(c.doctorToken(), c.patientId()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String fresh = upload(c.doctorToken());
+        assertThat(addPhoto(c.doctorToken(), c.patientId(), fresh, c.visitId()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Map<String, Object> tl = timeline(c.doctorToken(), c.patientId()).getBody();
+        List<Map<String, Object>> shown = photos(tl);
+        int newUrl = shown.isEmpty() ? -1 : get((String) shown.get(0).get("url"));
+        int oldT = get(oldTimelineUrl), oldD = get(oldDownloadUrl), oldAsk = downloadUrl(c.doctorToken(), old).getStatusCode().value();
+        int reRegister = addPhoto(c.doctorToken(), c.patientId(), old, c.visitId()).getStatusCode().value(); // the hidden upload again: must not come back
+        int oldAfterReRegister = get(oldTimelineUrl);
+        System.out.println("C47-A10 beforeWithdrawal=" + before + " newPhotoUrl=" + newUrl + " shown=" + shown.size() + " hiddenCount=" + tl.get("hiddenCount")
+                + " oldTimelineUrl=" + oldT + " oldDownloadUrl=" + oldD + " newDownloadUrlForOld=" + oldAsk + " reRegisterHiddenUpload=" + reRegister + " oldUrlAfter=" + oldAfterReRegister);
+        assertThat(before).isEqualTo(200);
+        assertThat(shown).hasSize(1);
+        assertThat(newUrl).isEqualTo(200);
+        assertThat(tl).containsEntry("hiddenCount", 1);
+        assertThat(List.of(oldT, oldD, oldAsk, oldAfterReRegister)).containsOnly(404);
+    }
+
+    // C47-A11 (round 2): withdrawing photo consent hides derm photos only: a dental image and a visit attachment of the same patient still open
+    @Test
+    void c47a11_dentalImageAndVisitAttachmentStillOpenAfterTheDermWithdrawal() throws Exception {
+        Clinic c = clinic();
+        assertThat(exchange("/v1/staff/" + c.doctor().id() + "/specialty-profiles", HttpMethod.PUT,
+                authedJsonBody(c.ownerToken(), Map.of("primary", "DERM", "secondary", "DENT")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        String doctor = loginAndGetAccessToken(c.doctor()); // the new token carries specialty_dental:*
+        consent(doctor, c.patientId());
+        String photo = upload(doctor);
+        assertThat(addPhoto(doctor, c.patientId(), photo, c.visitId()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String xray = upload(doctor, "xray");
+        ResponseEntity<Map> img = exchange("/v1/specialty/dental/patients/" + c.patientId() + "/images", HttpMethod.POST, authedJsonBody(doctor,
+                Map.of("uploadId", xray, "queueEntryId", c.visitId(), "kind", "iopa", "teeth", List.of(36))), Map.class);
+        assertThat(img.getStatusCode()).as("%s", img.getBody()).isEqualTo(HttpStatus.CREATED);
+        String report = upload(doctor); // a clinical_photo upload that is NOT a derm timeline photo
+        ResponseEntity<Map> att = exchange("/v1/clinical/visits/" + c.visitId() + "/attachments", HttpMethod.POST,
+                authedJsonBody(doctor, Map.of("fileId", report, "kind", "photo")), Map.class);
+        assertThat(att.getStatusCode()).as("%s", att.getBody()).isEqualTo(HttpStatus.CREATED);
+        String photoUrl = (String) downloadUrl(doctor, photo).getBody().get("url");
+        String xrayUrl = (String) downloadUrl(doctor, xray).getBody().get("url");
+        String reportUrl = (String) downloadUrl(doctor, report).getBody().get("url");
+        assertThat(exchange(base(c.patientId()) + "/photo-consent/withdraw", HttpMethod.POST, authed(doctor), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        int p = get(photoUrl), x = get(xrayUrl), r = get(reportUrl);
+        int xNew = downloadUrl(doctor, xray).getStatusCode().value(), rNew = downloadUrl(doctor, report).getStatusCode().value();
+        System.out.println("C47-A11 after derm withdrawal: photoLink=" + p + " dentalXrayLink=" + x + " visitAttachmentLink=" + r + " newXrayUrl=" + xNew + " newAttachmentUrl=" + rNew);
+        assertThat(p).isEqualTo(404);
+        assertThat(List.of(x, r, xNew, rNew)).containsOnly(200);
     }
 }
