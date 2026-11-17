@@ -58,6 +58,12 @@ class JdbcActorDirectory implements ActorDirectory {
     }
 
     @Override
+    public Optional<String> activeMobilePhone(UUID tenantId, UUID staffId) {
+        return jdbc.queryForList("SELECT mobile_phone FROM staff WHERE tenant_id = ? AND id = ? AND status = 'active' AND btrim(COALESCE(mobile_phone, '')) <> ''",
+                String.class, tenantId, staffId).stream().findFirst();
+    }
+
+    @Override
     public int seatsInUse(UUID tenantId) {
         return jdbc.queryForObject("SELECT count(*) FROM staff WHERE tenant_id = ? AND status IN ('invited','active')", Integer.class, tenantId);
     }

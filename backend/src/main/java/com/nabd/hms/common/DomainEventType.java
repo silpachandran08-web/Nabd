@@ -60,7 +60,9 @@ public enum DomainEventType {
     PATIENT_NOTIFICATION_PREFERENCES_CHANGED("patient.notification_preferences.changed.v1", "core/patient"),
     RX_REVOKED("clinical.prescription.revoked.v1", "core/clinical"),
     MESSAGING_SETTINGS_CHANGED("organization.messaging_settings.changed.v1", "core/organization"),
-    BREAK_GLASS_REVIEWED("iam.break_glass.reviewed.v1", "core/iam");
+    BREAK_GLASS_REVIEWED("iam.break_glass.reviewed.v1", "core/iam"),
+    /** PHL-008: the clinic's daily stock-alert digest was handed to its one named recipient. Ids and counts only. */
+    PHARMACY_STOCK_ALERTS_DIGEST_READY("pharmacy.stock.alerts_digest_ready.v1", "core/pharmacy");
 
     private final String type;
     private final String source;

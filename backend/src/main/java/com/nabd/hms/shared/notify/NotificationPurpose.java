@@ -53,7 +53,10 @@ public enum NotificationPurpose {
     /** ADM-005: the owner is stuck on a setup step (staff recipient); 2 params: the step's name, the help link. REMINDER, so quiet hours apply. */
     SETUP_NUDGE("setup_nudge", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY),
     /** ADM-006: Nabd finished the white-glove setup (staff recipient); 1 param: the steps that were set up. */
-    WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** PHL-008: the pharmacy's daily stock-alert digest to its one named recipient (staff); 7 params: day, five counts, secure link.
+     * Counts only, never a drug name. REMINDER, so COM-024 quiet hours apply. */
+    STOCK_ALERTS_DIGEST("stock_alerts_digest", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;
