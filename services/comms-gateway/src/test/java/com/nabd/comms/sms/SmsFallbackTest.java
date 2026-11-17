@@ -108,7 +108,7 @@ class SmsFallbackTest {
         var meters = new SimpleMeterRegistry();
         var props = new CommsConsumerProperties("smsfb", new CommsConsumerProperties.Consumer(true, 50, 5, 60000));
         return new SmsService(app, tx, crypto, new BspSmsProvider("bsp", "http://127.0.0.1:" + bsp.getAddress().getPort(), "k", JSON),
-                new SendGate(new ConsentSnapshotStore(app), app, meters, clock), new StreamEventPublisher(valkey, props, JSON, clock), JSON, meters, clock, region);
+                new SendGate(new ConsentSnapshotStore(app), app, meters, clock), new StreamEventPublisher(valkey, props, JSON, clock), JSON, meters, clock, region, java.time.Duration.ofHours(24));
     }
 
     SmsFallback fallback(String region) {
