@@ -253,6 +253,7 @@ class BookingRequestService {
         if (!"requested".equals(r.status())) throw alreadyDecided();
         if (repo.decide(tid, id, "declined", r.start(), r.end(), staffId, clock.now()) == 0) throw alreadyDecided();
         repo.recordDecline(tid, id, reasonCode);
+        packageSessions.releaseAppointment(id); // COM-044: a declined 'Book session N of M' gives the session back
         notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED);
         waitlist.onSlotFreed(tid, r.doctorId(), r.start());
         routed(tid, id, r.doctorId(), r.start(), "declined", Map.of("reasonCode", reasonCode, "decisionSource", "staff", "decidedBy", staffId));
