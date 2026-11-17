@@ -101,7 +101,7 @@ class SmsServiceTest {
         var meters = new SimpleMeterRegistry();
         var props = new CommsConsumerProperties(REGION, new CommsConsumerProperties.Consumer(true, 50, 5, 60000));
         return new SmsService(app, tx, crypto, new BspSmsProvider("bsp", "http://127.0.0.1:" + bsp.getAddress().getPort(), "k", JSON),
-                new SendGate(new ConsentSnapshotStore(app), app, meters, CLOCK), new StreamEventPublisher(valkey, props, JSON, CLOCK), JSON, meters, CLOCK, region);
+                new SendGate(new ConsentSnapshotStore(app), app, meters, CLOCK), new StreamEventPublisher(valkey, props, JSON, CLOCK), JSON, meters, CLOCK, region, java.time.Duration.ofHours(24));
     }
 
     static String otpText(String code) {
