@@ -22,6 +22,7 @@ export default function SellWizard({ packages, instances, staff, sellKeys, loadA
   const { results: sellResults } = usePatientSearch(sellPatient ? "" : sellQuery, 10);
   const [sellPackageId, setSellPackageId] = useState("");
   const [sellMethod, setSellMethod] = useState("");
+  const [nudgeDays, setNudgeDays] = useState(""); // COM-044: the doctor's interval between sessions (optional)
   const [sellStep, setSellStep] = useState(0);
   const [sold, setSold] = useState<InstanceT | null>(null);
   const [soldInvoice, setSoldInvoice] = useState<SoldInvoice | null>(null);
@@ -48,7 +49,12 @@ export default function SellWizard({ packages, instances, staff, sellKeys, loadA
       return;
     }
     setSelling(true);
-    const body = { patientId: sellPatient.id, packageId: sellPackageId, paymentMethod: sellMethod };
+    const days = Number(nudgeDays);
+    if (nudgeDays && !(Number.isInteger(days) && days >= 1 && days <= 365)) {
+      sfe.set("Days between sessions must be a whole number from 1 to 365.");
+      return;
+    }
+    const body = { patientId: sellPatient.id, packageId: sellPackageId, paymentMethod: sellMethod, ...(nudgeDays ? { nudgeIntervalDays: days } : {}) };
     let instance: InstanceT;
     try {
       instance = await api.post<InstanceT>("/packages/sell", body, { idempotencyKey: sellKeys.current.get("sell", body) });
@@ -154,6 +160,11 @@ export default function SellWizard({ packages, instances, staff, sellKeys, loadA
             <div key={i.id} className={styles.itemLine}><span>{i.name} × {i.quantity}</span><span>{money(i.listValue)}</span></div>
           ))}
           {sellPatient && <p className={styles.muted}>Selling to {sellPatient.name} · {sellPatient.phone}</p>}
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="sell-nudge">Days between sessions (doctor&apos;s advice, optional)</label>
+            <input id="sell-nudge" className={styles.input} type="number" inputMode="numeric" min={1} max={365} value={nudgeDays} onChange={(e) => setNudgeDays(e.target.value)} />
+            <p className={styles.muted}>The patient gets a WhatsApp reminder to book the next session after this many days.</p>
+          </div>
         </>
       )}
 

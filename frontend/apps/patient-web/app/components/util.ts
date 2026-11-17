@@ -13,6 +13,13 @@ export function formatWhen(iso: string, locale: string, opts: { time?: boolean; 
   } catch { return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(d); }
 }
 
+/** COM-044: an amount in the clinic's currency; a plain number when the currency is unknown or not supported. */
+export function formatMoney(n: number, locale: string, currency?: string | null): string {
+  try {
+    return new Intl.NumberFormat(locale, currency ? { style: "currency", currency } : { maximumFractionDigits: 2 }).format(n);
+  } catch { return n.toFixed(2); }
+}
+
 /** UUID for Idempotency-Key; crypto.randomUUID needs a secure context, a plain-http preview does not have one. */
 export function newKey(): string {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();

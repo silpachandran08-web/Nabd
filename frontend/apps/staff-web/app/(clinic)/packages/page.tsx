@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import styles from "./packages.module.css";
 import { can } from "../../lib/permissions";
 import { ErrorState, Skeleton } from "../../components/ui/StateViews";
-import { eventLabel } from "./eventLabel";
+import { deliveryLabel, eventLabel } from "./eventLabel";
 import { api, ApiError, intentKeys } from "../../lib/api";
 import { key, prefix } from "../../lib/query";
 import { ErrorSummary, FieldError, useFormErrors, type FormErrors } from "../../lib/formErrors";
@@ -217,7 +217,7 @@ function InstanceDetail({
         <div key={idx} className={styles.ledgerItem}>
           <div>
             <div>{eventLabel(e.eventType, e.note)}{e.delta != null && e.delta !== 0 ? ` (${e.delta})` : ""}</div>
-            <div className={styles.ledgerNote}>{e.note} · {e.actorName}</div>
+            <div className={styles.ledgerNote}>{e.note} · {e.actorName}{deliveryLabel(e.deliveryStatus) ? ` · ${deliveryLabel(e.deliveryStatus)}` : ""}</div>
           </div>
           <div className={styles.muted}>{new Date(e.createdAt).toLocaleString()}</div>
         </div>

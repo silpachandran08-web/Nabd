@@ -31,8 +31,15 @@ export type KeepScope = "NONE" | "BOOK_ONLY" | "BOOK_AND_RECORDS";
 /** ADM-015: GET {base}/public/exports/{token} (the owner's data export link; every download needs an OTP to the owner's mobile). */
 export type ExportLink = { clinicName: string; expiresAt: string; downloadsLeft: number };
 export type Booking = { doctorName: string; clinicName: string; address?: string | null; startsAt: string; timeZone: string; status: "confirmed" | "held" | "cancelled" };
+/** COM-044: the package card behind its secure link (core: SecureLinkOpenResponse.packageCard). Amounts are in `currency`. */
+export type PackageCard = {
+  packageName: string; status: "active" | "grace" | "expired" | "completed" | "refunded" | "cancelled";
+  items: { name: string; used: number; total: number }[]; sessionsUsed: number; sessionsTotal: number;
+  validUntil?: string | null; graceUntil?: string | null; paid: number; due: number; saved: number; currency?: string | null;
+};
 export type Resolved =
   | { kind: "document"; contentType: string; fileName?: string | null }
+  | { kind: "package"; card: PackageCard }
   | { kind: "consent"; consent: ConsentSummary }
   | { kind: "booking"; booking: Booking };
 
