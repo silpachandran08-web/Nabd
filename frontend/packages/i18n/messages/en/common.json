@@ -156,5 +156,16 @@
     "label": "Device name",
     "save": "Save name",
     "saved": "Saved. It is used from your next sign-in."
+  },
+  "channelPolicy": {
+    "pageTitle": "Integrations",
+    "title": "Your WhatsApp channel shows only your clinic",
+    "lead": "Patients who chat with your clinic on WhatsApp see your clinic and nothing else. Nabd never uses your channel to send your patients to another clinic.",
+    "points": {
+      "onlyYours": "Every chat that reaches your clinic, on your own number, through your booking link, or sent to you from Nabd's shared number, shows only your doctors, your free times, your packages and your messages.",
+      "never": "No other clinic's name, doctors, times or offers are ever shown or suggested in these chats.",
+      "guard": "Every automatic reply is checked before it is sent. If a reply would mention another clinic, it is stopped, the patient is told \"Let me connect you to the clinic\", your desk takes over the chat and Nabd's team is alerted.",
+      "discovery": "If Nabd later helps people find a clinic, that will only happen on Nabd's own number, for people who have not started a chat with any clinic. It is never offered in a chat with your clinic."
+    }
   }
 }

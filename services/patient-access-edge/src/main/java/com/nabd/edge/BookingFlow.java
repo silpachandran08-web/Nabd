@@ -47,20 +47,20 @@ class BookingFlow {
 
     private final CoreClient core;
     private final SlotHolds holds;
-    private final AvailabilityProjection projection;
+    private final ClinicContent.Provider contents;
     private final EdgeProperties props;
     private final MeterRegistry meters;
     private final Clock clock;
     private final ContactLanguage languages;
     private final PhoneVerifications phones;
 
-    BookingFlow(CoreClient core, SlotHolds holds, AvailabilityProjection projection, EdgeProperties props, MeterRegistry meters, Clock clock,
+    BookingFlow(CoreClient core, SlotHolds holds, ClinicContent.Provider contents, EdgeProperties props, MeterRegistry meters, Clock clock,
                 ContactLanguage languages, PhoneVerifications phones) {
         this.languages = languages;
         this.phones = phones;
         this.core = core;
         this.holds = holds;
-        this.projection = projection;
+        this.contents = contents;
         this.props = props;
         this.meters = meters;
         this.clock = clock;
@@ -204,7 +204,7 @@ class BookingFlow {
         // The context of a finished booking is dropped; only the language stays.
         Map<String, String> keep = new HashMap<>();
         keep.put("lang", l);
-        return new Outcome(State.MENU, keep, BookingCopy.t(l, "menu", core.profile(c.tenantId()).clinicName()),
+        return new Outcome(State.MENU, keep, BookingCopy.t(l, "menu", content(c).profile().clinicName()),
                 List.of(new Button("menu:book", BookingCopy.t(l, "menu.book")), new Button("menu:mine", BookingCopy.t(l, "menu.mine")),
                         new Button("menu:talk", BookingCopy.t(l, "menu.talk"))));
     }
@@ -355,7 +355,7 @@ class BookingFlow {
     // ---- doctor, day, time ---------------------------------------------------------------------------------------------
 
     private Outcome afterWho(Conversation c, Map<String, String> ctx) {
-        List<CoreClient.Doctor> docs = core.profile(c.tenantId()).doctors();
+        List<CoreClient.Doctor> docs = content(c).profile().doctors();
         if (docs.isEmpty()) {
             return handoff(c, "day.none");
         }
@@ -368,12 +368,12 @@ class BookingFlow {
 
     private Outcome askDoctor(Conversation c, Map<String, String> ctx) {
         return new Outcome(State.CHOOSING_DOCTOR, ctx, BookingCopy.t(lang(ctx), "doc.ask"),
-                core.profile(c.tenantId()).doctors().stream().limit(ROWS).map(d -> new Button("doc:" + d.id(), cut(d.name()))).toList());
+                content(c).profile().doctors().stream().limit(ROWS).map(d -> new Button("doc:" + d.id(), cut(d.name()))).toList());
     }
 
     private Outcome chooseDoctor(Conversation c, Message m) {
         String a = m.buttonAction();
-        if (a == null || !a.startsWith("doc:") || core.profile(c.tenantId()).doctors().stream().noneMatch(d -> a.equals("doc:" + d.id()))) {
+        if (a == null || !a.startsWith("doc:") || content(c).profile().doctors().stream().noneMatch(d -> a.equals("doc:" + d.id()))) {
             return null;
         }
         Map<String, String> ctx = new HashMap<>(c.context());
@@ -383,9 +383,9 @@ class BookingFlow {
 
     private Outcome askDay(Conversation c, Map<String, String> ctx) {
         String l = lang(ctx);
-        ZoneId zone = ZoneId.of(core.profile(c.tenantId()).timeZone());
+        ZoneId zone = ZoneId.of(content(c).profile().timeZone());
         LocalDate today = clock.instant().atZone(zone).toLocalDate();
-        List<LocalDate> days = core.freeDays(c.tenantId(), UUID.fromString(ctx.get("doctorId")), today, today.plusDays(13)).stream().limit(3).toList();
+        List<LocalDate> days = content(c).freeDays(UUID.fromString(ctx.get("doctorId")), today, today.plusDays(13)).stream().limit(3).toList();
         if (days.isEmpty()) {
             return handoff(c, "day.none");
         }
@@ -412,7 +412,7 @@ class BookingFlow {
         UUID doctor = UUID.fromString(ctx.get("doctorId"));
         Instant now = clock.instant();
         var taken = holds.heldByOthers(c.tenantId(), doctor, c.id());
-        return AvailabilityProjection.slotStarts(projection.read(c.tenantId(), doctor, LocalDate.parse(ctx.get("day")))).stream()
+        return AvailabilityProjection.slotStarts(content(c).sessions(doctor, LocalDate.parse(ctx.get("day")))).stream()
                 .filter(s -> s.isAfter(now) && !taken.contains(s)).sorted().distinct().toList();
     }
 
@@ -469,7 +469,7 @@ class BookingFlow {
     private Outcome askConfirm(Conversation c, Map<String, String> ctx) {
         String l = lang(ctx);
         Instant slot = Instant.parse(ctx.get("slotStart"));
-        return new Outcome(State.CONFIRMING, ctx, BookingCopy.t(l, "card", doctorName(c, ctx), dateLabel(c, ctx, slot), timeLabel(c, ctx, slot), core.profile(c.tenantId()).clinicName()),
+        return new Outcome(State.CONFIRMING, ctx, BookingCopy.t(l, "card", doctorName(c, ctx), dateLabel(c, ctx, slot), timeLabel(c, ctx, slot), content(c).profile().clinicName()),
                 List.of(new Button("confirm", BookingCopy.t(l, "confirm")), new Button("change", BookingCopy.t(l, "change"))));
     }
 
@@ -514,7 +514,7 @@ class BookingFlow {
         done.put("lang", l);
         String when = dateLabel(c, ctx, slot), at = timeLabel(c, ctx, slot);
         if ("CONFIRMED".equals(b.status())) {
-            return new Outcome(State.DONE, done, BookingCopy.t(l, "done.confirmed", doctorName(c, ctx), when, at, core.profile(c.tenantId()).clinicName()));
+            return new Outcome(State.DONE, done, BookingCopy.t(l, "done.confirmed", doctorName(c, ctx), when, at, content(c).profile().clinicName()));
         }
         long minutes = b.slaDueAt() == null ? 10 : Math.max(1, (Duration.between(clock.instant(), b.slaDueAt()).getSeconds() + 59) / 60);
         return new Outcome(State.DONE, done, BookingCopy.t(l, "done.requested", doctorName(c, ctx), when, at, minutes));
@@ -541,12 +541,17 @@ class BookingFlow {
 
     // ---- small helpers ------------------------------------------------------------------------------------------------
 
+    /** COM-016: what a reply shows about the clinic comes only from the conversation's own tenant. */
+    private ClinicContent content(Conversation c) {
+        return contents.of(c);
+    }
+
     private ZoneId zone(Conversation c) {
-        return ZoneId.of(core.profile(c.tenantId()).timeZone());
+        return ZoneId.of(content(c).profile().timeZone());
     }
 
     private String doctorName(Conversation c, Map<String, String> ctx) {
-        return core.profile(c.tenantId()).doctors().stream().filter(d -> d.id().toString().equals(ctx.get("doctorId"))).map(CoreClient.Doctor::name).findFirst().orElse("");
+        return content(c).profile().doctors().stream().filter(d -> d.id().toString().equals(ctx.get("doctorId"))).map(CoreClient.Doctor::name).findFirst().orElse("");
     }
 
     private String dateLabel(Conversation c, Map<String, String> ctx, Instant at) {

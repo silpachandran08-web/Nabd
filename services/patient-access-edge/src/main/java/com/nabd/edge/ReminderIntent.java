@@ -46,8 +46,10 @@ public class ReminderIntent implements Intent {
     private final TravelBuffers travel;
     private final EtaNotifications notifications;
     private final Clock clock;
+    private final ClinicContent.Provider contents;
 
-    ReminderIntent(CoreClient core, TravelBuffers travel, EtaNotifications notifications, Clock clock) {
+    ReminderIntent(CoreClient core, TravelBuffers travel, EtaNotifications notifications, Clock clock, ClinicContent.Provider contents) {
+        this.contents = contents;
         this.core = core;
         this.travel = travel;
         this.notifications = notifications;
@@ -150,7 +152,7 @@ public class ReminderIntent implements Intent {
         LocalDate from = now.atZone(zone).toLocalDate();
         List<Button> buttons = new ArrayList<>();
         for (int d = 0; d < 3 && buttons.size() < 3; d++) {
-            for (var session : core.doctorDay(c.tenantId(), o.detail.doctorId(), from.plusDays(d))) {
+            for (var session : contents.of(c).doctorDay(o.detail.doctorId(), from.plusDays(d))) { // COM-016: own clinic's slots only
                 for (var slot : session.path("slots")) {
                     Instant at = Instant.parse(slot.asString(""));
                     Button b = new Button("slot:" + at.getEpochSecond(), WHEN.format(at.atZone(zone)));
