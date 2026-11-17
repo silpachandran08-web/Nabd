@@ -148,6 +148,7 @@ public class StaffDirectoryRepository {
     /** CLN-042: the staff member's specialty profiles, primary first: [code, entitlement/permission module]. */
     public List<String[]> findSpecialtyProfiles(UUID tenantId, UUID staffId) {
         return jdbc.query("SELECT s.code, p.config->>'module' FROM staff_specialty_profiles s JOIN specialty_profiles p ON p.code = s.code " +
+                        "JOIN staff st ON st.id = s.staff_id AND st.is_clinician " + // T1-BUG-2: a non-clinician's old row grants nothing
                         "WHERE s.tenant_id = ? AND s.staff_id = ? ORDER BY s.is_primary DESC",
                 (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, tenantId, staffId);
     }

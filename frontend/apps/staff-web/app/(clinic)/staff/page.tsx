@@ -97,7 +97,7 @@ export default function StaffAccessPage() {
           onClinicianSaved={(on) => rows.clinicianSaved(regEdit.id, on)} />
       )}
 
-      {specEdit && g.canEditRoles && <SpecialtyProfileDialog staffId={specEdit.id} staffName={specEdit.name} onClose={() => setSpecEdit(null)} />}
+      {specEdit && d.owner && g.canEditRoles && <SpecialtyProfileDialog staffId={specEdit.id} staffName={specEdit.name} onClose={() => setSpecEdit(null)} />}
 
       {inviteOpen && g.canInvite && <InviteDialog f={invite} roles={roles} departments={d.departments} onClose={() => setInviteOpen(false)} />}
 
