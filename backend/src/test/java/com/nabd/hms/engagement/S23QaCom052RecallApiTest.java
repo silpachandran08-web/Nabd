@@ -115,4 +115,30 @@ class S23QaCom052RecallApiTest extends ApiTestBase {
         List<Map> listed = exchange("/v1/encounters/" + entry + "/recall-orders", HttpMethod.GET, authed(c.doc()), List.class).getBody();
         assertThat(listed).singleElement().satisfies(m -> assertThat(m).containsEntry("dueDate", "2027-01-14"));
     }
+    // Round 2 (T1-BUG-3 fix): the scope gate must not lock out the visit's own doctor when that doctor is own-patients-only,
+    // and an all-clinic nurse still reads it
+    @Test
+    void c52a04_round2_ownScopedVisitDoctorStillSetsAndReads_allClinicNurseReads() {
+        Clinic c = clinic();
+        su().update("UPDATE staff SET scope = 'own_patients_only' WHERE id = ?", c.doctor().id());
+        String scopedDoc = loginAndGetAccessToken(c.doctor());
+        String entry = visit(c);
+        ResponseEntity<Map> post = recall(scopedDoc, entry, UUID.randomUUID().toString(), Map.of("intervalDays", 14));
+        ResponseEntity<List> get = exchange("/v1/encounters/" + entry + "/recall-orders", HttpMethod.GET, authed(scopedDoc), List.class);
+        UUID nurseRole = seedRole(c.t().id(), "QNurse", false, new ModuleGrant("clinical", true, false, false, false, false, false, false),
+                new ModuleGrant("patients", true, false, false, false, false, false, false));
+        String nurse = loginAndGetAccessToken(seedStaff(c.t(), nurseRole, "q52n" + SEQ.incrementAndGet() + "@q.com", phone(), false));
+        ResponseEntity<List> nurseGet = exchange("/v1/encounters/" + entry + "/recall-orders", HttpMethod.GET, authed(nurse), List.class);
+        // another scoped doctor: POST is refused as unknown (404), never 403 that would reveal the visit
+        SeededStaff other = ClinicianFixture.licensed(seedStaff(c.t(), c.doctorRole(), "q52x" + SEQ.incrementAndGet() + "@q.com", phone(), false));
+        su().update("UPDATE staff SET scope = 'own_patients_only' WHERE id = ?", other.id());
+        ResponseEntity<Map> otherPost = recall(loginAndGetAccessToken(other), entry, UUID.randomUUID().toString(), Map.of("intervalDays", 7));
+        System.out.println("C52-A04 scopedDoctor post=" + post.getStatusCode() + " get=" + get.getStatusCode() + " size=" + (get.getBody() == null ? null : get.getBody().size())
+                + " nurseGet=" + nurseGet.getStatusCode() + " otherScopedPost=" + otherPost.getStatusCode());
+        assertThat(post.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(get.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(get.getBody()).hasSize(1);
+        assertThat(nurseGet.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(otherPost.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }
