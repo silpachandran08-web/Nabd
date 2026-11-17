@@ -16,7 +16,8 @@ import java.util.UUID;
  * PHL-001 (hazard H-04): the counter and the visit checkout may bill a prescription-only item (charge_catalogue.is_rx,
  * set by the clinic) only against a signed prescription line of the same tenant and patient with quantity left.
  * Which items are prescription-only is the clinic's data, not decided here. A refusal is 422 Problem+JSON with a
- * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted, PHL-012 rx-expired, CLN-023 rx-revoked) plus an audit row and event
+ * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted, PHL-012 rx-expired, CLN-023 rx-revoked,
+ * CLN-024 REFILLS_EXHAUSTED and rx-expired for a line past its own validity) plus an audit row and event
  * that survive the rolled-back checkout. The outside-prescription path (paper/photo Rx) is PHL-020.
  */
 @Service
@@ -26,7 +27,8 @@ public class RxGate {
     public record Line(String chargeCode, UUID catalogueId, boolean isRx, int quantity, UUID prescriptionItemId) {
     }
 
-    record RxItemRow(UUID id, UUID patientId, String status, BigDecimal quantity, boolean revoked) {
+    /** refills: dispenses allowed after the first (CLN-024); lapsed: the line's own validity has passed. */
+    record RxItemRow(UUID id, UUID patientId, String status, BigDecimal quantity, boolean revoked, int refills, boolean lapsed) {
     }
 
     public record RxLineResponse(UUID prescriptionItemId, UUID patientId, String patientName, String drugName, String dosage,
@@ -93,7 +95,7 @@ public class RxGate {
         }
         java.util.Set<UUID> lapsed = worklist.lapsedLines(tenantId, requested.keySet().toArray(UUID[]::new)); // PHL-012: In-house Rx validity
         for (Line l : lines) {
-            if (l.prescriptionItemId() != null && lapsed.contains(l.prescriptionItemId())) {
+            if (l.prescriptionItemId() != null && (lapsed.contains(l.prescriptionItemId()) || rows.get(l.prescriptionItemId()).lapsed())) { // CLN-024: per-line validity
                 block(tenantId, staffId, ip, l, "rx-expired", "Prescription expired",
                         "The prescription for " + l.chargeCode() + " has passed its validity date and can no longer be dispensed.");
             }
@@ -101,12 +103,19 @@ public class RxGate {
         for (Line l : lines) {
             if (l.prescriptionItemId() == null) continue;
             RxItemRow row = rows.get(l.prescriptionItemId());
-            BigDecimal after = dispensed.getOrDefault(row.id(), BigDecimal.ZERO).add(BigDecimal.valueOf(requested.get(row.id())));
+            BigDecimal done = dispensed.getOrDefault(row.id(), BigDecimal.ZERO);
+            BigDecimal after = done.add(BigDecimal.valueOf(requested.get(row.id())));
+            BigDecimal allowed = allowance(row.quantity(), row.refills());
             // A line with no prescribed quantity has nothing to dispense against (fail safe).
-            if (row.quantity() == null || after.compareTo(row.quantity()) > 0) {
+            if (allowed == null || after.compareTo(allowed) > 0) {
+                // CLN-024: the first fill is used up and every refill too: the pharmacist's answer is "no refills left"
+                if (row.refills() > 0 && done.compareTo(allowed) >= 0) {
+                    block(tenantId, staffId, ip, l, "REFILLS_EXHAUSTED", "No refills left",
+                            "The prescription for " + l.chargeCode() + " has been dispensed with all " + row.refills() + " refills.");
+                }
                 block(tenantId, staffId, ip, l, "rx-quantity-exhausted", "Prescription quantity used up",
                         "The linked prescription line for " + l.chargeCode() + " has "
-                                + remaining(row.quantity(), dispensed.get(row.id())).toPlainString() + " left; this bill asks for "
+                                + remaining(allowed, dispensed.get(row.id())).toPlainString() + " left; this bill asks for "
                                 + requested.get(row.id()) + ".");
             }
         }
@@ -123,6 +132,11 @@ public class RxGate {
         tenantContext.set(tenantId);
         return repo.searchByPhone(tenantId, digits).stream()
                 .filter(r -> r.remainingQty().signum() > 0).toList();
+    }
+
+    /** CLN-024: what a line may dispense in all: the prescribed quantity once plus once per refill; null without a quantity. */
+    static BigDecimal allowance(BigDecimal quantity, int refills) {
+        return quantity == null ? null : quantity.multiply(BigDecimal.valueOf(1L + refills));
     }
 
     static BigDecimal remaining(BigDecimal quantity, BigDecimal dispensed) {

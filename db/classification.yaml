@@ -1703,6 +1703,8 @@ schemas:
       quantity_unit: phi
       drug_id: phi
       generic_name_snapshot: phi
+      validity_days: phi
+      refills_allowed: phi
     prescription_signer_backfill:
       prescription_id: operational
       tenant_id: operational
@@ -2171,6 +2173,14 @@ schemas:
       activated_at: operational
       created_by: operational
       created_at: operational
+    rx_validity_rules:
+      region: operational
+      version: operational
+      class_id: operational
+      default_days: operational
+      max_days: operational
+      max_refills: operational
+      fixed: operational
     service_points:
       id: operational
       tenant_id: operational

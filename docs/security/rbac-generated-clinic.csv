@@ -69,6 +69,7 @@ owner,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 owner,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 owner,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 owner,GET /v1/clinical/rx-sets,clinical:view,allow
+owner,GET /v1/clinical/rx-validity-rules,clinical:view,allow
 owner,GET /v1/clinical/safety-dictionary,clinical:view,allow
 owner,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 owner,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
@@ -551,6 +552,7 @@ owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,all
 owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 owner_doctor,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 owner_doctor,GET /v1/clinical/rx-sets,clinical:view,allow
+owner_doctor,GET /v1/clinical/rx-validity-rules,clinical:view,allow
 owner_doctor,GET /v1/clinical/safety-dictionary,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 owner_doctor,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
@@ -1033,6 +1035,7 @@ doctor,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 doctor,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 doctor,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 doctor,GET /v1/clinical/rx-sets,clinical:view,allow
+doctor,GET /v1/clinical/rx-validity-rules,clinical:view,allow
 doctor,GET /v1/clinical/safety-dictionary,clinical:view,allow
 doctor,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 doctor,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
@@ -1515,6 +1518,7 @@ nurse,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,allow
 nurse,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 nurse,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 nurse,GET /v1/clinical/rx-sets,clinical:view,allow
+nurse,GET /v1/clinical/rx-validity-rules,clinical:view,allow
 nurse,GET /v1/clinical/safety-dictionary,clinical:view,allow
 nurse,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 nurse,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow
@@ -1997,6 +2001,7 @@ receptionist,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view,den
 receptionist,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,deny-403
 receptionist,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,deny-403
 receptionist,GET /v1/clinical/rx-sets,clinical:view,deny-403
+receptionist,GET /v1/clinical/rx-validity-rules,clinical:view,deny-403
 receptionist,GET /v1/clinical/safety-dictionary,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-403
 receptionist,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-403
@@ -2479,6 +2484,7 @@ frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId}/pdf,clinical:view
 frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId}/print-header,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/prescriptions/{queueEntryId}/signing-authority,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/rx-sets,clinical:view,allow
+frontdesk_vitals,GET /v1/clinical/rx-validity-rules,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/safety-dictionary,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,allow

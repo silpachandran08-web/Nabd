@@ -65,8 +65,7 @@ public class RxVerificationService {
         if (repo.revokedAt(t, rx.id()).isPresent()) {
             return invalid(t, rx.id(), "revoked", staffId); // CLN-023: the prescriber withdrew it; never shown as dispensable
         }
-        List<Line> lines = repo.lines(t, rx.id()).stream().map(l -> new Line(l.prescriptionItemId(), l.drugName(), l.quantity(), l.dispensed(),
-                RxGate.remaining(l.quantity(), l.dispensed()))).toList();
+        List<Line> lines = repo.lines(t, rx.id()).stream().map(l -> line(l, l.drugName())).toList();
         boolean fullyDispensed = fullyDispensed(lines);
         Instant validUntil = worklist.validUntil(rx.id(), rx.queueEntryId());
         UUID entryId = repo.worklistEntry(t, rx.id()).orElse(null);
@@ -86,14 +85,21 @@ public class RxVerificationService {
         UUID t = tenant.current();
         RxVerificationRepository.Rx rx = repo.find(t, prescriptionId).filter(r -> "signed".equals(r.status())).orElse(null);
         if (rx == null) return java.util.Optional.empty();
-        List<Line> lines = repo.lines(t, rx.id()).stream().map(l -> new Line(l.prescriptionItemId(), null, l.quantity(), l.dispensed(),
-                RxGate.remaining(l.quantity(), l.dispensed()))).toList();
+        List<Line> lines = repo.lines(t, rx.id()).stream().map(l -> line(l, null)).toList();
         Instant validUntil = worklist.validUntil(rx.id(), rx.queueEntryId());
         String status = repo.revokedAt(t, rx.id()).isPresent() ? "revoked" : fullyDispensed(lines) ? "dispensed"
                 : validUntil != null && !clock.instant().isBefore(validUntil) ? "expired" : "valid";
         Instant dispensedAt = "dispensed".equals(status) ? repo.lastDispense(t, rx.id()).map(RxVerificationRepository.Dispense::at).orElse(null) : null;
         return java.util.Optional.of(new PublicVerification(status, new PublicDoctor(rx.signerName(), rx.signerRegistrationNo(), rx.signerCouncil()),
                 rx.signedAt(), validUntil, lines.size(), dispensedAt));
+    }
+
+    /** CLN-024: a dispense beyond the first prescribed quantity is a refill (partial fills count by quantity, as RxGate does). */
+    private static Line line(RxVerificationRepository.Line l, String drug) {
+        int used = l.quantity() == null || l.quantity().signum() == 0 ? 0
+                : Math.max(0, l.dispensed().divide(l.quantity(), 0, java.math.RoundingMode.CEILING).intValue() - 1);
+        return new Line(l.prescriptionItemId(), drug, l.quantity(), l.dispensed(), RxGate.remaining(RxGate.allowance(l.quantity(), l.refills()), l.dispensed()),
+                l.refills(), Math.min(used, l.refills()), l.validUntil());
     }
 
     /** Every line with a prescribed quantity has nothing left (a line without one has nothing to dispense against). */

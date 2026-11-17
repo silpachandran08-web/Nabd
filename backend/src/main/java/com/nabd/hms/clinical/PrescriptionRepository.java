@@ -75,7 +75,7 @@ class PrescriptionRepository {
     }
 
     List<PrescriptionItemRow> findItems(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT id, tenant_id, prescription_id, drug_name, dosage, frequency, duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, route, quantity, quantity_unit, drug_id, generic_name_snapshot, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
+        return jdbc.query("SELECT id, tenant_id, prescription_id, drug_name, dosage, frequency, duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, route, quantity, quantity_unit, drug_id, generic_name_snapshot, validity_days, refills_allowed, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
                         "ORDER BY display_order",
                 itemMapper(), tenantId, prescriptionId);
     }
@@ -99,13 +99,20 @@ class PrescriptionRepository {
         for (PrescriptionItemRow item : items) {
             jdbc.update("INSERT INTO prescription_items (tenant_id, prescription_id, drug_name, dosage, frequency, " +
                             "  duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, " +
-                            "  route, quantity, quantity_unit, drug_id, generic_name_snapshot) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?, " + GENERIC_OF + ")",
+                            "  route, quantity, quantity_unit, drug_id, generic_name_snapshot, validity_days, refills_allowed) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?, " + GENERIC_OF + ", ?, ?)",
                     tenantId, prescriptionId, item.drugName(), item.dosage(), item.frequency(), item.duration(),
                     item.instructions(), item.allergyOverrideReason(), order++,
                     item.overridesJson() == null ? "[]" : item.overridesJson(),
-                    item.brandName(), item.sigPattern(), item.route(), item.quantity(), item.quantityUnit(), item.drugId(), item.drugId());
+                    item.brandName(), item.sigPattern(), item.route(), item.quantity(), item.quantityUnit(), item.drugId(), item.drugId(),
+                    item.validityDays(), item.refillsAllowed());
         }
+    }
+
+    /** CLN-024: the validity and refills applied at signing, written while the prescription is still a draft (V51 locks it after). */
+    void applyValidity(UUID tenantId, UUID itemId, Integer validityDays, int refillsAllowed) {
+        jdbc.update("UPDATE prescription_items SET validity_days = ?, refills_allowed = ? WHERE tenant_id = ? AND id = ?",
+                validityDays, refillsAllowed, tenantId, itemId);
     }
 
     /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed.
@@ -297,6 +304,8 @@ class PrescriptionRepository {
                 rs.getBigDecimal("quantity"),
                 rs.getString("quantity_unit"),
                 rs.getString("drug_id"),
-                rs.getString("generic_name_snapshot"));
+                rs.getString("generic_name_snapshot"),
+                rs.getObject("validity_days", Integer.class),
+                rs.getInt("refills_allowed"));
     }
 }

@@ -3,6 +3,8 @@ package com.nabd.hms.clinical.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -22,7 +24,19 @@ public record PrescriptionItemRequest(@NotBlank @Size(max = 200) String drugName
                                        @Size(max = 40) String route,
                                        @DecimalMin(value = "0", inclusive = false) @Digits(integer = 6, fraction = 2) BigDecimal quantity,
                                        @Size(max = 40) String quantityUnit,
-                                       @Size(max = 80) String drugId) {
+                                       @Size(max = 80) String drugId,
+                                       // CLN-024 (optional): days the line stays valid from signing (null = the class default; a
+                                       // controlled class ignores it) and refills after the first dispense (null = 0)
+                                       @Min(1) @Max(365) Integer validityDays,
+                                       @Min(0) @Max(5) Integer refills) {
+
+    /** Keeps the pre-CLN-024 shape (no validity or refills: the class default) compiling. */
+    public PrescriptionItemRequest(String drugName, String dosage, String frequency, String duration, String instructions,
+                                    List<RxWarningDecision> overrides, String brandName, String sigPattern, String route,
+                                    BigDecimal quantity, String quantityUnit, String drugId) {
+        this(drugName, dosage, frequency, duration, instructions, overrides, brandName, sigPattern, route, quantity, quantityUnit, drugId,
+                null, null);
+    }
 
     /** Keeps pre-DOC-033 call sites (favourite sets) compiling: no structured fields. */
     public PrescriptionItemRequest(String drugName, String dosage, String frequency, String duration,

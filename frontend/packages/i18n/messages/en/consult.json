@@ -505,7 +505,17 @@
     "instructionsForThePatientOr": "Instructions for the patient or pharmacist",
     "prescriptionLine": "Prescription line {number}",
     "doseOf": "{name} dose",
-    "pattern": "Pattern {pattern} (units per dose)."
+    "pattern": "Pattern {pattern} (units per dose).",
+    "validity": "Validity",
+    "validDays": "{days, plural, one {Valid # day} other {Valid # days}} from signing",
+    "validDaysFixed": "{days, plural, one {Valid # day} other {Valid # days}}, no refills (controlled)",
+    "validUntil": "Valid until {date}",
+    "noValidityRule": "No validity rule for this medicine",
+    "validForDays": "Valid for days (at most {max})",
+    "refillsOf": "Refills (at most {max})",
+    "refillsCount": "{count, plural, =0 {No refills} one {# refill} other {# refills}}",
+    "fewerRefills": "Fewer refills",
+    "moreRefills": "More refills"
   },
   "rxPrint": {
     "yourRoleDoesnTHave": "Your role doesn't have access to prescriptions.",

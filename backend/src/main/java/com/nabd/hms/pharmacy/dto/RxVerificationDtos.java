@@ -23,8 +23,11 @@ public final class RxVerificationDtos {
     public record Prescriber(String name, String regNo) {
     }
 
+    /** CLN-024: remaining counts every refill (qtyPrescribed per dispense, once plus once per refill); refillsAllowed = dispenses after
+     * the first, refillsUsed = how many of them were given; validUntil = the line's own validity, null when it has none. */
     @Schema(name = "RxVerificationLine")
-    public record Line(UUID prescriptionItemId, String drug, BigDecimal qtyPrescribed, BigDecimal qtyDispensed, BigDecimal remaining) {
+    public record Line(UUID prescriptionItemId, String drug, BigDecimal qtyPrescribed, BigDecimal qtyDispensed, BigDecimal remaining,
+                       int refillsAllowed, int refillsUsed, Instant validUntil) {
     }
 
     /** where: the clinic the billing invoice was raised at, with its number. */
