@@ -152,7 +152,11 @@ public class CoreClient {
 
     // ---- ACC-040 / ACC-042 ------------------------------------------------------------------------------------------
 
-    public record Doctor(UUID id, String name) {
+    /** tenantId: the clinic whose staff row this is, when Core says so (null when it does not). COM-016: a row of another clinic is never shown. */
+    public record Doctor(UUID id, String name, UUID tenantId) {
+        public Doctor(UUID id, String name) {
+            this(id, name, null);
+        }
     }
 
     public record Profile(String clinicName, String timeZone, java.util.List<Doctor> doctors) {
@@ -163,7 +167,8 @@ public class CoreClient {
         JsonNode n = json.readTree(http.get(base + "/internal/v1/tenants/" + tenantId + "/booking-profile"));
         java.util.List<Doctor> docs = new java.util.ArrayList<>();
         for (JsonNode d : n.path("doctors")) {
-            docs.add(new Doctor(UUID.fromString(d.path("doctorId").asString("")), d.path("name").asString("")));
+            docs.add(new Doctor(UUID.fromString(d.path("doctorId").asString("")), d.path("name").asString(""),
+                    d.hasNonNull("tenantId") ? UUID.fromString(d.path("tenantId").asString("")) : null));
         }
         return new Profile(n.path("clinicName").asString(""), n.path("timeZone").asString("UTC"), docs);
     }
