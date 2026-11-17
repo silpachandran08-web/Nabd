@@ -31,6 +31,7 @@ final class FakeUpstreams {
     /** ACC-040/042 fakes. profiles: tenant id -> booking-profile JSON (default: one clinic, one doctor). households: phone hash -> member JSON objects. */
     final Map<String, String> profiles = new ConcurrentHashMap<>();
     final Map<String, List<String>> households = new ConcurrentHashMap<>();
+    final Map<String, String> packageSessions = new ConcurrentHashMap<>();  // COM-044: phone hash -> JSON array of the household's package sessions
     final Map<String, String> rawSessions = new ConcurrentHashMap<>();  // doctorId -> JSON array of sessions (with "date")
     final List<String> corePaths = new CopyOnWriteArrayList<>();         // every path Core was asked for
     final List<String> bookCalls = new CopyOnWriteArrayList<>();         // "<Idempotency-Key>|<body>"
@@ -134,7 +135,8 @@ final class FakeUpstreams {
                         return;
                     }
                     List<String> m = households.get(hash);
-                    reply(ex, m == null || m.isEmpty() ? 404 : 200, m == null || m.isEmpty() ? "{}" : "{\"members\":[" + String.join(",", m) + "]}");
+                    reply(ex, m == null || m.isEmpty() ? 404 : 200, m == null || m.isEmpty() ? "{}"
+                            : "{\"members\":[" + String.join(",", m) + "],\"packageSessions\":" + packageSessions.getOrDefault(hash, "[]") + "}");
                     return;
                 }
                 if (path0.endsWith("/booking-requests")) {
