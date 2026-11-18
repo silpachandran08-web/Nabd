@@ -262,6 +262,37 @@ paths:
       tags:
       - messaging
       x-required-permission: public
+  /internal/v1/consents:sms-keyword:
+    post:
+      operationId: SmsKeywordController_keyword
+      parameters:
+      - in: header
+        name: X-Internal-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmsKeywordRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SmsKeywordResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - messaging
+      x-required-permission: public
   /internal/v1/drug-master/imports:
     post:
       operationId: DrugMasterImportController_start
@@ -1437,11 +1468,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/HouseholdMember"
+                $ref: "#/components/schemas/InternalHousehold"
           description: OK
         "401":
           content:
@@ -7389,6 +7416,37 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:edit
+  /v1/clinical/rx-validity-rules:
+    get:
+      operationId: PrescriptionController_rxValidityRules
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RxValidityRulesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:view
   /v1/clinical/safety-dictionary:
     get:
       operationId: SafetyDictionaryController_getActiveSafetyDictionary
@@ -13042,6 +13100,99 @@ paths:
       tags:
       - pharmacy
       x-required-permission: pharmacy:edit
+  /v1/pharmacy/alerts:
+    get:
+      operationId: StockAlertController_alerts
+      parameters:
+      - in: query
+        name: type
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockAlertPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:view
+  /v1/pharmacy/alerts/{id}/acknowledge:
+    post:
+      operationId: StockAlertController_acknowledge
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockAlertAcknowledgeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StockAlert"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:edit
   /v1/pharmacy/batches/{id}:
     patch:
       operationId: PharmacyController_patchBatch
@@ -13680,6 +13831,54 @@ paths:
       tags:
       - pharmacy
       x-required-permission: pharmacy:edit
+  /v1/pharmacy/reports/expiry:
+    get:
+      operationId: StockAlertController_expiryReport
+      parameters:
+      - in: query
+        name: withinDays
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 90
+      - in: query
+        name: format
+        required: false
+        schema:
+          type: string
+          default: json
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpiryReport"
+            text/csv:
+              schema:
+                type: string
+          description: The report
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:view
   /v1/pharmacy/returns:
     post:
       operationId: PharmacyReturnController_create
@@ -17448,6 +17647,39 @@ paths:
       tags:
       - queue
       x-required-permission: setup:edit
+  /v1/recall-orders/vaccines-due-today:
+    get:
+      operationId: RecallController_vaccinesDueToday
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaccineDueResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - engagement
+      x-required-permission: clinical:view
   /v1/regions:
     get:
       operationId: RegionController_list_1
@@ -21437,6 +21669,132 @@ paths:
       tags:
       - platform
       x-required-permission: setup:edit
+  /v1/specialty/dental/la-lots:
+    get:
+      operationId: DentalCaseController_laLots
+      parameters:
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DentalLaLot"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
+  /v1/specialty/dental/patients/{patientId}/chair-notes:
+    get:
+      operationId: DentalCaseController_chairNotes
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: tooth
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalChairNoteList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:view
+    post:
+      operationId: DentalCaseController_addChairNote
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalChairNoteRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalChairNoteCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
   /v1/specialty/dental/patients/{patientId}/chart:
     get:
       operationId: DentalController_chart
@@ -21706,6 +22064,366 @@ paths:
       tags:
       - clinical
       x-required-permission: specialty_dental:edit
+  /v1/specialty/dental/patients/{patientId}/images:
+    get:
+      operationId: DentalCaseController_images
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: tooth
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalImageList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:view
+    post:
+      operationId: DentalCaseController_attachImage
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalImageRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalImageCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
+  /v1/specialty/dental/settings:
+    get:
+      operationId: DentalCaseController_settings
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:view
+    put:
+      operationId: DentalCaseController_updateSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: setup:edit
+  /v1/specialty/dental/settings/my-presets:
+    put:
+      operationId: DentalCaseController_updateMyPresets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DentalMyPresetsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DentalSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_dental:edit
+  /v1/specialty/derm/patients/{patientId}/photo-consent:
+    post:
+      operationId: DermPhotoController_recordConsent
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DermPhotoConsentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DermPhotoConsentCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_derm:edit
+  /v1/specialty/derm/patients/{patientId}/photo-consent/withdraw:
+    post:
+      operationId: DermPhotoController_withdrawConsent
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DermPhotoConsentWithdrawn"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_derm:edit
+  /v1/specialty/derm/patients/{patientId}/photos:
+    get:
+      operationId: DermPhotoController_timeline
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: site
+        required: false
+        schema:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,39}$"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DermPhotoTimeline"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_derm:view
+    post:
+      operationId: DermPhotoController_addPhoto
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DermPhotoCreateRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DermPhotoCreated"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: specialty_derm:edit
   /v1/specialty/me:
     get:
       operationId: SpecialtyController_me
@@ -25599,6 +26317,217 @@ components:
         startsAt:
           type: string
           format: date-time
+    DentalChairNoteCreated:
+      type: object
+      properties:
+        noteId:
+          type: string
+          format: uuid
+    DentalChairNoteItem:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        laDrugId:
+          type: string
+          format: uuid
+        laLot:
+          type: string
+        noteId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        presetCode:
+          type: string
+        queueEntryId:
+          type: string
+          format: uuid
+        text:
+          type: string
+        tooth:
+          type: integer
+          format: int32
+    DentalChairNoteList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalChairNoteItem"
+    DentalChairNoteRequest:
+      type: object
+      properties:
+        laBatch:
+          $ref: "#/components/schemas/DentalLaBatch"
+        presetCode:
+          type: string
+          maxLength: 40
+          minLength: 0
+        queueEntryId:
+          type: string
+          format: uuid
+        tooth:
+          type: integer
+          format: int32
+      required:
+      - presetCode
+      - queueEntryId
+      - tooth
+    DentalImageCreated:
+      type: object
+      properties:
+        imageId:
+          type: string
+          format: uuid
+    DentalImageItem:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        fileId:
+          type: string
+          format: uuid
+        imageId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        patientId:
+          type: string
+          format: uuid
+        queueEntryId:
+          type: string
+          format: uuid
+        teeth:
+          type: array
+          items:
+            type: integer
+            format: int32
+    DentalImageList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalImageItem"
+    DentalImageRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          pattern: iopa|bitewing|opg|intraoral_photo
+        queueEntryId:
+          type: string
+          format: uuid
+        teeth:
+          type: array
+          items:
+            type: integer
+            format: int32
+          maxItems: 32
+          minItems: 0
+        uploadId:
+          type: string
+          format: uuid
+      required:
+      - kind
+      - queueEntryId
+      - uploadId
+    DentalLaBatch:
+      type: object
+      properties:
+        drugId:
+          type: string
+          format: uuid
+        lot:
+          type: string
+          maxLength: 80
+          minLength: 0
+      required:
+      - drugId
+      - lot
+    DentalLaLot:
+      type: object
+      properties:
+        drugId:
+          type: string
+          format: uuid
+        drugName:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        lot:
+          type: string
+    DentalMyPresetsRequest:
+      type: object
+      properties:
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+          maxItems: 24
+          minItems: 0
+      required:
+      - presets
+    DentalPreset:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          pattern: "^[A-Z0-9_]{1,40}$"
+        drugQuery:
+          type: string
+          maxLength: 60
+          minLength: 0
+        la:
+          type: boolean
+        label:
+          type: string
+          maxLength: 60
+          minLength: 0
+      required:
+      - code
+      - label
+    DentalSettingsRequest:
+      type: object
+      properties:
+        numbering:
+          type: string
+          pattern: FDI|UNIVERSAL
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+          maxItems: 24
+          minItems: 0
+      required:
+      - numbering
+    DentalSettingsResponse:
+      type: object
+      properties:
+        clinicPresets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+        myPresets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
+        numbering:
+          type: string
+        presets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DentalPreset"
     DepartmentResponse:
       type: object
       properties:
@@ -25650,6 +26579,180 @@ components:
           minLength: 1
       required:
       - name
+    DermPhoto:
+      type: object
+      description: Oldest first
+      properties:
+        consentBadge:
+          type: string
+          description: Scope of the consent the photo was taken under
+          enum:
+          - record_only
+          - record_and_teaching
+        id:
+          type: string
+          format: uuid
+        note:
+          type: string
+          nullable: true
+        queueEntryId:
+          type: string
+          format: uuid
+        site:
+          $ref: "#/components/schemas/DermPhotoSite"
+        takenAt:
+          type: string
+          format: date-time
+        url:
+          type: string
+          description: "Signed single-object GET URL, valid 5 minutes"
+        urlExpiresAt:
+          type: string
+          format: date-time
+        visitDate:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - consentBadge
+      - id
+      - queueEntryId
+      - site
+      - takenAt
+      - url
+      - urlExpiresAt
+    DermPhotoConsent:
+      type: object
+      description: The active photo consent; null = none (capture it before any photo)
+      nullable: true
+      properties:
+        consentId:
+          type: string
+          format: uuid
+        recordedAt:
+          type: string
+          format: date-time
+        scope:
+          type: string
+          enum:
+          - record_only
+          - record_and_teaching
+        signerKind:
+          type: string
+        status:
+          type: string
+      required:
+      - consentId
+      - recordedAt
+      - scope
+      - signerKind
+      - status
+    DermPhotoConsentCreated:
+      type: object
+      properties:
+        consentId:
+          type: string
+          format: uuid
+      required:
+      - consentId
+    DermPhotoConsentRequest:
+      type: object
+      properties:
+        scope:
+          type: string
+          pattern: record_only|record_and_teaching
+        signatureSvg:
+          type: string
+          description: "SVG path strokes in a 600 x 200 box, as for procedure consent\
+            \ (CLN-014)"
+          maxLength: 200000
+          minLength: 0
+        signerKind:
+          type: string
+          pattern: patient|guardian
+      required:
+      - scope
+      - signerKind
+    DermPhotoConsentWithdrawn:
+      type: object
+      properties:
+        photosHidden:
+          type: integer
+          format: int32
+          description: "Photos now hidden (kept, never deleted)"
+      required:
+      - photosHidden
+    DermPhotoCreateRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        queueEntryId:
+          type: string
+          format: uuid
+        site:
+          $ref: "#/components/schemas/DermPhotoSite"
+        uploadId:
+          type: string
+          format: uuid
+      required:
+      - queueEntryId
+      - site
+      - uploadId
+    DermPhotoCreated:
+      type: object
+      properties:
+        photoId:
+          type: string
+          format: uuid
+      required:
+      - photoId
+    DermPhotoSite:
+      type: object
+      properties:
+        mapPointId:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+        region:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,39}$"
+        side:
+          type: string
+          pattern: left|right|midline|none
+      required:
+      - region
+      - side
+    DermPhotoSiteGroup:
+      type: object
+      properties:
+        photos:
+          type: array
+          description: Oldest first
+          items:
+            $ref: "#/components/schemas/DermPhoto"
+        site:
+          $ref: "#/components/schemas/DermPhotoSite"
+      required:
+      - photos
+      - site
+    DermPhotoTimeline:
+      type: object
+      properties:
+        consent:
+          $ref: "#/components/schemas/DermPhotoConsent"
+        hiddenCount:
+          type: integer
+          format: int32
+          description: Photos hidden by a withdrawn consent (retained)
+        sites:
+          type: array
+          items:
+            $ref: "#/components/schemas/DermPhotoSiteGroup"
+      required:
+      - hiddenCount
+      - sites
     DeskExceptionActionResponse:
       type: object
       properties:
@@ -26747,6 +27850,8 @@ components:
           format: date
         instanceId:
           type: string
+        lastReminderStatus:
+          type: string
         packageName:
           type: string
         patientName:
@@ -26760,6 +27865,49 @@ components:
         reminderSentForTier:
           type: boolean
         valueLeft:
+          type: number
+    ExpiryReport:
+      type: object
+      properties:
+        asOf:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExpiryReportLine"
+        totalValueAtRisk:
+          type: number
+        withinDays:
+          type: integer
+          format: int32
+    ExpiryReportLine:
+      type: object
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        batchNo:
+          type: string
+        daysToExpiry:
+          type: integer
+          format: int32
+        expiryDate:
+          type: string
+          format: date
+        itemId:
+          type: string
+          format: uuid
+        itemName:
+          type: string
+        purchaseRate:
+          type: number
+        qtyOnHand:
+          type: integer
+          format: int32
+        suggestedAction:
+          type: string
+        valueAtRisk:
           type: number
     ExportJobResponse:
       type: object
@@ -27754,6 +28902,8 @@ components:
         createdAt:
           type: string
           format: date-time
+        deliveryStatus:
+          type: string
         delta:
           type: integer
           format: int32
@@ -27915,6 +29065,9 @@ components:
           type: string
           maxLength: 280
           minLength: 0
+        packageInstanceId:
+          type: string
+          format: uuid
         patientRef:
           type: string
           minLength: 1
@@ -27961,6 +29114,36 @@ components:
         v:
           type: integer
           format: int64
+    InternalHousehold:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/HouseholdMember"
+        packageSessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalHouseholdPackageSession"
+    InternalHouseholdPackageSession:
+      type: object
+      properties:
+        eligibleDoctorIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        instanceId:
+          type: string
+          format: uuid
+        nextSession:
+          type: integer
+          format: int32
+        patientRef:
+          type: string
+        totalSessions:
+          type: integer
+          format: int32
     InternalProfileDoctor:
       type: object
       properties:
@@ -27969,6 +29152,9 @@ components:
           format: uuid
         name:
           type: string
+        tenantId:
+          type: string
+          format: uuid
     InternalSession:
       type: object
       properties:
@@ -29584,6 +30770,48 @@ components:
           format: int32
         workspaceToken:
           type: string
+    PackageCard:
+      type: object
+      properties:
+        currency:
+          type: string
+        due:
+          type: number
+        graceUntil:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageCardItem"
+        packageName:
+          type: string
+        paid:
+          type: number
+        saved:
+          type: number
+        sessionsTotal:
+          type: integer
+          format: int32
+        sessionsUsed:
+          type: integer
+          format: int32
+        status:
+          type: string
+        validUntil:
+          type: string
+          format: date
+    PackageCardItem:
+      type: object
+      properties:
+        name:
+          type: string
+        total:
+          type: integer
+          format: int32
+        used:
+          type: integer
+          format: int32
     PackageItemInput:
       type: object
       properties:
@@ -30230,6 +31458,9 @@ components:
           type: boolean
         register:
           type: string
+        reorderLevel:
+          type: integer
+          format: int32
         returnable:
           type: boolean
         scheduleClass:
@@ -30289,6 +31520,10 @@ components:
           minimum: 0
         priceInclusiveOfTax:
           type: boolean
+        reorderLevel:
+          type: integer
+          format: int32
+          minimum: 0
         returnable:
           type: boolean
         scheduleClass:
@@ -30948,6 +32183,11 @@ components:
           type: string
           maxLength: 40
           minLength: 0
+        refills:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 0
         route:
           type: string
           maxLength: 40
@@ -30956,6 +32196,11 @@ components:
           type: string
           maxLength: 40
           minLength: 0
+        validityDays:
+          type: integer
+          format: int32
+          maximum: 365
+          minimum: 1
       required:
       - drugName
     PrescriptionItemResponse:
@@ -30997,10 +32242,18 @@ components:
           type: number
         quantityUnit:
           type: string
+        refills:
+          type: integer
+          format: int32
         route:
           type: string
         sigPattern:
           type: string
+        validity:
+          $ref: "#/components/schemas/RxLineValidityResponse"
+        validityDays:
+          type: integer
+          format: int32
         warnings:
           type: array
           items:
@@ -32575,6 +33828,22 @@ components:
             $ref: "#/components/schemas/Cell"
         time:
           type: string
+    Rule:
+      type: object
+      properties:
+        classId:
+          type: string
+        defaultDays:
+          type: integer
+          format: int32
+        fixed:
+          type: boolean
+        maxDays:
+          type: integer
+          format: int32
+        maxRefills:
+          type: integer
+          format: int32
     RxCodeSuggestion:
       type: object
       properties:
@@ -32631,6 +33900,28 @@ components:
           minLength: 1
       required:
       - phone
+    RxLineValidityResponse:
+      type: object
+      properties:
+        classId:
+          type: string
+        days:
+          type: integer
+          format: int32
+        fixed:
+          type: boolean
+        maxDays:
+          type: integer
+          format: int32
+        maxRefills:
+          type: integer
+          format: int32
+        refills:
+          type: integer
+          format: int32
+        validUntil:
+          type: string
+          format: date-time
     RxPublicDoctor:
       type: object
       properties:
@@ -32689,6 +33980,18 @@ components:
         language:
           type: string
           pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+    RxValidityRulesResponse:
+      type: object
+      properties:
+        region:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rule"
+        version:
+          type: integer
+          format: int32
     RxVerification:
       type: object
       properties:
@@ -32739,8 +34042,17 @@ components:
           type: number
         qtyPrescribed:
           type: number
+        refillsAllowed:
+          type: integer
+          format: int32
+        refillsUsed:
+          type: integer
+          format: int32
         remaining:
           type: number
+        validUntil:
+          type: string
+          format: date-time
     RxVerificationPrescriber:
       type: object
       properties:
@@ -32828,6 +34140,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Item"
+        validityRules:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidityRule"
     SalesDay:
       type: object
       properties:
@@ -32926,6 +34242,8 @@ components:
           type: string
         mime:
           type: string
+        packageCard:
+          $ref: "#/components/schemas/PackageCard"
         title:
           type: string
     SelfCheckInCandidate:
@@ -33009,6 +34327,11 @@ components:
     SellPackageRequest:
       type: object
       properties:
+        nudgeIntervalDays:
+          type: integer
+          format: int32
+          maximum: 365
+          minimum: 1
         packageId:
           type: string
           format: uuid
@@ -33238,6 +34561,34 @@ components:
       required:
       - kind
       - name
+    SmsKeywordRequest:
+      type: object
+      properties:
+        inboundRef:
+          type: integer
+          format: int64
+          minimum: 0
+        phone:
+          type: string
+          pattern: "^[1-9][0-9]{7,14}$"
+        tenantId:
+          type: string
+          format: uuid
+        text:
+          type: string
+          maxLength: 64
+          minLength: 0
+      required:
+      - inboundRef
+      - phone
+      - text
+    SmsKeywordResponse:
+      type: object
+      properties:
+        confirm:
+          type: boolean
+        optedOut:
+          type: boolean
     SourceBreakdownResponse:
       type: object
       properties:
@@ -33599,6 +34950,81 @@ components:
           type: integer
           format: int32
         reasonCode:
+          type: string
+    StockAlert:
+      type: object
+      properties:
+        action:
+          type: string
+        batchId:
+          type: string
+          format: uuid
+        batchNo:
+          type: string
+        createdOn:
+          type: string
+          format: date
+        daysToExpiry:
+          type: integer
+          format: int32
+        expiryDate:
+          type: string
+          format: date
+        id:
+          type: string
+          format: uuid
+        itemId:
+          type: string
+          format: uuid
+        itemName:
+          type: string
+        onHand:
+          type: integer
+          format: int32
+        reorderLevel:
+          type: integer
+          format: int32
+        status:
+          type: string
+        type:
+          type: string
+        valueAtRisk:
+          type: number
+    StockAlertAcknowledgeRequest:
+      type: object
+      properties:
+        action:
+          type: string
+          minLength: 1
+          pattern: returned|discounted|quarantined|none
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - action
+    StockAlertCounts:
+      type: object
+      properties:
+        dead:
+          type: integer
+          format: int32
+        expiry:
+          type: integer
+          format: int32
+        low:
+          type: integer
+          format: int32
+    StockAlertPage:
+      type: object
+      properties:
+        counts:
+          $ref: "#/components/schemas/StockAlertCounts"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockAlert"
+        nextCursor:
           type: string
     StockBatch:
       type: object
@@ -34708,6 +36134,22 @@ components:
         whatsappUtilityMessages:
           type: integer
           format: int64
+    VaccineDueResponse:
+      type: object
+      properties:
+        arrived:
+          type: boolean
+        dueDate:
+          type: string
+          format: date
+        patientId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+        recallId:
+          type: string
+          format: uuid
     VaccineRecordRequest:
       type: object
       properties:
@@ -34782,6 +36224,22 @@ components:
           type: string
         vaccineName:
           type: string
+    ValidityRule:
+      type: object
+      properties:
+        classId:
+          type: string
+        defaultDays:
+          type: integer
+          format: int32
+        fixed:
+          type: boolean
+        maxDays:
+          type: integer
+          format: int32
+        maxRefills:
+          type: integer
+          format: int32
     VerifyRequest:
       type: object
       properties:

@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
+import java.time.Duration;
 
 /** SMS exists only where a BSP is configured (and the field key that encrypts phone numbers at rest): no BSP, no SMS channel. */
 @Configuration
@@ -27,7 +28,21 @@ class SmsConfig {
 
     @Bean
     SmsService smsService(JdbcTemplate jdbc, TransactionTemplate tx, FieldCrypto crypto, SmsProvider provider, SendGate gate, StreamEventPublisher events,
-                          ObjectMapper json, MeterRegistry metrics, Clock clock, @Value("${comms.region:in}") String region) {
-        return new SmsService(jdbc, tx, crypto, provider, gate, events, json, metrics, clock, region);
+                          ObjectMapper json, MeterRegistry metrics, Clock clock, @Value("${comms.region:in}") String region,
+                          @Value("${comms.sms.dnd.max-age:PT24H}") Duration dndMaxAge) {
+        return new SmsService(jdbc, tx, crypto, provider, gate, events, json, metrics, clock, region, dndMaxAge);
+    }
+
+    /** COM-028: STOP handling needs Core's consent API; without it inbound SMS stay stored (pending) until it is configured. */
+    @Bean
+    @ConditionalOnProperty("comms.core.base-url")
+    SmsStopService smsStopService(JdbcTemplate jdbc, TransactionTemplate tx, FieldCrypto crypto, SmsService sms, ObjectMapper json, MeterRegistry metrics,
+                                  @Value("${comms.core.base-url}") String coreBaseUrl, @Value("${comms.core.token:}") String coreToken) {
+        return new SmsStopService(jdbc, tx, crypto, sms, json, metrics, coreBaseUrl, coreToken);
+    }
+
+    @Bean
+    SmsFallback smsFallback(JdbcTemplate jdbc, TransactionTemplate tx, FieldCrypto crypto, SmsService sms, MeterRegistry metrics, Clock clock) {
+        return new SmsFallback(jdbc, tx, crypto, sms, metrics, clock);
     }
 }

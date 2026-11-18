@@ -28,7 +28,7 @@ class PrescriptionPrintRepository {
     }
 
     record Item(String drugName, String brandName, String dosage, String frequency, String duration, String route, java.math.BigDecimal quantity,
-                String quantityUnit, String instructions) {
+                String quantityUnit, String instructions, Integer validityDays, int refillsAllowed) {
     }
 
     private final JdbcTemplate jdbc;
@@ -95,10 +95,11 @@ class PrescriptionPrintRepository {
     }
 
     List<Item> items(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT drug_name, brand_name, dosage, frequency, duration, route, quantity, quantity_unit, instructions FROM prescription_items "
-                        + "WHERE tenant_id = ? AND prescription_id = ? ORDER BY display_order",
+        return jdbc.query("SELECT drug_name, brand_name, dosage, frequency, duration, route, quantity, quantity_unit, instructions, validity_days, "
+                        + "refills_allowed FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? ORDER BY display_order",
                 (rs, i) -> new Item(rs.getString("drug_name"), rs.getString("brand_name"), rs.getString("dosage"), rs.getString("frequency"),
-                        rs.getString("duration"), rs.getString("route"), rs.getBigDecimal("quantity"), rs.getString("quantity_unit"), rs.getString("instructions")),
+                        rs.getString("duration"), rs.getString("route"), rs.getBigDecimal("quantity"), rs.getString("quantity_unit"), rs.getString("instructions"),
+                        rs.getObject("validity_days", Integer.class), rs.getInt("refills_allowed")),
                 tenantId, prescriptionId);
     }
 

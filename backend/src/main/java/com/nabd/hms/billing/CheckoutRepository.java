@@ -7,7 +7,6 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -29,9 +28,12 @@ class CheckoutRepository {
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.pharmacy.api.StockCommands stock;
     private final com.nabd.hms.pharmacy.api.RxDispensing dispensing;
+    private final com.nabd.hms.queue.api.VisitQueries visits; // PLT-035: visit facts come from the visit module, never queue_entries SQL
 
-    CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock, com.nabd.hms.pharmacy.api.RxDispensing dispensing) {
+    CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock, com.nabd.hms.pharmacy.api.RxDispensing dispensing,
+                       com.nabd.hms.queue.api.VisitQueries visits) {
         this.dispensing = dispensing;
+        this.visits = visits;
         this.jdbc = jdbc;
         this.stock = stock;
     }
@@ -91,13 +93,10 @@ class CheckoutRepository {
                 "AND status = 'completed' AND billed = false", tenantId, queueEntryId);
     }
 
-    // Not reaching into QueueRepository/PatientService (different packages) for these — same
-    // narrow-direct-query precedent as CheckoutRepository.planExists() in the platform module.
+    /** PLT-035: through queue.api.VisitQueries (billing SQL never touches queue_entries). */
     Optional<QueueEntryContext> findQueueEntryContext(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT patient_id, doctor_id, department_id, status, appointment_id FROM queue_entries WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> new QueueEntryContext(UUID.fromString(rs.getString("patient_id")), UUID.fromString(rs.getString("doctor_id")),
-                        UUID.fromString(rs.getString("department_id")), rs.getString("status"), rs.getString("appointment_id") != null),
-                tenantId, queueEntryId).stream().findFirst();
+        return visits.visit(tenantId, queueEntryId)
+                .map(v -> new QueueEntryContext(v.patientId(), v.doctorId(), v.departmentId(), v.status(), v.hasAppointment()));
     }
 
     Optional<String> findPatientName(UUID tenantId, UUID patientId) {
@@ -110,20 +109,27 @@ class CheckoutRepository {
                 (rs, i) -> rs.getString("name"), tenantId, staffId).stream().findFirst();
     }
 
-    /** FIN-015: date of the last completed visit with this doctor billed at full price; a follow-up visit does not restart the window. */
+    /** FIN-015: date of the last completed visit with this doctor billed at full price; a follow-up visit does not restart the window.
+     * PLT-035: the completed visits come from VisitQueries; billing only checks its own invoices for a follow_up line. */
     LocalDate lastFullPriceVisit(UUID tenantId, UUID patientId, UUID doctorId) {
-        Date d = jdbc.queryForObject(
-                "SELECT max(q.queue_date) FROM queue_entries q WHERE q.tenant_id = ? AND q.patient_id = ? AND q.doctor_id = ? " +
-                        "AND q.status = 'completed' AND NOT EXISTS (SELECT 1 FROM invoices i JOIN invoice_line_items li ON li.invoice_id = i.id " +
-                        "WHERE i.tenant_id = q.tenant_id AND i.queue_entry_id = q.id AND li.tier = 'follow_up')",
-                Date.class, tenantId, patientId, doctorId);
-        return d == null ? null : d.toLocalDate();
+        List<com.nabd.hms.queue.api.VisitQueries.VisitDay> done = visits.completedVisits(tenantId, patientId, doctorId);
+        if (done.isEmpty()) return null;
+        java.util.Set<UUID> followUps = new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT DISTINCT i.queue_entry_id FROM invoices i JOIN invoice_line_items li ON li.invoice_id = i.id " +
+                        "WHERE i.tenant_id = ? AND i.queue_entry_id = ANY(?::uuid[]) AND li.tier = 'follow_up'",
+                UUID.class, tenantId, uuidArray(done.stream().map(com.nabd.hms.queue.api.VisitQueries.VisitDay::visitId).toList())));
+        return done.stream().filter(v -> !followUps.contains(v.visitId())).map(com.nabd.hms.queue.api.VisitQueries.VisitDay::date)
+                .findFirst().orElse(null); // newest first
     }
 
-    /** FIN-016: the check-in's urgent flag is queue_entries.priority (owned by the queue domain; billing only reads it). */
+    /** FIN-016: the check-in's urgent flag (queue_entries.priority, owned by the visit module; read through VisitQueries). */
     boolean isUrgent(UUID tenantId, UUID queueEntryId) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT COALESCE(priority, false) FROM queue_entries WHERE tenant_id = ? AND id = ?",
-                Boolean.class, tenantId, queueEntryId));
+        return visits.visit(tenantId, queueEntryId).map(com.nabd.hms.queue.api.VisitQueries.Visit::urgent).orElse(false);
+    }
+
+    /** A Postgres uuid[] literal for {@code = ANY(?::uuid[])} (ScheduleRepository.flagNeedsReschedule does the same). */
+    static String uuidArray(List<UUID> ids) {
+        return "{" + String.join(",", ids.stream().map(UUID::toString).toList()) + "}";
     }
 
     /** FIN-015: a doctor's own fee for a consultation head, or null (blank override: the base amount applies). */

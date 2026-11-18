@@ -119,3 +119,11 @@ export function headline(status: ScanStatus, reason: string | null | undefined, 
       return "Signature invalid";
   }
 }
+
+/** CLN-024: what the scan card adds to a line: its refills (used of allowed) and its own validity date, when it has them. */
+export function lineTerms(l: { refillsAllowed?: number; refillsUsed?: number; validUntil?: string | null }, day: (iso: string) => string): string {
+  const parts: string[] = [];
+  if ((l.refillsAllowed ?? 0) > 0) parts.push(`refills ${l.refillsUsed ?? 0} of ${l.refillsAllowed} used`);
+  if (l.validUntil) parts.push(`valid until ${day(l.validUntil)}`);
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}

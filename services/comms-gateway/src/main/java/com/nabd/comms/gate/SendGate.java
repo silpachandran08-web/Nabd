@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * IDC-006.3 / IDC-008.1: the send-time gate, evaluated when the message is about to leave, never at enqueue time.
- * MARKETING and recall-promo sends need the marketing consent and a subject aged 18+; UTILITY sends need the messaging
+ * MARKETING and recall-promo sends need a patient with the marketing consent and a subject aged 18+; UTILITY sends need the messaging
  * consent; AUTHENTICATION sends (one-time codes) need neither. A refusal is recorded (send_refusals) and counted
  * (comms_send_refused_total{reason}). The caller (the sender) binds the result to the message: refused = status 'blocked'.
  */
@@ -53,7 +53,7 @@ public class SendGate {
         String reason = null;
         if (marketing && r.subjectDob() != null && MinorSubject.isMinor(r.subjectDob(), r.clinicZone(), clock)) {
             reason = "minor-subject";
-        } else if (marketing && r.patientRef() != null && !snapshot.isGranted(r.tenantId(), r.patientRef(), "marketing")) {
+        } else if (marketing && (r.patientRef() == null || !snapshot.isGranted(r.tenantId(), r.patientRef(), "marketing"))) { // COM-028: no patient, no consent to show
             reason = "no-marketing-consent";
         } else if (!marketing && r.category() == Category.UTILITY && r.patientRef() != null && !snapshot.isGranted(r.tenantId(), r.patientRef(), "messaging")) {
             reason = "no-messaging-consent";

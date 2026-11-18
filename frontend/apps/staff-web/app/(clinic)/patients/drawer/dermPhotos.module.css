@@ -1,0 +1,73 @@
+/* CLN-047: dermatology photo timeline (patient drawer). Logical properties only (RTL); 44 px targets. */
+.tab { display: flex; flex-direction: column; gap: var(--nb-space-16); }
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--nb-space-12); }
+.headActions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.muted { margin: 0; font-size: 13px; color: var(--nb-text-secondary); }
+.notice {
+  margin: 0;
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-size: 13px;
+}
+.error { margin: 0; font-size: 13px; color: var(--nb-danger-500); }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding-inline: var(--nb-space-8);
+  min-block-size: 24px;
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  color: var(--nb-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.primary, .secondary, .danger {
+  min-block-size: 44px;
+  padding-inline: var(--nb-space-16);
+  border-radius: var(--nb-radius-md);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary { border: 1px solid var(--nb-accent-500); background: var(--nb-accent-500); color: var(--nb-on-accent); }
+.secondary { border: 1px solid var(--nb-border-default); background: transparent; color: var(--nb-text-primary); }
+.danger { border: 1px solid var(--nb-danger-500); background: transparent; color: var(--nb-danger-500); }
+.primary:disabled, .secondary:disabled, .danger:disabled { opacity: 0.6; cursor: not-allowed; }
+.site { display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.siteHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--nb-space-8); }
+.siteTitle { margin: 0; font-size: 14px; font-weight: 600; }
+.strip { display: flex; gap: var(--nb-space-12); overflow-x: auto; margin: 0; padding: 0 0 var(--nb-space-8); list-style: none; }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-4);
+  flex: 0 0 160px;
+  padding: var(--nb-space-8);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  background: var(--nb-surface-1);
+}
+.thumb { inline-size: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--nb-radius-md); }
+.placeholder { background: var(--nb-surface-2); }
+.meta { margin: 0; font-size: 12px; color: var(--nb-text-secondary); }
+.pick { display: flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; font-size: 13px; cursor: pointer; }
+.form { display: flex; flex-direction: column; gap: var(--nb-space-16); }
+.fieldset { display: flex; flex-direction: column; gap: var(--nb-space-4); margin: 0; padding: var(--nb-space-12); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); }
+.choice { display: flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; font-size: 13px; cursor: pointer; }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 13px; }
+.field select, .field input { min-block-size: 44px; font: inherit; }
+.row { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); justify-content: flex-end; }
+.fileBtn { display: inline-flex; align-items: center; justify-content: center; position: relative; }
+.fileInput { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.sideBySide { display: grid; grid-template-columns: 1fr 1fr; gap: var(--nb-space-12); }
+.figure { margin: 0; display: flex; flex-direction: column; gap: var(--nb-space-4); }
+.full { display: block; inline-size: 100%; block-size: auto; border-radius: var(--nb-radius-md); }
+.overlay { position: relative; }
+.overlayTop { position: absolute; inset: 0; }
+.slider { inline-size: 100%; min-block-size: 44px; }
+@media (max-width: 640px) { .sideBySide { grid-template-columns: 1fr; } }

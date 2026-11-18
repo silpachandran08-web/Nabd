@@ -69,6 +69,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
             Map.entry("clinical.rx.signed.v1", List.of("prescriptionId", "queueEntryId", "signedBy", "status")),
             Map.entry("clinical.allergy.changed.v1", List.of("patientId", "allergyId?", "change", "status")),
             Map.entry("billing.invoice.paid.v1", List.of("invoiceId", "totalMinor", "currency", "status")),
+            Map.entry("billing.invoice.settled.v1", List.of("invoiceId", "visitId", "settledAt", "settledBy")), // PLT-035
             Map.entry("billing.payment.recorded.v1", List.of("invoiceId", "paymentId", "method", "amountMinor", "currency", "balanceMinor", "status")),
             Map.entry("billing.refund.approved.v1", List.of("refundRequestId", "invoiceId", "amountMinor", "methods")),
             Map.entry("consent.changed.v1", List.of("patientId", "consentType", "status")),
@@ -400,6 +401,9 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("clinical.prescription.revoked.v1"); // CLN-023: Cln023RxPdfApiTest
         expected.remove("organization.messaging_settings.changed.v1"); // COM-024: Com024MessagingSettingsApiTest, DomainEventContractApiTest
         expected.remove("iam.break_glass.reviewed.v1"); // PLT-013: Plt013BreakGlassReviewApiTest
+        expected.remove("billing.package.sold.v1"); // COM-044: Com044PackageMessagingApiTest
+        expected.remove("pharmacy.stock.alerts_digest_ready.v1"); // PHL-008: Phl008StockAlertsApiTest
+        expected.remove("specialty.photo.added.v1"); // CLN-047: Cln047DermPhotosApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

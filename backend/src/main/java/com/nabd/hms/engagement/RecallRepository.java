@@ -1,6 +1,7 @@
 package com.nabd.hms.engagement;
 
 import com.nabd.hms.engagement.dto.RecallOrderResponse;
+import com.nabd.hms.engagement.dto.VaccineDueResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -59,6 +60,33 @@ class RecallRepository {
 
     Optional<RecallOrderResponse> find(UUID tenantId, UUID id) {
         return jdbc.query("SELECT " + COLS + " FROM recall_orders WHERE tenant_id = ? AND id = ?", ROW, tenantId, id).stream().findFirst();
+    }
+
+    /**
+     * CLN-043: open vaccine recalls due by {@code today} of the patients this doctor has today: an appointment still
+     * scheduled/arrived in [from, to), or a queue entry of that clinic date (arrived). Consent gate as every clinical read;
+     * own-patients holds by construction (each row is the caller's own appointment or queue entry).
+     */
+    List<VaccineDueResponse> vaccinesDue(UUID tenantId, UUID doctorId, LocalDate today, Instant from, Instant to) {
+        return jdbc.query("""
+                WITH today AS (
+                  SELECT patient_id, bool_or(arrived) AS arrived FROM (
+                    SELECT patient_id, true AS arrived FROM queue_entries
+                     WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? AND status NOT IN ('no_show', 'transferred_out')
+                    UNION ALL
+                    SELECT patient_id, status = 'arrived' FROM appointments
+                     WHERE tenant_id = ? AND doctor_id = ? AND status IN ('scheduled', 'arrived') AND start_time >= ? AND start_time < ?
+                  ) t GROUP BY patient_id)
+                SELECT r.id, r.patient_id, r.due_date, r.reason_code, today.arrived
+                  FROM recall_orders r JOIN today ON today.patient_id = r.patient_id
+                 WHERE r.tenant_id = ? AND r.source = 'vaccine' AND r.status IN ('pending', 'messaged', 'booked', 'callback')
+                   AND r.due_date <= ?
+                """ + com.nabd.hms.patient.api.ConsentGateSql.gate("r.patient_id", "r.tenant_id")
+                        + "ORDER BY r.due_date, r.id",
+                (rs, i) -> new VaccineDueResponse(rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class),
+                        rs.getObject("due_date", LocalDate.class), rs.getString("reason_code"), rs.getBoolean("arrived")),
+                tenantId, doctorId, Date.valueOf(today), tenantId, doctorId, Timestamp.from(from), Timestamp.from(to),
+                tenantId, Date.valueOf(today));
     }
 
     /** The patient's oldest-due open recall with this doctor (or none named) becomes 'booked'; returns its id. */

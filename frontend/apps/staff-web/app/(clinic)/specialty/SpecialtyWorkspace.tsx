@@ -2,18 +2,17 @@
 
 // CLN-042: the doctor's specialty workspace, resolved from GET /v1/specialty/me (registry-driven: no per-specialty code).
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
-import { getter, key } from "../../lib/query";
 import { errorText } from "../../lib/api";
-import { workspaceView, type MySpecialty } from "./specialtyModel";
+import { workspaceView } from "./specialtyModel";
+import { useSpecialtyMe } from "./useSpecialtyMe";
 import s from "./specialty.module.css";
 
 export default function SpecialtyWorkspace() {
   const t = useTranslations("shell.specialty");
   const locale = useLocale();
-  const q = useQuery({ queryKey: key("specialty-me"), queryFn: getter<MySpecialty>("/specialty/me") });
+  const q = useSpecialtyMe();
   if (q.isPending) return <main className={s.page}><Skeleton rows={4} label={t("loading")} /></main>;
   if (q.isError) return <main className={s.page}><ErrorState message={errorText(q.error, t("loadFailed"))} onRetry={() => q.refetch()} /></main>;
   const v = workspaceView(q.data, locale);

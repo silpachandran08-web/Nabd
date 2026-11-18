@@ -60,7 +60,7 @@ class PatientConsentService implements PatientConsentCommands {
                     + "VALUES (?,?,?," + (grant ? "NULL" : "now()") + ",?,?)", tenant, p, purpose, v, source);
             events.publish(tenant, DomainEventType.CONSENT_CHANGED, p,
                     Map.of("patientId", p, "consentType", purpose, "status", grant ? "granted" : "withdrawn"));
-            audit.record(tenant, "system", null, "WhatsApp", "System", null, grant ? "consent.granted_by_phone" : "consent.withdrawn_by_phone",
+            audit.record(tenant, "system", null, source.startsWith("sms") ? "SMS" : "WhatsApp", "System", null, grant ? "consent.granted_by_phone" : "consent.withdrawn_by_phone",
                     "patient", p, null, Map.of("purpose", purpose, "source", source, "inboundId", inboundId));
             changed++;
             version = Math.max(version, v);

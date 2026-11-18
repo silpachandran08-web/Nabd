@@ -154,6 +154,7 @@ class Acc042DependantApiTest extends ApiTestBase {
         assertThat(r.getBody().get("timeZone")).isEqualTo(clinicClock.zone(a.tenant().id()).getId());
         assertThat(r.getBody().get("clinicName")).isNotNull();
         assertThat((List<Map<String, Object>>) r.getBody().get("doctors")).extracting(d -> d.get("doctorId")).containsExactly(a.doctor().id().toString());
+        assertThat((List<Map<String, Object>>) r.getBody().get("doctors")).extracting(d -> d.get("tenantId")).containsExactly(a.tenant().id().toString()); // COM-016: the Edge guard checks it
         assertThat(exchange(b.base() + "/booking-profile", HttpMethod.GET, authed(a.edgeToken()), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat((List<?>) exchange(b.base() + "/booking-profile", HttpMethod.GET, authed(b.edgeToken()), Map.class).getBody().get("doctors")).isEmpty();
     }

@@ -133,9 +133,14 @@ export function useInstanceActions({ fe, loadAll, setTab }: { fe: FormErrors; lo
   });
 
   async function sendReminder(instanceId: string) {
-    // The endpoint only records the reminder; nothing is messaged (COM-044 wires real sending).
+    // COM-044: a real WhatsApp/SMS send; the row's tick follows its delivery (blocked = no messaging consent, also on the desk list).
     setReminderNotice(null);
-    if (await act(() => api.post(`/packages/instances/${instanceId}/send-reminder`), "Action failed.")) setReminderNotice("Recorded. No message was sent.");
+    let status: string | null = null;
+    const ok = await act(async () => {
+      const r = await api.post<InstanceT>(`/packages/instances/${instanceId}/send-reminder`);
+      status = [...(r.events ?? [])].reverse().find((e) => e.eventType === "expiry_warning_sent")?.deliveryStatus ?? null;
+    }, "Action failed.");
+    if (ok) setReminderNotice(status === "blocked" ? "Not sent: the patient has not agreed to messages." : "Reminder sent.");
   }
 
   return {

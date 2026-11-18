@@ -69,7 +69,7 @@ test("module not entitled: the item is absent, and a role left with nothing fall
   assert.ok(!ids(noLab).some((x) => x.startsWith("lab-")));
   // Unknown entitlements (loading, failed): built screens stay, planned skeletons stay absent.
   assert.deepEqual(ids(nav(BILLING, null)), ["billing-checkout", "billing-packages", "billing-dayclose"]);
-  assert.deepEqual(ids(nav(PHARMACIST, null)), ["ph-dispense", "ph-pos", "ph-stock"]);
+  assert.deepEqual(ids(nav(PHARMACIST, null)), ["ph-dispense", "ph-pos", "ph-stock", "ph-insights"]); // PHL-008 built the insights screen
   const off = { modules: [{ code: "lab", enabled: false }], killedFeatures: [], seatLimit: null };
   assert.equal(nav(LAB, off).role, "reception", "lab module switched off: no lab shell");
   assert.deepEqual(ids(nav(LAB, off)), ["account"]);
@@ -175,7 +175,8 @@ test("active item: the checkout queue covers the checkout tab and a visit's chec
 
 test("badges: checkout follows the live queue (SSE 'queue' resource); items without a count source carry no badge", () => {
   assert.equal(findItem("billing-checkout").badge, "checkout");
-  for (const r of COUNTER_ROLES) for (const i of NAV[r]) if (i.id !== "billing-checkout") assert.equal(i.badge, undefined, i.id);
+  assert.equal(findItem("ph-insights").badge, "stock-alerts"); // PHL-008: open stock alerts
+  for (const r of COUNTER_ROLES) for (const i of NAV[r]) if (i.id !== "billing-checkout" && i.id !== "ph-insights") assert.equal(i.badge, undefined, i.id);
   const hook = src("shell/useNavBadges.ts");
   assert.match(hook, /enabled: \(role === "reception" \|\| role === "owner" \|\| role === "billing" \|\| role === "solo"\) && q/); // FEF-056 adds the solo shell
   assert.match(hook, /checkout: count\(reception, \(r\) => r\.status === "checkout_pending"\)/);

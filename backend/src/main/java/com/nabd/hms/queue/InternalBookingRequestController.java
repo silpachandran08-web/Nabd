@@ -28,7 +28,9 @@ class InternalBookingRequestController {
     // shortcut: doctorId + slotStart only; specialtyCode / sessionId need ACC-011 (token sessions) and a specialty model, holdId lives in the Edge
     @Schema(name = "InternalBookingRequest")
     record RouteRequest(@NotBlank String patientRef, @NotNull UUID doctorId, @NotNull Instant slotStart, String visitType, @NotBlank String channel,
-                        List<String> triageFlags, Boolean group, @Size(max = 280) String note) {
+                        List<String> triageFlags, Boolean group, @Size(max = 280) String note,
+                        /* COM-044: book the next session of this package (the Edge's 'Book session N of M'); null = a regular visit */
+                        UUID packageInstanceId) {
     }
 
     @Schema(name = "InternalBookingOfferChoice")
@@ -46,7 +48,7 @@ class InternalBookingRequestController {
     ResponseEntity<Map<String, Object>> route(@PathVariable UUID tid, @Valid @RequestBody RouteRequest req) {
         ServiceIdentity edge = caller(tid);
         return ResponseEntity.status(HttpStatus.CREATED).body(service.route(tid, edge, req.patientRef(), req.doctorId(), req.slotStart(), req.visitType(),
-                req.channel(), req.triageFlags(), Boolean.TRUE.equals(req.group()), req.note()));
+                req.channel(), req.triageFlags(), Boolean.TRUE.equals(req.group()), req.note(), req.packageInstanceId()));
     }
 
     @Idempotent

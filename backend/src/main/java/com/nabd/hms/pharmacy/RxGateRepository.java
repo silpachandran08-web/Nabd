@@ -25,14 +25,17 @@ class RxGateRepository {
     /** Row-locks the prescription lines in id order (deadlock-free between two bills linking the same lines). */
     Map<UUID, RxGate.RxItemRow> lockItems(UUID tenantId, Collection<UUID> ids) {
         Map<UUID, RxGate.RxItemRow> out = new HashMap<>();
-        jdbc.query("SELECT pi.id, pr.patient_id, pr.status, pi.quantity, EXISTS (SELECT 1 FROM prescription_rx_tokens r WHERE r.tenant_id = pr.tenant_id " +
+        // CLN-024: the line's refills and whether its own validity (signed_at + validity_days) has passed
+        jdbc.query("SELECT pi.id, pr.patient_id, pr.status, pi.quantity, pi.refills_allowed, " +
+                        "(pi.validity_days IS NOT NULL AND pr.signed_at + pi.validity_days * interval '1 day' <= now()) AS lapsed, " +
+                        "EXISTS (SELECT 1 FROM prescription_rx_tokens r WHERE r.tenant_id = pr.tenant_id " +
                         "AND r.prescription_id = pr.id AND r.revoked_at IS NOT NULL) AS revoked FROM prescription_items pi " +
                         "JOIN prescriptions pr ON pr.id = pi.prescription_id AND pr.tenant_id = pi.tenant_id " +
                         "WHERE pi.tenant_id = ? AND pi.id = ANY (?) ORDER BY pi.id FOR UPDATE OF pi",
                 (RowCallbackHandler) rs -> {
                     UUID id = rs.getObject("id", UUID.class);
                     out.put(id, new RxGate.RxItemRow(id, rs.getObject("patient_id", UUID.class), rs.getString("status"), rs.getBigDecimal("quantity"),
-                            rs.getBoolean("revoked")));
+                            rs.getBoolean("revoked"), rs.getInt("refills_allowed"), rs.getBoolean("lapsed")));
                 },
                 tenantId, ids.toArray(new UUID[0]));
         return out;
@@ -50,7 +53,7 @@ class RxGateRepository {
     }
 
     List<RxGate.RxLineResponse> searchByPhone(UUID tenantId, String digits) {
-        return jdbc.query("SELECT pi.id, p.id AS patient_id, p.name AS patient_name, pi.drug_name, pi.dosage, pi.quantity, pr.signed_at, " +
+        return jdbc.query("SELECT pi.id, p.id AS patient_id, p.name AS patient_name, pi.drug_name, pi.dosage, pi.quantity, pi.refills_allowed, pr.signed_at, " +
                         "(SELECT COALESCE(SUM(li.quantity), 0) FROM invoice_line_items li JOIN invoices i ON i.id = li.invoice_id " +
                         "  WHERE li.tenant_id = pi.tenant_id AND li.prescription_item_id = pi.id AND i.status <> 'void') AS dispensed " +
                         "FROM patients p JOIN prescriptions pr ON pr.tenant_id = p.tenant_id AND pr.patient_id = p.id AND pr.status = 'signed' " +
@@ -59,7 +62,7 @@ class RxGateRepository {
                         "ORDER BY pr.signed_at DESC NULLS LAST, pi.display_order LIMIT 50",
                 (rs, i) -> new RxGate.RxLineResponse(rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class),
                         rs.getString("patient_name"), rs.getString("drug_name"), rs.getString("dosage"), rs.getBigDecimal("quantity"),
-                        RxGate.remaining(rs.getBigDecimal("quantity"), rs.getBigDecimal("dispensed")),
+                        RxGate.remaining(RxGate.allowance(rs.getBigDecimal("quantity"), rs.getInt("refills_allowed")), rs.getBigDecimal("dispensed")),
                         rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant()),
                 tenantId, digits);
     }

@@ -17,12 +17,15 @@ public interface FlowHandler {
         REG_NAME, REG_SEX, REG_DOB, COMPLETE_ADDRESS, COMPLETE_LANG, // ACC-043: registration and the desk's "complete in chat"
         MEMBER_RELATION, MEMBER_NAME, MEMBER_DOB, MEMBER_PHONE_CHOICE, MEMBER_PHONE, MEMBER_CONSENT, MEMBER_OTP,
         /** COM-041 re-verification of a changed number */
-        REVERIFY_OTP, REVERIFY_DOB }
+        REVERIFY_OTP, REVERIFY_DOB,
+        /** COM-044: 'Book session N of M' of a treatment package, or a regular visit */
+        CHOOSING_PACKAGE }
 
     /** Context keys the Edge may keep: ids, first name, age. Anything else is refused (no clinical content in the Edge DB). */
     Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care", "cands", "ciChannel",
             /* ACC-040/042: who (opaque patientRef), day, misses (unrecognised messages in a row), urgent, cname/dob (child being added) */
             "who", "day", "misses", "urgent", "cname", "dob",
+            "pkg", // COM-044: the package instance id being booked ('none' = a regular visit)
             "appointmentId", "patientRef", "flow",
             "sex", "consentId",
             "caregiverRef", "memRel", "memName", "memDob", "memPhone", "otpChal", "otpHash", "otpTry"); // IDC-010 add-a-member flow // ACC-043: the answers so far (name is firstName, the date of birth is never kept), the consent record id

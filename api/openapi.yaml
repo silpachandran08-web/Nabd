@@ -4188,6 +4188,15 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden. 403 not-prescriber when an override is sent by someone who is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "CLN-024. VALIDITY_ABOVE_CLASS_MAX (validityDays above the line's class maximum; maxDays in the body) or REFILLS_NOT_ALLOWED (refills above the class maximum, or any refill when no rule applies; maxRefills in the body). Signing re-checks against the rules active then and answers the same 422s (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/rx-validity-rules:
+    get:
+      tags: [Clinical]
+      summary: "CLN-024. The Rx validity / refill rules by drug class in effect for the caller's tenant region: those of the latest safety dictionary version at or below the active one that carries rules (CSO-approved with the dictionary, CLN-004). classId: a drug class id, 'schedule:<flag>', 'controlled' or '*' (any other line). A region with no rules returns version null and no rules (then lines get no validity of their own and no refills). No PHI."
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RxValidityRules" } } } }
+        "503": { description: "No active dictionary for the region (safety-dictionary-unavailable, problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}/print-header:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -4741,6 +4750,30 @@ paths:
         - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
         "200": { description: "OK: { items: [{ patientId, purpose, granted, version, at }], nextCursor? }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /consents:sms-keyword:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (comms-gateway service token)" }]
+    post:
+      tags: [Messaging]
+      summary: "COM-028. The Comms Gateway relays an inbound SMS keyword (header X-Internal-Token). Core's COM-002 matcher classifies it; a STOP withdraws marketing (WhatsApp and SMS): an all-clinics phone suppression plus the consent rows in tenantId (the clinic of the latest SMS to the number; null = none). optedOut = it was a STOP; confirm = something changed (the gateway sends one SMS confirmation). Idempotent."
+      x-required-permission: public
+      parameters:
+        - { name: X-Internal-Token, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, text, inboundRef]
+              properties:
+                phone: { type: string, pattern: "^[1-9][0-9]{7,14}$", description: "E.164 digits without '+'" }
+                text: { type: string, maxLength: 64 }
+                tenantId: { type: string, format: uuid, nullable: true }
+                inboundRef: { type: integer, format: int64, minimum: 0 }
+      responses:
+        "200": { description: "OK: { optedOut, confirm }", content: { application/json: { schema: { type: object, properties: { optedOut: { type: boolean }, confirm: { type: boolean } } } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/drug-knowledge-base:
@@ -7159,6 +7192,34 @@ components:
         quantity: { type: [number, "null"], exclusiveMinimum: 0, description: "DOC-033. Quantity to dispense, as entered by the doctor; never derived or converted by the server." }
         quantityUnit: { type: [string, "null"], maxLength: 40, description: "DOC-033. Unit of quantity as entered (tablets, ml, ...); never converted." }
         drugId: { type: [string, "null"], maxLength: 80, description: "CLN-021. Drug master id; 404 DRUG_NOT_FOUND when unknown. The server stores it with the generic name snapshot and adds ingredient/class safety checks to the text checks." }
+        validityDays: { type: [integer, "null"], minimum: 1, maximum: 365, description: "CLN-024. Days the line stays valid from signing; null = the class default. May shorten the default, lengthen only up to the class maximum (422 VALIDITY_ABOVE_CLASS_MAX). Ignored for a fixed (controlled) class." }
+        refills: { type: [integer, "null"], minimum: 0, maximum: 5, description: "CLN-024. Dispenses allowed after the first; null = 0. Above the class maximum: 422 REFILLS_NOT_ALLOWED. Ignored for a fixed (controlled) class." }
+    RxLineValidity:
+      type: object
+      description: "CLN-024. Draft: what signing now would apply (days, refills) and the matched rule's limits. Signed: what was applied at signing and validUntil = signedAt + days; maxDays, maxRefills, fixed, classId are null. days null = no rule applies."
+      properties:
+        days: { type: [integer, "null"] }
+        maxDays: { type: [integer, "null"] }
+        refills: { type: integer }
+        maxRefills: { type: [integer, "null"] }
+        fixed: { type: [boolean, "null"], description: "A controlled class: its values apply whatever the prescriber enters" }
+        classId: { type: [string, "null"], description: "The matched rule(s), comma-separated" }
+        validUntil: { type: [string, "null"], format: date-time }
+    RxValidityRules:
+      type: object
+      properties:
+        region: { type: string }
+        version: { type: [integer, "null"], description: "The safety dictionary version that carries the rules" }
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              classId: { type: string }
+              defaultDays: { type: integer }
+              maxDays: { type: integer }
+              maxRefills: { type: integer }
+              fixed: { type: boolean }
     DrugSuggestion:
       type: object
       description: "DOC-033. A type-ahead suggestion from the tenant's own data. Not a clinical formulary: no dose, strength or class."
@@ -7265,6 +7326,9 @@ components:
         drugId: { type: [string, "null"], description: "CLN-021. Drug master id; null = uncoded free text." }
         coded: { type: boolean }
         genericName: { type: [string, "null"], description: "CLN-021. Generic name snapshot taken when the line was saved." }
+        validityDays: { type: [integer, "null"], description: "CLN-024. As requested on a draft (null = class default); as applied on a signed line" }
+        refills: { type: integer, description: "CLN-024. As requested on a draft; as applied on a signed line" }
+        validity: { $ref: "#/components/schemas/RxLineValidity" }
     PharmacySettings:
       type: object
       properties:
@@ -7801,6 +7865,18 @@ components:
           type: object
           properties:
             controlled: { type: object, additionalProperties: { type: string }, description: "lang -> label; en required" }
+        validityRules:
+          type: [array, "null"]
+          description: "CLN-024. The Rx validity / refill rules of this version (approved and activated with it); omitted = the version keeps the rules of the version before it. Validated: classId a class id, 'schedule:<flag>', 'controlled' or '*', unique; 1 <= defaultDays <= maxDays <= 365; maxRefills 0-5; fixed => maxRefills 0 and maxDays = defaultDays."
+          items:
+            type: object
+            required: [classId, defaultDays, maxDays, maxRefills]
+            properties:
+              classId: { type: string }
+              defaultDays: { type: integer }
+              maxDays: { type: integer }
+              maxRefills: { type: integer }
+              fixed: { type: boolean }
     PrescriptionAllergySnapshot:
       type: object
       required: [state, allergies]

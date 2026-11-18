@@ -412,6 +412,51 @@ class BookingFlowTest extends BookingTestBase {
         assertEquals(BookingCopy.t("hi", "menu.book"), titles().get(0), "no picker the second time");
     }
 
+    // ---- COM-044: 'Book session N of M' --------------------------------------------------------------------------------
+
+    @Test
+    void bookSessionThreeOfSixOffersOnlyTheEligibleDoctorAndSendsThePackageToCore() {
+        Clinic c = clinic("Kappa", "Asia/Kolkata");
+        UUID other = UUID.randomUUID(), pkg = UUID.randomUUID();
+        UP.profiles.put(c.tenant().toString(), "{\"clinicName\":\"Kappa\",\"timeZone\":\"Asia/Kolkata\",\"doctors\":[{\"doctorId\":\"" + other
+                + "\",\"name\":\"Dr Other\"},{\"doctorId\":\"" + c.doctor() + "\",\"name\":\"Dr Shah K\"}]}");
+        UP.packageSessions.put(c.hash(), "[{\"patientRef\":\"ref-me\",\"instanceId\":\"" + pkg + "\",\"nextSession\":3,\"totalSessions\":6,"
+                + "\"eligibleDoctorIds\":[\"" + c.doctor() + "\"]}]");
+        say(c, "Hi");
+        tap(c, "Book");
+        tap(c, "Me");
+        assertEquals(List.of("Book session 3 of 6", "A regular visit"), titles());
+        tap(c, "Book session 3 of 6");
+        assertTrue(text().contains("Which day"), "one eligible doctor: the doctor step is skipped, Dr Other is never offered: " + text());
+        assertEquals(pkg.toString(), ctx(c, "pkg"));
+        tapAt(c, 0);
+        tapAt(c, 0);
+        assertTrue(text().contains("Dr Shah K"), text());
+        tap(c, "Confirm");
+        String call = UP.bookCalls.get(UP.bookCalls.size() - 1);
+        assertTrue(call.contains("\"packageInstanceId\":\"" + pkg + "\"") && call.contains("\"doctorId\":\"" + c.doctor() + "\""), call);
+    }
+
+    @Test
+    void aRegularVisitStillOffersEveryDoctorAndSendsNoPackage() {
+        Clinic c = clinic("Lambda", "Asia/Kolkata");
+        UUID other = UUID.randomUUID();
+        UP.profiles.put(c.tenant().toString(), "{\"clinicName\":\"Lambda\",\"timeZone\":\"Asia/Kolkata\",\"doctors\":[{\"doctorId\":\"" + other
+                + "\",\"name\":\"Dr Other\"},{\"doctorId\":\"" + c.doctor() + "\",\"name\":\"Dr Shah L\"}]}");
+        UP.packageSessions.put(c.hash(), "[{\"patientRef\":\"ref-me\",\"instanceId\":\"" + UUID.randomUUID() + "\",\"nextSession\":1,\"totalSessions\":4,"
+                + "\"eligibleDoctorIds\":[\"" + c.doctor() + "\"]}]");
+        say(c, "Hi");
+        tap(c, "Book");
+        tap(c, "Me");
+        tap(c, "A regular visit");
+        assertEquals(List.of("Dr Other", "Dr Shah L"), titles());
+        tap(c, "Dr Shah L");
+        tapAt(c, 0);
+        tapAt(c, 0);
+        tap(c, "Confirm");
+        assertFalse(UP.bookCalls.get(UP.bookCalls.size() - 1).contains("packageInstanceId"));
+    }
+
     @Test
     void everyLanguageHasEveryKeyWithTheSamePlaceholdersAndButtonTitlesFit20Characters() {
         var en = BookingCopy.load("en");

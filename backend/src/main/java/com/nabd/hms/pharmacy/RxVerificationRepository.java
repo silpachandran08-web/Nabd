@@ -16,7 +16,8 @@ class RxVerificationRepository {
     record Rx(UUID id, String status, UUID queueEntryId, Instant signedAt, String signerName, String signerRegistrationNo, String signerCouncil) {
     }
 
-    record Line(UUID prescriptionItemId, String drugName, BigDecimal quantity, BigDecimal dispensed) {
+    /** CLN-024: refills after the first dispense; validUntil = signed + the line's own validity days, null when it has none. */
+    record Line(UUID prescriptionItemId, String drugName, BigDecimal quantity, BigDecimal dispensed, int refills, Instant validUntil) {
     }
 
     /** The newest non-void invoice that billed a line of the prescription, and the clinic it was billed at. */
@@ -48,8 +49,11 @@ class RxVerificationRepository {
         return jdbc.query("SELECT pi.id, pi.drug_name, pi.quantity, (SELECT COALESCE(sum(li.quantity), 0) FROM invoice_line_items li " +
                         "JOIN invoices i ON i.id = li.invoice_id AND i.tenant_id = li.tenant_id " +
                         "WHERE li.tenant_id = pi.tenant_id AND li.prescription_item_id = pi.id AND i.status <> 'void') AS dispensed " +
-                        "FROM prescription_items pi WHERE pi.tenant_id = ? AND pi.prescription_id = ? ORDER BY pi.display_order",
-                (rs, i) -> new Line(rs.getObject("id", UUID.class), rs.getString("drug_name"), rs.getBigDecimal("quantity"), rs.getBigDecimal("dispensed")),
+                        ", pi.refills_allowed, pr.signed_at + pi.validity_days * interval '1 day' AS line_valid_until " +
+                        "FROM prescription_items pi JOIN prescriptions pr ON pr.id = pi.prescription_id AND pr.tenant_id = pi.tenant_id " +
+                        "WHERE pi.tenant_id = ? AND pi.prescription_id = ? ORDER BY pi.display_order",
+                (rs, i) -> new Line(rs.getObject("id", UUID.class), rs.getString("drug_name"), rs.getBigDecimal("quantity"), rs.getBigDecimal("dispensed"),
+                        rs.getInt("refills_allowed"), rs.getTimestamp("line_valid_until") == null ? null : rs.getTimestamp("line_valid_until").toInstant()),
                 tenantId, prescriptionId);
     }
 

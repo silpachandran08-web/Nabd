@@ -60,3 +60,11 @@ groups:
         annotations:
           summary: "A conversation could not be moved after 25 version conflicts"
           runbook: docs/runbooks/edge-cohort-b.md
+      # ---- COM-016: channel exclusivity (a clinic's conversation never shows or suggests another clinic) ----
+      - alert: EdgeCrossTenantReplyBlocked
+        expr: sum(increase(edge_output_guard_blocked_total[5m])) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "The Edge output guard stopped a bot reply that carried another clinic's id or name (or offered discovery); the patient was handed to reception"
+          runbook: docs/runbooks/patient-access-edge.md

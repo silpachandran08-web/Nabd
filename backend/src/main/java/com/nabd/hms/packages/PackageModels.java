@@ -32,7 +32,7 @@ final class PackageModels {
                             BigDecimal unitListPrice, BigDecimal allocatedPrice, BigDecimal taxRatePercent) {
     }
 
-    record EventRow(String eventType, String note, Integer delta, String actorName, Instant createdAt) {
+    record EventRow(String eventType, String note, Integer delta, String actorName, Instant createdAt, String deliveryStatus) {
     }
 
     record RefundRow(UUID id, UUID instanceId, String patientName, String packageName, String reason,

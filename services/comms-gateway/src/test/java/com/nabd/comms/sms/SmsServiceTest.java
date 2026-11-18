@@ -101,7 +101,7 @@ class SmsServiceTest {
         var meters = new SimpleMeterRegistry();
         var props = new CommsConsumerProperties(REGION, new CommsConsumerProperties.Consumer(true, 50, 5, 60000));
         return new SmsService(app, tx, crypto, new BspSmsProvider("bsp", "http://127.0.0.1:" + bsp.getAddress().getPort(), "k", JSON),
-                new SendGate(new ConsentSnapshotStore(app), app, meters, CLOCK), new StreamEventPublisher(valkey, props, JSON, CLOCK), JSON, meters, CLOCK, region);
+                new SendGate(new ConsentSnapshotStore(app), app, meters, CLOCK), new StreamEventPublisher(valkey, props, JSON, CLOCK), JSON, meters, CLOCK, region, java.time.Duration.ofHours(24));
     }
 
     static String otpText(String code) {
@@ -178,6 +178,10 @@ class SmsServiceTest {
         var first = service("in").send(tenant, new SmsService.SendRequest(PHONE, otpText("111111"), null, request));
         var again = service("in").send(tenant, new SmsService.SendRequest(PHONE, otpText("111111"), null, request));
         assertThat(again).isEqualTo(first);
+        assertThat(bspRequests).hasSize(1);
+        // S24 T1-BUG-7: the fallback caller is told the SMS is another call's, so the desk's second press is not audited as a send
+        assertThatThrownBy(() -> service("in").send(tenant, new SmsService.SendRequest(PHONE, otpText("111111"), null, request), UUID.randomUUID()))
+                .hasMessage("DUPLICATE_REQUEST");
         assertThat(bspRequests).hasSize(1);
 
         bspStatus.set(400);

@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.nabd.hms.queue.api.VisitQueries;
+
 import static com.nabd.hms.queue.QueueModels.QueueEntryRow;
 
 @Repository
@@ -216,19 +218,17 @@ class QueueRepository {
     }
 
     /**
-     * NB-101: mean minutes from check-in to invoice (a real, already-recorded end-to-end visit
-     * duration) over this doctor's most recent completed visits — a narrow direct query into
-     * billing's invoices table rather than injecting CheckoutRepository, same convention as
-     * CheckoutRepository's own reads into pharmacy/procedure_orders. OTC sales (no queue_entry_id)
-     * are naturally excluded by the join. Empty when this doctor has no billed visits yet.
+     * NB-101: mean minutes from check-in to the end of the visit over this doctor's most recent completed visits. PLT-035: the end
+     * is the visit's own 'completed' transition (written in the checkout transaction), not billing's invoice row. Empty when this
+     * doctor has no completed visits yet.
      */
     Optional<Double> averageRecentVisitMinutes(UUID tenantId, UUID doctorId, int sampleSize) {
         return jdbc.query(
                 "SELECT AVG(minutes) AS avg_minutes FROM (" +
-                        "  SELECT EXTRACT(EPOCH FROM (i.created_at - q.created_at)) / 60.0 AS minutes " +
-                        "  FROM invoices i JOIN queue_entries q ON q.id = i.queue_entry_id " +
-                        "  WHERE i.tenant_id = ? AND i.doctor_id = ? " +
-                        "  ORDER BY i.created_at DESC LIMIT ?" +
+                        "  SELECT EXTRACT(EPOCH FROM (e.occurred_at - q.created_at)) / 60.0 AS minutes " +
+                        "  FROM queue_entry_events e JOIN queue_entries q ON q.id = e.queue_entry_id " +
+                        "  WHERE e.tenant_id = ? AND e.doctor_id = ? AND e.kind = 'transition' AND e.to_status = 'completed' " +
+                        "  ORDER BY e.clinic_date DESC, e.occurred_at DESC LIMIT ?" +
                         ") recent",
                 (rs, i) -> {
                     double v = rs.getDouble("avg_minutes");
@@ -245,6 +245,68 @@ class QueueRepository {
                         "AND status NOT IN ('completed', 'no_show', 'transferred_out')",
                 Integer.class, tenantId, doctorId, Date.valueOf(date));
         return count == null ? 0 : count;
+    }
+
+    // ── PLT-035: VisitQueries (what billing reads about visits; moved here from CheckoutRepository and DayCloseRepository) ──
+
+    Optional<VisitQueries.Visit> visit(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT patient_id, doctor_id, department_id, status, appointment_id, COALESCE(priority, false) AS urgent " +
+                        "FROM queue_entries WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> new VisitQueries.Visit(rs.getObject("patient_id", UUID.class), rs.getObject("doctor_id", UUID.class),
+                        rs.getObject("department_id", UUID.class), rs.getString("status"), rs.getObject("appointment_id") != null,
+                        rs.getBoolean("urgent")),
+                tenantId, id).stream().findFirst();
+    }
+
+    List<VisitQueries.VisitDay> completedVisits(UUID tenantId, UUID patientId, UUID doctorId) {
+        return jdbc.query("SELECT id, queue_date FROM queue_entries WHERE tenant_id = ? AND patient_id = ? AND doctor_id = ? " +
+                        "AND status = 'completed' ORDER BY queue_date DESC",
+                (rs, i) -> new VisitQueries.VisitDay(rs.getObject("id", UUID.class), rs.getDate("queue_date").toLocalDate()),
+                tenantId, patientId, doctorId);
+    }
+
+    int atBillingStop(UUID tenantId, LocalDate day) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? " +
+                "AND status IN ('checkout_pending', 'billing_pending')", Integer.class, tenantId, Date.valueOf(day));
+        return n == null ? 0 : n;
+    }
+
+    List<VisitQueries.AwaitingCheckout> awaitingCheckout(UUID tenantId, LocalDate day) {
+        return jdbc.query("""
+                SELECT q.id, q.token_number, p.name AS patient_name, s.name AS doctor_name, q.updated_at
+                FROM queue_entries q
+                JOIN patients p ON p.id = q.patient_id
+                LEFT JOIN staff s ON s.id = q.doctor_id
+                WHERE q.tenant_id = ? AND q.queue_date = ? AND q.status = 'checkout_pending'
+                ORDER BY q.updated_at
+                """, (rs, i) -> new VisitQueries.AwaitingCheckout(rs.getObject("id", UUID.class), rs.getInt("token_number"),
+                        rs.getString("patient_name"), rs.getString("doctor_name"), rs.getTimestamp("updated_at").toInstant()),
+                tenantId, Date.valueOf(day));
+    }
+
+    VisitQueries.DayCounts dayCounts(UUID tenantId, LocalDate day) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS total,
+                       count(*) FILTER (WHERE status = 'completed') AS completed,
+                       count(*) FILTER (WHERE status NOT IN ('completed', 'no_show')) AS in_flow
+                FROM queue_entries WHERE tenant_id = ? AND queue_date = ?
+                """, (rs, i) -> new VisitQueries.DayCounts(rs.getInt("total"), rs.getInt("completed"), rs.getInt("in_flow")),
+                tenantId, Date.valueOf(day));
+    }
+
+    /** The owner reports' no-show rule, minus bookings checked in later through late arrival (ACC-025: that token has no appointment_id). */
+    List<VisitQueries.NoShow> noShows(UUID tenantId, Instant from, Instant to, Instant now) {
+        return jdbc.query("""
+                SELECT a.id, p.name AS patient_name, a.doctor_id, a.start_time
+                FROM appointments a
+                JOIN patients p ON p.id = a.patient_id
+                WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ? AND a.start_time < ?
+                  AND a.late_arrival_queue_entry_id IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM queue_entries q WHERE q.tenant_id = a.tenant_id AND q.appointment_id = a.id)
+                ORDER BY a.start_time, a.id
+                """, (rs, i) -> new VisitQueries.NoShow(rs.getObject("id", UUID.class), rs.getString("patient_name"),
+                        rs.getObject("doctor_id", UUID.class), rs.getTimestamp("start_time").toInstant()),
+                tenantId, Timestamp.from(from), Timestamp.from(to), Timestamp.from(now));
     }
 
     private RowMapper<QueueEntryRow> mapper() {

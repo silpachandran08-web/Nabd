@@ -11,10 +11,10 @@ import type {
 // GET/POST/PATCH /v1/packages/** (PackageController) — the generated types, with the fields the server always sends marked present.
 export type PackageT = Omit<Full<PackageResponse, "speciality" | "description" | "refundNote" | "doctorLeaveWarning">, "items"> & { items: Full<PackageItemResponse>[] };
 export type InstanceT = Omit<Full<InstanceResponse, "validityStart" | "validityEnd" | "events">, "items" | "events"> & {
-  items: Full<InstanceItemResponse>[]; events: Full<InstanceEventResponse, "note" | "delta">[] | null;
+  items: Full<InstanceItemResponse>[]; events: Full<InstanceEventResponse, "note" | "delta" | "deliveryStatus">[] | null;
 };
 export type RefundT = Full<RefundResponse, "creditNoteNumber" | "recomputedAmount">;
-export type ExpiringT = Full<ExpiringSoonResponse>;
+export type ExpiringT = Full<ExpiringSoonResponse, "lastReminderStatus">;
 export type LiabilityT = Full<LiabilityResponse>;
 export type StaffOption = Full<StaffRosterEntry>;
 export type ItemDraft = { itemType: string; name: string; quantity: string; unitListPrice: string; taxRatePercent: string };

@@ -72,6 +72,14 @@
   border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); cursor: pointer;
 }
 .suggestBtn:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
+.stepper { display: flex; align-items: center; gap: var(--nb-space-8); font-size: 13px; color: var(--nb-text-primary); }
+.stepBtn {
+  min-block-size: 44px; min-inline-size: 44px; font-family: inherit; font-size: 16px;
+  background: var(--nb-surface-2); color: var(--nb-text-primary);
+  border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); cursor: pointer;
+}
+.stepBtn:disabled { color: var(--nb-text-tertiary); cursor: not-allowed; }
+.stepBtn:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
 .srOnly { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 1100px) {
   .c4, .c3 { grid-column: span 6; }

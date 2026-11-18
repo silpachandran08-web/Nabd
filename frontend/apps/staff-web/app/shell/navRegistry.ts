@@ -4,7 +4,7 @@ import type { IconName } from "../components/ui/Icon";
 import { NAV_MODULES, navAllowed, type Entitlements } from "../lib/entitlementRules.ts";
 
 export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing" | "solo";
-export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent";
+export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent" | "stock-alerts";
 export type NavItem = {
   id: string; href: string; label: string; short: string; icon: IconName;
   perms: string[]; // every grant is required
@@ -41,7 +41,7 @@ const OWNER_ITEMS: NavItem[] = [
   { id: "overview", href: "/overview", label: "Overview", short: "Overview", icon: "home", perms: ["reports:view"], owner: "Data & Infra + Patient Access", section: "run", active: (p) => p === "/overview" },
   { id: "ops", href: "/schedule", label: "Clinic Operations", short: "Clinic", icon: "calendar", perms: ["queue:view"], owner: "Data & Infra + Patient Access", section: "run", badge: "waiting", active: (p) => p === "/schedule" || p === "/arrivals" },
   { id: "workflows", href: "/workflows", label: "Workflows", short: "Workflows", icon: "refresh", perms: ["setup:view"], owner: ACC, section: "run", planned: { module: ["whatsapp_booking", "queue_eta"] } },
-  { id: "integrations", href: "/integrations", label: "Integrations", short: "Integrations", icon: "globe", perms: ["setup:view"], owner: DI, section: "run", planned: { module: ["lab", "insurance", "patient_app"] } },
+  { id: "integrations", href: "/integrations", label: "Integrations", short: "Integrations", icon: "globe", perms: ["setup:view"], owner: DI, section: "run", planned: { module: ["whatsapp_booking", "lab", "insurance", "patient_app"] } }, // COM-016: the WhatsApp channel policy lives here
   { id: "setup", href: "/setup", label: "Clinic Setup", short: "Setup", icon: "settings", perms: ["setup:view"], owner: PT, section: "run",
     active: (p, t) => p.startsWith("/setup") && setupTabOf(p, t) !== "licences" && setupTabOf(p, t) !== "subscription" },
   { id: "reports", href: "/reports", label: "Reports", short: "Reports", icon: "chart", perms: ["reports:view"], owner: "Data & Infra + Patient Access", section: "run" },
@@ -135,7 +135,8 @@ const PHARMACIST: NavItem[] = [
   { id: "ph-stock", href: "/pharmacy/stock-take", label: "Stock take", short: "Stock", icon: "package", perms: ["pharmacy:view", "pharmacy:edit"], modules: PHARMACY_MODULES, owner: MON, keywords: ["inventory", "stock take", "count", "adjustment"] },
   { id: "ph-purchase", href: "/pharmacy/purchase", label: "Purchase & GRN", short: "Purchase", icon: "plusSquare", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["goods receipt", "supplier"] },
   { id: "ph-registers", href: "/pharmacy/registers", label: "Controlled registers", short: "Registers", icon: "scroll", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
-  { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES } },
+  // PHL-008: stock alerts and the expiry report (pharmacist.insights); the badge counts the open alerts.
+  { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], modules: PHARMACY_MODULES, owner: MON, badge: "stock-alerts", keywords: ["expiry", "near expiry", "low stock", "dead stock", "reorder"] },
 ];
 // No lab permission exists yet: "lab:view" is the placeholder grant the Diagnostics squad defines with the lab screens (absent until then).
 export const LAB_GRANT = "lab:view";

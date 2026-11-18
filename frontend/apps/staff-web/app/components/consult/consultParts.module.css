@@ -113,3 +113,13 @@
 
 /* COM-052 recall chips: thumb-sized on touch screens (one-hand layout) */
 @media (pointer: coarse) { .recallChip { min-height: 48px; min-inline-size: 48px; } }
+
+/* CLN-050: chart beside its images, chair-side phrases in the thumb zone */
+.dentalLayout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--nb-space-16); align-items: start; }
+@media (max-width: 1024px) { .dentalLayout { grid-template-columns: minmax(0, 1fr); } }
+.toothOn { outline: 2px solid var(--nb-accent-500); }
+.imageStrip { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.thumb { inline-size: 88px; block-size: 88px; padding: 0; display: grid; place-items: center; overflow: hidden; background: var(--nb-surface-3); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); cursor: pointer; }
+.thumb img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.chairBar { position: sticky; inset-block-end: 0; z-index: 1; padding: var(--nb-space-12); background: var(--nb-surface-1); border-block-start: 1px solid var(--nb-border-default); }
+.chipTouch { min-height: 44px; }

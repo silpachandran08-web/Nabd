@@ -28,6 +28,9 @@ public interface ActorDirectory {
     /** ADM-004: active staff on the built-in Owner role. */
     List<OwnerContact> activeOwners(UUID tenantId);
 
+    /** PHL-008: the mobile number of one active staff member (a named alert recipient); empty when inactive, unknown or none on file. */
+    Optional<String> activeMobilePhone(UUID tenantId, UUID staffId);
+
     /** PLT-059: staff seats in use = invited + active (suspended do not count). */
     int seatsInUse(UUID tenantId);
 }

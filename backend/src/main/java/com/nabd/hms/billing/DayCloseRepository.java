@@ -26,9 +26,11 @@ class DayCloseRepository {
     }
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.queue.api.VisitQueries visits; // PLT-035: visit counts and lists come from the visit module
 
-    DayCloseRepository(JdbcTemplate jdbc) {
+    DayCloseRepository(JdbcTemplate jdbc, com.nabd.hms.queue.api.VisitQueries visits) {
         this.jdbc = jdbc;
+        this.visits = visits;
     }
 
     DayCloseSummaryResponse.Totals totals(UUID tenantId, Instant dayStart, Instant dayEnd) {
@@ -89,9 +91,7 @@ class DayCloseRepository {
 
     /** Visits waiting at a billing stop — the reception checkout worklist. */
     int pendingCheckouts(UUID tenantId, LocalDate day) {
-        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? " +
-                "AND status IN ('checkout_pending', 'billing_pending')", Integer.class, tenantId, Date.valueOf(day));
-        return n == null ? 0 : n;
+        return visits.atBillingStop(tenantId, day);
     }
 
     /**
@@ -100,28 +100,20 @@ class DayCloseRepository {
      * so it isn't counted: it would block the day forever with nothing anyone could do about it.
      */
     List<DayCloseSummaryResponse.Unbilled> unbilled(UUID tenantId, LocalDate day) {
-        return jdbc.query("""
-                SELECT q.id, q.token_number, p.name AS patient_name, s.name AS doctor_name, q.updated_at
-                FROM queue_entries q
-                JOIN patients p ON p.id = q.patient_id
-                LEFT JOIN staff s ON s.id = q.doctor_id
-                WHERE q.tenant_id = ? AND q.queue_date = ? AND q.status = 'checkout_pending'
-                  AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.queue_entry_id = q.id)
-                ORDER BY q.updated_at
-                """, (rs, i) -> new DayCloseSummaryResponse.Unbilled(rs.getObject("id", UUID.class), rs.getInt("token_number"),
-                        rs.getString("patient_name"), rs.getString("doctor_name"), rs.getTimestamp("updated_at").toInstant()),
-                tenantId, Date.valueOf(day));
+        List<com.nabd.hms.queue.api.VisitQueries.AwaitingCheckout> waiting = visits.awaitingCheckout(tenantId, day);
+        if (waiting.isEmpty()) return List.of();
+        java.util.Set<UUID> billed = new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT queue_entry_id FROM invoices WHERE tenant_id = ? AND queue_entry_id = ANY(?::uuid[])", UUID.class, tenantId,
+                CheckoutRepository.uuidArray(waiting.stream().map(com.nabd.hms.queue.api.VisitQueries.AwaitingCheckout::visitId).toList())));
+        return waiting.stream().filter(w -> !billed.contains(w.visitId()))
+                .map(w -> new DayCloseSummaryResponse.Unbilled(w.visitId(), w.tokenNumber(), w.patientName(), w.doctorName(), w.since()))
+                .toList();
     }
 
     /** ADM-044: the day's visits, as ReportsRepository.visitsOn counts them for the owner overview. */
     DeskSummaryResponse.DeskVisits visits(UUID tenantId, LocalDate day) {
-        return jdbc.queryForObject("""
-                SELECT count(*) AS total,
-                       count(*) FILTER (WHERE status = 'completed') AS completed,
-                       count(*) FILTER (WHERE status NOT IN ('completed', 'no_show')) AS in_flow
-                FROM queue_entries WHERE tenant_id = ? AND queue_date = ?
-                """, (rs, i) -> new DeskSummaryResponse.DeskVisits(rs.getInt("total"), rs.getInt("completed"), rs.getInt("in_flow")),
-                tenantId, Date.valueOf(day));
+        var c = visits.dayCounts(tenantId, day);
+        return new DeskSummaryResponse.DeskVisits(c.total(), c.completed(), c.inFlow());
     }
 
     record NoShowRow(UUID appointmentId, String patientName, UUID doctorId, Instant startTime) {
@@ -130,17 +122,8 @@ class DayCloseRepository {
     /** ADM-044: the owner reports' no-show rule (non-cancelled booking in the day, start passed, never checked in),
      * minus bookings checked in later through late arrival (ACC-025: that token has no appointment_id). */
     List<NoShowRow> noShows(UUID tenantId, Instant dayStart, Instant dayEnd, Instant now) {
-        return jdbc.query("""
-                SELECT a.id, p.name AS patient_name, a.doctor_id, a.start_time
-                FROM appointments a
-                JOIN patients p ON p.id = a.patient_id
-                WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ? AND a.start_time < ?
-                  AND a.late_arrival_queue_entry_id IS NULL
-                  AND NOT EXISTS (SELECT 1 FROM queue_entries q WHERE q.tenant_id = a.tenant_id AND q.appointment_id = a.id)
-                ORDER BY a.start_time, a.id
-                """, (rs, i) -> new NoShowRow(rs.getObject("id", UUID.class), rs.getString("patient_name"),
-                        rs.getObject("doctor_id", UUID.class), rs.getTimestamp("start_time").toInstant()),
-                tenantId, ts(dayStart), ts(dayEnd), ts(now));
+        return visits.noShows(tenantId, dayStart, dayEnd, now).stream()
+                .map(n -> new NoShowRow(n.appointmentId(), n.patientName(), n.doctorId(), n.startTime())).toList();
     }
 
     /** FIN-008: the tax column is the stored line taxes (the same figures as the bills); lines from before the tax engine fall back to the old per-line rounding. */

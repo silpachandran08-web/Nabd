@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { patientApi, PatientApiError, type LinkInfo, type Resolved } from "../lib/patientApi";
+import { isCoreLink, patientApi, PatientApiError, type LinkInfo, type Resolved } from "../lib/patientApi";
 import { makeT, type T } from "./util";
 import OtpGate from "./OtpGate";
 import DocumentView from "./DocumentView";
 import ConsentView from "./ConsentView";
 import BookingView from "./BookingView";
+import PackageCardView from "./PackageCardView";
 import styles from "./linkflow.module.css";
 
 const LOCALE_LABELS: Record<string, string> = { en: "English", hi: "हिन्दी", kn: "ಕನ್ನಡ", te: "తెలుగు" };
@@ -22,6 +23,10 @@ export default function LinkFlow({ linkId, locale, messages }: { linkId: string 
 
   const start = useCallback(async () => {
     if (!linkId) return;
+    if (isCoreLink(linkId)) { // IDC-015: Core has no call before the code; an expired link says so when the code is asked for
+      setPhase({ name: "otp", info: { clinicName: "" } });
+      return;
+    }
     setPhase({ name: "loading" });
     try {
       const info = await api.linkInfo(linkId);
@@ -63,7 +68,7 @@ export default function LinkFlow({ linkId, locale, messages }: { linkId: string 
           <button type="button" className={styles.btn} onClick={() => { const r = phase.resume; if (r) void onVerified(r.info, r.token); else void start(); }}>{t("retry")}</button>
         </section>
       )}
-      {phase.name === "otp" && linkId && <OtpGate linkId={linkId} clinic={phase.info.clinicName} api={api} t={t} onVerified={(token) => void onVerified(phase.info, token)} onExpired={() => setPhase({ name: "expired" })} />}
+      {phase.name === "otp" && linkId && <OtpGate linkId={linkId} clinic={phase.info.clinicName} api={api} t={t} onVerified={(token) => void onVerified(phase.info, token)} onOpened={(resolved) => setPhase({ name: "content", info: phase.info, token: "", resolved })} onExpired={() => setPhase({ name: "expired" })} />}
       {phase.name === "content" && linkId && <Content linkId={linkId} locale={locale} t={t} messages={messages} phase={phase} api={api} onExpired={() => setPhase({ name: "expired" })} onReload={() => void onVerified(phase.info, phase.token)} />}
     </main>
   );
@@ -74,6 +79,8 @@ function Content({ linkId, locale, t, messages, phase, api, onExpired, onReload 
 }) {
   const { resolved, token } = phase;
   if (resolved.kind === "document") return <DocumentView linkId={linkId} token={token} resolved={resolved} api={api} t={t} onExpired={onExpired} />;
+  if (resolved.kind === "package") return <PackageCardView card={resolved.card} t={t} locale={locale} />;
+  if (resolved.kind === "unsupported") return <section className={styles.card}><h1 className={styles.h1}>{t("docTitle")}</h1><p className={styles.muted}>{t("docNotHere")}</p></section>;
   if (resolved.kind === "consent") return <ConsentView summary={resolved.consent} token={token} api={api} t={t} messages={messages} locale={locale} onExpired={onExpired} onReload={onReload} />;
   return <BookingView booking={resolved.booking} t={t} locale={locale} />;
 }

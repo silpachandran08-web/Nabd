@@ -97,6 +97,22 @@ class SmsControllerTest {
     }
 
     @Test
+    void anInboundSmsMustProveItselfLikeAReportAndIsStoredWithANormalisedSender() throws Exception {
+        byte[] mo = "{\"id\":\"mo-1\",\"from\":\"9876543210\",\"text\":\"STOP\"}".getBytes(StandardCharsets.UTF_8);
+        var m = mvc(SECRET, "");
+        m.perform(post("/v1/webhooks/sms/bsp/inbound").contentType("application/json").content(mo).header("X-Signature", sign("wrong", mo)))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("BAD_SIGNATURE"));
+        m.perform(post("/v1/webhooks/sms/bsp/inbound").contentType("application/json").content(mo)).andExpect(status().isUnauthorized());
+        verify(service, never()).storeMos(anyList());
+        m.perform(post("/v1/webhooks/sms/bsp/inbound").contentType("application/json").content(mo).header("X-Signature", sign(SECRET, mo)))
+                .andExpect(status().isOk());
+        verify(service).storeMos(List.of(new SmsProvider.Mo("mo-1", "+919876543210", "STOP")));
+        byte[] noSender = "{\"id\":\"mo-2\",\"text\":\"STOP\"}".getBytes(StandardCharsets.UTF_8);
+        m.perform(post("/v1/webhooks/sms/bsp/inbound").contentType("application/json").content(noSender).header("X-Signature", sign(SECRET, noSender)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void internalSendNeedsTheServiceTokenAndMapsRefusalsToProblemCodes() throws Exception {
         UUID tenant = UUID.randomUUID();
         String body = "{\"to\":\"+919876543210\",\"text\":\"hello\"}";

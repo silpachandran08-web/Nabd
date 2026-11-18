@@ -6,7 +6,8 @@ import styles from "../patients.module.css";
 import { api } from "../../../lib/api";
 import { getter, key } from "../../../lib/query";
 import { ErrorSummary, failText, useFormErrors } from "../../../lib/formErrors";
-import { FDI_TEETH, FDI_TO_UNIVERSAL, TOOTH_STATUSES, type Tooth, type ToothHistoryEntry } from "../patientsModel";
+import { FDI_TEETH, TOOTH_STATUSES, type Tooth, type ToothHistoryEntry } from "../patientsModel";
+import { toothLabel as label, type Numbering } from "../../../lib/dental";
 
 // The dental chart tab: own query; tooth edits patch the cached chart. Moved unchanged from the old drawer.
 export default function DentalTab({ patientId, dentalEdit }: { patientId: string; dentalEdit: boolean }) {
@@ -16,16 +17,17 @@ export default function DentalTab({ patientId, dentalEdit }: { patientId: string
   const chart = chartQ.data ?? []; // an unreadable chart stays empty; tooth edits re-fetch nothing
   const setChart = (f: (prev: Tooth[]) => Tooth[]) => qc.setQueryData(key("patient-chart", { id: patientId }), (prev: Tooth[] | undefined) => f(prev ?? []));
   const [chartBusy, setChartBusy] = useState<number | null>(null);
-  const [numbering, setNumbering] = useState<"fdi" | "universal">("fdi");
+  // CLN-050: the clinic's numbering is the default; the toggle only changes this view (storage is FDI either way)
+  const settingsQ = useQuery({ queryKey: key("dental-settings", {}), queryFn: getter<{ numbering: Numbering }>("/specialty/dental/settings") });
+  const [viewNumbering, setNumbering] = useState<Numbering | null>(null);
+  const numbering: Numbering = viewNumbering ?? settingsQ.data?.numbering ?? "FDI";
   const [newSupernumerary, setNewSupernumerary] = useState({ nearToothNumber: 11, status: "healthy", note: "" });
   const [supernumeraryBusy, setSupernumeraryBusy] = useState<string | null>(null);
   const [historyToothId, setHistoryToothId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<ToothHistoryEntry[]>([]);
   const drawerPatient = { id: patientId };
 
-  function toothLabel(fdiNumber: number): string {
-    return numbering === "universal" ? `#${FDI_TO_UNIVERSAL[fdiNumber]}` : String(fdiNumber);
-  }
+  const toothLabel = (fdiNumber: number, supernumerary = false) => label(fdiNumber, numbering, supernumerary);
 
   async function setToothStatus(toothNumber: number, status: string) {
     if (!drawerPatient) return;
@@ -93,8 +95,8 @@ export default function DentalTab({ patientId, dentalEdit }: { patientId: string
     <>
       <ErrorSummary fe={fe} className={styles.errorInline} />
                   <div className={styles.numberingToggle}>
-                    <button className={numbering === "fdi" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("fdi")}>FDI</button>
-                    <button className={numbering === "universal" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("universal")}>Universal</button>
+                    <button className={numbering === "FDI" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("FDI")}>FDI</button>
+                    <button className={numbering === "UNIVERSAL" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("UNIVERSAL")}>Universal</button>
                   </div>
 
                   <div className={styles.toothGrid}>
@@ -131,7 +133,7 @@ export default function DentalTab({ patientId, dentalEdit }: { patientId: string
                     ) : (
                       chart.filter((t) => t.isSupernumerary).map((t) => (
                         <div key={t.id} className={styles.allergyRow}>
-                          <span>Near {toothLabel(t.toothNumber)}{t.note ? ` · ${t.note}` : ""}</span>
+                          <span>{toothLabel(t.toothNumber, true)} · Near {toothLabel(t.toothNumber)}{t.note ? ` · ${t.note}` : ""}</span>
                           {dentalEdit ? (
                             <select className={styles.smallInput} aria-label="Supernumerary tooth status" value={t.status} disabled={supernumeraryBusy === t.id}
                               onChange={(e) => updateSupernumeraryStatus(t.id, e.target.value)}>

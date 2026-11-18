@@ -13,6 +13,8 @@ import com.nabd.hms.clinical.dto.PrescriptionItemRequest;
 import com.nabd.hms.clinical.dto.PrescriptionItemResponse;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
 import com.nabd.hms.clinical.dto.RxDecisionView;
+import com.nabd.hms.clinical.dto.RxLineValidityResponse;
+import com.nabd.hms.clinical.dto.RxValidityRulesResponse;
 import com.nabd.hms.clinical.dto.RxReasonOption;
 import com.nabd.hms.clinical.dto.RxWarningDecision;
 import com.nabd.hms.clinical.dto.RxWarningResponse;
@@ -89,11 +91,14 @@ public class PrescriptionService {
     private final RxSafetyService safety;
     private final RxDocumentService rxDocuments;
     private final PrescriptionPrintRepository printRepo;
+    private final RxValidityRules validity;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
                          SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors,
-                         DrugCoding coding, RxSafetyService safety, RxDocumentService rxDocuments, PrescriptionPrintRepository printRepo) {
+                         DrugCoding coding, RxSafetyService safety, RxDocumentService rxDocuments, PrescriptionPrintRepository printRepo,
+                         RxValidityRules validity) {
+        this.validity = validity;
         this.rxDocuments = rxDocuments;
         this.printRepo = printRepo;
         this.safety = safety;
@@ -185,6 +190,7 @@ public class PrescriptionService {
         LocalDate today = clock.today(tenantId);
         List<PrescriptionItemRow> existing = repo.findItems(tenantId, prescriptionId);
         ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
+        RxValidityRules.RuleSet rules = validity.effective(dict.region(), dict.version());
 
         List<PrescriptionItemRow> rows = new ArrayList<>();
         List<StoredDecision> kept = new ArrayList<>();
@@ -225,10 +231,18 @@ public class PrescriptionService {
                 }
             }
             kept.addAll(decisions);
+            // CLN-024: 422 when the input breaks the line's class rule; a fixed (controlled) class keeps no input (its values apply at sign)
+            RxValidityRules.Applied applied = RxValidityRules.apply(RxValidityRules.ruleFor(rules,
+                    validity.keys(dict, item.drugName(), item.brandName(), drugId, codes)), item.validityDays(), item.refills());
+            if (applied.violation() != null) {
+                throw RxValidityRules.refusal(item.drugName(), applied);
+            }
+            boolean fixed = applied.rule() != null && applied.rule().fixed();
             rows.add(new PrescriptionItemRow(null, prescriptionId, item.drugName(), item.dosage(), item.frequency(),
                     item.duration(), item.instructions(), allergyLabel(decisions), 0, toJson(decisions),
                     blankToNull(item.brandName()), blankToNull(item.sigPattern()), blankToNull(item.route()),
-                    item.quantity(), blankToNull(item.quantityUnit()), drugId, null));
+                    item.quantity(), blankToNull(item.quantityUnit()), drugId, null,
+                    fixed ? null : item.validityDays(), fixed ? 0 : applied.refills()));
         }
         // A decision that no longer applies (drug changed or removed, warning gone) is withdrawn on the record, not dropped silently.
         for (PrescriptionItemRow old : existing) {
@@ -499,6 +513,16 @@ public class PrescriptionService {
         // DOC-R3: capture the allergy statement the gate above just checked (still under the register lock) and store
         // it with the status flip, so the printout shows what the prescriber signed against, not the register at print time.
         StoredAllergySnapshot snapshot = captureAllergySnapshot(tenantId, owner.patientId());
+        // CLN-024: each line gets the validity and refills of the rules active NOW (a version activated after the draft was saved
+        // applies to it, never to an already signed prescription); an input the current rule no longer allows refuses the sign.
+        RxValidityRules.RuleSet rules = validity.effective(dict.region(), dict.version());
+        for (PrescriptionItemRow i : repo.findItems(tenantId, row.id())) {
+            RxValidityRules.Applied applied = appliedValidity(i, dict, rules);
+            if (applied.violation() != null) {
+                throw RxValidityRules.refusal(i.drugName(), applied);
+            }
+            repo.applyValidity(tenantId, i.id(), applied.days(), applied.refills());
+        }
         if (repo.sign(tenantId, row.id(), toJson(snapshot), dict.label(), callerStaffId, licence.registrationNo()) == 0) {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
             return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(ApiException::notFound));
@@ -515,6 +539,8 @@ public class PrescriptionService {
             m.put("sigPattern", i.sigPattern());
             m.put("quantity", i.quantity() == null ? null : i.quantity().toPlainString());
             m.put("quantityUnit", i.quantityUnit());
+            m.put("validityDays", i.validity().days());
+            m.put("refills", i.validity().refills());
             m.put("decisions", i.warnings().stream().filter(w -> w.decision() != null)
                     .map(w -> Map.of("kind", w.kind(), "reasonCode", w.decision().reasonCode(), "by", String.valueOf(w.decision().by()))).toList());
             return m;
@@ -572,6 +598,8 @@ public class PrescriptionService {
         LocalDate today = clock.today(tenantId);
         int[] unresolved = {0};
         int[] itemNo = {0};
+        boolean signed = "signed".equals(p.status());
+        RxValidityRules.RuleSet rules = signed ? null : validity.effective(dict.region(), dict.version());
         List<PrescriptionWarningResponse> flat = new ArrayList<>();
         List<PrescriptionItemResponse> items = repo.findItems(tenantId, p.id()).stream()
                 .map(i -> {
@@ -602,16 +630,43 @@ public class PrescriptionService {
                         flat.add(new PrescriptionWarningResponse(itemNo[0], w.kind(), w.severity(), w.message()));
                     }
                     itemNo[0]++;
+                    RxLineValidityResponse lineValidity;
+                    if (signed) {
+                        lineValidity = new RxLineValidityResponse(i.validityDays(), null, i.refillsAllowed(), null, null, null,
+                                i.validityDays() == null || p.signedAt() == null ? null : p.signedAt().plus(java.time.Duration.ofDays(i.validityDays())));
+                    } else {
+                        RxValidityRules.Applied a = appliedValidity(i, dict, rules);
+                        RxValidityRules.Rule r = a.rule();
+                        lineValidity = new RxLineValidityResponse(a.days(), r == null ? null : r.maxDays(), a.refills(),
+                                r == null ? null : r.maxRefills(), r == null ? null : r.fixed(), r == null ? null : r.classId(), null);
+                    }
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,
                             pregnancyWarning, controlledWarning, warnings, i.brandName(), i.sigPattern(), i.route(),
-                            i.quantity(), i.quantityUnit(), i.drugId(), i.drugId() != null, i.genericName());
+                            i.quantity(), i.quantityUnit(), i.drugId(), i.drugId() != null, i.genericName(),
+                            i.validityDays(), i.refillsAllowed(), lineValidity);
                 })
                 .toList();
         String signedByName = p.signedBy() == null ? null : actors.findActor(tenantId, p.signedBy()).map(ActorDirectory.Actor::name).orElse(null);
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
                 p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat,
                 p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo(), signedByName, p.revokedAt());
+    }
+
+    /** CLN-024: a stored line against a rule set (its stored input as the request). */
+    private RxValidityRules.Applied appliedValidity(PrescriptionItemRow i, SafetyDictionary dict, RxValidityRules.RuleSet rules) {
+        DrugCoding.Codes codes = coding.codes(i.drugId()).orElse(null);
+        return RxValidityRules.apply(RxValidityRules.ruleFor(rules, validity.keys(dict, i.drugName(), i.brandName(), i.drugId(), codes)),
+                i.validityDays(), i.refillsAllowed());
+    }
+
+    /** CLN-024: the validity / refill rules in effect for the caller's region (the active dictionary version's, or the latest before it). */
+    @Transactional
+    public RxValidityRulesResponse validityRules(UUID tenantId) {
+        SafetyDictionary dict = dictionaryFor(tenantId);
+        RxValidityRules.RuleSet set = validity.effective(dict.region(), dict.version());
+        return new RxValidityRulesResponse(dict.region(), set.version(), set.rules().stream()
+                .map(r -> new RxValidityRulesResponse.Rule(r.classId(), r.defaultDays(), r.maxDays(), r.maxRefills(), r.fixed())).toList());
     }
 
     // ── DOC-R3: allergy statement snapshotted at signing ─────────────────

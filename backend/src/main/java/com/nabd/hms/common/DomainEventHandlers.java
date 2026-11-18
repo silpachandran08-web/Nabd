@@ -38,6 +38,12 @@ class DomainEventHandlers {
                     if (t == DomainEventType.QUEUE_ENTRY_CHANGED) {
                         continue; // FEF-048: queue.PatientReadyPushConsumer sends the doctor's "patient ready" push
                     }
+                    if (t == DomainEventType.INVOICE_SETTLED) {
+                        continue; // PLT-035: queue.InvoiceSettledConsumer completes the visit
+                    }
+                    if (t == DomainEventType.PACKAGE_SOLD || t == DomainEventType.MESSAGE_STATUS_CHANGED) {
+                        continue; // COM-044: packages.PackageSoldConsumer (card request) / PackageMessageStatusConsumer (delivery status on the ledger)
+                    }
                     if (t == DomainEventType.VISIT_COMPLETED || t == DomainEventType.APPOINTMENT_NO_SHOW) {
                         continue; // IDC-014: patient.proxy.VisitInstructionsConsumer / MissedVisitAlertConsumer (care fan-out)
                     }

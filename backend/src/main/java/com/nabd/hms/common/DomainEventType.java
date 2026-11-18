@@ -19,6 +19,8 @@ public enum DomainEventType {
     RX_SIGNED("clinical.rx.signed.v1", "core/clinical"),
     ALLERGY_CHANGED("clinical.allergy.changed.v1", "core/clinical"),
     INVOICE_PAID("billing.invoice.paid.v1", "core/billing"),
+    /** PLT-035: the visit's bill was settled at its terminal billing stop (checkout). Consumer: queue.InvoiceSettledConsumer (visit status). */
+    INVOICE_SETTLED("billing.invoice.settled.v1", "core/billing"),
     PAYMENT_RECORDED("billing.payment.recorded.v1", "core/billing"),
     REFUND_APPROVED("billing.refund.approved.v1", "core/billing"),
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
@@ -60,7 +62,12 @@ public enum DomainEventType {
     PATIENT_NOTIFICATION_PREFERENCES_CHANGED("patient.notification_preferences.changed.v1", "core/patient"),
     RX_REVOKED("clinical.prescription.revoked.v1", "core/clinical"),
     MESSAGING_SETTINGS_CHANGED("organization.messaging_settings.changed.v1", "core/organization"),
-    BREAK_GLASS_REVIEWED("iam.break_glass.reviewed.v1", "core/iam");
+    BREAK_GLASS_REVIEWED("iam.break_glass.reviewed.v1", "core/iam"),
+    /** COM-044: a package was sold and paid at the desk; core.billing (packages) requests the package card message. Ids only. */
+    PACKAGE_SOLD("billing.package.sold.v1", "core/billing"),
+    /** PHL-008: the clinic's daily stock-alert digest was handed to its one named recipient. Ids and counts only. */
+    PHARMACY_STOCK_ALERTS_DIGEST_READY("pharmacy.stock.alerts_digest_ready.v1", "core/pharmacy"),
+    SPECIALTY_PHOTO_ADDED("specialty.photo.added.v1", "core/specialty");
 
     private final String type;
     private final String source;

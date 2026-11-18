@@ -39,6 +39,14 @@ public enum NotificationPurpose {
     EXPORT_READY("export_ready", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** FIN-020: UPI payment link; slots are clinic name, amount and link only (no line items, no diagnosis). */
     PAYMENT_LINK("payment_link", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: the package card after a sale; 2 params: first name, the OTP-protected card link (no package name, no amounts). */
+    PACKAGE_CARD("package_card", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: time to book the next package session (doctor-set interval); 1 param: first name. */
+    PACKAGE_SESSION_NUDGE("package_session_nudge", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: the 30/14/7-day expiry warning (job or the desk's Send reminder); 2 params: first name, validity end date. */
+    PACKAGE_EXPIRY("package_expiry", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** COM-044: validity ended, sessions usable until the grace end; 2 params: first name, grace end date. */
+    PACKAGE_GRACE("package_grace", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
     EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
@@ -53,7 +61,10 @@ public enum NotificationPurpose {
     /** ADM-005: the owner is stuck on a setup step (staff recipient); 2 params: the step's name, the help link. REMINDER, so quiet hours apply. */
     SETUP_NUDGE("setup_nudge", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY),
     /** ADM-006: Nabd finished the white-glove setup (staff recipient); 1 param: the steps that were set up. */
-    WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** PHL-008: the pharmacy's daily stock-alert digest to its one named recipient (staff); 7 params: day, five counts, secure link.
+     * Counts only, never a drug name. REMINDER, so COM-024 quiet hours apply. */
+    STOCK_ALERTS_DIGEST("stock_alerts_digest", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;

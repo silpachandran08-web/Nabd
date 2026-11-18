@@ -27,6 +27,8 @@ export type Message = {
   status: string | null;
   at: string;
   authorStaffRef?: string | null;
+  /** "sms" = the SMS fallback of a WhatsApp message (COM-027); absent or "whatsapp" otherwise. */
+  channel?: string | null;
 };
 
 export const FILTERS = [
@@ -104,6 +106,17 @@ export function tick(status: string | null | undefined): Tick {
   }
 }
 export const isFailed = (status: string | null | undefined): boolean => status === "failed" || status === "blocked" || status === "expired";
+
+/** COM-027: 'Send as SMS' on a WhatsApp message we sent that failed or expired. SMS exists in India only (the server checks region and consent again). */
+export const canSendAsSms = (m: Pick<Message, "direction" | "status" | "channel">, region: string | null | undefined): boolean =>
+  region === "IN" && m.direction === "out" && m.channel !== "sms" && (m.status === "failed" || m.status === "expired");
+
+/** The answer to 'Send as SMS' as the desk reads it; "sending" is a second press while the SMS is on its way, not a failure. */
+export const smsNotice = (status: string | null | undefined): string =>
+  status === "blocked" ? "Not sent by SMS: this patient has not agreed to messages."
+    : status === "sent" || status === "delivered" ? "Sent by SMS."
+    : status === "sending" || status === "queued" ? "This message is being sent by SMS."
+    : "SMS could not be sent.";
 
 /** The same two checks the server runs (COM-032): they only warn, a person decides. */
 const RESULT_OR_DIAGNOSIS = /\b(diagnos(is|ed)|test results?|lab results?|report shows|biopsy|hba1c|you (have|tested) (positive|negative)|(positive|negative) for)\b|\b\d+(\.\d+)?\s?(mg\/dl|mmol\/l|g\/dl|iu\/l)\b/i;

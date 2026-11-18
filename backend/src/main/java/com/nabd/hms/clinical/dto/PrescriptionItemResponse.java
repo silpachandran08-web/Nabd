@@ -16,5 +16,7 @@ public record PrescriptionItemResponse(UUID id, String drugName, String dosage, 
                                         List<RxWarningResponse> warnings,
                                         String brandName, String sigPattern, String route,
                                         BigDecimal quantity, String quantityUnit,
-                                        String drugId, boolean coded, String genericName) {
+                                        String drugId, boolean coded, String genericName,
+                                        // CLN-024: what the prescriber asked for (validityDays null = class default) and what applies
+                                        Integer validityDays, int refills, RxLineValidityResponse validity) {
 }
