@@ -410,6 +410,17 @@ export const InvoiceSeriesListResponseSchema = z.object({ items: z.array(Invoice
 export const IssuedSchema = z.object({ expiresAt: z.string().optional(), linkId: z.string().optional() });
 export const JobSchema = z.object({ archiveSha256: z.string().optional(), bytes: z.number().int().optional(), completedAt: z.string().optional(), createdAt: z.string().optional(), datasets: z.array(DatasetProgressSchema).optional(), format: z.string().optional(), id: z.string().optional(), linkExpiresAt: z.string().optional(), linkSent: z.boolean().optional(), status: z.string().optional() });
 export const KillRequestSchema = z.object({ active: z.boolean().optional(), reason: z.string().min(0).max(500) });
+export const LabImportRequestSchema = z.object({ dryRun: z.boolean().optional(), pack: z.string().min(1) });
+export const LabImportResultSchema = z.object({ created: z.number().int(), dryRun: z.boolean(), pack: z.string(), reviewNote: z.string().optional(), reviewed: z.boolean(), skipped: z.array(z.string()), toCreate: z.array(z.string()) });
+export const LabOutsourcedSchema = z.object({ partnerLabId: z.string() });
+export const LabPanelTestSchema = z.object({ code: z.string(), id: z.string(), name: z.string(), price: z.number() });
+export const LabPanelSchema = z.object({ active: z.boolean(), chargeCode: z.string(), chargeItemId: z.string(), code: z.string(), discount: z.number(), id: z.string(), name: z.string(), price: z.number(), tests: z.array(LabPanelTestSchema), testsTotal: z.number() });
+export const LabPanelListSchema = z.object({ items: z.array(LabPanelSchema) });
+export const LabPanelRequestSchema = z.object({ code: z.string().min(1), name: z.string().min(0).max(120), price: z.number().gte(0), testIds: z.array(z.string()) });
+export const LabTestSchema = z.object({ active: z.boolean(), chargeCode: z.string(), chargeItemId: z.string(), code: z.string(), container: z.string(), id: z.string(), loinc: z.string().optional(), method: z.string().optional(), name: z.string(), price: z.number(), sampleType: z.string(), tatMinutes: z.number().int(), taxCode: z.string().optional(), unit: z.string().optional(), updatedAt: z.string(), volumeMl: z.number().optional() });
+export const LabTestPageSchema = z.object({ items: z.array(LabTestSchema), nextCursor: z.string().optional() });
+export const LabTestRequestSchema = z.object({ code: z.string().min(1), container: z.string().min(0).max(40), loinc: z.string().optional(), method: z.string().min(0).max(80).optional(), name: z.string().min(0).max(120), outsourced: LabOutsourcedSchema.optional(), price: z.number().gte(0), sampleType: z.string().min(0).max(40), tatMinutes: z.number().int().gte(1).lte(43200), taxCode: z.string().min(0).max(20).optional(), unit: z.string().min(0).max(40), volumeMl: z.number().gt(0) });
+export const LabTestUpdateRequestSchema = z.object({ active: z.boolean().optional(), container: z.string().min(0).max(40).optional(), loinc: z.string().optional(), method: z.string().min(0).max(80).optional(), name: z.string().min(0).max(120).optional(), price: z.number().gte(0).optional(), sampleType: z.string().min(0).max(40).optional(), tatMinutes: z.number().int().gte(1).lte(43200).optional(), taxCode: z.string().min(0).max(20).optional(), unit: z.string().min(0).max(40).optional(), volumeMl: z.number().gt(0).optional() });
 export const LateArrivalRequestSchema = z.object({ appointmentId: z.string() });
 export const LeakageItemSchema = z.object({ amountMinor: z.number().int(), appliedBy: z.string().optional(), appliedByName: z.string().optional(), approvalMethod: z.string(), approverId: z.string().optional(), approverName: z.string().optional(), at: z.string(), id: z.string(), invoiceId: z.string(), invoiceNumber: z.string().optional(), reasonCode: z.string(), type: z.string() });
 export const LeakageTotalsSchema = z.object({ count: z.number().int(), discountMinor: z.number().int(), overrideMinor: z.number().int(), ownerApprovedMinor: z.number().int(), refundMinor: z.number().int(), totalMinor: z.number().int(), withoutOwnerApprovalMinor: z.number().int(), writeOffMinor: z.number().int() });
@@ -1054,6 +1065,12 @@ export const operationSchemas = {
   AttachmentController_downloadUrl: { response: FileDownloadUrlResponseSchema },
   DeskExceptionController_list: { response: DeskExceptionPageSchema },
   DeskExceptionController_act: { body: ActionRequestSchema, response: DeskExceptionActionResponseSchema },
+  LabController_importCatalogue: { body: LabImportRequestSchema, response: LabImportResultSchema },
+  LabController_panels: { response: LabPanelListSchema },
+  LabController_createPanel: { body: LabPanelRequestSchema, response: LabPanelSchema },
+  LabController_tests: { response: LabTestPageSchema },
+  LabController_createTest: { body: LabTestRequestSchema, response: LabTestSchema },
+  LabController_updateTest: { body: LabTestUpdateRequestSchema, response: LabTestSchema },
   MeEntitlementsController_get: { response: MeEntitlementsSchema },
   StaffOnboardingController_get: { response: StaffOnboardingProgressSchema },
   StaffOnboardingController_complete: { response: StaffOnboardingProgressSchema },

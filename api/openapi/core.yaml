@@ -9739,6 +9739,239 @@ paths:
       tags:
       - queue
       x-required-permission: queue:edit
+  /v1/lab/catalogue/imports:
+    post:
+      operationId: LabController_importCatalogue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabImportRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabImportResult"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:catalogue
+  /v1/lab/panels:
+    get:
+      operationId: LabController_panels
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabPanelList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:view
+    post:
+      operationId: LabController_createPanel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabPanelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabPanel"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:catalogue
+  /v1/lab/tests:
+    get:
+      operationId: LabController_tests
+      parameters:
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabTestPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:view
+    post:
+      operationId: LabController_createTest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabTestRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabTest"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:catalogue
+  /v1/lab/tests/{id}:
+    patch:
+      operationId: LabController_updateTest
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabTestUpdateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabTest"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:catalogue
   /v1/me/entitlements:
     get:
       operationId: MeEntitlementsController_get
@@ -29473,6 +29706,320 @@ components:
           minLength: 0
       required:
       - reason
+    LabImportRequest:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+        pack:
+          type: string
+          minLength: 1
+          pattern: "^[A-Z][A-Z0-9_]{1,30}$"
+      required:
+      - pack
+    LabImportResult:
+      type: object
+      properties:
+        created:
+          type: integer
+          format: int32
+        dryRun:
+          type: boolean
+        pack:
+          type: string
+        reviewNote:
+          type: string
+        reviewed:
+          type: boolean
+        skipped:
+          type: array
+          items:
+            type: string
+        toCreate:
+          type: array
+          items:
+            type: string
+      required:
+      - created
+      - dryRun
+      - pack
+      - reviewed
+      - skipped
+      - toCreate
+    LabOutsourced:
+      type: object
+      properties:
+        partnerLabId:
+          type: string
+          format: uuid
+      required:
+      - partnerLabId
+    LabPanel:
+      type: object
+      properties:
+        active:
+          type: boolean
+        chargeCode:
+          type: string
+        chargeItemId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        discount:
+          type: number
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabPanelTest"
+        testsTotal:
+          type: number
+      required:
+      - active
+      - chargeCode
+      - chargeItemId
+      - code
+      - discount
+      - id
+      - name
+      - price
+      - tests
+      - testsTotal
+    LabPanelList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabPanel"
+      required:
+      - items
+    LabPanelRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,23}$"
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        price:
+          type: number
+          minimum: 0
+        testIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 60
+          minItems: 0
+      required:
+      - code
+      - name
+      - price
+      - testIds
+    LabPanelTest:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+      required:
+      - code
+      - id
+      - name
+      - price
+    LabTest:
+      type: object
+      properties:
+        active:
+          type: boolean
+        chargeCode:
+          type: string
+        chargeItemId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        container:
+          type: string
+        id:
+          type: string
+          format: uuid
+        loinc:
+          type: string
+        method:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        sampleType:
+          type: string
+        tatMinutes:
+          type: integer
+          format: int32
+        taxCode:
+          type: string
+        unit:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        volumeMl:
+          type: number
+      required:
+      - active
+      - chargeCode
+      - chargeItemId
+      - code
+      - container
+      - id
+      - name
+      - price
+      - sampleType
+      - tatMinutes
+      - updatedAt
+    LabTestPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabTest"
+        nextCursor:
+          type: string
+      required:
+      - items
+    LabTestRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,23}$"
+        container:
+          type: string
+          maxLength: 40
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        loinc:
+          type: string
+          pattern: "^[0-9]{1,7}-[0-9]$"
+        method:
+          type: string
+          maxLength: 80
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        outsourced:
+          $ref: "#/components/schemas/LabOutsourced"
+        price:
+          type: number
+          minimum: 0
+        sampleType:
+          type: string
+          maxLength: 40
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        tatMinutes:
+          type: integer
+          format: int32
+          maximum: 43200
+          minimum: 1
+        taxCode:
+          type: string
+          maxLength: 20
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        unit:
+          type: string
+          maxLength: 40
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        volumeMl:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+      required:
+      - code
+      - container
+      - name
+      - price
+      - sampleType
+      - tatMinutes
+      - unit
+      - volumeMl
+    LabTestUpdateRequest:
+      type: object
+      properties:
+        active:
+          type: boolean
+        container:
+          type: string
+          maxLength: 40
+          minLength: 0
+          pattern: "^(?=.*\\S)[^\\p{Cntrl}]*$"
+        loinc:
+          type: string
+          pattern: "^[0-9]{1,7}-[0-9]$"
+        method:
+          type: string
+          maxLength: 80
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+          pattern: "^(?=.*\\S)[^\\p{Cntrl}]*$"
+        price:
+          type: number
+          minimum: 0
+        sampleType:
+          type: string
+          maxLength: 40
+          minLength: 0
+          pattern: "^(?=.*\\S)[^\\p{Cntrl}]*$"
+        tatMinutes:
+          type: integer
+          format: int32
+          maximum: 43200
+          minimum: 1
+        taxCode:
+          type: string
+          maxLength: 20
+          minLength: 0
+          pattern: "^[^\\p{Cntrl}]*$"
+        unit:
+          type: string
+          maxLength: 40
+          minLength: 0
+          pattern: "^(?=.*\\S)[^\\p{Cntrl}]*$"
+        volumeMl:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
     LateArrivalRequest:
       type: object
       properties:

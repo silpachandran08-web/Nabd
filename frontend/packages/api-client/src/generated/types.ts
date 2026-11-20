@@ -382,6 +382,17 @@ export type Job = { archiveSha256?: string; bytes?: number; completedAt?: string
 export type JsonNode = Record<string, unknown>;
 export type Keys = { keyId?: string; keySecret?: string; };
 export type KillRequest = { active?: boolean; reason: string; };
+export type LabImportRequest = { dryRun?: boolean; pack: string; };
+export type LabImportResult = { created: number; dryRun: boolean; pack: string; reviewNote?: string; reviewed: boolean; skipped: Array<string>; toCreate: Array<string>; };
+export type LabOutsourced = { partnerLabId: string; };
+export type LabPanel = { active: boolean; chargeCode: string; chargeItemId: string; code: string; discount: number; id: string; name: string; price: number; tests: Array<LabPanelTest>; testsTotal: number; };
+export type LabPanelList = { items: Array<LabPanel>; };
+export type LabPanelRequest = { code: string; name: string; price: number; testIds: Array<string>; };
+export type LabPanelTest = { code: string; id: string; name: string; price: number; };
+export type LabTest = { active: boolean; chargeCode: string; chargeItemId: string; code: string; container: string; id: string; loinc?: string; method?: string; name: string; price: number; sampleType: string; tatMinutes: number; taxCode?: string; unit?: string; updatedAt: string; volumeMl?: number; };
+export type LabTestPage = { items: Array<LabTest>; nextCursor?: string; };
+export type LabTestRequest = { code: string; container: string; loinc?: string; method?: string; name: string; outsourced?: LabOutsourced; price: number; sampleType: string; tatMinutes: number; taxCode?: string; unit: string; volumeMl: number; };
+export type LabTestUpdateRequest = { active?: boolean; container?: string; loinc?: string; method?: string; name?: string; price?: number; sampleType?: string; tatMinutes?: number; taxCode?: string; unit?: string; volumeMl?: number; };
 export type LateArrivalRequest = { appointmentId: string; };
 export type LeakageItem = { amountMinor: number; appliedBy?: string; appliedByName?: string; approvalMethod: string; approverId?: string; approverName?: string; at: string; id: string; invoiceId: string; invoiceNumber?: string; reasonCode: string; type: string; };
 export type LeakageResponse = { currency: string; from: string; items: Array<LeakageItem>; to: string; totals: LeakageTotals; };
@@ -1052,6 +1063,12 @@ export type Operations = {
   AttachmentController_downloadUrl: { method: "post"; path: "/v1/files/{id}/download-url"; permission: "clinical:view"; pathParams: { id: string; }; query: never; body: never; response: FileDownloadUrlResponse };
   DeskExceptionController_list: { method: "get"; path: "/v1/front-desk/exceptions"; permission: "queue:view"; pathParams: never; query: { kind?: string; cursor?: string; limit?: number; }; body: never; response: DeskExceptionPage };
   DeskExceptionController_act: { method: "post"; path: "/v1/front-desk/exceptions/{id}/{action}"; permission: "queue:edit"; pathParams: { id: string; action: string; }; query: never; body: ActionRequest; response: DeskExceptionActionResponse };
+  LabController_importCatalogue: { method: "post"; path: "/v1/lab/catalogue/imports"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabImportRequest; response: LabImportResult };
+  LabController_panels: { method: "get"; path: "/v1/lab/panels"; permission: "lab:view"; pathParams: never; query: never; body: never; response: LabPanelList };
+  LabController_createPanel: { method: "post"; path: "/v1/lab/panels"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabPanelRequest; response: LabPanel };
+  LabController_tests: { method: "get"; path: "/v1/lab/tests"; permission: "lab:view"; pathParams: never; query: { q?: string; cursor?: string; limit?: number; }; body: never; response: LabTestPage };
+  LabController_createTest: { method: "post"; path: "/v1/lab/tests"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabTestRequest; response: LabTest };
+  LabController_updateTest: { method: "patch"; path: "/v1/lab/tests/{id}"; permission: "lab:catalogue"; pathParams: { id: string; }; query: never; body: LabTestUpdateRequest; response: LabTest };
   MeEntitlementsController_get: { method: "get"; path: "/v1/me/entitlements"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MeEntitlements };
   StaffOnboardingController_get: { method: "get"; path: "/v1/me/onboarding"; permission: "authenticated"; pathParams: never; query: never; body: never; response: StaffOnboardingProgress };
   StaffOnboardingController_complete: { method: "put"; path: "/v1/me/onboarding/{key}"; permission: "authenticated"; pathParams: { key: string; }; query: never; body: never; response: StaffOnboardingProgress };
@@ -1439,6 +1456,8 @@ export type Permission =
   | "departments:edit"
   | "departments:view"
   | "kb_import:edit"
+  | "lab:catalogue"
+  | "lab:view"
   | "messaging_operations:override"
   | "nursing:create"
   | "nursing:edit"

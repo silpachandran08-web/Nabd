@@ -138,7 +138,7 @@ const PHARMACIST: NavItem[] = [
   // PHL-008: stock alerts and the expiry report (pharmacist.insights); the badge counts the open alerts.
   { id: "ph-insights", href: "/pharmacy/insights", label: "Pharmacy insights", short: "Insights", icon: "chart", perms: ["pharmacy:view"], modules: PHARMACY_MODULES, owner: MON, badge: "stock-alerts", keywords: ["expiry", "near expiry", "low stock", "dead stock", "reorder"] },
 ];
-// No lab permission exists yet: "lab:view" is the placeholder grant the Diagnostics squad defines with the lab screens (absent until then).
+// PHL-041: lab:view is the lab module's read grant (roles.grants module "lab"); the catalogue is built, the other lab screens are skeletons.
 export const LAB_GRANT = "lab:view";
 const LAB: NavItem[] = [
   { id: "lab-worklist", href: "/lab", label: "Worklist", short: "Worklist", icon: "list", perms: [LAB_GRANT], owner: DI, planned: { module: ["lab"] }, active: (p) => p === "/lab" },

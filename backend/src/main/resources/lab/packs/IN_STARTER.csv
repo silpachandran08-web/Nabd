@@ -88,7 +88,7 @@ TROPI,Troponin I,10839-9,serum,sst_gold,ng/mL,1440
 HSTROPI,Troponin I high sensitivity,89579-7,serum,sst_gold,ng/L,1440
 HSTROPT,Troponin T high sensitivity,67151-1,serum,sst_gold,ng/L,1440
 NTPROBNP,NT-proBNP,33762-6,serum,sst_gold,pg/mL,1440
-BNP,B-type natriuretic peptide,30934-4,plasma,edta_lavender,pg/mL,serum
+BNP,B-type natriuretic peptide,30934-4,plasma,edta_lavender,pg/mL,1440
 FERR,Ferritin,2276-4,serum,sst_gold,ng/mL,1440
 B12,Vitamin B12,2132-9,serum,sst_gold,pg/mL,1440
 FOLATE,Folate,2284-8,serum,sst_gold,ng/mL,1440
@@ -121,7 +121,7 @@ PROG,Progesterone,2839-9,serum,sst_gold,ng/mL,1440
 TESTO,Testosterone total,2986-8,serum,sst_gold,ng/dL,1440
 CYSC,Cystatin C,33863-2,serum,sst_gold,mg/L,1440
 BHCG,Beta hCG quantitative,21198-7,serum,sst_gold,m[IU]/mL,1440
-ACTH,Adrenocorticotropic hormone,2141-0,plasma,edta_lavender,pg/mL,serum
+ACTH,Adrenocorticotropic hormone,2141-0,plasma,edta_lavender,pg/mL,1440
 PSA,Prostate specific antigen total,2857-1,serum,sst_gold,ng/mL,1440
 FPSA,Prostate specific antigen free,10886-0,serum,sst_gold,ng/mL,1440
 CEA,Carcinoembryonic antigen,2039-6,serum,sst_gold,ng/mL,1440
