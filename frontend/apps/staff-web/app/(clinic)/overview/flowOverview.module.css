@@ -1,0 +1,20 @@
+/* ADM-041: time KPI tiles and charts of the owner overview. Logical properties only; tokens only. */
+.section { margin-block-end: var(--nb-space-24); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-12); flex-wrap: wrap; margin-block-end: var(--nb-space-8); }
+.heading { font-size: 14px; font-weight: 600; margin: var(--nb-space-12) 0 var(--nb-space-8); color: var(--nb-text-secondary); }
+.meta { font-size: 12px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-8); }
+.seg { display: inline-flex; gap: var(--nb-space-4); padding: var(--nb-space-4); border-radius: 12px; background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); }
+.segBtn { min-block-size: 44px; min-inline-size: 44px; padding-inline: var(--nb-space-12); border-radius: 9px; border: 0; background: transparent; color: var(--nb-text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.segOn { composes: segBtn; background: var(--nb-accent-gradient); color: var(--nb-on-accent); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--nb-space-12); }
+.tileLink { display: block; min-block-size: 44px; color: inherit; text-decoration: none; border-radius: var(--nb-radius-lg); }
+.tileLink:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
+.tileSkel { min-block-size: 96px; border-radius: var(--nb-radius-lg); background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--nb-space-16); margin-block-start: var(--nb-space-16); align-items: start; }
+.panel { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-16); display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.panelTitle { font-size: 14px; font-weight: 600; margin: 0; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.listRow { display: flex; justify-content: space-between; gap: var(--nb-space-8); font-size: 13px; }
+.empty { font-size: 13px; color: var(--nb-text-secondary); margin: 0; }
+.error { background: var(--nb-danger-tint); color: var(--nb-danger-500); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); font-size: 13px; margin-block-end: var(--nb-space-8); }
+.retry { background: transparent; border: 0; color: inherit; text-decoration: underline; font: inherit; cursor: pointer; min-block-size: 44px; }
