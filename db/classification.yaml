@@ -1582,6 +1582,7 @@ schemas:
       returnable: operational
       cold_chain: operational
       reorder_level: operational
+      gtin: operational
     pharmacy_schedule_rules:
       market: operational
       schedule_class: operational

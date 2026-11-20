@@ -30,6 +30,8 @@ public record PharmacyItemResponse(
         boolean coldChain,
         boolean returnable,
         /** PHL-008: null = no reorder level (no low-stock alert). */
-        Integer reorderLevel
+        Integer reorderLevel,
+        /** PHL-019: pack barcode (GTIN); null = none on file. */
+        String gtin
 ) {
 }

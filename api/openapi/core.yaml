@@ -13493,6 +13493,45 @@ paths:
       tags:
       - pharmacy
       x-required-permission: pharmacy:edit
+  /v1/pharmacy/items/index:
+    get:
+      operationId: PharmacyController_itemIndex
+      parameters:
+      - in: header
+        name: If-None-Match
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PharmacyItemIndexEntry"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - pharmacy
+      x-required-permission: pharmacy:dispense
   /v1/pharmacy/items/{id}:
     patch:
       operationId: PharmacyController_updateItem
@@ -25364,6 +25403,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LineItemRequest"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentRequest"
+          maxItems: 4
+          minItems: 0
       required:
       - lineItems
     ClassDef:
@@ -31424,6 +31469,28 @@ components:
             type: string
         mode:
           type: string
+    PharmacyItemIndexEntry:
+      type: object
+      properties:
+        class:
+          type: string
+        code:
+          type: string
+        generic:
+          type: string
+        gtin:
+          type: string
+        id:
+          type: string
+        isRx:
+          type: boolean
+        name:
+          type: string
+        onHand:
+          type: integer
+          format: int32
+        price:
+          type: number
     PharmacyItemResponse:
       type: object
       properties:
@@ -31436,6 +31503,8 @@ components:
         drugId:
           type: string
         genericName:
+          type: string
+        gtin:
           type: string
         hsnCode:
           type: string
@@ -31498,6 +31567,9 @@ components:
           type: string
           maxLength: 200
           minLength: 0
+        gtin:
+          type: string
+          pattern: "^([0-9]{8,14})?$"
         hsnCode:
           type: string
         inHouse:

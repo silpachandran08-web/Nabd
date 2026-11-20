@@ -24,4 +24,11 @@ public interface PharmacyTaxInputs {
 
     /** Header lines for a pharmacy invoice: one "label: number" per drug licence on file, in label order. */
     List<String> licenceLines();
+
+    /**
+     * PHL-019: for the receipt, the batches an invoice's units were dispensed from: item id -> one "Batch <no> Exp <MM/yyyy>" per
+     * batch joined by newlines, FEFO order (with " x<qty>" when the line came from several). An item sold from a batch without
+     * batch details (a Hybrid clinic's implicit batch) is absent.
+     */
+    Map<UUID, String> batchLines(UUID invoiceId);
 }

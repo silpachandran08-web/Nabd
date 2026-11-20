@@ -33,10 +33,12 @@ public class InvoiceDocumentService {
     private final com.nabd.hms.common.ClinicClock clock;
     private final com.nabd.hms.common.TenantContext tenantContext;
     private final com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     InvoiceDocumentService(CheckoutService checkout, InvoiceDocumentRepository repo, AuditService audit, ActorDirectory actors,
                            com.nabd.hms.common.ClinicClock clock, com.nabd.hms.common.TenantContext tenantContext,
-                           com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy) {
+                           com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy, com.nabd.hms.organization.api.RegionRules regions) {
+        this.regions = regions;
         this.pharmacy = pharmacy;
         this.clock = clock;
         this.tenantContext = tenantContext;
@@ -83,11 +85,18 @@ public class InvoiceDocumentService {
         var heads = repo.catalogueIds(tenantId, invoiceId);
         var pharmacyLines = pharmacy.inputs(heads.stream().filter(java.util.Objects::nonNull).distinct().toList());
         var supplier = repo.supplier(tenantId, clock.zone(tenantId));
-        if (!pharmacyLines.isEmpty()) {
-            supplier = new InvoiceDocumentText.Supplier(supplier.legalName(), supplier.gstin(), supplier.stateCode(), supplier.zone(), pharmacy.licenceLines());
-        }
-        List<String> notes = heads.stream().map(h -> h != null && pharmacyLines.containsKey(h) && pharmacyLines.get(h).zeroRated()
-                ? com.nabd.hms.billing.tax.PharmacyTaxLines.ZERO_RATED_NOTE : null).toList();
+        // PHL-019: a market without GST prints its VAT number instead of the GSTIN line (the regions table decides the regime)
+        String[] vat = repo.vatIdentity(tenantId);
+        String taxIdLine = "GST".equals(regions.region(vat[0]).taxRegime()) ? null : "VAT No: " + (vat[1] == null ? "not registered" : vat[1]);
+        supplier = new InvoiceDocumentText.Supplier(supplier.legalName(), supplier.gstin(), supplier.stateCode(), supplier.zone(),
+                pharmacyLines.isEmpty() ? List.of() : pharmacy.licenceLines(), taxIdLine);
+        // PHL-019: a stocked line also says which batch it came from and when that expires
+        Map<UUID, String> batches = pharmacyLines.isEmpty() ? Map.of() : pharmacy.batchLines(invoiceId);
+        List<String> notes = heads.stream().map(h -> {
+            String zero = h != null && pharmacyLines.containsKey(h) && pharmacyLines.get(h).zeroRated() ? com.nabd.hms.billing.tax.PharmacyTaxLines.ZERO_RATED_NOTE : null;
+            String batch = h == null ? null : batches.get(h);
+            return zero == null ? batch : batch == null ? zero : zero + "\n" + batch;
+        }).toList();
         return InvoiceDocumentText.build(inv, supplier, kind, "receipt".equals(kind) ? repo.latestReceiptNumber(tenantId, invoiceId) : null,
                 cols, repo.sacHsn(tenantId, invoiceId), notes);
     }
