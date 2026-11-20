@@ -6,3 +6,5 @@ export * from "./controls.tsx";
 export * from "./feedback.tsx";
 export * from "./Table.tsx";
 export * from "./Sheet.tsx";
+// FEF-026: accessible chart kit (README.md).
+export * from "./charts/index.ts";

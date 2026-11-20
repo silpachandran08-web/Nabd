@@ -11,7 +11,8 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./ui.css": "./src/ui.css"
+    "./ui.css": "./src/ui.css",
+    "./charts/fixtures": "./src/charts/fixtures.ts"
   },
   "scripts": {
     "lint": "eslint .",
