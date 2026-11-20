@@ -5346,6 +5346,36 @@ paths:
       responses:
         "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /pharmacy/items/index:
+    get:
+      tags: [Pharmacy]
+      summary: >
+        PHL-019. Compact index of every sellable item (active, stocked, dispensed here; ordered by name) for the counter sale's
+        client-side typeahead. `code` is the charge code a sale line is billed by. The ETag is a hash of the body: send it back in
+        If-None-Match and an unchanged index answers 304 with no body. 403 pharmacy-mode-external in External mode.
+      x-required-permission: pharmacy:dispense
+      parameters: [{ name: If-None-Match, in: header, required: false, schema: { type: string } }]
+      responses:
+        "200":
+          description: OK
+          headers: { ETag: { schema: { type: string } } }
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    code: { type: string }
+                    name: { type: string }
+                    generic: { type: [string, "null"] }
+                    gtin: { type: [string, "null"] }
+                    price: { type: number }
+                    class: { type: string, description: "Schedule class code (OTC, IN_H1, ...)" }
+                    isRx: { type: boolean }
+                    onHand: { type: integer }
+        "304": { description: Not modified (the If-None-Match ETag is current) }
   /pharmacy/items/{id}:
     patch:
       tags: [Pharmacy]
@@ -5424,6 +5454,11 @@ paths:
         `pharmacy.rx_gate.blocked.v1` { tenantId, itemId, reason, actorId }; nothing else is written and stock is unchanged.
         A counter sale with linked Rx lines is recorded against that prescription's patient (patientId set); lines from two patients are
         rx-patient-mismatch. Sales against an outside (paper/photo) prescription are PHL-020.
+        PHL-019: optional `payments: [{ method: cash|card|upi|other, amount, reference? }]` (at most 4) settle the new invoice in the same
+        transaction, one payment row each (split tender). They must add up to the invoice total (422 payment-mismatch, nothing is written)
+        and need billing:edit like POST /billing/invoices/{id}/payments (403 payment-not-permitted). Every sale publishes
+        `pharmacy.otc_sale.completed.v1` { tenantId, invoiceId, lineCount, totalMinor, currency }.
+      x-permission-check: "payments[] also needs billing:edit"
       x-required-permission: billing:create
       responses:
         "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
@@ -7380,6 +7415,7 @@ components:
         priceInclusiveOfTax: { type: [boolean, "null"], description: "PHL-021: true = the price already contains the tax (India MRP pricing); tax is backed out by the billing tax engine. Omitted = unchanged (null = the charge head decides)." }
         zeroRated: { type: [boolean, "null"], description: "PHL-021: zero-rated medicine, VAT 0% with the reason printed on the invoice. Omitted = unchanged (false on create)." }
         mrp: { type: [number, "null"], minimum: 0, description: "PHL-021: maximum retail price; billing a higher price is 422 price-above-mrp. Omitted = unchanged. Item level until PHL-005 adds batch MRP." }
+        gtin: { type: [string, "null"], pattern: "^([0-9]{8,14})?$", description: "PHL-019: pack barcode (GTIN, 8 to 14 digits), unique in the clinic (409 gtin-in-use). Omitted = unchanged; empty string clears it." }
     BillingCharge:
       type: object
       description: Row of the checkout / OTC charge lists (ChargeResponse).
@@ -7575,6 +7611,7 @@ components:
         priceInclusiveOfTax: { type: [boolean, "null"], description: "PHL-021: null = the charge head decides." }
         zeroRated: { type: boolean }
         mrp: { type: [number, "null"] }
+        gtin: { type: [string, "null"], description: "PHL-019: pack barcode (GTIN); null = none on file." }
     GoodsReceiptRequest:
       type: object
       required: [supplierName, billNumber, billDate, lines]

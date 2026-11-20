@@ -254,7 +254,22 @@ public class CheckoutService {
     public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, boolean canDiscount, String ip, CheckoutRequest req) {
         tenantContext.set(tenantId);
         requireOtcAvailable(tenantId);
-        return standaloneInvoice(tenantId, staffId, null, req, "OTC", canDiscount, false, ip);
+        InvoiceResponse inv = standaloneInvoice(tenantId, staffId, null, req, "OTC", canDiscount, false, ip);
+        // PHL-019: the counter takes the money with the sale (split tender = several rows); all of it or the sale rolls back
+        List<PaymentRequest> payments = req.payments() == null ? List.of() : req.payments();
+        if (!payments.isEmpty()) {
+            BigDecimal tendered = payments.stream().map(PaymentRequest::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (tendered.compareTo(inv.total()) != 0) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "payment-mismatch", "Payments do not match the total",
+                        "The payments add up to " + tendered.toPlainString() + " but the bill is " + inv.total().toPlainString() + ".",
+                        java.util.Map.of("total", inv.total()));
+            }
+            for (PaymentRequest p : payments) inv = recordPayment(tenantId, inv.id(), staffId, p, null);
+        }
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.PHARMACY_OTC_SALE_COMPLETED, inv.id(), java.util.Map.of(
+                "invoiceId", inv.id(), "lineCount", inv.lineItems().size(),
+                "totalMinor", Money.of(inv.total(), inv.currency()).amountMinor(), "currency", inv.currency()));
+        return inv;
     }
 
     /** E14 Treatment Packages: a package sale is also a standalone invoice — no queue entry, but

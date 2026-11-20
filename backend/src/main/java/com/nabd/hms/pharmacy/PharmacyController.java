@@ -65,6 +65,26 @@ public class PharmacyController {
         return service.listItems(tenantId, scheduleClass);
     }
 
+    /**
+     * PHL-019: compact index of every sellable item for the counter's client-side typeahead. The ETag is a SHA-256 of the clinic id
+     * and the body, so it changes with any item, price, barcode or stock change and never matches another clinic's copy in a
+     * shared browser cache; If-None-Match with the current one answers 304 with no body.
+     */
+    @GetMapping("/items/index")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:dispense')")
+    public ResponseEntity<List<com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry>> itemIndex(@CurrentTenant UUID tenantId,
+            @org.springframework.web.bind.annotation.RequestHeader(value = org.springframework.http.HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
+        List<com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry> index = service.itemIndex(tenantId);
+        String etag = "\"" + com.nabd.hms.common.OpaqueTokens.sha256Hex(tenantId + "|" + index).substring(0, 32) + "\"";
+        // a proxy that compresses the body may hand the tag back as a weak one (W/"...")
+        boolean same = ifNoneMatch != null && java.util.Arrays.stream(ifNoneMatch.split(",")).map(String::trim)
+                .anyMatch(t -> t.equals(etag) || t.equals("W/" + etag));
+        ResponseEntity.BodyBuilder r = ResponseEntity.status(same ? HttpStatus.NOT_MODIFIED : HttpStatus.OK).eTag(etag)
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, no-cache");
+        return same ? r.build() : r.body(index);
+    }
+
     @PostMapping("/items")
     @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @RequiresPharmacyMode(PharmacyMode.HYBRID)

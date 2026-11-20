@@ -89,7 +89,7 @@ test("permission missing: the item is absent, also from Ctrl+K", () => {
   assert.ok(!ids(nav(BILLING.filter((p) => p !== "packages:view"), ALL)).includes("billing-packages"));
   assert.ok(!ids(nav(PHARMACIST.filter((p) => p !== "billing:create"), ALL)).includes("ph-pos"), "no counter sale without billing:create");
   assert.deepEqual(jumpTargets({ perms: PHARMACIST.filter((p) => !p.startsWith("billing:")), owner: false, ent: ALL }, "otc"), []);
-  assert.deepEqual(jumpTargets({ perms: PHARMACIST, owner: false, ent: ALL }, "otc").map((i) => i.href), ["/checkout/otc"]);
+  assert.deepEqual(jumpTargets({ perms: PHARMACIST, owner: false, ent: ALL }, "otc").map((i) => i.href), ["/pharmacy/pos"]);
   assert.deepEqual(rolesFor(["pharmacy:view"], false), ["reception"], "no lab or pharmacy grant: no counter shell");
 });
 

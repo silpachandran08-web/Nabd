@@ -72,7 +72,7 @@ class PharmacyRepository {
                     "(SELECT max(r.register_type) FROM pharmacy_schedule_rules r WHERE r.schedule_class = p.schedule_class) AS register_type, " +
                     "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house, " +
                     "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp, " +
-                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable, p.reorder_level " +
+                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable, p.reorder_level, p.gtin " +
                     "FROM charge_catalogue c LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id ";
 
     /** @param scheduleClass optional PHL-002 filter (index on tenant_id, schedule_class) */
@@ -153,6 +153,24 @@ class PharmacyRepository {
         jdbc.update("UPDATE pharmacy_item_profiles SET cold_chain = COALESCE(?, cold_chain), returnable = COALESCE(?, returnable), " +
                         "reorder_level = COALESCE(?, reorder_level) WHERE tenant_id = ? AND item_id = ?",
                 coldChain, returnable, reorderLevel, tenantId, itemId);
+    }
+
+    /** PHL-019: null leaves the stored barcode, "" clears it. A code another item of the clinic holds is a DuplicateKeyException. */
+    void setGtin(UUID tenantId, UUID itemId, String gtin) {
+        if (gtin != null) {
+            jdbc.update("UPDATE pharmacy_item_profiles SET gtin = NULLIF(?, '') WHERE tenant_id = ? AND item_id = ?", gtin, tenantId, itemId);
+        }
+    }
+
+    /** PHL-019: what the counter can sell: active, stocked, dispensed here. Ordered by name (the client's result order). */
+    List<com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry> itemIndex(UUID tenantId) {
+        return jdbc.query("SELECT c.id, c.code, c.name, p.generic_name, p.gtin, c.base_amount, COALESCE(p.schedule_class, 'OTC') AS schedule_class, " +
+                        "COALESCE(c.is_rx, false) AS is_rx, c.stock_qty FROM charge_catalogue c " +
+                        "LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id " +
+                        "WHERE c.tenant_id = ? AND c.stock_qty IS NOT NULL AND c.active AND COALESCE(p.in_house, true) ORDER BY c.name, c.id",
+                (rs, i) -> new com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry(rs.getString("id"), rs.getString("code"), rs.getString("name"),
+                        rs.getString("generic_name"), rs.getString("gtin"), rs.getBigDecimal("base_amount"), rs.getString("schedule_class"),
+                        rs.getBoolean("is_rx"), rs.getInt("stock_qty")), tenantId);
     }
 
     List<RuleRow> rulesForMarket(String market) {
@@ -273,6 +291,6 @@ class PharmacyRepository {
                 rs.getString("schedule_class"), rs.getString("register_type"), rs.getString("generic_name"),
                 (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"),
                 (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"),
-                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"), (Integer) rs.getObject("reorder_level"));
+                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"), (Integer) rs.getObject("reorder_level"), rs.getString("gtin"));
     }
 }

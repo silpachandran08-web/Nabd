@@ -130,7 +130,9 @@ const BILLING: NavItem[] = [
 ];
 const PHARMACIST: NavItem[] = [
   { id: "ph-dispense", href: "/pharmacy", label: "e-Rx queue & Dispense", short: "Dispense", icon: "syringe", perms: ["pharmacy:view"], owner: MON, active: (p) => p === "/pharmacy" || p.startsWith("/pharmacy/receipt"), keywords: ["e-rx", "prescriptions", "dispensing"] },
-  { id: "ph-pos", href: "/checkout/otc", label: "Counter sale (POS)", short: "POS", icon: "card", perms: ["billing:view", "billing:create"], modules: PHARMACY_MODULES, owner: MON, keywords: ["otc", "sale"] },
+  // PHL-019: the fast counter sale; the older counter-sale page (discounts, returns) stays under the same item.
+  { id: "ph-pos", href: "/pharmacy/pos", label: "Counter sale (POS)", short: "POS", icon: "card", perms: ["billing:view", "billing:create"], modules: PHARMACY_MODULES, owner: MON, keywords: ["otc", "sale", "barcode", "scan"],
+    active: (p) => p === "/pharmacy/pos" || p === "/checkout/otc" },
   // pharmacist.stock is PHL-010's stock take (built, opened from the Pharmacy panel too); same grant as its page gate.
   { id: "ph-stock", href: "/pharmacy/stock-take", label: "Stock take", short: "Stock", icon: "package", perms: ["pharmacy:view", "pharmacy:edit"], modules: PHARMACY_MODULES, owner: MON, keywords: ["inventory", "stock take", "count", "adjustment"] },
   { id: "ph-purchase", href: "/pharmacy/purchase", label: "Purchase & GRN", short: "Purchase", icon: "plusSquare", perms: ["pharmacy:view"], owner: MON, planned: { module: PHARMACY_MODULES }, keywords: ["goods receipt", "supplier"] },

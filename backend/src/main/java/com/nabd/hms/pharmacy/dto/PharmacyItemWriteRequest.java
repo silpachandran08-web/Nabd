@@ -35,11 +35,13 @@ public record PharmacyItemWriteRequest(
         /** PHL-011: false = customer returns are refused. Omitted = unchanged (true on create). */
         Boolean returnable,
         /** PHL-008: on hand below this raises a low-stock alert. Omitted = unchanged (none on create). */
-        @PositiveOrZero Integer reorderLevel
+        @PositiveOrZero Integer reorderLevel,
+        /** PHL-019: pack barcode (GTIN, 8 to 14 digits), unique in the clinic (409 gtin-in-use). Omitted = unchanged; "" clears it. */
+        @jakarta.validation.constraints.Pattern(regexp = "^([0-9]{8,14})?$") String gtin
 ) {
     public PharmacyItemWriteRequest withTaxRatePercent(BigDecimal rate) {
         return new PharmacyItemWriteRequest(name, isRx, hsnCode, price, rate, stockQty, scheduleClass, drugMasterId, genericName, packSize,
-                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp, coldChain, returnable, reorderLevel);
+                unit, inHouse, priceInclusiveOfTax, zeroRated, mrp, coldChain, returnable, reorderLevel, gtin);
     }
 
     public BigDecimal taxRatePercentOrZero() {

@@ -21,6 +21,7 @@ import java.util.UUID;
 @Transactional(propagation = Propagation.MANDATORY)
 class PharmacyTaxInputsImpl implements PharmacyTaxInputs {
 
+    private static final java.time.format.DateTimeFormatter EXPIRY = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy");
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     private final PharmacyTaxInputsRepository repo;
@@ -46,6 +47,16 @@ class PharmacyTaxInputsImpl implements PharmacyTaxInputs {
                         "The selling price cannot be higher than the MRP (" + mrp.toPlainString() + ").", Map.of("mrp", mrp));
             }
         });
+    }
+
+    @Override
+    public Map<UUID, String> batchLines(UUID invoiceId) {
+        Map<UUID, List<PharmacyTaxInputsRepository.SoldBatch>> byItem = new java.util.LinkedHashMap<>();
+        for (var b : repo.soldBatches(tenant.current(), invoiceId)) byItem.computeIfAbsent(b.itemId(), k -> new java.util.ArrayList<>()).add(b);
+        Map<UUID, String> out = new HashMap<>();
+        byItem.forEach((item, bs) -> out.put(item, bs.stream().map(b -> "Batch " + b.batchNo() + " Exp " + EXPIRY.format(b.expiry())
+                + (bs.size() > 1 ? " x" + b.qty() : "")).collect(java.util.stream.Collectors.joining("\n"))));
+        return out;
     }
 
     @Override
