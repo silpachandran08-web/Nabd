@@ -326,7 +326,7 @@ class Adm016OffboardingApiTest extends ApiTestBase {
         assertThat(com.nabd.hms.common.OpaqueTokens.sha256Hex(canonical)).isEqualTo(sha).isEqualTo(forHolder.getBody().get("sha256"));
         assertThat(canonical).doesNotContain("Asha").doesNotContain("Bala").doesNotContain("+9197").doesNotContain("@a.com"); // no PHI, no contact details
         Map<String, Object> jwks = http.exchange(url("/v1/public/deletion-certificates/keys"), HttpMethod.GET, anon, Map.class).getBody();
-        assertThat(jwks.toString()).doesNotContain("d=");
+        assertThat(jwks.toString()).doesNotContain(", d=").doesNotContain("{d="); // public members only
         ECKey key = (ECKey) JWKSet.parse(jwks).getKeyByKeyId((String) forHolder.getBody().get("kid"));
         byte[] signature = Base64.getUrlDecoder().decode((String) forHolder.getBody().get("signature"));
         assertThat(forHolder.getBody()).containsEntry("alg", "ES256");

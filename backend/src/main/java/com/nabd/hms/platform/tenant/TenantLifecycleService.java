@@ -87,8 +87,9 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
         return move(tenantId, toStatus, changedBy, changedByStaff, reason, ipAddress, false);
     }
 
-    private TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
-                                         String ipAddress, boolean cancelOffboarding) {
+    @Transactional
+    TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
+                                 String ipAddress, boolean cancelOffboarding) {
         String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
         Set<String> allowed = cancelOffboarding && "offboarding".equals(fromStatus) ? RESTORABLE : ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());
         if (!allowed.contains(toStatus)) {

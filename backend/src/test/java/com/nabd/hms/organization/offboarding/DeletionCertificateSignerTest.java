@@ -44,7 +44,7 @@ class DeletionCertificateSignerTest {
         assertThat(signer.verify(s.kid(), changed, s.signature())).isFalse();
         assertThat(signer.verify("other-kid", doc(), s.signature())).isFalse();
         assertThat(signer.verify(s.kid(), doc(), "not base64 !")).isFalse();
-        assertThat(signer.publicJwks().toString()).doesNotContain("\"d\"").doesNotContain("d=");
+        assertThat(signer.publicJwks().toString()).doesNotContain(", d=").doesNotContain("{d="); // no private member
     }
 
     @Test
