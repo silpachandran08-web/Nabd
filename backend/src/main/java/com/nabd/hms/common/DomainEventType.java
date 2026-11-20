@@ -78,7 +78,9 @@ public enum DomainEventType {
     /** COM-015: produced by services/comms-gateway once per clinic and closed day: message counts and cost by channel and category. No PHI. */
     USAGE_REPORTED("comms.usage.reported.v1", "core/messaging"),
     /** ADM-016: a leaving clinic's rows were erased and its deletion certificate issued. Ids, the erase time and totals only. */
-    ORGANIZATION_OFFBOARDING_ERASED("organization.offboarding.erased.v1", "core/organization");
+    ORGANIZATION_OFFBOARDING_ERASED("organization.offboarding.erased.v1", "core/organization"),
+    /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
+    REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting");
 
     private final String type;
     private final String source;

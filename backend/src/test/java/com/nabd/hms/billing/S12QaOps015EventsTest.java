@@ -410,6 +410,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("pharmacy.batch.quarantined.v1"); // PHL-009: Phl009QuarantineApiTest
         expected.remove("specialty.photo.added.v1"); // CLN-047: Cln047DermPhotosApiTest
         expected.remove("pharmacy.otc_sale.completed.v1"); // PHL-019: Phl019CounterSaleApiTest
+        expected.remove("reporting.export.created.v1"); // ADM-047: Adm047ReportsLibraryApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));
