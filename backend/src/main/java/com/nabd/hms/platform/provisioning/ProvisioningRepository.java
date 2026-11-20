@@ -30,7 +30,7 @@ class ProvisioningRepository {
             "id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, owner_mobile, brand_name, " +
                     "status, path, created_tenant_id, created_owner_id, created_brand_id, " +
                     "owner_newly_created, brand_newly_created, approved_at, approved_by, " +
-                    "source_tenant_id, requested_by_staff, planned_tenant_id, branch_code, branch_address, timezone, copy_sections ";
+                    "source_tenant_id, requested_by_staff, planned_tenant_id, branch_code, branch_address, timezone, copy_sections, edition ";
 
     void insertJob(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
                    String ownerEmail, String ownerName, String ownerMobile, String brandName, String path) {
@@ -114,6 +114,28 @@ class ProvisioningRepository {
     List<Job> openBranchJobs(String ownerEmail) {
         return jdbc.query("SELECT " + JOB_COLUMNS + "FROM master.provisioning_jobs WHERE source_tenant_id IS NOT NULL AND status <> 'done' " +
                 "AND owner_email = ?::citext ORDER BY created_at DESC", jobMapper(), ownerEmail);
+    }
+
+    /** PHL-032: the edition the job provisions (a new job is a clinic until this says otherwise). */
+    void setJobEdition(UUID jobId, String edition) {
+        jdbc.update("UPDATE master.provisioning_jobs SET edition = ? WHERE id = ?", edition, jobId);
+    }
+
+    /** PHL-032: a pharmacy edition's tenant is facility_type 'pharmacy' (the column defaults to 'clinic'). */
+    void setFacilityType(UUID tenantId, String facilityType) {
+        jdbc.update("UPDATE tenants SET facility_type = ? WHERE id = ?", facilityType, tenantId);
+    }
+
+    /** PHL-032: the pharmacy plan by code (inactive, so never in the catalogue); sold as a live subscription, no trial. */
+    void subscribeToPlan(UUID tenantId, String planCode, String currency) {
+        jdbc.update("INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date, plan_version, status) " +
+                        "SELECT ?, p.id, 0, ?, current_date + 30, p.version, 'active' FROM master.plans p WHERE p.code = ? " +
+                        "ON CONFLICT (tenant_id) DO NOTHING",
+                tenantId, currency, planCode);
+    }
+
+    void deleteSubscription(UUID tenantId) {
+        jdbc.update("DELETE FROM master.subscriptions WHERE tenant_id = ?", tenantId);
     }
 
     /** Only meaningful for an enterprise-path job — self-serve jobs have nothing to gate. */
@@ -354,7 +376,8 @@ class ProvisioningRepository {
                     rs.getString("source_tenant_id") == null ? null : new ProvisioningModels.Branch(
                             uuidOrNull(rs.getString("source_tenant_id")), uuidOrNull(rs.getString("requested_by_staff")),
                             uuidOrNull(rs.getString("planned_tenant_id")), rs.getString("branch_code"), rs.getString("branch_address"),
-                            rs.getString("timezone"), List.of((String[]) rs.getArray("copy_sections").getArray())));
+                            rs.getString("timezone"), List.of((String[]) rs.getArray("copy_sections").getArray())),
+                    rs.getString("edition"));
         };
     }
 

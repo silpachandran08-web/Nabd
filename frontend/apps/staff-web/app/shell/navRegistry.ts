@@ -1,7 +1,7 @@
 // FEF-052/053/054: the ONE nav registry. Role context -> items, each with its grants, plan module, badge source and the squad
 // that owns the screen. Pure (unit-tested): ClinicNav, the Ctrl+K palette and the planned-screen pages all read this.
 import type { IconName } from "../components/ui/Icon";
-import { NAV_MODULES, navAllowed, type Entitlements } from "../lib/entitlementRules.ts";
+import { NAV_MODULES, editionAllows, navAllowed, pharmacyEdition, type Entitlements } from "../lib/entitlementRules.ts";
 
 export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing" | "solo";
 export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent" | "stock-alerts";
@@ -165,6 +165,9 @@ const SOLO: NavItem[] = [
     active: (p) => p.startsWith("/setup"), keywords: ["hours", "auto-accept", "fees", "solo preset"] },
 ];
 
+/** PHL-032: the pharmacy setup wizard, first in an unfinished pharmacy owner's nav (setup:edit writes the profile and the licences). */
+const PHARMACY_SETUP: NavItem = { id: "ph-setup", href: "/setup/pharmacy-wizard", label: "Pharmacy setup", short: "Setup", icon: "settings", perms: ["setup:edit", "pharmacy:edit"], owner: MON, keywords: ["licence", "drug licence", "gstin", "opening stock", "printer"] };
+
 /** Counter role -> the grant that marks it, for a role that does not book patients (queue:create is the front desk's). */
 const COUNTER_SIGNAL: [RoleContext, string][] = [["pharmacist", "pharmacy:edit"], ["lab", LAB_GRANT], ["billing", "billing:create"]];
 export const COUNTER_ROLES: readonly RoleContext[] = COUNTER_SIGNAL.map(([r]) => r);
@@ -178,6 +181,7 @@ const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(
 
 export function itemVisible(i: NavItem, perms: readonly string[], ent: Entitlements | null): boolean {
   if (!i.perms.every((p) => perms.includes(p))) return false;
+  if (!editionAllows(i.href, ent)) return false; // PHL-032
   const on = (m: string) => !!ent && ent.modules.some((x) => x.code === m && x.enabled);
   if (i.planned) return i.planned.module.some(on);
   return i.modules ? !ent || i.modules.some(on) : navAllowed(i.href, ent);
@@ -201,6 +205,7 @@ export function navFor({ perms, owner, ent, override, specialty, solo }: NavInpu
   let items = NAV[role].filter((i) => itemVisible(i, perms, ent));
   // A trimmed Owner role (or a counter role) that can open none of its items falls back to the generic staff list.
   if (items.length === 0 && (role === "owner" || COUNTER_ROLES.includes(role))) { role = "reception"; items = NAV.reception.filter((i) => itemVisible(i, perms, ent)); }
+  if (pharmacyEdition(ent) && role === "owner") items = [...PHARMACIST, PHARMACY_SETUP].filter((i) => itemVisible(i, perms, ent) && !items.some((x) => x.href === i.href)).concat(items); // PHL-032: the owner of a pharmacy runs the counter too
   if (specialty) items = items.map((i) => (i.id === "specialty" || i.id === "solo-specialty" ? { ...i, label: `${titleCase(specialty)} workspace`, short: titleCase(specialty), icon: SPECIALTY_ICON[specialty] ?? i.icon } : i));
   return { role, roles, items };
 }

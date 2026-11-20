@@ -52,7 +52,7 @@ public class PlanEntitlements implements Entitlements {
 
     /** modules == null: plan without entitlement rows (legacy) or no subscription = unrestricted. */
     record Snapshot(Set<String> modules, Integer seats, Integer branches, Map<String, Ovr> overrides,
-                    Set<String> globalKills, Instant loadedAt) {
+                    Set<String> globalKills, Instant loadedAt, String facilityType) {
     }
 
     private final JdbcTemplate jdbc;
@@ -133,6 +133,11 @@ public class PlanEntitlements implements Entitlements {
         }
     }
 
+    /** PHL-032: the tenant's facility type: clinic, single_specialty, multi_specialty, pharmacy or lab. */
+    String facilityType(UUID tenant) {
+        return snapshot(tenant).facilityType();
+    }
+
     public void evict(UUID tenant) {
         cache.remove(tenant);
     }
@@ -173,7 +178,10 @@ public class PlanEntitlements implements Entitlements {
                     overrides.put(rs.getString("feature_code"), new Ovr(rs.getString("state"), e == null ? null : e.toInstant()));
                 }, tenant);
         Set<String> kills = Set.copyOf(jdbc.queryForList("SELECT feature_code FROM master.kill_switches WHERE active", String.class));
-        return new Snapshot(modules, seats, branches, overrides, kills, clock.instant());
+        // PHL-032: tenants carries no RLS, so the facility type (the edition) is readable here without a tenant transaction
+        String facilityType = jdbc.queryForList("SELECT facility_type FROM tenants WHERE id = ?", String.class, tenant)
+                .stream().findFirst().orElse("clinic");
+        return new Snapshot(modules, seats, branches, overrides, kills, clock.instant(), facilityType);
     }
 
     static UUID currentTenant() {
