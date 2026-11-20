@@ -1,0 +1,2165 @@
+{
+ "clinicalKeys": {
+  "patient": [
+   "rxValid",
+   "rxExpired",
+   "rxDispensed",
+   "rxDispensedNoDate",
+   "rxRevoked",
+   "rxUnknownTitle",
+   "rxUnknownHint",
+   "rxOfflineValid",
+   "rxOfflineHint",
+   "rxOfflineNoKey",
+   "rxLines",
+   "rxPrivacy",
+   "cat_prescriptions",
+   "cat_lab_reports",
+   "cat_imaging",
+   "cat_diagnoses",
+   "cat_allergies",
+   "cat_visit_notes"
+  ],
+  "templates": []
+ },
+ "locales": [
+  "en",
+  "hi",
+  "kn",
+  "te"
+ ],
+ "patient": {
+  "en": {
+   "approve": "Approve",
+   "bookingStatus": "Status",
+   "bookingTitle": "Your appointment",
+   "bookingWhen": "When",
+   "bookingWhere": "Where",
+   "bookingWith": "With",
+   "cat_allergies": "Allergies",
+   "cat_diagnoses": "Diagnoses",
+   "cat_imaging": "Imaging reports",
+   "cat_invoices": "Bills and receipts",
+   "cat_lab_reports": "Lab reports",
+   "cat_prescriptions": "Prescriptions",
+   "cat_visit_notes": "Visit notes",
+   "claimDone": "Done. Your profile is now yours.",
+   "claimIntro": "At {clinic}, {guardian} has managed your profile as your guardian. From your 18th birthday you can take it over with a code sent to your own phone.",
+   "claimKeepLabel": "What may {guardian} still do for you?",
+   "claimKeepNone": "Nothing: my guardian's access ends",
+   "claimNotOpen": "You can claim your profile from {date}.",
+   "claimOwnPhone": "The clinic does not have a phone number of your own. Visit the clinic desk to claim your profile.",
+   "claimSubmit": "Claim my profile",
+   "claimTitle": "Your profile is yours now, {name}",
+   "consentApproved": "You approved this request.",
+   "consentChangedHint": "The clinic updated the request after you opened it. Please read it again before you decide.",
+   "consentChangedTitle": "This request changed",
+   "consentData": "What would be shared",
+   "consentDeclined": "You declined this request.",
+   "consentPurpose": "Why",
+   "consentRange": "Records from",
+   "consentReload": "Show the updated request",
+   "consentRequester": "Who is asking",
+   "consentTitle": "A clinic asks to share your records",
+   "consentValid": "This request is valid until",
+   "decline": "Decline",
+   "docNotHere": "This document cannot be opened on this page yet. Ask the clinic for a copy.",
+   "docOpen": "Open or save",
+   "docPreviewTitle": "Document preview",
+   "docTitle": "Your document",
+   "docUnsupported": "This file cannot be shown here. Use the button to open or save it.",
+   "errorHint": "Check your connection and try again.",
+   "errorTitle": "Something went wrong",
+   "expiredFull": "This link has expired — ask the clinic to resend",
+   "expiredHint": "Ask the clinic to resend it.",
+   "expiredTitle": "This link has expired",
+   "exportChecksum": "Check the archive against manifest.json inside it: every file is listed with its row count and SHA-256.",
+   "exportDone": "Download started. Keep the file somewhere safe: it holds your clinic's records.",
+   "exportDownload": "Download the archive",
+   "exportIntro": "This link works until {date} and for {left} more download(s). A code is sent to the clinic owner's mobile for each download.",
+   "exportTitle": "Your clinic data export",
+   "landingHint": "Use the message your clinic sent you. This page has nothing to show without it.",
+   "landingTitle": "Open the link from your clinic",
+   "langLabel": "Language",
+   "loading": "Loading…",
+   "otpHint": "We will send a 6-digit code to your phone number on file at {clinic}.",
+   "otpHintPlain": "We will send a 6-digit code to the phone number the clinic has for you.",
+   "otpLabel": "6-digit code",
+   "otpResend": "Send a new code",
+   "otpSend": "Send code",
+   "otpSent": "Code sent. Enter it below.",
+   "otpTitle": "Confirm it is you",
+   "otpTooMany": "Too many tries. Wait a few minutes, then ask for a new code.",
+   "otpVerify": "Continue",
+   "otpWrong": "That code is not right. Check it and try again.",
+   "pkgBookHint": "To book session {next} of {total}, message the clinic on WhatsApp and tap Book.",
+   "pkgDue": "Still to pay",
+   "pkgGraceUntil": "Can still be used until",
+   "pkgPaid": "Paid",
+   "pkgSaved": "You saved {amount} with this package",
+   "pkgSessions": "Sessions",
+   "pkgSessionsValue": "{used} of {total} used, {left} left",
+   "pkgStatus": "Status",
+   "pkgStatus_active": "Active",
+   "pkgStatus_cancelled": "Cancelled",
+   "pkgStatus_completed": "All sessions used",
+   "pkgStatus_expired": "Expired",
+   "pkgStatus_grace": "In grace period",
+   "pkgStatus_refunded": "Refunded",
+   "pkgTitle": "Your package card",
+   "pkgValidUntil": "Valid until",
+   "proxyAccept": "Confirm",
+   "proxyDone": "Thank you. {name} can now help with your visits.",
+   "proxyIntro": "{name} ({relation}) asked to help with your visits at {clinic}. Choose what they may do.",
+   "proxyScopeBook": "Book visits only",
+   "proxyScopeBookHint": "They can book and change your appointments. They cannot see your medical records.",
+   "proxyScopeFull": "Full help",
+   "proxyScopeFullHint": "Everything above, plus payments and forms.",
+   "proxyScopeLabel": "What may they do?",
+   "proxyScopeRecords": "Book visits and see my records",
+   "proxyScopeRecordsHint": "They can also see your prescriptions and reports.",
+   "proxyTitle": "Allow {name} to help with your care",
+   "purpose_insurance_claim": "An insurance claim",
+   "purpose_personal_record": "Your own records",
+   "purpose_referral": "A referral",
+   "purpose_second_opinion": "A second opinion",
+   "purpose_treatment": "Your treatment",
+   "retry": "Try again",
+   "rxCouncil": "Council",
+   "rxDispensed": "Already fully dispensed on {date}",
+   "rxDispensedNoDate": "Already fully dispensed",
+   "rxDoctor": "Doctor",
+   "rxExpired": "Expired on {date}",
+   "rxIssued": "Issued",
+   "rxLines": "Medicines on this prescription",
+   "rxNoExpiry": "No expiry set",
+   "rxOfflineHint": "No connection: the signature matches the published key, but whether it was dispensed or revoked can only be checked online.",
+   "rxOfflineNoKey": "No connection and no saved key on this phone, so the prescription can't be checked now.",
+   "rxOfflineValid": "Signature verified offline",
+   "rxPrivacy": "This page shows the doctor and the validity only. No patient details or medicines are shown.",
+   "rxRegNo": "Registration no.",
+   "rxRevoked": "Revoked by the doctor. Do not dispense.",
+   "rxTitle": "Prescription check",
+   "rxTooMany": "Too many checks from this network. Try again in a minute.",
+   "rxUnknownHint": "The QR code is damaged, altered or not from Nabd. Do not dispense against it.",
+   "rxUnknownTitle": "This prescription could not be verified",
+   "rxValid": "Valid prescription",
+   "rxValidUntil": "Valid until",
+   "status_cancelled": "Cancelled",
+   "status_confirmed": "Confirmed",
+   "status_held": "Waiting for the clinic to confirm",
+   "title": "Nabd",
+   "to": "to"
+  },
+  "hi": {
+   "approve": "मंज़ूर करें",
+   "bookingStatus": "स्थिति",
+   "bookingTitle": "आपकी अपॉइंटमेंट",
+   "bookingWhen": "कब",
+   "bookingWhere": "कहाँ",
+   "bookingWith": "किसके साथ",
+   "cat_allergies": "एलर्जी",
+   "cat_diagnoses": "निदान",
+   "cat_imaging": "इमेजिंग रिपोर्ट",
+   "cat_invoices": "बिल और रसीदें",
+   "cat_lab_reports": "लैब रिपोर्ट",
+   "cat_prescriptions": "पर्चे",
+   "cat_visit_notes": "विज़िट के नोट्स",
+   "claimDone": "हो गया। अब आपकी प्रोफ़ाइल आपकी है।",
+   "claimIntro": "{clinic} में {guardian} आपके अभिभावक के रूप में आपकी प्रोफ़ाइल संभालते रहे हैं। अपने 18वें जन्मदिन से आप अपने फ़ोन पर भेजे गए कोड से इसे खुद संभाल सकते हैं।",
+   "claimKeepLabel": "{guardian} अब आपके लिए क्या कर सकते हैं?",
+   "claimKeepNone": "कुछ नहीं: मेरे अभिभावक की पहुँच समाप्त",
+   "claimNotOpen": "आप {date} से अपनी प्रोफ़ाइल ले सकते हैं।",
+   "claimOwnPhone": "क्लिनिक के पास आपका अपना फ़ोन नंबर नहीं है। अपनी प्रोफ़ाइल लेने के लिए क्लिनिक डेस्क पर आएँ।",
+   "claimSubmit": "मेरी प्रोफ़ाइल लें",
+   "claimTitle": "{name}, अब आपकी प्रोफ़ाइल आपकी है",
+   "consentApproved": "आपने यह अनुरोध मंज़ूर किया।",
+   "consentChangedHint": "आपके खोलने के बाद क्लिनिक ने अनुरोध बदला है। फ़ैसला करने से पहले इसे फिर से पढ़ें।",
+   "consentChangedTitle": "यह अनुरोध बदल गया है",
+   "consentData": "क्या साझा होगा",
+   "consentDeclined": "आपने यह अनुरोध अस्वीकार किया।",
+   "consentPurpose": "क्यों",
+   "consentRange": "इस अवधि के रिकॉर्ड",
+   "consentReload": "बदला हुआ अनुरोध दिखाएँ",
+   "consentRequester": "कौन माँग रहा है",
+   "consentTitle": "एक क्लिनिक आपके रिकॉर्ड साझा करने की अनुमति माँग रहा है",
+   "consentValid": "यह अनुरोध इस तारीख तक मान्य है",
+   "decline": "अस्वीकार करें",
+   "docNotHere": "यह दस्तावेज़ अभी इस पेज पर नहीं खोला जा सकता। क्लिनिक से इसकी प्रति माँगें।",
+   "docOpen": "खोलें या सहेजें",
+   "docPreviewTitle": "दस्तावेज़ का पूर्वावलोकन",
+   "docTitle": "आपका दस्तावेज़",
+   "docUnsupported": "यह फ़ाइल यहाँ नहीं दिखाई जा सकती। बटन से इसे खोलें या सहेजें।",
+   "errorHint": "अपना कनेक्शन जाँचें और फिर कोशिश करें।",
+   "errorTitle": "कुछ गड़बड़ हो गई",
+   "expiredFull": "यह लिंक समाप्त हो गया है — क्लिनिक से दोबारा भेजने को कहें",
+   "expiredHint": "क्लिनिक से इसे दोबारा भेजने को कहें।",
+   "expiredTitle": "यह लिंक समाप्त हो गया है",
+   "exportChecksum": "संग्रह के अंदर manifest.json से मिलान करें: हर फ़ाइल उसकी पंक्ति संख्या और SHA-256 के साथ सूचीबद्ध है।",
+   "exportDone": "डाउनलोड शुरू हो गया। फ़ाइल को सुरक्षित जगह रखें: इसमें आपके क्लिनिक के रिकॉर्ड हैं।",
+   "exportDownload": "संग्रह डाउनलोड करें",
+   "exportIntro": "यह लिंक {date} तक और {left} और डाउनलोड के लिए काम करता है। हर डाउनलोड के लिए क्लिनिक मालिक के मोबाइल पर एक कोड भेजा जाता है।",
+   "exportTitle": "आपके क्लिनिक का डेटा निर्यात",
+   "landingHint": "क्लिनिक ने जो संदेश भेजा है उसका उपयोग करें। इसके बिना यहाँ कुछ नहीं दिखेगा।",
+   "landingTitle": "अपने क्लिनिक का लिंक खोलें",
+   "langLabel": "भाषा",
+   "loading": "लोड हो रहा है…",
+   "otpHint": "{clinic} में दर्ज आपके फ़ोन नंबर पर हम 6 अंकों का कोड भेजेंगे।",
+   "otpHintPlain": "क्लिनिक में दर्ज आपके फ़ोन नंबर पर हम 6 अंकों का कोड भेजेंगे।",
+   "otpLabel": "6 अंकों का कोड",
+   "otpResend": "नया कोड भेजें",
+   "otpSend": "कोड भेजें",
+   "otpSent": "कोड भेज दिया गया है। नीचे डालें।",
+   "otpTitle": "पुष्टि करें कि यह आप हैं",
+   "otpTooMany": "बहुत ज़्यादा कोशिशें हो गईं। कुछ मिनट रुकें, फिर नया कोड माँगें।",
+   "otpVerify": "आगे बढ़ें",
+   "otpWrong": "यह कोड सही नहीं है। जाँचकर फिर कोशिश करें।",
+   "pkgBookHint": "सेशन {next}/{total} बुक करने के लिए क्लिनिक को WhatsApp पर संदेश भेजें और Book दबाएँ।",
+   "pkgDue": "बाकी भुगतान",
+   "pkgGraceUntil": "इस तिथि तक अभी भी उपयोग कर सकते हैं",
+   "pkgPaid": "भुगतान किया",
+   "pkgSaved": "इस पैकेज से आपने {amount} बचाए",
+   "pkgSessions": "सेशन",
+   "pkgSessionsValue": "{total} में से {used} उपयोग हुए, {left} बाकी",
+   "pkgStatus": "स्थिति",
+   "pkgStatus_active": "सक्रिय",
+   "pkgStatus_cancelled": "रद्द",
+   "pkgStatus_completed": "सभी सेशन उपयोग हो गए",
+   "pkgStatus_expired": "समाप्त",
+   "pkgStatus_grace": "अतिरिक्त अवधि में",
+   "pkgStatus_refunded": "रिफ़ंड हो गया",
+   "pkgTitle": "आपका पैकेज कार्ड",
+   "pkgValidUntil": "मान्य तिथि तक",
+   "proxyAccept": "पुष्टि करें",
+   "proxyDone": "धन्यवाद। {name} अब आपकी विज़िट में मदद कर सकते हैं।",
+   "proxyIntro": "{name} ({relation}) ने {clinic} में आपकी विज़िट में मदद माँगी है। चुनें कि वे क्या कर सकते हैं।",
+   "proxyScopeBook": "सिर्फ़ अपॉइंटमेंट बुक करना",
+   "proxyScopeBookHint": "वे आपके अपॉइंटमेंट बुक और बदल सकते हैं। वे आपके मेडिकल रिकॉर्ड नहीं देख सकते।",
+   "proxyScopeFull": "पूरी मदद",
+   "proxyScopeFullHint": "ऊपर की सब बातें, साथ में भुगतान और फ़ॉर्म।",
+   "proxyScopeLabel": "वे क्या कर सकते हैं?",
+   "proxyScopeRecords": "अपॉइंटमेंट बुक करना और मेरे रिकॉर्ड देखना",
+   "proxyScopeRecordsHint": "वे आपके पर्चे और रिपोर्ट भी देख सकते हैं।",
+   "proxyTitle": "{name} को अपनी देखभाल में मदद की अनुमति दें",
+   "purpose_insurance_claim": "बीमा दावा",
+   "purpose_personal_record": "आपके अपने रिकॉर्ड",
+   "purpose_referral": "रेफ़रल",
+   "purpose_second_opinion": "दूसरी राय",
+   "purpose_treatment": "आपका इलाज",
+   "retry": "फिर कोशिश करें",
+   "rxCouncil": "परिषद",
+   "rxDispensed": "{date} को पूरी दवा दी जा चुकी है",
+   "rxDispensedNoDate": "पूरी दवा दी जा चुकी है",
+   "rxDoctor": "डॉक्टर",
+   "rxExpired": "{date} को समाप्त",
+   "rxIssued": "जारी",
+   "rxLines": "इस पर्चे में दवाएँ",
+   "rxNoExpiry": "कोई समाप्ति तिथि नहीं",
+   "rxOfflineHint": "कनेक्शन नहीं है: हस्ताक्षर प्रकाशित कुंजी से मेल खाता है, पर दवा दी गई या रद्द हुई, यह केवल ऑनलाइन जाँचा जा सकता है।",
+   "rxOfflineNoKey": "कनेक्शन नहीं है और इस फ़ोन पर कोई सहेजी गई कुंजी नहीं है, इसलिए अभी पर्चे की जाँच नहीं हो सकती।",
+   "rxOfflineValid": "हस्ताक्षर ऑफ़लाइन सत्यापित",
+   "rxPrivacy": "इस पेज पर केवल डॉक्टर और वैधता दिखाई जाती है। मरीज़ की जानकारी या दवाएँ नहीं दिखाई जातीं।",
+   "rxRegNo": "पंजीकरण संख्या",
+   "rxRevoked": "डॉक्टर ने रद्द किया है। दवा न दें।",
+   "rxTitle": "पर्चे की जाँच",
+   "rxTooMany": "इस नेटवर्क से बहुत अधिक जाँचें हुईं। एक मिनट बाद फिर कोशिश करें।",
+   "rxUnknownHint": "QR कोड खराब है, बदला गया है या Nabd का नहीं है। इस पर दवा न दें।",
+   "rxUnknownTitle": "इस पर्चे की पुष्टि नहीं हो सकी",
+   "rxValid": "मान्य पर्चा",
+   "rxValidUntil": "मान्य तक",
+   "status_cancelled": "रद्द",
+   "status_confirmed": "पक्की",
+   "status_held": "क्लिनिक की पुष्टि का इंतज़ार",
+   "title": "Nabd",
+   "to": "से"
+  },
+  "kn": {
+   "approve": "ಒಪ್ಪಿಗೆ ನೀಡಿ",
+   "bookingStatus": "ಸ್ಥಿತಿ",
+   "bookingTitle": "ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್",
+   "bookingWhen": "ಯಾವಾಗ",
+   "bookingWhere": "ಎಲ್ಲಿ",
+   "bookingWith": "ಯಾರೊಂದಿಗೆ",
+   "cat_allergies": "ಅಲರ್ಜಿಗಳು",
+   "cat_diagnoses": "ರೋಗನಿರ್ಣಯಗಳು",
+   "cat_imaging": "ಇಮೇಜಿಂಗ್ ವರದಿಗಳು",
+   "cat_invoices": "ಬಿಲ್‌ಗಳು ಮತ್ತು ರಸೀದಿಗಳು",
+   "cat_lab_reports": "ಲ್ಯಾಬ್ ವರದಿಗಳು",
+   "cat_prescriptions": "ಔಷಧಿ ಚೀಟಿಗಳು",
+   "cat_visit_notes": "ಭೇಟಿಯ ಟಿಪ್ಪಣಿಗಳು",
+   "claimDone": "ಮುಗಿದಿದೆ. ಈಗ ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ನಿಮ್ಮದು.",
+   "claimIntro": "{clinic} ನಲ್ಲಿ {guardian} ಅವರು ನಿಮ್ಮ ಪೋಷಕರಾಗಿ ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ನಿರ್ವಹಿಸುತ್ತಿದ್ದರು. ನಿಮ್ಮ 18ನೇ ಹುಟ್ಟುಹಬ್ಬದಿಂದ ನಿಮ್ಮ ಫೋನ್‌ಗೆ ಕಳುಹಿಸಿದ ಕೋಡ್ ಮೂಲಕ ನೀವೇ ಅದನ್ನು ವಹಿಸಿಕೊಳ್ಳಬಹುದು.",
+   "claimKeepLabel": "{guardian} ಅವರು ಇನ್ನೂ ನಿಮಗಾಗಿ ಏನು ಮಾಡಬಹುದು?",
+   "claimKeepNone": "ಏನೂ ಇಲ್ಲ: ನನ್ನ ಪೋಷಕರ ಪ್ರವೇಶ ಕೊನೆಗೊಳ್ಳುತ್ತದೆ",
+   "claimNotOpen": "{date} ರಿಂದ ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ಪಡೆಯಬಹುದು.",
+   "claimOwnPhone": "ಕ್ಲಿನಿಕ್ ಬಳಿ ನಿಮ್ಮದೇ ಫೋನ್ ಸಂಖ್ಯೆ ಇಲ್ಲ. ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ಪಡೆಯಲು ಕ್ಲಿನಿಕ್ ಡೆಸ್ಕ್‌ಗೆ ಭೇಟಿ ನೀಡಿ.",
+   "claimSubmit": "ನನ್ನ ಪ್ರೊಫೈಲ್ ಪಡೆಯಿರಿ",
+   "claimTitle": "{name}, ಈಗ ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ನಿಮ್ಮದು",
+   "consentApproved": "ನೀವು ಈ ವಿನಂತಿಗೆ ಒಪ್ಪಿಗೆ ನೀಡಿದ್ದೀರಿ.",
+   "consentChangedHint": "ನೀವು ತೆರೆದ ನಂತರ ಕ್ಲಿನಿಕ್ ವಿನಂತಿಯನ್ನು ಬದಲಿಸಿದೆ. ನಿರ್ಧರಿಸುವ ಮೊದಲು ಮತ್ತೆ ಓದಿ.",
+   "consentChangedTitle": "ಈ ವಿನಂತಿ ಬದಲಾಗಿದೆ",
+   "consentData": "ಏನು ಹಂಚಿಕೆಯಾಗುತ್ತದೆ",
+   "consentDeclined": "ನೀವು ಈ ವಿನಂತಿಯನ್ನು ನಿರಾಕರಿಸಿದ್ದೀರಿ.",
+   "consentPurpose": "ಏಕೆ",
+   "consentRange": "ಈ ಅವಧಿಯ ದಾಖಲೆಗಳು",
+   "consentReload": "ಬದಲಾದ ವಿನಂತಿಯನ್ನು ತೋರಿಸಿ",
+   "consentRequester": "ಯಾರು ಕೇಳುತ್ತಿದ್ದಾರೆ",
+   "consentTitle": "ಒಂದು ಕ್ಲಿನಿಕ್ ನಿಮ್ಮ ದಾಖಲೆಗಳನ್ನು ಹಂಚಿಕೊಳ್ಳಲು ಕೇಳುತ್ತಿದೆ",
+   "consentValid": "ಈ ವಿನಂತಿ ಈ ದಿನಾಂಕದವರೆಗೆ ಮಾನ್ಯ",
+   "decline": "ನಿರಾಕರಿಸಿ",
+   "docNotHere": "ಈ ದಾಖಲೆಯನ್ನು ಸದ್ಯಕ್ಕೆ ಈ ಪುಟದಲ್ಲಿ ತೆರೆಯಲು ಆಗುವುದಿಲ್ಲ. ಕ್ಲಿನಿಕ್‌ನಿಂದ ಅದರ ಪ್ರತಿಯನ್ನು ಕೇಳಿ.",
+   "docOpen": "ತೆರೆಯಿರಿ ಅಥವಾ ಉಳಿಸಿ",
+   "docPreviewTitle": "ದಾಖಲೆಯ ಪೂರ್ವವೀಕ್ಷಣೆ",
+   "docTitle": "ನಿಮ್ಮ ದಾಖಲೆ",
+   "docUnsupported": "ಈ ಫೈಲ್ ಅನ್ನು ಇಲ್ಲಿ ತೋರಿಸಲಾಗದು. ಬಟನ್ ಬಳಸಿ ತೆರೆಯಿರಿ ಅಥವಾ ಉಳಿಸಿ.",
+   "errorHint": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+   "errorTitle": "ಏನೋ ತಪ್ಪಾಯಿತು",
+   "expiredFull": "ಈ ಲಿಂಕ್‌ನ ಅವಧಿ ಮುಗಿದಿದೆ — ಮತ್ತೆ ಕಳುಹಿಸಲು ಕ್ಲಿನಿಕ್‌ಗೆ ಕೇಳಿ",
+   "expiredHint": "ಅದನ್ನು ಮತ್ತೆ ಕಳುಹಿಸುವಂತೆ ಕ್ಲಿನಿಕ್‌ಗೆ ಕೇಳಿ.",
+   "expiredTitle": "ಈ ಲಿಂಕ್‌ನ ಅವಧಿ ಮುಗಿದಿದೆ",
+   "exportChecksum": "ಆರ್ಕೈವ್‌ನೊಳಗಿನ manifest.json ನೊಂದಿಗೆ ಹೋಲಿಸಿ: ಪ್ರತಿ ಫೈಲ್ ಅದರ ಸಾಲುಗಳ ಸಂಖ್ಯೆ ಮತ್ತು SHA-256 ನೊಂದಿಗೆ ಪಟ್ಟಿಯಾಗಿದೆ.",
+   "exportDone": "ಡೌನ್‌ಲೋಡ್ ಪ್ರಾರಂಭವಾಗಿದೆ. ಫೈಲ್ ಅನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ಇಡಿ: ಇದರಲ್ಲಿ ನಿಮ್ಮ ಕ್ಲಿನಿಕ್‌ನ ದಾಖಲೆಗಳಿವೆ.",
+   "exportDownload": "ಆರ್ಕೈವ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+   "exportIntro": "ಈ ಲಿಂಕ್ {date} ವರೆಗೆ ಮತ್ತು ಇನ್ನೂ {left} ಡೌನ್‌ಲೋಡ್‌ಗಳಿಗೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ. ಪ್ರತಿ ಡೌನ್‌ಲೋಡ್‌ಗೆ ಕ್ಲಿನಿಕ್ ಮಾಲೀಕರ ಮೊಬೈಲ್‌ಗೆ ಕೋಡ್ ಕಳುಹಿಸಲಾಗುತ್ತದೆ.",
+   "exportTitle": "ನಿಮ್ಮ ಕ್ಲಿನಿಕ್ ಡೇಟಾ ರಫ್ತು",
+   "landingHint": "ಕ್ಲಿನಿಕ್ ಕಳುಹಿಸಿದ ಸಂದೇಶವನ್ನು ಬಳಸಿ. ಅದಿಲ್ಲದೆ ಇಲ್ಲಿ ತೋರಿಸಲು ಏನೂ ಇಲ್ಲ.",
+   "landingTitle": "ನಿಮ್ಮ ಕ್ಲಿನಿಕ್‌ನ ಲಿಂಕ್ ತೆರೆಯಿರಿ",
+   "langLabel": "ಭಾಷೆ",
+   "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+   "otpHint": "{clinic} ನಲ್ಲಿರುವ ನಿಮ್ಮ ಫೋನ್ ಸಂಖ್ಯೆಗೆ ನಾವು 6 ಅಂಕಿಗಳ ಕೋಡ್ ಕಳುಹಿಸುತ್ತೇವೆ.",
+   "otpHintPlain": "ಕ್ಲಿನಿಕ್‌ನಲ್ಲಿರುವ ನಿಮ್ಮ ಫೋನ್ ಸಂಖ್ಯೆಗೆ ನಾವು 6 ಅಂಕಿಗಳ ಕೋಡ್ ಕಳುಹಿಸುತ್ತೇವೆ.",
+   "otpLabel": "6 ಅಂಕಿಗಳ ಕೋಡ್",
+   "otpResend": "ಹೊಸ ಕೋಡ್ ಕಳುಹಿಸಿ",
+   "otpSend": "ಕೋಡ್ ಕಳುಹಿಸಿ",
+   "otpSent": "ಕೋಡ್ ಕಳುಹಿಸಲಾಗಿದೆ. ಕೆಳಗೆ ನಮೂದಿಸಿ.",
+   "otpTitle": "ಇದು ನೀವೇ ಎಂದು ದೃಢಪಡಿಸಿ",
+   "otpTooMany": "ತುಂಬಾ ಪ್ರಯತ್ನಗಳಾಗಿವೆ. ಕೆಲವು ನಿಮಿಷ ಕಾಯಿರಿ, ನಂತರ ಹೊಸ ಕೋಡ್ ಕೇಳಿ.",
+   "otpVerify": "ಮುಂದುವರಿಸಿ",
+   "otpWrong": "ಈ ಕೋಡ್ ಸರಿಯಿಲ್ಲ. ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+   "pkgBookHint": "ಸೆಷನ್ {next}/{total} ಬುಕ್ ಮಾಡಲು ಕ್ಲಿನಿಕ್‌ಗೆ WhatsApp ನಲ್ಲಿ ಸಂದೇಶ ಕಳುಹಿಸಿ ಮತ್ತು Book ಒತ್ತಿರಿ.",
+   "pkgDue": "ಬಾಕಿ ಪಾವತಿ",
+   "pkgGraceUntil": "ಈ ದಿನಾಂಕದವರೆಗೆ ಇನ್ನೂ ಬಳಸಬಹುದು",
+   "pkgPaid": "ಪಾವತಿಸಲಾಗಿದೆ",
+   "pkgSaved": "ಈ ಪ್ಯಾಕೇಜ್‌ನಿಂದ ನೀವು {amount} ಉಳಿಸಿದ್ದೀರಿ",
+   "pkgSessions": "ಸೆಷನ್‌ಗಳು",
+   "pkgSessionsValue": "{total} ರಲ್ಲಿ {used} ಬಳಸಲಾಗಿದೆ, {left} ಉಳಿದಿವೆ",
+   "pkgStatus": "ಸ್ಥಿತಿ",
+   "pkgStatus_active": "ಸಕ್ರಿಯ",
+   "pkgStatus_cancelled": "ರದ್ದಾಗಿದೆ",
+   "pkgStatus_completed": "ಎಲ್ಲಾ ಸೆಷನ್‌ಗಳು ಬಳಸಲಾಗಿದೆ",
+   "pkgStatus_expired": "ಅವಧಿ ಮುಗಿದಿದೆ",
+   "pkgStatus_grace": "ಹೆಚ್ಚುವರಿ ಅವಧಿಯಲ್ಲಿ",
+   "pkgStatus_refunded": "ಮರುಪಾವತಿಸಲಾಗಿದೆ",
+   "pkgTitle": "ನಿಮ್ಮ ಪ್ಯಾಕೇಜ್ ಕಾರ್ಡ್",
+   "pkgValidUntil": "ಮಾನ್ಯತೆ ಇರುವ ದಿನಾಂಕ",
+   "proxyAccept": "ದೃಢೀಕರಿಸಿ",
+   "proxyDone": "ಧನ್ಯವಾದಗಳು. {name} ಈಗ ನಿಮ್ಮ ಭೇಟಿಗಳಿಗೆ ಸಹಾಯ ಮಾಡಬಹುದು.",
+   "proxyIntro": "{name} ({relation}) ಅವರು {clinic} ನಲ್ಲಿ ನಿಮ್ಮ ಭೇಟಿಗಳಿಗೆ ಸಹಾಯ ಮಾಡಲು ಕೇಳಿದ್ದಾರೆ. ಅವರು ಏನು ಮಾಡಬಹುದು ಎಂಬುದನ್ನು ಆರಿಸಿ.",
+   "proxyScopeBook": "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಬುಕ್ ಮಾಡುವುದು ಮಾತ್ರ",
+   "proxyScopeBookHint": "ಅವರು ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್‌ಗಳನ್ನು ಬುಕ್ ಮಾಡಬಹುದು ಮತ್ತು ಬದಲಾಯಿಸಬಹುದು. ನಿಮ್ಮ ವೈದ್ಯಕೀಯ ದಾಖಲೆಗಳನ್ನು ನೋಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+   "proxyScopeFull": "ಸಂಪೂರ್ಣ ಸಹಾಯ",
+   "proxyScopeFullHint": "ಮೇಲಿನ ಎಲ್ಲವೂ, ಜೊತೆಗೆ ಪಾವತಿ ಮತ್ತು ಫಾರ್ಮ್‌ಗಳು.",
+   "proxyScopeLabel": "ಅವರು ಏನು ಮಾಡಬಹುದು?",
+   "proxyScopeRecords": "ಬುಕ್ ಮಾಡುವುದು ಮತ್ತು ನನ್ನ ದಾಖಲೆಗಳನ್ನು ನೋಡುವುದು",
+   "proxyScopeRecordsHint": "ಅವರು ನಿಮ್ಮ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಮತ್ತು ವರದಿಗಳನ್ನೂ ನೋಡಬಹುದು.",
+   "proxyTitle": "ನಿಮ್ಮ ಆರೈಕೆಯಲ್ಲಿ ಸಹಾಯ ಮಾಡಲು {name} ಅವರಿಗೆ ಅನುಮತಿ ನೀಡಿ",
+   "purpose_insurance_claim": "ವಿಮೆ ಕ್ಲೈಮ್",
+   "purpose_personal_record": "ನಿಮ್ಮ ಸ್ವಂತ ದಾಖಲೆಗಳು",
+   "purpose_referral": "ಶಿಫಾರಸು",
+   "purpose_second_opinion": "ಎರಡನೇ ಅಭಿಪ್ರಾಯ",
+   "purpose_treatment": "ನಿಮ್ಮ ಚಿಕಿತ್ಸೆ",
+   "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+   "rxCouncil": "ಪರಿಷತ್ತು",
+   "rxDispensed": "{date} ರಂದು ಎಲ್ಲ ಔಷಧಿ ನೀಡಲಾಗಿದೆ",
+   "rxDispensedNoDate": "ಎಲ್ಲ ಔಷಧಿ ನೀಡಲಾಗಿದೆ",
+   "rxDoctor": "ವೈದ್ಯರು",
+   "rxExpired": "{date} ರಂದು ಅವಧಿ ಮುಗಿದಿದೆ",
+   "rxIssued": "ನೀಡಿದ ದಿನಾಂಕ",
+   "rxLines": "ಈ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ನಲ್ಲಿರುವ ಔಷಧಿಗಳು",
+   "rxNoExpiry": "ಅವಧಿ ಮುಕ್ತಾಯ ಇಲ್ಲ",
+   "rxOfflineHint": "ಸಂಪರ್ಕ ಇಲ್ಲ: ಸಹಿ ಪ್ರಕಟಿತ ಕೀಲಿಗೆ ಹೊಂದುತ್ತದೆ, ಆದರೆ ಔಷಧಿ ನೀಡಲಾಗಿದೆಯೇ ಅಥವಾ ರದ್ದಾಗಿದೆಯೇ ಎಂಬುದನ್ನು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಮಾತ್ರ ಪರಿಶೀಲಿಸಬಹುದು.",
+   "rxOfflineNoKey": "ಸಂಪರ್ಕ ಇಲ್ಲ ಮತ್ತು ಈ ಫೋನ್‌ನಲ್ಲಿ ಉಳಿಸಿದ ಕೀಲಿ ಇಲ್ಲ, ಆದ್ದರಿಂದ ಈಗ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಪರಿಶೀಲಿಸಲಾಗುವುದಿಲ್ಲ.",
+   "rxOfflineValid": "ಸಹಿಯನ್ನು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
+   "rxPrivacy": "ಈ ಪುಟವು ವೈದ್ಯರು ಮತ್ತು ಮಾನ್ಯತೆಯನ್ನು ಮಾತ್ರ ತೋರಿಸುತ್ತದೆ. ರೋಗಿಯ ವಿವರಗಳು ಅಥವಾ ಔಷಧಿಗಳನ್ನು ತೋರಿಸುವುದಿಲ್ಲ.",
+   "rxRegNo": "ನೋಂದಣಿ ಸಂಖ್ಯೆ",
+   "rxRevoked": "ವೈದ್ಯರು ರದ್ದುಪಡಿಸಿದ್ದಾರೆ. ಔಷಧಿ ನೀಡಬೇಡಿ.",
+   "rxTitle": "ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಪರಿಶೀಲನೆ",
+   "rxTooMany": "ಈ ನೆಟ್‌ವರ್ಕ್‌ನಿಂದ ಹೆಚ್ಚು ಪರಿಶೀಲನೆಗಳು ಆಗಿವೆ. ಒಂದು ನಿಮಿಷದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+   "rxUnknownHint": "QR ಕೋಡ್ ಹಾಳಾಗಿದೆ, ಬದಲಾಯಿಸಲಾಗಿದೆ ಅಥವಾ Nabd ನದ್ದಲ್ಲ. ಇದರ ಆಧಾರದ ಮೇಲೆ ಔಷಧಿ ನೀಡಬೇಡಿ.",
+   "rxUnknownTitle": "ಈ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಅನ್ನು ಪರಿಶೀಲಿಸಲಾಗಲಿಲ್ಲ",
+   "rxValid": "ಮಾನ್ಯ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್",
+   "rxValidUntil": "ಮಾನ್ಯತೆ ಇರುವವರೆಗೆ",
+   "status_cancelled": "ರದ್ದಾಗಿದೆ",
+   "status_confirmed": "ದೃಢಪಟ್ಟಿದೆ",
+   "status_held": "ಕ್ಲಿನಿಕ್ ದೃಢೀಕರಣಕ್ಕಾಗಿ ಕಾಯುತ್ತಿದೆ",
+   "title": "Nabd",
+   "to": "ರಿಂದ"
+  },
+  "te": {
+   "approve": "అంగీకరించండి",
+   "bookingStatus": "స్థితి",
+   "bookingTitle": "మీ అపాయింట్‌మెంట్",
+   "bookingWhen": "ఎప్పుడు",
+   "bookingWhere": "ఎక్కడ",
+   "bookingWith": "ఎవరితో",
+   "cat_allergies": "అలర్జీలు",
+   "cat_diagnoses": "రోగనిర్ధారణలు",
+   "cat_imaging": "ఇమేజింగ్ రిపోర్టులు",
+   "cat_invoices": "బిల్లులు మరియు రసీదులు",
+   "cat_lab_reports": "ల్యాబ్ రిపోర్టులు",
+   "cat_prescriptions": "ప్రిస్క్రిప్షన్లు",
+   "cat_visit_notes": "సందర్శన నోట్స్",
+   "claimDone": "పూర్తయింది. ఇప్పుడు మీ ప్రొఫైల్ మీదే.",
+   "claimIntro": "{clinic} లో {guardian} మీ సంరక్షకులుగా మీ ప్రొఫైల్‌ను నిర్వహించారు. మీ 18వ పుట్టినరోజు నుండి మీ ఫోన్‌కు పంపిన కోడ్‌తో మీరే దాన్ని తీసుకోవచ్చు.",
+   "claimKeepLabel": "{guardian} ఇంకా మీ కోసం ఏమి చేయవచ్చు?",
+   "claimKeepNone": "ఏమీ లేదు: నా సంరక్షకుని యాక్సెస్ ముగుస్తుంది",
+   "claimNotOpen": "మీరు {date} నుండి మీ ప్రొఫైల్‌ను తీసుకోవచ్చు.",
+   "claimOwnPhone": "క్లినిక్ వద్ద మీ స్వంత ఫోన్ నంబర్ లేదు. మీ ప్రొఫైల్ తీసుకోవడానికి క్లినిక్ డెస్క్‌ను సందర్శించండి.",
+   "claimSubmit": "నా ప్రొఫైల్ తీసుకోండి",
+   "claimTitle": "{name}, ఇప్పుడు మీ ప్రొఫైల్ మీదే",
+   "consentApproved": "మీరు ఈ అభ్యర్థనను అంగీకరించారు.",
+   "consentChangedHint": "మీరు తెరిచిన తర్వాత క్లినిక్ అభ్యర్థనను మార్చింది. నిర్ణయించే ముందు మళ్లీ చదవండి.",
+   "consentChangedTitle": "ఈ అభ్యర్థన మారింది",
+   "consentData": "ఏమి పంచుకుంటారు",
+   "consentDeclined": "మీరు ఈ అభ్యర్థనను తిరస్కరించారు.",
+   "consentPurpose": "ఎందుకు",
+   "consentRange": "ఈ కాలపు రికార్డులు",
+   "consentReload": "మారిన అభ్యర్థనను చూపండి",
+   "consentRequester": "ఎవరు అడుగుతున్నారు",
+   "consentTitle": "ఒక క్లినిక్ మీ రికార్డులను పంచుకోవడానికి అనుమతి అడుగుతోంది",
+   "consentValid": "ఈ అభ్యర్థన ఈ తేదీ వరకు చెల్లుతుంది",
+   "decline": "తిరస్కరించండి",
+   "docNotHere": "ఈ పత్రాన్ని ప్రస్తుతం ఈ పేజీలో తెరవడం సాధ్యం కాదు. దాని ప్రతి కోసం క్లినిక్‌ను అడగండి.",
+   "docOpen": "తెరవండి లేదా సేవ్ చేయండి",
+   "docPreviewTitle": "పత్రం ప్రివ్యూ",
+   "docTitle": "మీ పత్రం",
+   "docUnsupported": "ఈ ఫైల్‌ను ఇక్కడ చూపలేము. బటన్‌తో తెరవండి లేదా సేవ్ చేయండి.",
+   "errorHint": "మీ కనెక్షన్ చూసి మళ్లీ ప్రయత్నించండి.",
+   "errorTitle": "ఏదో తప్పు జరిగింది",
+   "expiredFull": "ఈ లింక్ గడువు ముగిసింది — మళ్లీ పంపమని క్లినిక్‌ను అడగండి",
+   "expiredHint": "దీన్ని మళ్లీ పంపమని క్లినిక్‌ను అడగండి.",
+   "expiredTitle": "ఈ లింక్ గడువు ముగిసింది",
+   "exportChecksum": "ఆర్కైవ్‌లోని manifest.json తో సరిచూడండి: ప్రతి ఫైల్ దాని వరుసల సంఖ్య మరియు SHA-256 తో జాబితా చేయబడింది.",
+   "exportDone": "డౌన్‌లోడ్ ప్రారంభమైంది. ఫైల్‌ను సురక్షితంగా ఉంచండి: ఇందులో మీ క్లినిక్ రికార్డులు ఉన్నాయి.",
+   "exportDownload": "ఆర్కైవ్‌ను డౌన్‌లోడ్ చేయండి",
+   "exportIntro": "ఈ లింక్ {date} వరకు మరియు మరో {left} డౌన్‌లోడ్‌ల వరకు పనిచేస్తుంది. ప్రతి డౌన్‌లోడ్‌కు క్లినిక్ యజమాని మొబైల్‌కు కోడ్ పంపబడుతుంది.",
+   "exportTitle": "మీ క్లినిక్ డేటా ఎగుమతి",
+   "landingHint": "క్లినిక్ పంపిన సందేశాన్ని ఉపయోగించండి. అది లేకుండా ఇక్కడ చూపించడానికి ఏమీ లేదు.",
+   "landingTitle": "మీ క్లినిక్ లింక్‌ను తెరవండి",
+   "langLabel": "భాష",
+   "loading": "లోడ్ అవుతోంది…",
+   "otpHint": "{clinic} వద్ద ఉన్న మీ ఫోన్ నంబర్‌కు మేము 6 అంకెల కోడ్ పంపుతాము.",
+   "otpHintPlain": "క్లినిక్ వద్ద ఉన్న మీ ఫోన్ నంబర్‌కు మేము 6 అంకెల కోడ్ పంపుతాము.",
+   "otpLabel": "6 అంకెల కోడ్",
+   "otpResend": "కొత్త కోడ్ పంపండి",
+   "otpSend": "కోడ్ పంపండి",
+   "otpSent": "కోడ్ పంపాము. కింద నమోదు చేయండి.",
+   "otpTitle": "ఇది మీరేనని నిర్ధారించండి",
+   "otpTooMany": "చాలా ప్రయత్నాలు జరిగాయి. కొన్ని నిమిషాలు ఆగి, కొత్త కోడ్ అడగండి.",
+   "otpVerify": "కొనసాగండి",
+   "otpWrong": "ఈ కోడ్ సరైనది కాదు. చూసి మళ్లీ ప్రయత్నించండి.",
+   "pkgBookHint": "సెషన్ {next}/{total} బుక్ చేయడానికి క్లినిక్‌కు WhatsApp లో సందేశం పంపి Book నొక్కండి.",
+   "pkgDue": "చెల్లించాల్సింది",
+   "pkgGraceUntil": "ఈ తేదీ వరకు ఇంకా వాడుకోవచ్చు",
+   "pkgPaid": "చెల్లించారు",
+   "pkgSaved": "ఈ ప్యాకేజీతో మీరు {amount} ఆదా చేశారు",
+   "pkgSessions": "సెషన్‌లు",
+   "pkgSessionsValue": "{total} లో {used} వాడారు, {left} మిగిలి ఉన్నాయి",
+   "pkgStatus": "స్థితి",
+   "pkgStatus_active": "సక్రియం",
+   "pkgStatus_cancelled": "రద్దయింది",
+   "pkgStatus_completed": "అన్ని సెషన్‌లు వాడారు",
+   "pkgStatus_expired": "గడువు ముగిసింది",
+   "pkgStatus_grace": "అదనపు గడువులో ఉంది",
+   "pkgStatus_refunded": "తిరిగి చెల్లించారు",
+   "pkgTitle": "మీ ప్యాకేజీ కార్డ్",
+   "pkgValidUntil": "చెల్లుబాటు తేదీ",
+   "proxyAccept": "నిర్ధారించండి",
+   "proxyDone": "ధన్యవాదాలు. {name} ఇప్పుడు మీ సందర్శనలకు సహాయం చేయగలరు.",
+   "proxyIntro": "{name} ({relation}) {clinic} లో మీ సందర్శనలకు సహాయం చేయమని అడిగారు. వారు ఏమి చేయవచ్చో ఎంచుకోండి.",
+   "proxyScopeBook": "అపాయింట్‌మెంట్ బుక్ చేయడం మాత్రమే",
+   "proxyScopeBookHint": "వారు మీ అపాయింట్‌మెంట్లను బుక్ చేయవచ్చు, మార్చవచ్చు. మీ వైద్య రికార్డులను చూడలేరు.",
+   "proxyScopeFull": "పూర్తి సహాయం",
+   "proxyScopeFullHint": "పైవన్నీ, అలాగే చెల్లింపులు, ఫారాలు.",
+   "proxyScopeLabel": "వారు ఏమి చేయవచ్చు?",
+   "proxyScopeRecords": "బుక్ చేయడం, నా రికార్డులు చూడటం",
+   "proxyScopeRecordsHint": "వారు మీ ప్రిస్క్రిప్షన్లు, రిపోర్టులను కూడా చూడవచ్చు.",
+   "proxyTitle": "మీ సంరక్షణలో సహాయం చేయడానికి {name} కు అనుమతి ఇవ్వండి",
+   "purpose_insurance_claim": "బీమా క్లెయిమ్",
+   "purpose_personal_record": "మీ స్వంత రికార్డులు",
+   "purpose_referral": "రిఫరల్",
+   "purpose_second_opinion": "రెండవ అభిప్రాయం",
+   "purpose_treatment": "మీ చికిత్స",
+   "retry": "మళ్లీ ప్రయత్నించండి",
+   "rxCouncil": "కౌన్సిల్",
+   "rxDispensed": "{date}న మందులు పూర్తిగా ఇవ్వబడ్డాయి",
+   "rxDispensedNoDate": "మందులు పూర్తిగా ఇవ్వబడ్డాయి",
+   "rxDoctor": "డాక్టర్",
+   "rxExpired": "{date}న గడువు ముగిసింది",
+   "rxIssued": "జారీ చేసిన తేదీ",
+   "rxLines": "ఈ ప్రిస్క్రిప్షన్‌లోని మందులు",
+   "rxNoExpiry": "గడువు లేదు",
+   "rxOfflineHint": "కనెక్షన్ లేదు: సంతకం ప్రచురించిన కీతో సరిపోతుంది, కానీ మందులు ఇచ్చారా లేదా రద్దు చేశారా అనేది ఆన్‌లైన్‌లో మాత్రమే తనిఖీ చేయవచ్చు.",
+   "rxOfflineNoKey": "కనెక్షన్ లేదు మరియు ఈ ఫోన్‌లో సేవ్ చేసిన కీ లేదు, కాబట్టి ఇప్పుడు ప్రిస్క్రిప్షన్‌ను తనిఖీ చేయలేము.",
+   "rxOfflineValid": "సంతకం ఆఫ్‌లైన్‌లో ధృవీకరించబడింది",
+   "rxPrivacy": "ఈ పేజీ డాక్టర్ మరియు చెల్లుబాటును మాత్రమే చూపిస్తుంది. రోగి వివరాలు లేదా మందులు చూపబడవు.",
+   "rxRegNo": "నమోదు సంఖ్య",
+   "rxRevoked": "డాక్టర్ రద్దు చేశారు. మందులు ఇవ్వవద్దు.",
+   "rxTitle": "ప్రిస్క్రిప్షన్ తనిఖీ",
+   "rxTooMany": "ఈ నెట్‌వర్క్ నుండి చాలా తనిఖీలు జరిగాయి. ఒక నిమిషం తర్వాత మళ్లీ ప్రయత్నించండి.",
+   "rxUnknownHint": "QR కోడ్ దెబ్బతిన్నది, మార్చబడింది లేదా Nabd ది కాదు. దీని ఆధారంగా మందులు ఇవ్వవద్దు.",
+   "rxUnknownTitle": "ఈ ప్రిస్క్రిప్షన్‌ను ధృవీకరించలేకపోయాము",
+   "rxValid": "చెల్లుబాటు అయ్యే ప్రిస్క్రిప్షన్",
+   "rxValidUntil": "చెల్లుబాటు వరకు",
+   "status_cancelled": "రద్దు చేయబడింది",
+   "status_confirmed": "ధృవీకరించబడింది",
+   "status_held": "క్లినిక్ ధృవీకరణ కోసం వేచి ఉంది",
+   "title": "Nabd",
+   "to": "నుండి"
+  }
+ },
+ "review": {
+  "hi": {
+   "patient": {
+    "approve": {
+     "status": "unreviewed"
+    },
+    "bookingStatus": {
+     "status": "unreviewed"
+    },
+    "bookingTitle": {
+     "status": "unreviewed"
+    },
+    "bookingWhen": {
+     "status": "unreviewed"
+    },
+    "bookingWhere": {
+     "status": "unreviewed"
+    },
+    "bookingWith": {
+     "status": "unreviewed"
+    },
+    "cat_allergies": {
+     "status": "unreviewed"
+    },
+    "cat_diagnoses": {
+     "status": "unreviewed"
+    },
+    "cat_imaging": {
+     "status": "unreviewed"
+    },
+    "cat_invoices": {
+     "status": "unreviewed"
+    },
+    "cat_lab_reports": {
+     "status": "unreviewed"
+    },
+    "cat_prescriptions": {
+     "status": "unreviewed"
+    },
+    "cat_visit_notes": {
+     "status": "unreviewed"
+    },
+    "claimDone": {
+     "status": "unreviewed"
+    },
+    "claimIntro": {
+     "status": "unreviewed"
+    },
+    "claimKeepLabel": {
+     "status": "unreviewed"
+    },
+    "claimKeepNone": {
+     "status": "unreviewed"
+    },
+    "claimNotOpen": {
+     "status": "unreviewed"
+    },
+    "claimOwnPhone": {
+     "status": "unreviewed"
+    },
+    "claimSubmit": {
+     "status": "unreviewed"
+    },
+    "claimTitle": {
+     "status": "unreviewed"
+    },
+    "consentApproved": {
+     "status": "unreviewed"
+    },
+    "consentChangedHint": {
+     "status": "unreviewed"
+    },
+    "consentChangedTitle": {
+     "status": "unreviewed"
+    },
+    "consentData": {
+     "status": "unreviewed"
+    },
+    "consentDeclined": {
+     "status": "unreviewed"
+    },
+    "consentPurpose": {
+     "status": "unreviewed"
+    },
+    "consentRange": {
+     "status": "unreviewed"
+    },
+    "consentReload": {
+     "status": "unreviewed"
+    },
+    "consentRequester": {
+     "status": "unreviewed"
+    },
+    "consentTitle": {
+     "status": "unreviewed"
+    },
+    "consentValid": {
+     "status": "unreviewed"
+    },
+    "decline": {
+     "status": "unreviewed"
+    },
+    "docNotHere": {
+     "status": "unreviewed"
+    },
+    "docOpen": {
+     "status": "unreviewed"
+    },
+    "docPreviewTitle": {
+     "status": "unreviewed"
+    },
+    "docTitle": {
+     "status": "unreviewed"
+    },
+    "docUnsupported": {
+     "status": "unreviewed"
+    },
+    "errorHint": {
+     "status": "unreviewed"
+    },
+    "errorTitle": {
+     "status": "unreviewed"
+    },
+    "expiredFull": {
+     "status": "unreviewed"
+    },
+    "expiredHint": {
+     "status": "unreviewed"
+    },
+    "expiredTitle": {
+     "status": "unreviewed"
+    },
+    "exportChecksum": {
+     "status": "unreviewed"
+    },
+    "exportDone": {
+     "status": "unreviewed"
+    },
+    "exportDownload": {
+     "status": "unreviewed"
+    },
+    "exportIntro": {
+     "status": "unreviewed"
+    },
+    "exportTitle": {
+     "status": "unreviewed"
+    },
+    "landingHint": {
+     "status": "unreviewed"
+    },
+    "landingTitle": {
+     "status": "unreviewed"
+    },
+    "langLabel": {
+     "status": "unreviewed"
+    },
+    "loading": {
+     "status": "unreviewed"
+    },
+    "otpHint": {
+     "status": "unreviewed"
+    },
+    "otpHintPlain": {
+     "status": "unreviewed"
+    },
+    "otpLabel": {
+     "status": "unreviewed"
+    },
+    "otpResend": {
+     "status": "unreviewed"
+    },
+    "otpSend": {
+     "status": "unreviewed"
+    },
+    "otpSent": {
+     "status": "unreviewed"
+    },
+    "otpTitle": {
+     "status": "unreviewed"
+    },
+    "otpTooMany": {
+     "status": "unreviewed"
+    },
+    "otpVerify": {
+     "status": "unreviewed"
+    },
+    "otpWrong": {
+     "status": "unreviewed"
+    },
+    "pkgBookHint": {
+     "status": "unreviewed"
+    },
+    "pkgDue": {
+     "status": "unreviewed"
+    },
+    "pkgGraceUntil": {
+     "status": "unreviewed"
+    },
+    "pkgPaid": {
+     "status": "unreviewed"
+    },
+    "pkgSaved": {
+     "status": "unreviewed"
+    },
+    "pkgSessions": {
+     "status": "unreviewed"
+    },
+    "pkgSessionsValue": {
+     "status": "unreviewed"
+    },
+    "pkgStatus": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_active": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_cancelled": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_completed": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_expired": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_grace": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_refunded": {
+     "status": "unreviewed"
+    },
+    "pkgTitle": {
+     "status": "unreviewed"
+    },
+    "pkgValidUntil": {
+     "status": "unreviewed"
+    },
+    "proxyAccept": {
+     "status": "unreviewed"
+    },
+    "proxyDone": {
+     "status": "unreviewed"
+    },
+    "proxyIntro": {
+     "status": "unreviewed"
+    },
+    "proxyScopeBook": {
+     "status": "unreviewed"
+    },
+    "proxyScopeBookHint": {
+     "status": "unreviewed"
+    },
+    "proxyScopeFull": {
+     "status": "unreviewed"
+    },
+    "proxyScopeFullHint": {
+     "status": "unreviewed"
+    },
+    "proxyScopeLabel": {
+     "status": "unreviewed"
+    },
+    "proxyScopeRecords": {
+     "status": "unreviewed"
+    },
+    "proxyScopeRecordsHint": {
+     "status": "unreviewed"
+    },
+    "proxyTitle": {
+     "status": "unreviewed"
+    },
+    "purpose_insurance_claim": {
+     "status": "unreviewed"
+    },
+    "purpose_personal_record": {
+     "status": "unreviewed"
+    },
+    "purpose_referral": {
+     "status": "unreviewed"
+    },
+    "purpose_second_opinion": {
+     "status": "unreviewed"
+    },
+    "purpose_treatment": {
+     "status": "unreviewed"
+    },
+    "retry": {
+     "status": "unreviewed"
+    },
+    "rxCouncil": {
+     "status": "unreviewed"
+    },
+    "rxDispensed": {
+     "status": "unreviewed"
+    },
+    "rxDispensedNoDate": {
+     "status": "unreviewed"
+    },
+    "rxDoctor": {
+     "status": "unreviewed"
+    },
+    "rxExpired": {
+     "status": "unreviewed"
+    },
+    "rxIssued": {
+     "status": "unreviewed"
+    },
+    "rxLines": {
+     "status": "unreviewed"
+    },
+    "rxNoExpiry": {
+     "status": "unreviewed"
+    },
+    "rxOfflineHint": {
+     "status": "unreviewed"
+    },
+    "rxOfflineNoKey": {
+     "status": "unreviewed"
+    },
+    "rxOfflineValid": {
+     "status": "unreviewed"
+    },
+    "rxPrivacy": {
+     "status": "unreviewed"
+    },
+    "rxRegNo": {
+     "status": "unreviewed"
+    },
+    "rxRevoked": {
+     "status": "unreviewed"
+    },
+    "rxTitle": {
+     "status": "unreviewed"
+    },
+    "rxTooMany": {
+     "status": "unreviewed"
+    },
+    "rxUnknownHint": {
+     "status": "unreviewed"
+    },
+    "rxUnknownTitle": {
+     "status": "unreviewed"
+    },
+    "rxValid": {
+     "status": "unreviewed"
+    },
+    "rxValidUntil": {
+     "status": "unreviewed"
+    },
+    "status_cancelled": {
+     "status": "unreviewed"
+    },
+    "status_confirmed": {
+     "status": "unreviewed"
+    },
+    "status_held": {
+     "status": "unreviewed"
+    },
+    "title": {
+     "status": "unreviewed"
+    },
+    "to": {
+     "status": "unreviewed"
+    }
+   },
+   "templates": {
+    "appt_cancelled_by_clinic": {
+     "status": "unreviewed"
+    },
+    "appt_confirmed": {
+     "status": "unreviewed"
+    },
+    "appt_nudge": {
+     "status": "unreviewed"
+    },
+    "appt_reminder_24h": {
+     "status": "unreviewed"
+    },
+    "appt_reminder_2h": {
+     "status": "unreviewed"
+    },
+    "appt_rescheduled": {
+     "status": "unreviewed"
+    },
+    "doctor_delay": {
+     "status": "unreviewed"
+    },
+    "feedback_request": {
+     "status": "unreviewed"
+    },
+    "leave_now": {
+     "status": "unreviewed"
+    },
+    "optout_confirm": {
+     "status": "unreviewed"
+    },
+    "otp_login": {
+     "status": "unreviewed"
+    },
+    "package_card": {
+     "status": "unreviewed"
+    },
+    "package_expiry": {
+     "status": "unreviewed"
+    },
+    "package_grace": {
+     "status": "unreviewed"
+    },
+    "package_session_nudge": {
+     "status": "unreviewed"
+    },
+    "queue_paused": {
+     "status": "unreviewed"
+    },
+    "queue_your_turn": {
+     "status": "unreviewed"
+    },
+    "recall_due": {
+     "status": "unreviewed"
+    },
+    "review_request": {
+     "status": "unreviewed"
+    },
+    "secure_link_ready": {
+     "status": "unreviewed"
+    }
+   }
+  },
+  "kn": {
+   "patient": {
+    "approve": {
+     "status": "unreviewed"
+    },
+    "bookingStatus": {
+     "status": "unreviewed"
+    },
+    "bookingTitle": {
+     "status": "unreviewed"
+    },
+    "bookingWhen": {
+     "status": "unreviewed"
+    },
+    "bookingWhere": {
+     "status": "unreviewed"
+    },
+    "bookingWith": {
+     "status": "unreviewed"
+    },
+    "cat_allergies": {
+     "status": "unreviewed"
+    },
+    "cat_diagnoses": {
+     "status": "unreviewed"
+    },
+    "cat_imaging": {
+     "status": "unreviewed"
+    },
+    "cat_invoices": {
+     "status": "unreviewed"
+    },
+    "cat_lab_reports": {
+     "status": "unreviewed"
+    },
+    "cat_prescriptions": {
+     "status": "unreviewed"
+    },
+    "cat_visit_notes": {
+     "status": "unreviewed"
+    },
+    "claimDone": {
+     "status": "unreviewed"
+    },
+    "claimIntro": {
+     "status": "unreviewed"
+    },
+    "claimKeepLabel": {
+     "status": "unreviewed"
+    },
+    "claimKeepNone": {
+     "status": "unreviewed"
+    },
+    "claimNotOpen": {
+     "status": "unreviewed"
+    },
+    "claimOwnPhone": {
+     "status": "unreviewed"
+    },
+    "claimSubmit": {
+     "status": "unreviewed"
+    },
+    "claimTitle": {
+     "status": "unreviewed"
+    },
+    "consentApproved": {
+     "status": "unreviewed"
+    },
+    "consentChangedHint": {
+     "status": "unreviewed"
+    },
+    "consentChangedTitle": {
+     "status": "unreviewed"
+    },
+    "consentData": {
+     "status": "unreviewed"
+    },
+    "consentDeclined": {
+     "status": "unreviewed"
+    },
+    "consentPurpose": {
+     "status": "unreviewed"
+    },
+    "consentRange": {
+     "status": "unreviewed"
+    },
+    "consentReload": {
+     "status": "unreviewed"
+    },
+    "consentRequester": {
+     "status": "unreviewed"
+    },
+    "consentTitle": {
+     "status": "unreviewed"
+    },
+    "consentValid": {
+     "status": "unreviewed"
+    },
+    "decline": {
+     "status": "unreviewed"
+    },
+    "docNotHere": {
+     "status": "unreviewed"
+    },
+    "docOpen": {
+     "status": "unreviewed"
+    },
+    "docPreviewTitle": {
+     "status": "unreviewed"
+    },
+    "docTitle": {
+     "status": "unreviewed"
+    },
+    "docUnsupported": {
+     "status": "unreviewed"
+    },
+    "errorHint": {
+     "status": "unreviewed"
+    },
+    "errorTitle": {
+     "status": "unreviewed"
+    },
+    "expiredFull": {
+     "status": "unreviewed"
+    },
+    "expiredHint": {
+     "status": "unreviewed"
+    },
+    "expiredTitle": {
+     "status": "unreviewed"
+    },
+    "exportChecksum": {
+     "status": "unreviewed"
+    },
+    "exportDone": {
+     "status": "unreviewed"
+    },
+    "exportDownload": {
+     "status": "unreviewed"
+    },
+    "exportIntro": {
+     "status": "unreviewed"
+    },
+    "exportTitle": {
+     "status": "unreviewed"
+    },
+    "landingHint": {
+     "status": "unreviewed"
+    },
+    "landingTitle": {
+     "status": "unreviewed"
+    },
+    "langLabel": {
+     "status": "unreviewed"
+    },
+    "loading": {
+     "status": "unreviewed"
+    },
+    "otpHint": {
+     "status": "unreviewed"
+    },
+    "otpHintPlain": {
+     "status": "unreviewed"
+    },
+    "otpLabel": {
+     "status": "unreviewed"
+    },
+    "otpResend": {
+     "status": "unreviewed"
+    },
+    "otpSend": {
+     "status": "unreviewed"
+    },
+    "otpSent": {
+     "status": "unreviewed"
+    },
+    "otpTitle": {
+     "status": "unreviewed"
+    },
+    "otpTooMany": {
+     "status": "unreviewed"
+    },
+    "otpVerify": {
+     "status": "unreviewed"
+    },
+    "otpWrong": {
+     "status": "unreviewed"
+    },
+    "pkgBookHint": {
+     "status": "unreviewed"
+    },
+    "pkgDue": {
+     "status": "unreviewed"
+    },
+    "pkgGraceUntil": {
+     "status": "unreviewed"
+    },
+    "pkgPaid": {
+     "status": "unreviewed"
+    },
+    "pkgSaved": {
+     "status": "unreviewed"
+    },
+    "pkgSessions": {
+     "status": "unreviewed"
+    },
+    "pkgSessionsValue": {
+     "status": "unreviewed"
+    },
+    "pkgStatus": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_active": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_cancelled": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_completed": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_expired": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_grace": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_refunded": {
+     "status": "unreviewed"
+    },
+    "pkgTitle": {
+     "status": "unreviewed"
+    },
+    "pkgValidUntil": {
+     "status": "unreviewed"
+    },
+    "proxyAccept": {
+     "status": "unreviewed"
+    },
+    "proxyDone": {
+     "status": "unreviewed"
+    },
+    "proxyIntro": {
+     "status": "unreviewed"
+    },
+    "proxyScopeBook": {
+     "status": "unreviewed"
+    },
+    "proxyScopeBookHint": {
+     "status": "unreviewed"
+    },
+    "proxyScopeFull": {
+     "status": "unreviewed"
+    },
+    "proxyScopeFullHint": {
+     "status": "unreviewed"
+    },
+    "proxyScopeLabel": {
+     "status": "unreviewed"
+    },
+    "proxyScopeRecords": {
+     "status": "unreviewed"
+    },
+    "proxyScopeRecordsHint": {
+     "status": "unreviewed"
+    },
+    "proxyTitle": {
+     "status": "unreviewed"
+    },
+    "purpose_insurance_claim": {
+     "status": "unreviewed"
+    },
+    "purpose_personal_record": {
+     "status": "unreviewed"
+    },
+    "purpose_referral": {
+     "status": "unreviewed"
+    },
+    "purpose_second_opinion": {
+     "status": "unreviewed"
+    },
+    "purpose_treatment": {
+     "status": "unreviewed"
+    },
+    "retry": {
+     "status": "unreviewed"
+    },
+    "rxCouncil": {
+     "status": "unreviewed"
+    },
+    "rxDispensed": {
+     "status": "unreviewed"
+    },
+    "rxDispensedNoDate": {
+     "status": "unreviewed"
+    },
+    "rxDoctor": {
+     "status": "unreviewed"
+    },
+    "rxExpired": {
+     "status": "unreviewed"
+    },
+    "rxIssued": {
+     "status": "unreviewed"
+    },
+    "rxLines": {
+     "status": "unreviewed"
+    },
+    "rxNoExpiry": {
+     "status": "unreviewed"
+    },
+    "rxOfflineHint": {
+     "status": "unreviewed"
+    },
+    "rxOfflineNoKey": {
+     "status": "unreviewed"
+    },
+    "rxOfflineValid": {
+     "status": "unreviewed"
+    },
+    "rxPrivacy": {
+     "status": "unreviewed"
+    },
+    "rxRegNo": {
+     "status": "unreviewed"
+    },
+    "rxRevoked": {
+     "status": "unreviewed"
+    },
+    "rxTitle": {
+     "status": "unreviewed"
+    },
+    "rxTooMany": {
+     "status": "unreviewed"
+    },
+    "rxUnknownHint": {
+     "status": "unreviewed"
+    },
+    "rxUnknownTitle": {
+     "status": "unreviewed"
+    },
+    "rxValid": {
+     "status": "unreviewed"
+    },
+    "rxValidUntil": {
+     "status": "unreviewed"
+    },
+    "status_cancelled": {
+     "status": "unreviewed"
+    },
+    "status_confirmed": {
+     "status": "unreviewed"
+    },
+    "status_held": {
+     "status": "unreviewed"
+    },
+    "title": {
+     "status": "unreviewed"
+    },
+    "to": {
+     "status": "unreviewed"
+    }
+   },
+   "templates": {
+    "appt_cancelled_by_clinic": {
+     "status": "unreviewed"
+    },
+    "appt_confirmed": {
+     "status": "unreviewed"
+    },
+    "appt_nudge": {
+     "status": "unreviewed"
+    },
+    "appt_reminder_24h": {
+     "status": "unreviewed"
+    },
+    "appt_reminder_2h": {
+     "status": "unreviewed"
+    },
+    "appt_rescheduled": {
+     "status": "unreviewed"
+    },
+    "doctor_delay": {
+     "status": "unreviewed"
+    },
+    "feedback_request": {
+     "status": "unreviewed"
+    },
+    "leave_now": {
+     "status": "unreviewed"
+    },
+    "optout_confirm": {
+     "status": "unreviewed"
+    },
+    "otp_login": {
+     "status": "unreviewed"
+    },
+    "package_card": {
+     "status": "unreviewed"
+    },
+    "package_expiry": {
+     "status": "unreviewed"
+    },
+    "package_grace": {
+     "status": "unreviewed"
+    },
+    "package_session_nudge": {
+     "status": "unreviewed"
+    },
+    "queue_paused": {
+     "status": "unreviewed"
+    },
+    "queue_your_turn": {
+     "status": "unreviewed"
+    },
+    "recall_due": {
+     "status": "unreviewed"
+    },
+    "review_request": {
+     "status": "unreviewed"
+    },
+    "secure_link_ready": {
+     "status": "unreviewed"
+    }
+   }
+  },
+  "te": {
+   "patient": {
+    "approve": {
+     "status": "unreviewed"
+    },
+    "bookingStatus": {
+     "status": "unreviewed"
+    },
+    "bookingTitle": {
+     "status": "unreviewed"
+    },
+    "bookingWhen": {
+     "status": "unreviewed"
+    },
+    "bookingWhere": {
+     "status": "unreviewed"
+    },
+    "bookingWith": {
+     "status": "unreviewed"
+    },
+    "cat_allergies": {
+     "status": "unreviewed"
+    },
+    "cat_diagnoses": {
+     "status": "unreviewed"
+    },
+    "cat_imaging": {
+     "status": "unreviewed"
+    },
+    "cat_invoices": {
+     "status": "unreviewed"
+    },
+    "cat_lab_reports": {
+     "status": "unreviewed"
+    },
+    "cat_prescriptions": {
+     "status": "unreviewed"
+    },
+    "cat_visit_notes": {
+     "status": "unreviewed"
+    },
+    "claimDone": {
+     "status": "unreviewed"
+    },
+    "claimIntro": {
+     "status": "unreviewed"
+    },
+    "claimKeepLabel": {
+     "status": "unreviewed"
+    },
+    "claimKeepNone": {
+     "status": "unreviewed"
+    },
+    "claimNotOpen": {
+     "status": "unreviewed"
+    },
+    "claimOwnPhone": {
+     "status": "unreviewed"
+    },
+    "claimSubmit": {
+     "status": "unreviewed"
+    },
+    "claimTitle": {
+     "status": "unreviewed"
+    },
+    "consentApproved": {
+     "status": "unreviewed"
+    },
+    "consentChangedHint": {
+     "status": "unreviewed"
+    },
+    "consentChangedTitle": {
+     "status": "unreviewed"
+    },
+    "consentData": {
+     "status": "unreviewed"
+    },
+    "consentDeclined": {
+     "status": "unreviewed"
+    },
+    "consentPurpose": {
+     "status": "unreviewed"
+    },
+    "consentRange": {
+     "status": "unreviewed"
+    },
+    "consentReload": {
+     "status": "unreviewed"
+    },
+    "consentRequester": {
+     "status": "unreviewed"
+    },
+    "consentTitle": {
+     "status": "unreviewed"
+    },
+    "consentValid": {
+     "status": "unreviewed"
+    },
+    "decline": {
+     "status": "unreviewed"
+    },
+    "docNotHere": {
+     "status": "unreviewed"
+    },
+    "docOpen": {
+     "status": "unreviewed"
+    },
+    "docPreviewTitle": {
+     "status": "unreviewed"
+    },
+    "docTitle": {
+     "status": "unreviewed"
+    },
+    "docUnsupported": {
+     "status": "unreviewed"
+    },
+    "errorHint": {
+     "status": "unreviewed"
+    },
+    "errorTitle": {
+     "status": "unreviewed"
+    },
+    "expiredFull": {
+     "status": "unreviewed"
+    },
+    "expiredHint": {
+     "status": "unreviewed"
+    },
+    "expiredTitle": {
+     "status": "unreviewed"
+    },
+    "exportChecksum": {
+     "status": "unreviewed"
+    },
+    "exportDone": {
+     "status": "unreviewed"
+    },
+    "exportDownload": {
+     "status": "unreviewed"
+    },
+    "exportIntro": {
+     "status": "unreviewed"
+    },
+    "exportTitle": {
+     "status": "unreviewed"
+    },
+    "landingHint": {
+     "status": "unreviewed"
+    },
+    "landingTitle": {
+     "status": "unreviewed"
+    },
+    "langLabel": {
+     "status": "unreviewed"
+    },
+    "loading": {
+     "status": "unreviewed"
+    },
+    "otpHint": {
+     "status": "unreviewed"
+    },
+    "otpHintPlain": {
+     "status": "unreviewed"
+    },
+    "otpLabel": {
+     "status": "unreviewed"
+    },
+    "otpResend": {
+     "status": "unreviewed"
+    },
+    "otpSend": {
+     "status": "unreviewed"
+    },
+    "otpSent": {
+     "status": "unreviewed"
+    },
+    "otpTitle": {
+     "status": "unreviewed"
+    },
+    "otpTooMany": {
+     "status": "unreviewed"
+    },
+    "otpVerify": {
+     "status": "unreviewed"
+    },
+    "otpWrong": {
+     "status": "unreviewed"
+    },
+    "pkgBookHint": {
+     "status": "unreviewed"
+    },
+    "pkgDue": {
+     "status": "unreviewed"
+    },
+    "pkgGraceUntil": {
+     "status": "unreviewed"
+    },
+    "pkgPaid": {
+     "status": "unreviewed"
+    },
+    "pkgSaved": {
+     "status": "unreviewed"
+    },
+    "pkgSessions": {
+     "status": "unreviewed"
+    },
+    "pkgSessionsValue": {
+     "status": "unreviewed"
+    },
+    "pkgStatus": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_active": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_cancelled": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_completed": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_expired": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_grace": {
+     "status": "unreviewed"
+    },
+    "pkgStatus_refunded": {
+     "status": "unreviewed"
+    },
+    "pkgTitle": {
+     "status": "unreviewed"
+    },
+    "pkgValidUntil": {
+     "status": "unreviewed"
+    },
+    "proxyAccept": {
+     "status": "unreviewed"
+    },
+    "proxyDone": {
+     "status": "unreviewed"
+    },
+    "proxyIntro": {
+     "status": "unreviewed"
+    },
+    "proxyScopeBook": {
+     "status": "unreviewed"
+    },
+    "proxyScopeBookHint": {
+     "status": "unreviewed"
+    },
+    "proxyScopeFull": {
+     "status": "unreviewed"
+    },
+    "proxyScopeFullHint": {
+     "status": "unreviewed"
+    },
+    "proxyScopeLabel": {
+     "status": "unreviewed"
+    },
+    "proxyScopeRecords": {
+     "status": "unreviewed"
+    },
+    "proxyScopeRecordsHint": {
+     "status": "unreviewed"
+    },
+    "proxyTitle": {
+     "status": "unreviewed"
+    },
+    "purpose_insurance_claim": {
+     "status": "unreviewed"
+    },
+    "purpose_personal_record": {
+     "status": "unreviewed"
+    },
+    "purpose_referral": {
+     "status": "unreviewed"
+    },
+    "purpose_second_opinion": {
+     "status": "unreviewed"
+    },
+    "purpose_treatment": {
+     "status": "unreviewed"
+    },
+    "retry": {
+     "status": "unreviewed"
+    },
+    "rxCouncil": {
+     "status": "unreviewed"
+    },
+    "rxDispensed": {
+     "status": "unreviewed"
+    },
+    "rxDispensedNoDate": {
+     "status": "unreviewed"
+    },
+    "rxDoctor": {
+     "status": "unreviewed"
+    },
+    "rxExpired": {
+     "status": "unreviewed"
+    },
+    "rxIssued": {
+     "status": "unreviewed"
+    },
+    "rxLines": {
+     "status": "unreviewed"
+    },
+    "rxNoExpiry": {
+     "status": "unreviewed"
+    },
+    "rxOfflineHint": {
+     "status": "unreviewed"
+    },
+    "rxOfflineNoKey": {
+     "status": "unreviewed"
+    },
+    "rxOfflineValid": {
+     "status": "unreviewed"
+    },
+    "rxPrivacy": {
+     "status": "unreviewed"
+    },
+    "rxRegNo": {
+     "status": "unreviewed"
+    },
+    "rxRevoked": {
+     "status": "unreviewed"
+    },
+    "rxTitle": {
+     "status": "unreviewed"
+    },
+    "rxTooMany": {
+     "status": "unreviewed"
+    },
+    "rxUnknownHint": {
+     "status": "unreviewed"
+    },
+    "rxUnknownTitle": {
+     "status": "unreviewed"
+    },
+    "rxValid": {
+     "status": "unreviewed"
+    },
+    "rxValidUntil": {
+     "status": "unreviewed"
+    },
+    "status_cancelled": {
+     "status": "unreviewed"
+    },
+    "status_confirmed": {
+     "status": "unreviewed"
+    },
+    "status_held": {
+     "status": "unreviewed"
+    },
+    "title": {
+     "status": "unreviewed"
+    },
+    "to": {
+     "status": "unreviewed"
+    }
+   },
+   "templates": {
+    "appt_cancelled_by_clinic": {
+     "status": "unreviewed"
+    },
+    "appt_confirmed": {
+     "status": "unreviewed"
+    },
+    "appt_nudge": {
+     "status": "unreviewed"
+    },
+    "appt_reminder_24h": {
+     "status": "unreviewed"
+    },
+    "appt_reminder_2h": {
+     "status": "unreviewed"
+    },
+    "appt_rescheduled": {
+     "status": "unreviewed"
+    },
+    "doctor_delay": {
+     "status": "unreviewed"
+    },
+    "feedback_request": {
+     "status": "unreviewed"
+    },
+    "leave_now": {
+     "status": "unreviewed"
+    },
+    "optout_confirm": {
+     "status": "unreviewed"
+    },
+    "otp_login": {
+     "status": "unreviewed"
+    },
+    "package_card": {
+     "status": "unreviewed"
+    },
+    "package_expiry": {
+     "status": "unreviewed"
+    },
+    "package_grace": {
+     "status": "unreviewed"
+    },
+    "package_session_nudge": {
+     "status": "unreviewed"
+    },
+    "queue_paused": {
+     "status": "unreviewed"
+    },
+    "queue_your_turn": {
+     "status": "unreviewed"
+    },
+    "recall_due": {
+     "status": "unreviewed"
+    },
+    "review_request": {
+     "status": "unreviewed"
+    },
+    "secure_link_ready": {
+     "status": "unreviewed"
+    }
+   }
+  }
+ },
+ "schemaVersion": 1,
+ "templates": {
+  "appt_cancelled_by_clinic": {
+   "en": {
+    "body": "Hello {{1}}, we are sorry, we had to cancel your appointment on {{2}} at {{3}}. Please contact the clinic to book a new time.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, खेद है कि हमें {{2}} को {{3}} बजे की आपकी अपॉइंटमेंट रद्द करनी पड़ी। नया समय लेने के लिए कृपया क्लिनिक से संपर्क करें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ಕ್ಷಮಿಸಿ, {{2}} ರಂದು {{3}} ಗಂಟೆಯ ನಿಮ್ಮ ಭೇಟಿಯನ್ನು ರದ್ದುಪಡಿಸಬೇಕಾಯಿತು. ಹೊಸ ಸಮಯಕ್ಕಾಗಿ ದಯವಿಟ್ಟು ಕ್ಲಿನಿಕ್ ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, క్షమించండి, {{2}} న {{3}} గంటల మీ సందర్శనను రద్దు చేయవలసి వచ్చింది. కొత్త సమయం కోసం దయచేసి క్లినిక్ వారిని సంప్రదించండి.",
+    "category": "UTILITY"
+   }
+  },
+  "appt_confirmed": {
+   "en": {
+    "body": "Hello {{1}}, your appointment is confirmed for {{2}} at {{3}} with {{4}}. Thank you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपकी अपॉइंटमेंट {{2}} को {{3}} बजे {{4}} के साथ पक्की हो गई है। धन्यवाद।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಭೇಟಿ {{2}} ರಂದು {{3}} ಗಂಟೆಗೆ {{4}} ಅವರೊಂದಿಗೆ ದೃಢಪಟ್ಟಿದೆ. ಧನ್ಯವಾದಗಳು.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ సందర్శన {{2}} న {{3}} గంటలకు {{4}} గారితో ఖరారైంది. ధన్యవాదాలు.",
+    "category": "UTILITY"
+   }
+  },
+  "appt_nudge": {
+   "en": {
+    "body": "Hello {{1}}, we have not heard from you about your appointment on {{2}} at {{3}}. Please reply to confirm, or contact us to change it.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, {{2}} को {{3}} बजे की आपकी अपॉइंटमेंट के बारे में हमें आपका जवाब नहीं मिला। कृपया पुष्टि के लिए जवाब दें, या बदलने के लिए हमसे संपर्क करें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, {{2}} ರಂದು {{3}} ಗಂಟೆಗೆ ಇರುವ ನಿಮ್ಮ ಭೇಟಿಯ ಬಗ್ಗೆ ನಿಮ್ಮಿಂದ ಉತ್ತರ ಬಂದಿಲ್ಲ. ದೃಢೀಕರಿಸಲು ದಯವಿಟ್ಟು ಉತ್ತರಿಸಿ, ಅಥವಾ ಬದಲಾಯಿಸಲು ನಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, {{2}} న {{3}} గంటలకు ఉన్న మీ సందర్శన గురించి మీ నుండి మాకు సమాధానం రాలేదు. నిర్ధారించడానికి దయచేసి సమాధానం ఇవ్వండి, లేదా మార్చడానికి మమ్మల్ని సంప్రదించండి.",
+    "category": "UTILITY"
+   }
+  },
+  "appt_reminder_24h": {
+   "en": {
+    "body": "Hello {{1}}, this is a reminder of your appointment tomorrow, {{2}}, at {{3}}. Reply STOP to stop reminders.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपको याद दिलाना है कि आपकी अपॉइंटमेंट कल {{2}} को {{3}} बजे है। संदेश बंद करने के लिए STOP लिखें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಾಳೆ {{2}} ರಂದು {{3}} ಗಂಟೆಗೆ ನಿಮ್ಮ ಭೇಟಿ ಇದೆ ಎಂದು ನೆನಪಿಸುತ್ತಿದ್ದೇವೆ. ಸಂದೇಶ ನಿಲ್ಲಿಸಲು STOP ಎಂದು ಕಳುಹಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, రేపు {{2}} న {{3}} గంటలకు మీ సందర్శన ఉందని గుర్తు చేస్తున్నాము. సందేశాలు ఆపడానికి STOP అని పంపండి.",
+    "category": "UTILITY"
+   }
+  },
+  "appt_reminder_2h": {
+   "en": {
+    "body": "Hello {{1}}, your appointment is today at {{2}}. We look forward to seeing you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपकी अपॉइंटमेंट आज {{2}} बजे है। हम आपका इंतज़ार करेंगे।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಭೇಟಿ ಇಂದು {{2}} ಗಂಟೆಗೆ ಇದೆ. ನಿಮ್ಮನ್ನು ಎದುರು ನೋಡುತ್ತಿದ್ದೇವೆ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ సందర్శన ఈ రోజు {{2}} గంటలకు ఉంది. మీ కోసం ఎదురు చూస్తున్నాము.",
+    "category": "UTILITY"
+   }
+  },
+  "appt_rescheduled": {
+   "en": {
+    "body": "Hello {{1}}, your appointment has been moved to {{2}} at {{3}}. Please contact us if this time does not suit you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपकी अपॉइंटमेंट अब {{2}} को {{3}} बजे कर दी गई है। यदि यह समय सुविधाजनक न हो तो कृपया हमसे संपर्क करें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಭೇಟಿಯನ್ನು {{2}} ರಂದು {{3}} ಗಂಟೆಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ. ಈ ಸಮಯ ಅನುಕೂಲವಾಗದಿದ್ದರೆ ದಯವಿಟ್ಟು ನಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ సందర్శనను {{2}} న {{3}} గంటలకు మార్చాము. ఈ సమయం సరిపోకపోతే దయచేసి మమ్మల్ని సంప్రదించండి.",
+    "category": "UTILITY"
+   }
+  },
+  "doctor_delay": {
+   "en": {
+    "body": "Hello {{1}}, {{2}} is running late. Your new expected time is {{3}}. Thank you for your patience.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, {{2}} को आने में देर हो रही है। आपका नया अनुमानित समय {{3}} है। आपके धैर्य के लिए धन्यवाद।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, {{2}} ಅವರು ಬರಲು ತಡವಾಗುತ್ತಿದೆ. ನಿಮ್ಮ ಹೊಸ ಅಂದಾಜು ಸಮಯ {{3}}. ನಿಮ್ಮ ತಾಳ್ಮೆಗೆ ಧನ್ಯವಾದಗಳು.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, {{2}} గారు రావడం ఆలస్యమవుతోంది. మీ కొత్త అంచనా సమయం {{3}}. మీ ఓపికకు ధన్యవాదాలు.",
+    "category": "UTILITY"
+   }
+  },
+  "feedback_request": {
+   "en": {
+    "body": "Hello {{1}}, how was your visit with {{2}}? Please share a few words here: {{3}} Thank you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, {{2}} के साथ आपकी मुलाकात कैसी रही? कृपया यहाँ दो शब्द लिखें: {{3}} धन्यवाद।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, {{2}} ಅವರೊಂದಿಗಿನ ನಿಮ್ಮ ಭೇಟಿ ಹೇಗಿತ್ತು? ದಯವಿಟ್ಟು ಇಲ್ಲಿ ಎರಡು ಮಾತು ಬರೆಯಿರಿ: {{3}} ಧನ್ಯವಾದಗಳು.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, {{2}} గారితో మీ సందర్శన ఎలా సాగింది? దయచేసి ఇక్కడ రెండు మాటలు రాయండి: {{3}} ధన్యవాదాలు.",
+    "category": "UTILITY"
+   }
+  },
+  "leave_now": {
+   "en": {
+    "body": "Hello {{1}}, it is almost your turn. Your token number is {{2}}. Please start for the clinic now.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपकी बारी लगभग आ गई है। आपका टोकन नंबर {{2}} है। कृपया अब क्लिनिक के लिए निकलिए।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಸರದಿ ಸಮೀಪಿಸಿದೆ. ನಿಮ್ಮ ಟೋಕನ್ ಸಂಖ್ಯೆ {{2}}. ದಯವಿಟ್ಟು ಈಗ ಕ್ಲಿನಿಕ್ ಕಡೆಗೆ ಹೊರಡಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ వంతు దాదాపు వచ్చింది. మీ టోకెన్ నంబర్ {{2}}. దయచేసి ఇప్పుడు క్లినిక్ వైపు బయలుదేరండి.",
+    "category": "UTILITY"
+   }
+  },
+  "optout_confirm": {
+   "en": {
+    "body": "Hello {{1}}, you have stopped receiving messages from us. Reply START to receive them again.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपने हमारे संदेश लेना बंद कर दिया है। दोबारा पाने के लिए START लिखें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನೀವು ನಮ್ಮ ಸಂದೇಶಗಳನ್ನು ಪಡೆಯುವುದನ್ನು ನಿಲ್ಲಿಸಿದ್ದೀರಿ. ಮತ್ತೆ ಪಡೆಯಲು START ಎಂದು ಕಳುಹಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీరు మా సందేశాలు అందుకోవడం ఆపేశారు. మళ్లీ అందుకోవడానికి START అని పంపండి.",
+    "category": "UTILITY"
+   }
+  },
+  "otp_login": {
+   "en": {
+    "body": "Your verification code is {{1}}. Do not share it with anyone.",
+    "category": "AUTHENTICATION"
+   },
+   "hi": {
+    "body": "आपका सत्यापन कोड {{1}} है। इसे किसी के साथ साझा न करें।",
+    "category": "AUTHENTICATION"
+   },
+   "kn": {
+    "body": "ನಿಮ್ಮ ಪರಿಶೀಲನಾ ಕೋಡ್ {{1}}. ಇದನ್ನು ಯಾರೊಂದಿಗೂ ಹಂಚಿಕೊಳ್ಳಬೇಡಿ.",
+    "category": "AUTHENTICATION"
+   },
+   "te": {
+    "body": "మీ ధృవీకరణ కోడ్ {{1}}. దీనిని ఎవరితోనూ పంచుకోకండి.",
+    "category": "AUTHENTICATION"
+   }
+  },
+  "package_card": {
+   "en": {
+    "body": "Hello {{1}}, your package card is ready. Open it here: {{2}} to see your visits. Thank you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपका पैकेज कार्ड तैयार है। अपनी मुलाकातें देखने के लिए इसे यहाँ खोलिए: {{2}} धन्यवाद।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಪ್ಯಾಕೇಜ್ ಕಾರ್ಡ್ ಸಿದ್ಧವಾಗಿದೆ. ನಿಮ್ಮ ಭೇಟಿಗಳನ್ನು ನೋಡಲು ಇಲ್ಲಿ ತೆರೆಯಿರಿ: {{2}} ಧನ್ಯವಾದಗಳು.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ ప్యాకేజీ కార్డ్ సిద్ధంగా ఉంది. మీ సందర్శనలను చూడటానికి ఇక్కడ తెరవండి: {{2}} ధన్యవాదాలు.",
+    "category": "UTILITY"
+   }
+  },
+  "package_expiry": {
+   "en": {
+    "body": "Hello {{1}}, your package expires on {{2}}. Please contact the clinic to use your remaining visits.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपका पैकेज {{2}} को समाप्त हो रहा है। बची हुई मुलाकातों के लिए कृपया क्लिनिक से संपर्क करें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಪ್ಯಾಕೇಜ್ {{2}} ರಂದು ಮುಕ್ತಾಯವಾಗುತ್ತದೆ. ಉಳಿದ ಭೇಟಿಗಳಿಗಾಗಿ ದಯವಿಟ್ಟು ಕ್ಲಿನಿಕ್ ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ ప్యాకేజీ {{2}} న ముగుస్తుంది. మిగిలిన సందర్శనల కోసం దయచేసి క్లినిక్ వారిని సంప్రదించండి.",
+    "category": "UTILITY"
+   }
+  },
+  "package_grace": {
+   "en": {
+    "body": "Hello {{1}}, your package validity has ended. Until {{2}}, you can still use your remaining sessions.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपके पैकेज की वैधता समाप्त हो गई है। आप {{2}} तक अपने बचे हुए सेशन अभी भी उपयोग कर सकते हैं।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಪ್ಯಾಕೇಜ್ ಮಾನ್ಯತೆ ಮುಗಿದಿದೆ. {{2}} ರವರೆಗೆ ಉಳಿದ ಸೆಶನ್ಗಳನ್ನು ನೀವು ಇನ್ನೂ ಬಳಸಬಹುದು.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ ప్యాకేజీ చెల్లుబాటు ముగిసింది. {{2}} వరకు మిగిలిన సెషన్లను మీరు ఇంకా ఉపయోగించుకోవచ్చు.",
+    "category": "UTILITY"
+   }
+  },
+  "package_session_nudge": {
+   "en": {
+    "body": "Hello {{1}}, it is time for your next package session. Reply to this message to book a time.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपके पैकेज के अगले सेशन का समय हो गया है। समय बुक करने के लिए इस संदेश का जवाब दें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಮುಂದಿನ ಪ್ಯಾಕೇಜ್ ಸೆಶನ್ ಸಮಯ ಬಂದಿದೆ. ಸಮಯ ಕಾಯ್ದಿರಿಸಲು ಈ ಸಂದೇಶಕ್ಕೆ ಉತ್ತರಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ తదుపరి ప్యాకేజీ సెషన్ సమయం వచ్చింది. సమయం బుక్ చేసుకోవడానికి ఈ సందేశానికి సమాధానం ఇవ్వండి.",
+    "category": "UTILITY"
+   }
+  },
+  "queue_paused": {
+   "en": {
+    "body": "The doctor is briefly unavailable; we will update you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "डॉक्टर कुछ देर के लिए उपलब्ध नहीं हैं; हम आपको जानकारी देंगे।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ವೈದ್ಯರು ಸ್ವಲ್ಪ ಸಮಯ ಲಭ್ಯವಿಲ್ಲ; ನಾವು ನಿಮಗೆ ತಿಳಿಸುತ್ತೇವೆ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "డాక్టర్ గారు కొద్దిసేపు అందుబాటులో లేరు; మేము మీకు తెలియజేస్తాము.",
+    "category": "UTILITY"
+   }
+  },
+  "queue_your_turn": {
+   "en": {
+    "body": "Hello {{1}}, your token number {{2}} is next. Please come to the reception.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपका टोकन नंबर {{2}} अगला है। कृपया रिसेप्शन पर आइए।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಟೋಕನ್ ಸಂಖ್ಯೆ {{2}} ಮುಂದಿನದು. ದಯವಿಟ್ಟು ಸ್ವಾಗತ ಕೌಂಟರ್ ಬಳಿ ಬನ್ನಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ టోకెన్ నంబర్ {{2}} తదుపరిది. దయచేసి రిసెప్షన్ వద్దకు రండి.",
+    "category": "UTILITY"
+   }
+  },
+  "recall_due": {
+   "en": {
+    "body": "Hello {{1}}, it is time for your next visit. Please call us or reply to choose a time that suits you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपकी अगली मुलाकात का समय हो गया है। अपनी सुविधा का समय तय करने के लिए कृपया हमें कॉल करें या जवाब दें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಮುಂದಿನ ಭೇಟಿಯ ಸಮಯ ಬಂದಿದೆ. ನಿಮಗೆ ಅನುಕೂಲವಾದ ಸಮಯ ನಿಗದಿಪಡಿಸಲು ದಯವಿಟ್ಟು ನಮಗೆ ಕರೆ ಮಾಡಿ ಅಥವಾ ಉತ್ತರಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ తదుపరి సందర్శన సమయం వచ్చింది. మీకు వీలైన సమయం నిర్ణయించడానికి దయచేసి మాకు కాల్ చేయండి లేదా సమాధానం ఇవ్వండి.",
+    "category": "UTILITY"
+   }
+  },
+  "review_request": {
+   "en": {
+    "body": "Hello {{1}}, thank you for visiting us on {{2}}. We would value your feedback: {{3}} Thank you.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, {{2}} को हमारे यहाँ आने के लिए धन्यवाद। हमें आपकी राय जानकर खुशी होगी: {{3}} धन्यवाद।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, {{2}} ರಂದು ನಮ್ಮಲ್ಲಿಗೆ ಬಂದಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು. ನಿಮ್ಮ ಅಭಿಪ್ರಾಯ ತಿಳಿಸಿ: {{3}} ಧನ್ಯವಾದಗಳು.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, {{2}} న మా వద్దకు వచ్చినందుకు ధన్యవాదాలు. మీ అభిప్రాయం తెలియజేయండి: {{3}} ధన్యవాదాలు.",
+    "category": "UTILITY"
+   }
+  },
+  "secure_link_ready": {
+   "en": {
+    "body": "Hello {{1}}, a secure message from your clinic is ready. Open it here: {{2}} then follow the steps.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपके क्लिनिक का एक सुरक्षित संदेश तैयार है। इसे यहाँ खोलिए: {{2}} और आगे के निर्देश देखिए।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ನಿಮ್ಮ ಕ್ಲಿನಿಕ್ ಕಡೆಯಿಂದ ಒಂದು ಸುರಕ್ಷಿತ ಸಂದೇಶ ಸಿದ್ಧವಾಗಿದೆ. ಇಲ್ಲಿ ತೆರೆಯಿರಿ: {{2}} ನಂತರ ಮುಂದಿನ ಹಂತಗಳನ್ನು ಅನುಸರಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, మీ క్లినిక్ నుండి ఒక సురక్షిత సందేశం సిద్ధంగా ఉంది. ఇక్కడ తెరవండి: {{2}} తరువాత సూచనలను అనుసరించండి.",
+    "category": "UTILITY"
+   }
+  }
+ },
+ "version": "8c5a0b297264"
+}

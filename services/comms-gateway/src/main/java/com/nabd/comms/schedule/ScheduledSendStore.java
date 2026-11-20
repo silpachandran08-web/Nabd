@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.nabd.comms.i18n.PatientCatalogue;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -35,10 +36,10 @@ public class ScheduledSendStore {
             bind(s.tenantId());
             jdbc.update("""
                     INSERT INTO outbound_messages (id, tenant_id, request_id, sender_account_id, to_address_enc, to_hash, template_name, language,
-                      priority, not_before, not_after, status, scheduled_at, created_at, updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,'scheduled',?,?,?)
+                      priority, not_before, not_after, status, scheduled_at, created_at, updated_at, catalogue_version)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,'scheduled',?,?,?,?)
                     """, s.id(), s.tenantId(), s.requestId(), s.senderAccountId(), s.toAddressEnc(), s.toHash(), s.templateName(), s.language(),
-                    s.priority(), ts(s.notBefore()), ts(s.notAfter()), ts(now), ts(now), ts(now));
+                    s.priority(), ts(s.notBefore()), ts(s.notAfter()), ts(now), ts(now), ts(now), PatientCatalogue.get().version());
         });
         index.add(s.tenantId(), s.id(), s.notBefore() == null ? now : s.notBefore());
     }
