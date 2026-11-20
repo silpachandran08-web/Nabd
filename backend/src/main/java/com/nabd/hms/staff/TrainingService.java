@@ -64,6 +64,8 @@ class TrainingService {
     public Completion record(UUID staffId, String moduleId, int score) {
         TrainingRules.check(moduleId, score);
         UUID tenantId = tenantContext.current();
+        // looked up first: a token whose subject is not a staff member of this clinic gets 404, not a foreign-key error
+        ActorDirectory.Actor a = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
         Instant now = clock.instant();
         boolean created = jdbc.update("INSERT INTO training_completions (tenant_id, staff_id, module_id, score, completed_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",
                 tenantId, staffId, moduleId, score, Timestamp.from(now)) > 0;
@@ -75,7 +77,6 @@ class TrainingService {
                     return new Completion(rs.getObject("id", UUID.class), moduleId, rs.getInt("score"), at, TrainingRules.refresherDue(at), created);
                 }, tenantId, staffId, moduleId);
         if (created) {
-            ActorDirectory.Actor a = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
             audit.record(tenantId, "staff", staffId, a.name(), a.role(), null, "staff.training_completed", "staff", staffId, null,
                     Map.of("module", moduleId, "score", score));
         }
