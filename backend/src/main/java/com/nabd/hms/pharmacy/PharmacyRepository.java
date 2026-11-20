@@ -134,6 +134,12 @@ class PharmacyRepository {
                 (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, code).stream().findFirst();
     }
 
+    /** ADM-013: a pharmacy item by name, ignoring case; an active one first. */
+    Optional<UUID> findItemIdByName(UUID tenantId, String name) {
+        return jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL AND lower(name) = lower(?) " +
+                "ORDER BY active DESC, created_at LIMIT 1", (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, name).stream().findFirst();
+    }
+
     Optional<String> scheduleClassOf(UUID tenantId, UUID itemId) {
         return jdbc.query("SELECT schedule_class FROM pharmacy_item_profiles WHERE tenant_id = ? AND item_id = ?",
                 (rs, i) -> rs.getString("schedule_class"), tenantId, itemId).stream().findFirst();

@@ -13,7 +13,7 @@ import java.util.UUID;
 class ImportRepository {
 
     record Job(UUID id, String importType, String fileName, String status, UUID uploadId, String mapping, String diff,
-               Integer rowsTotal, int rowsDone, int lastChunk, UUID requestedBy, String errorMessage) {
+               Integer rowsTotal, int rowsDone, int lastChunk, UUID requestedBy, String errorMessage, String source) {
     }
 
     record Upload(UUID id, String fileName, String format, byte[] contentEnc) {
@@ -23,7 +23,7 @@ class ImportRepository {
     }
 
     private static final String JOB_COLS = "id, import_type, file_name, status, upload_id, mapping::text AS mapping, diff_summary::text AS diff, " +
-            "rows_total, rows_done, last_chunk, requested_by, error_message";
+            "rows_total, rows_done, last_chunk, requested_by, error_message, source";
 
     private final JdbcTemplate jdbc;
     private final TenantContext tenant;
@@ -57,10 +57,10 @@ class ImportRepository {
         jdbc.update("DELETE FROM data_import_uploads WHERE tenant_id = ? AND id = ?", t(), id);
     }
 
-    UUID insertJob(String fileName, UUID uploadId, UUID by) {
+    UUID insertJob(String importType, String source, String fileName, UUID uploadId, UUID by) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO data_import_jobs (id, tenant_id, import_type, file_name, status, upload_id, requested_by) VALUES (?,?, 'patients', ?, 'validating', ?, ?)",
-                id, t(), fileName, uploadId, by);
+        jdbc.update("INSERT INTO data_import_jobs (id, tenant_id, import_type, source, file_name, status, upload_id, requested_by) VALUES (?,?,?,?,?, 'validating', ?, ?)",
+                id, t(), importType, source, fileName, uploadId, by);
         return id;
     }
 
@@ -69,7 +69,7 @@ class ImportRepository {
                 (rs, i) -> new Job(rs.getObject("id", UUID.class), rs.getString("import_type"), rs.getString("file_name"), rs.getString("status"),
                         rs.getObject("upload_id", UUID.class), rs.getString("mapping"), rs.getString("diff"),
                         (Integer) rs.getObject("rows_total"), rs.getInt("rows_done"), rs.getInt("last_chunk"), rs.getObject("requested_by", UUID.class),
-                        rs.getString("error_message")), t(), id).stream().findFirst();
+                        rs.getString("error_message"), rs.getString("source")), t(), id).stream().findFirst();
     }
 
     /** Jobs the worker still owes work: not touched for staleSeconds (a live worker updates the row every chunk). */

@@ -1,0 +1,14 @@
+clinicea/drugs: name=Item Name, genericName=Generic Name, price=Selling Price, mrp=MRP, taxRate=Tax %, hsnCode=HSN Code, packSize=Pack Size, unit=Unit
+clinicea/patients: name=Patient Name, mobile=Mobile, dob=Date of Birth, sex=Gender, oldRecordNo=Patient ID, allergies=Allergies
+clinicea/stock: name=Item Name, batchNo=Batch No, expiry=Expiry Date, qty=Quantity, mrp=MRP, purchaseRate=Purchase Rate, price=Selling Price
+clinicea/visit_history: oldRecordNo=Patient ID, visitDate=Visit Date, doctorName=Doctor, complaint=Chief Complaint, diagnosis=Diagnosis, notes=Notes, medications=Prescription, billNo=Invoice No, billAmount=Invoice Amount
+lybrate/patients: name=Name, mobile=Phone, dob=DOB, sex=Gender, oldRecordNo=Patient Id
+lybrate/visit_history: oldRecordNo=Patient Id, visitDate=Appointment Date, doctorName=Doctor Name, complaint=Symptoms, diagnosis=Diagnosis, notes=Advice, medications=Medicines, billAmount=Fee
+medas/drugs: name=Drug Name, genericName=Generic Name, price=Sale Price, taxRate=VAT %, packSize=Pack Size, unit=UOM
+medas/patients: name=Patient Name, mobile=Mobile No, dob=DOB, sex=Sex, oldRecordNo=File No
+medas/stock: name=Drug Name, batchNo=Batch No, expiry=Expiry Date, qty=Qty On Hand, mrp=Retail Price, purchaseRate=Cost Price, price=Sale Price
+medas/visit_history: oldRecordNo=File No, visitDate=Visit Date, doctorName=Doctor Name, complaint=Chief Complaint, diagnosis=Diagnosis, notes=Remarks, medications=Medication, billNo=Bill No, billAmount=Net Amount
+practo_ray/drugs: name=Item Name, price=Retail Price, mrp=MRP, taxRate=Tax
+practo_ray/patients: name=Patient Name, mobile=Mobile Number, dob=Date of Birth, sex=Gender, oldRecordNo=Patient Number
+practo_ray/stock: name=Item Name, batchNo=Batch Number, expiry=Expiry Date, qty=Stock Level, mrp=MRP, purchaseRate=Cost Price, price=Retail Price
+practo_ray/visit_history: oldRecordNo=Patient Number, visitDate=Date, doctorName=Doctor, complaint=Complaints, diagnosis=Diagnoses, notes=Notes, medications=Prescriptions, billNo=Invoice Number, billAmount=Total Amount

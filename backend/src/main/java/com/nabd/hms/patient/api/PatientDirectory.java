@@ -17,6 +17,9 @@ public interface PatientDirectory {
 
     Optional<UUID> findByPhoneDob(String phoneE164, LocalDate dob);
 
+    /** ADM-013: the one active patient carrying this old record number; empty when none or when several share it (never a guess). */
+    Optional<UUID> findByLegacyRecordNo(String legacyRecordNo);
+
     /** Registers a patient from a legacy list; legacyRecordNo may be null. */
     UUID createImported(String name, String phoneE164, LocalDate dob, String gender, String legacyRecordNo);
 

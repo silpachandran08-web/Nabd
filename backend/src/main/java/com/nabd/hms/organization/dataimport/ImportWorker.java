@@ -53,6 +53,7 @@ public class ImportWorker {
     private final ClinicClock clock;
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.organization.setup.SetupStepEvents stepEvents;
+    private final ImportRows rowRules;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "adm-import-worker");
         t.setDaemon(true);
@@ -61,7 +62,8 @@ public class ImportWorker {
 
     ImportWorker(ImportPipeline pipeline, ImportRepository repo, TenantScope scope, TenantContext tenant, PatientDirectory patients,
                  ImportedAllergies allergies, EventPublisher events, ClinicClock clock, JdbcTemplate jdbc,
-                 com.nabd.hms.organization.setup.SetupStepEvents stepEvents) {
+                 com.nabd.hms.organization.setup.SetupStepEvents stepEvents, ImportRows rowRules) {
+        this.rowRules = rowRules;
         this.stepEvents = stepEvents;
         this.pipeline = pipeline;
         this.repo = repo;
@@ -134,6 +136,15 @@ public class ImportWorker {
         }
         Map<String, Integer> idx = pipeline.columnIndex(job);
         String fmt = pipeline.dateFormat(job);
+        if (!"patients".equals(job.importType())) { // ADM-013: visits through clinical.api, drugs and stock through pharmacy.api
+            ImportRows.Pass pass = rowRules.pass(job.importType(), idx, fmt);
+            for (ImportRepository.Row r : rows) {
+                ImportRows.Verdict v = rowRules.apply(pass, pipeline.decode(jobId, r), job);
+                repo.markRow(jobId, r.rowNo(), v.outcome(), v.errorCode(), null);
+            }
+            repo.chunkDone(jobId, rows.size());
+            return "importing";
+        }
         String region = clock.region(tenant.current());
         java.time.LocalDate today = clock.today(tenant.current());
         Map<ImportRepository.Row, Rec> recs = new LinkedHashMap<>();

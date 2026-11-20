@@ -32,10 +32,10 @@ final class ImportFileReader {
     private ImportFileReader() {
     }
 
-    /** 'xlsx' (zip magic PK) or 'csv' (anything text); null when the bytes are neither. */
+    /** 'xlsx' or 'zip' (zip magic PK) or 'csv' (anything text); null when the bytes are not what was declared. */
     static String sniff(byte[] data, String declared) {
         boolean zip = data.length > 3 && data[0] == 'P' && data[1] == 'K';
-        if ("xlsx".equals(declared)) return zip ? "xlsx" : null;
+        if ("xlsx".equals(declared) || "zip".equals(declared)) return zip ? declared : null;
         if ("csv".equals(declared)) {
             for (int i = 0, n = Math.min(data.length, 4096); i < n; i++) if (data[i] == 0) return null; // binary, not text
             return zip ? null : "csv";
@@ -45,6 +45,50 @@ final class ImportFileReader {
 
     static List<String[]> read(byte[] data, String format) throws IOException {
         return "xlsx".equals(format) ? xlsx(data) : csv(new String(data, StandardCharsets.UTF_8));
+    }
+
+    /** ADM-013: one table of an upload; name is the zip entry ("" for a single file). */
+    record Table(String name, List<String[]> rows) {
+    }
+
+    /**
+     * The table whose header row scores highest with the caller (0 or less = not this table; the first wins a tie); null
+     * when none scores. A csv / xlsx upload is one table; an export zip is one table per .csv / .xlsx entry (other
+     * entries and unreadable ones are skipped; nothing is written to disk, entry names are never used as paths). The
+     * unzipped total is capped like an xlsx.
+     */
+    static Table bestTable(byte[] data, String format, java.util.function.ToIntFunction<String[]> headerScore) throws IOException {
+        if (!"zip".equals(format)) {
+            List<String[]> rows = read(data, format);
+            return rows.isEmpty() || headerScore.applyAsInt(rows.get(0)) > 0 ? new Table("", rows) : null;
+        }
+        long total = 0;
+        int files = 0;
+        Table best = null;
+        int bestScore = 0;
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(data))) {
+            for (ZipEntry e; (e = zip.getNextEntry()) != null; ) {
+                String n = e.getName().toLowerCase(java.util.Locale.ROOT);
+                if (e.isDirectory() || !(n.endsWith(".csv") || n.endsWith(".xlsx"))) continue;
+                if (++files > 200) throw new IllegalArgumentException("TOO_MANY_FILES");
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[16384];
+                for (int r; (r = zip.read(buf)) > 0; ) {
+                    total += r;
+                    if (total > MAX_UNZIPPED) throw new IllegalArgumentException("FILE_TOO_LARGE");
+                    out.write(buf, 0, r);
+                }
+                List<String[]> rows;
+                try {
+                    rows = read(out.toByteArray(), n.endsWith(".xlsx") ? "xlsx" : "csv");
+                } catch (IOException | RuntimeException bad) {
+                    continue; // not a table we can read: another entry may be the one
+                }
+                int score = rows.isEmpty() ? 0 : headerScore.applyAsInt(rows.get(0));
+                if (score > bestScore) { best = new Table(e.getName(), rows); bestScore = score; }
+            }
+        }
+        return best;
     }
 
     static List<String[]> csv(String text) {

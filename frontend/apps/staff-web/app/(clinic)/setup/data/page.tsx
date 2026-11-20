@@ -25,7 +25,7 @@ export default function DataTab() {
           <h2 className={styles.cardTitle}>Self-serve data import & export</h2>
           {can("setup:edit") && (
             <div className={styles.field}>
-              <label className={styles.label}>Import patients</label>
+              <label className={styles.label}>Import patients, past visits, drug list and opening stock</label>
               <PatientImport />
             </div>
           )}

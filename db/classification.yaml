@@ -627,6 +627,7 @@ schemas:
       id: operational
       tenant_id: operational
       import_type: operational
+      source: operational
       file_name: operational  # uncertain: uploaded file name / errors may echo row content; verify
       status: operational
       result_url: operational

@@ -49,6 +49,14 @@ class PatientDirectoryJdbc implements PatientDirectory {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<UUID> findByLegacyRecordNo(String legacyRecordNo) {
+        var ids = jdbc.query("SELECT id FROM patients WHERE tenant_id = ? AND status = 'active' AND legacy_record_no = ? LIMIT 2",
+                (rs, i) -> rs.getObject("id", UUID.class), tenant.current(), legacyRecordNo);
+        return ids.size() == 1 ? Optional.of(ids.get(0)) : Optional.empty();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public UUID createImported(String name, String phoneE164, LocalDate dob, String gender, String legacyRecordNo) {
         gate.requireRealData(); // ADM-002: imported patients are real patients
         UUID id = UUID.randomUUID();
