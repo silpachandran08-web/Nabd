@@ -180,6 +180,7 @@ public class QuarantineService {
     }
 
     /** The batches behind the request lines, each batch once; 404 when one is not this clinic's. */
+    @Transactional(propagation = Propagation.MANDATORY)
     private List<BatchRow> rows(UUID t, List<LineRequest> lines) {
         UUID[] ids = lines.stream().map(LineRequest::batchId).distinct().toArray(UUID[]::new);
         if (ids.length != lines.size()) {
