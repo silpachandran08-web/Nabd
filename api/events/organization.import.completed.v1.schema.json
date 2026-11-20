@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:nabd:event-schema:organization.import.completed.v1",
   "title": "organization.import.completed.v1",
-  "description": "A staged patient import (ADM-012) finished: counts only, never a name, number or file content.",
+  "description": "A staged import (ADM-012 patients; ADM-013 visit history, drug list, opening stock) finished: counts only, never a name, number or file content.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,7 +29,10 @@
     "importType": {
       "type": "string",
       "enum": [
-        "patients"
+        "patients",
+        "visit_history",
+        "drugs",
+        "stock"
       ]
     },
     "created": {

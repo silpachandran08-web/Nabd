@@ -1,0 +1,3 @@
+Patient Number,Patient Name,Date,Doctor,Complaints,Diagnoses,Notes,Prescriptions,Invoice Number,Total Amount
+P101,Ravi Kumar,20/01/2022,Dr S Kulkarni,Cough,Bronchitis,,Testamol 500,R-12,300
+P102,,02/02/2020,Dr S Kulkarni,,Checkup,,,,

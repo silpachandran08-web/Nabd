@@ -128,7 +128,7 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
                 new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt,
                         List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("clinical:view"))));
         try {
-            return timelineController.get(jwt, p, 20, null);
+            return timelineController.get(jwt, p, 20, null, null);
         } finally {
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }

@@ -29,7 +29,7 @@ public final class FieldGrantMasker {
 
     public static EncounterPage timeline(ReadScope s, EncounterPage p) {
         return s.sees(DIAGNOSIS) ? p : new EncounterPage(p.data().stream().map(e -> new EncounterResponse(e.queueEntryId(),
-                e.occurredAt(), e.doctorId(), null, e.assessment(), e.medications())).toList(), p.page());
+                e.occurredAt(), e.doctorId(), null, e.assessment(), e.medications(), e.kind(), e.documentId(), e.doctorName(), e.bill())).toList(), p.page());
     }
 
     /** Clinical document bodies (visit summary) carry a "diagnosis" entry; it is left out, not blanked. */

@@ -7,28 +7,24 @@ import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { ApiError, api } from "../../lib/api";
 import { can } from "../../lib/permissions";
 import PaperQuickEntry from "./PaperQuickEntry";
+import { SOURCES, SUPPORTED_NOTE, TYPES, TYPE_FIELDS, formatOf, missingFields, typeOf, type ImportType } from "./importModel";
 
 // ADM-012: upload -> dry-run diff -> mapping -> commit -> progress. Mounted by the setup page only for setup:edit.
 // Nothing is written to patients until the owner taps "Import"; the commit runs in the background.
+// ADM-013: the "Old software" tab runs the same steps for a named old system's export (patients, past visits, drug list, opening stock).
 type Diff = { ready?: number; duplicates?: number; errors?: number; total?: number; needsMapping?: boolean; created?: number; merged?: number; skipped?: number };
 type Mapping = { headers?: string[]; columns?: { source: string; target: string }[]; dateFormat?: string };
-type Job = { id: string; status: string; fileName: string; errorMessage: string | null; rowsTotal: number | null; rowsDone: number | null; diff: Diff | null; mapping: Mapping | null };
+type Job = { id: string; importType?: string; status: string; fileName: string; errorMessage: string | null; rowsTotal: number | null; rowsDone: number | null; diff: Diff | null; mapping: Mapping | null };
 type Dup = { row: number; reason: "DUP_FILE" | "DUP_REGISTRY"; name: string; mobileEnding: string; dob: string; decision: string | null };
 type Action = "skip" | "merge" | "create";
 
-export const FIELDS: { key: string; label: string; required: boolean }[] = [
-  { key: "name", label: "Name", required: true },
-  { key: "mobile", label: "Mobile", required: true },
-  { key: "dob", label: "Date of birth", required: true },
-  { key: "sex", label: "Sex", required: true },
-  { key: "oldRecordNo", label: "Old record number", required: false },
-  { key: "allergies", label: "Allergies (a doctor confirms them later)", required: false },
-];
 export const DATE_FORMATS = ["dd/MM/yyyy", "MM/dd/yyyy", "dd-MM-yyyy", "dd.MM.yyyy", "yyyy-MM-dd"];
 const TEMPLATE = "Name,Mobile,Date of Birth,Sex,Old Record No,Allergies\r\n";
 const FAIL_TEXT: Record<string, string> = {
   FILE_UNREADABLE: "The file could not be read. Save it again as .xlsx or .csv.",
-  NO_ROWS: "The file has a header but no patient rows.",
+  NO_ROWS: "The file has a header but no rows.",
+  UNKNOWN_LAYOUT: "The headings are not the standard export of that software. Choose Other software and match the columns yourself.",
+  TOO_MANY_FILES: "The zip has too many files. Upload the one list you want to import.",
   TOO_MANY_ROWS: "The file has too many rows (limit 100,000). Split it and import in parts.",
   FILE_TOO_LARGE: "The file is too large.",
   NO_SHEET: "No worksheet was found in the file.",
@@ -55,6 +51,8 @@ export default function PatientImport() {
   const [dupError, setDupError] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Action>>({});
   const fileRef = useRef<HTMLInputElement>(null);
+  const [source, setSource] = useState(SOURCES[0].key);
+  const [importType, setImportType] = useState<ImportType>("patients");
 
   // The mapping form follows the server's mapping whenever a new job state arrives.
   const adopt = useCallback((j: Job) => {
@@ -80,16 +78,16 @@ export default function PatientImport() {
     return () => { live = false; clearTimeout(t); };
   }, [job, status, adopt]);
 
-  async function start(file: File) {
+  async function start(file: File, type: ImportType = "patients", from: string | null = null) {
     setBusy(true); setError(null); setJob(null); setDups(null); setDecisions({}); setSample([]);
     try {
-      const format = /\.xlsx$/i.test(file.name) ? "xlsx" : /\.csv$/i.test(file.name) ? "csv" : null;
-      if (!format) { setError("Choose an .xlsx or .csv file."); return; }
+      const format = formatOf(file.name, from !== null);
+      if (!format) { setError(from !== null ? "Choose a .zip, .xlsx or .csv file." : "Choose an .xlsx or .csv file."); return; }
       let step = "Upload failed.";
       try {
         const { uploadId } = await api.post<{ uploadId: string }>(`/setup/import-uploads?fileName=${encodeURIComponent(file.name)}&format=${format}`, undefined, { rawBody: file, headers: { "Content-Type": "application/octet-stream" } });
         step = "Could not start the import.";
-        adopt(await api.post<Job>("/setup/import-jobs", { uploadId, importType: "patients", sourceFormat: format }));
+        adopt(await api.post<Job>("/setup/import-jobs", { uploadId, importType: type, sourceFormat: format, ...(from !== null ? { source: from } : {}) }));
       } catch (e) { setError(problem(e, step)); }
     } finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   }
@@ -157,7 +155,10 @@ export default function PatientImport() {
 
   const diff = job?.diff ?? {};
   const importable = (diff.ready ?? 0) + Object.values(decisions).filter((a) => a !== "skip").length;
-  const missing = FIELDS.filter((f) => f.required && !columns[f.key]);
+  const type = typeOf(job?.importType);
+  const fields = TYPE_FIELDS[type];
+  const noun = TYPES.find((t) => t.key === type)?.noun ?? "rows";
+  const missing = missingFields(type, columns);
 
   return (
     <section className={s.panel} aria-label="Import patients">
@@ -167,7 +168,6 @@ export default function PatientImport() {
         ))}
       </div>
 
-      {pane === "software" && <p className={s.note}>Export your patient list from the old software as Excel or CSV, then use the Excel / CSV tab. Columns are matched by their headings.</p>}
       {pane === "paper" && (
         <div className={s.panel}>
           {can("patients:create") && <PaperQuickEntry />}
@@ -176,9 +176,28 @@ export default function PatientImport() {
         </div>
       )}
 
-      {pane === "file" && (
+      {pane !== "paper" && (
         <>
-          {(!job || status === "failed") && (
+          {pane === "software" && (!job || status === "failed") && (
+            <div className={s.panel}>
+              <div className={s.row}>
+                <label className={s.note} htmlFor="imp-source">Old software</label>
+                <select id="imp-source" className={s.select} value={source} onChange={(e) => setSource(e.target.value)} disabled={busy}>
+                  {SOURCES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+                <label className={s.note} htmlFor="imp-type">What to import</label>
+                <select id="imp-type" className={s.select} value={importType} onChange={(e) => setImportType(typeOf(e.target.value))} disabled={busy}>
+                  {TYPES.map((t) => <option key={t.key} value={t.key}>{t.option}</option>)}
+                </select>
+              </div>
+              <p className={s.note}>{SUPPORTED_NOTE}</p>
+              <div className={s.row}>
+                <input ref={fileRef} type="file" aria-label="Export file" accept=".zip,.xlsx,.csv" className={s.select} onChange={(e) => { const f = e.target.files?.[0]; if (f) void start(f, importType, source); }} disabled={busy} />
+                <span className={s.note}>Up to 25 MB. Nothing is saved to your clinic&apos;s records until you confirm.</span>
+              </div>
+            </div>
+          )}
+          {pane === "file" && (!job || status === "failed") && (
             <div className={s.row}>
               <input ref={fileRef} type="file" aria-label="Patient file" accept=".xlsx,.csv" className={s.select} onChange={(e) => { const f = e.target.files?.[0]; if (f) void start(f); }} disabled={busy} />
               <span className={s.note}>Up to 25 MB. Nothing is saved to your patient list until you confirm.</span>
@@ -192,7 +211,7 @@ export default function PatientImport() {
 
           {job && status === "dry_run" && (
             <div className={s.panel}>
-              {(job.diff?.total ?? 0) === 0 ? <EmptyState title="No patient rows found" hint="Check that the file has a heading row and at least one patient." /> : (
+              {(job.diff?.total ?? 0) === 0 ? <EmptyState title={type === "patients" ? "No patient rows found" : "No rows found"} hint="Check that the file has a heading row and at least one row under it." /> : (
                 <>
                   <div className={s.tiles} aria-label="Dry-run result">
                     <div className={`${s.tile} ${s.ok}`}><div className={s.tileN}>{diff.ready ?? 0}</div><div className={s.tileL}>Ready to create</div></div>
@@ -206,7 +225,7 @@ export default function PatientImport() {
                       <caption className={s.note}>Match each field to a column of your file</caption>
                       <thead><tr><th scope="col">Field</th><th scope="col">Column in your file</th></tr></thead>
                       <tbody>
-                        {FIELDS.map((f) => (
+                        {fields.map((f) => (
                           <tr key={f.key}>
                             <th scope="row">{f.label}{f.required ? " *" : ""}</th>
                             <td>
@@ -226,25 +245,27 @@ export default function PatientImport() {
                       {DATE_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
                     </select>
                     <button type="button" className={s.btn} onClick={saveMapping} disabled={busy || missing.length > 0}>Apply and check again</button>
-                    {missing.length > 0 && <span className={s.err}>Map: {missing.map((m) => m.label).join(", ")}</span>}
+                    {missing.length > 0 && <span className={s.err}>Map: {missing.join(", ")}</span>}
                   </div>
                   {sample.length > 0 && (
                     <div className={s.wide}>
                       <table className={s.mapTable} aria-label="Sample row">
                         <caption className={s.note}>First row as we read it</caption>
-                        <thead><tr>{Object.keys(sample[0]).map((k) => <th key={k} scope="col">{FIELDS.find((f) => f.key === k)?.label ?? k}</th>)}</tr></thead>
+                        <thead><tr>{Object.keys(sample[0]).map((k) => <th key={k} scope="col">{fields.find((f) => f.key === k)?.label ?? k}</th>)}</tr></thead>
                         <tbody><tr>{Object.values(sample[0]).map((v, i) => <td key={i}>{v}</td>)}</tr></tbody>
                       </table>
                     </div>
                   )}
 
                   <div className={s.row}>
-                    {(diff.duplicates ?? 0) > 0 && <button type="button" className={s.btn} onClick={openDrawer}>Review {diff.duplicates} possible duplicates</button>}
+                    {type === "patients" && (diff.duplicates ?? 0) > 0 && <button type="button" className={s.btn} onClick={openDrawer}>Review {diff.duplicates} possible duplicates</button>}
                     {(diff.errors ?? 0) > 0 && <button type="button" className={s.btn} onClick={downloadErrors}>Download error report (CSV)</button>}
                   </div>
-                  <p className={s.note}>Possible duplicates are skipped unless you choose to merge them into the existing patient or create them anyway. Imported allergies are saved as unconfirmed: a doctor confirms them at the next consult.</p>
+                  {type === "patients" && <p className={s.note}>Possible duplicates are skipped unless you choose to merge them into the existing patient or create them anyway. Imported allergies are saved as unconfirmed: a doctor confirms them at the next consult.</p>}
+                  {type === "visit_history" && <p className={s.note}>Each past visit is saved on the patient&apos;s timeline as read-only &quot;Imported history&quot; with its date and doctor name. Nothing can be edited and no invoice or invoice number is created. Visits already imported, or repeated in the file, are skipped.</p>}
+                  {(type === "drugs" || type === "stock") && <p className={s.note}>Items already on your pharmacy list, batches already in stock and rows repeated in the file are skipped. Expired batches are rejected and listed in the error report. An item with no prescription-only column is saved as prescription-only until a pharmacist sets its class.</p>}
                   <div className={s.row}>
-                    <button type="button" className={s.btnPrimary} onClick={commit} disabled={busy || diff.needsMapping === true || importable === 0}>Import {importable} patients</button>
+                    <button type="button" className={s.btnPrimary} onClick={commit} disabled={busy || diff.needsMapping === true || importable === 0}>Import {importable} {noun}</button>
                     <button type="button" className={s.btn} onClick={() => { setJob(null); setDups(null); setDecisions({}); setSample([]); }}>Cancel</button>
                   </div>
                 </>
@@ -255,7 +276,7 @@ export default function PatientImport() {
           {job && status === "importing" && (
             <div className={s.panel} role="status" aria-live="polite">
               <div className={s.bar} aria-hidden="true"><div className={s.barFill} style={{ inlineSize: `${job.rowsTotal ? Math.min(100, Math.round(((job.rowsDone ?? 0) / job.rowsTotal) * 100)) : 0}%` }} /></div>
-              <p className={s.note}>Importing {job.rowsDone ?? 0} of {job.rowsTotal ?? 0} patients. You can keep working; this continues in the background.</p>
+              <p className={s.note}>Importing {job.rowsDone ?? 0} of {job.rowsTotal ?? 0} {noun}. You can keep working; this continues in the background.</p>
             </div>
           )}
 

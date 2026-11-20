@@ -47,13 +47,13 @@ class ClinicalDocumentRepository {
 
     Optional<DocumentRow> find(UUID tenantId, UUID id) {
         return jdbc.query("SELECT *, body::text AS body_json, header::text AS header_json FROM clinical_documents " +
-                "WHERE tenant_id = ? AND id = ?", mapper(), tenantId, id).stream().findFirst();
+                "WHERE tenant_id = ? AND id = ? AND queue_entry_id IS NOT NULL", mapper(), tenantId, id).stream().findFirst(); // ADM-013: imported history is read through the timeline only
     }
 
     /** Row lock held to the end of the transaction: serialises edit/issue on one document. */
     Optional<DocumentRow> lock(UUID tenantId, UUID id) {
         return jdbc.query("SELECT *, body::text AS body_json, header::text AS header_json FROM clinical_documents " +
-                "WHERE tenant_id = ? AND id = ? FOR UPDATE", mapper(), tenantId, id).stream().findFirst();
+                "WHERE tenant_id = ? AND id = ? AND queue_entry_id IS NOT NULL FOR UPDATE", mapper(), tenantId, id).stream().findFirst();
     }
 
     /** No-op (returns 0) once issued. */
