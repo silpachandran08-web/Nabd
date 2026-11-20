@@ -279,7 +279,8 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "free-text-not-allowed", "Only price-list items at the counter",
                     "Counter sales can only bill items from the price list. Add the item to the price list first.");
         }
-        // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
+        // PHL-001: a counter sale of an Rx line needs a signed in-system prescription (the invoice then carries that patient)
+        // or, PHL-020, a recorded outside prescription line.
         UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
         Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
         UUID approvalId = trusted ? null : gate(tenantId, null, t, List.of(), BigDecimal.ZERO, req);
@@ -298,7 +299,7 @@ public class CheckoutService {
 
     private static List<com.nabd.hms.pharmacy.RxGate.Line> rxLines(List<LineItemInput> items) {
         return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.Line(i.chargeCode(), i.catalogueId(), i.isRx(), i.quantity(),
-                i.prescriptionItemId())).toList();
+                i.prescriptionItemId(), i.paperRxLineId())).toList();
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,

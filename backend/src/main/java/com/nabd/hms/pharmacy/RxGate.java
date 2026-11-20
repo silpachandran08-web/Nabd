@@ -18,13 +18,14 @@ import java.util.UUID;
  * Which items are prescription-only is the clinic's data, not decided here. A refusal is 422 Problem+JSON with a
  * stable type (rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted, PHL-012 rx-expired, CLN-023 rx-revoked,
  * CLN-024 REFILLS_EXHAUSTED and rx-expired for a line past its own validity) plus an audit row and event
- * that survive the rolled-back checkout. The outside-prescription path (paper/photo Rx) is PHL-020.
+ * that survive the rolled-back checkout. PHL-020: a line may instead point at a recorded outside (paper/photo) prescription line
+ * (paperRxLineId); PaperRxService checks those (rx-item-mismatch, rx-copy-required, document-not-clean, rx-expired, rx-quantity-exhausted).
  */
 @Service
 public class RxGate {
 
     /** One bill line as the gate sees it. */
-    public record Line(String chargeCode, UUID catalogueId, boolean isRx, int quantity, UUID prescriptionItemId) {
+    public record Line(String chargeCode, UUID catalogueId, boolean isRx, int quantity, UUID prescriptionItemId, UUID paperRxLineId) {
     }
 
     /** refills: dispenses allowed after the first (CLN-024); lapsed: the line's own validity has passed. */
@@ -39,8 +40,11 @@ public class RxGate {
     private final RxGateBlockRecorder recorder;
     private final com.nabd.hms.common.TenantContext tenantContext;
     private final PharmacyWorklistRepository worklist;
+    private final PaperRxService paper;
 
-    RxGate(RxGateRepository repo, RxGateBlockRecorder recorder, com.nabd.hms.common.TenantContext tenantContext, PharmacyWorklistRepository worklist) {
+    RxGate(RxGateRepository repo, RxGateBlockRecorder recorder, com.nabd.hms.common.TenantContext tenantContext, PharmacyWorklistRepository worklist,
+           PaperRxService paper) {
+        this.paper = paper;
         this.worklist = worklist;
         this.repo = repo;
         this.recorder = recorder;
@@ -58,11 +62,16 @@ public class RxGate {
     public UUID check(UUID tenantId, UUID patientId, List<Line> lines, UUID staffId, String ip) {
         tenantContext.set(tenantId);
         for (Line l : lines) {
-            if (l.isRx() && l.prescriptionItemId() == null) {
+            if (l.prescriptionItemId() != null && l.paperRxLineId() != null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
+                        "Link " + l.chargeCode() + " to a signed prescription line or to a paper prescription, not both.");
+            }
+            if (l.isRx() && l.prescriptionItemId() == null && l.paperRxLineId() == null) {
                 block(tenantId, staffId, ip, l, "rx-required", "Prescription required",
                         l.chargeCode() + " is prescription-only. Link it to a signed prescription line before billing it.");
             }
         }
+        paper.refusal(tenantId, lines).ifPresent(r -> block(tenantId, staffId, ip, r.line(), r.type(), r.title(), r.detail())); // PHL-020
         Map<UUID, Integer> requested = new LinkedHashMap<>();
         for (Line l : lines) {
             if (l.prescriptionItemId() != null) requested.merge(l.prescriptionItemId(), l.quantity(), Integer::sum);

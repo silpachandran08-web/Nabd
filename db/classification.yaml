@@ -1018,6 +1018,7 @@ schemas:
       inter_state: financial
       sac_hsn: financial
       batch_id: operational
+      paper_rx_line_id: operational
     invoice_line_taxes:
       id: operational
       tenant_id: operational
@@ -1401,6 +1402,26 @@ schemas:
       created_by: operational
       created_at: operational
       updated_at: operational
+    paper_prescription_lines:
+      id: operational
+      tenant_id: operational
+      paper_rx_id: operational
+      item_id: operational
+      drug_text: phi
+      qty: phi
+    paper_prescriptions:
+      id: operational
+      tenant_id: operational
+      prescriber_name: pii
+      prescriber_reg_no: pii
+      rx_date: phi
+      customer_name: pii
+      customer_phone: pii
+      document_id: operational
+      duplicate_copy_retained: operational
+      valid_until: operational
+      created_by: operational
+      created_at: operational
     patient_allergies:
       unconfirmed: operational
       id: operational

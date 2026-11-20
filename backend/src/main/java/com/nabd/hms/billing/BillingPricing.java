@@ -90,7 +90,7 @@ class BillingPricing {
             if (o == null) {
                 if (c.stocked()) pharmacy.requireWithinMrp(c.id(), list); // PHL-021
                 out.add(new LineItemInput(li.chargeCode(), c.name(), c.category(), li.quantity(), list, c.taxRatePercent(),
-                        c.id(), list, tier, null, null, null, c.isRx(), li.prescriptionItemId(), li.shortfallReason()));
+                        c.id(), list, tier, null, null, null, c.isRx(), li.prescriptionItemId(), li.shortfallReason(), li.paperRxLineId()));
                 continue;
             }
             requireDiscountRight(canDiscount);
@@ -100,7 +100,7 @@ class BillingPricing {
             }
             if (c.stocked()) pharmacy.requireWithinMrp(c.id(), o.unitPrice()); // PHL-021
             out.add(new LineItemInput(li.chargeCode(), c.name(), c.category(), li.quantity(), o.unitPrice(), c.taxRatePercent(),
-                    c.id(), list, tier, reason, o.note(), staffId, c.isRx(), li.prescriptionItemId(), li.shortfallReason()));
+                    c.id(), list, tier, reason, o.note(), staffId, c.isRx(), li.prescriptionItemId(), li.shortfallReason(), li.paperRxLineId()));
         }
         return out;
     }
@@ -118,7 +118,7 @@ class BillingPricing {
         String reason = trusted ? null : requireReason(o == null ? null : o.reasonCode());
         return new LineItemInput(li.chargeCode(), li.chargeName(), li.category() == null || li.category().isBlank() ? "Service" : li.category(),
                 li.quantity(), li.unitPrice(), li.taxRatePercent() != null ? li.taxRatePercent() : regionTax, null,
-                li.unitPrice(), "custom", reason, o == null ? null : o.note(), trusted ? null : staffId, false, li.prescriptionItemId(), null);
+                li.unitPrice(), "custom", reason, o == null ? null : o.note(), trusted ? null : staffId, false, li.prescriptionItemId(), null, null);
     }
 
     /** Ledger rows for this request. remaining = combined subtotal minus discounts already on the invoice. */

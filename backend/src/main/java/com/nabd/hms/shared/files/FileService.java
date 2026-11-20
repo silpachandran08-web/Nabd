@@ -26,7 +26,8 @@ import java.util.UUID;
 @Service
 public class FileService implements FileStore {
 
-    static final Set<String> PURPOSES = Set.of("outside_report", "clinical_photo", "xray", "consent_form", "signature"); // CLN-023: the prescriber's signature image
+    static final Set<String> PURPOSES = Set.of("outside_report", "clinical_photo", "xray", "consent_form", "signature", // CLN-023: the prescriber's signature image
+            PRIVATE_PURPOSE); // PHL-020: the photo of an outside prescription
     static final Set<String> GENERATED_PURPOSES = Set.of("claim_pack", "consent_form", "prescription"); // FIN-035 / CLN-014 / CLN-023: server-rendered documents
     static final Set<String> GENERATED_TYPES = Set.of("application/pdf", "text/csv", "image/svg+xml");
     static final Set<String> TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
@@ -151,16 +152,36 @@ public class FileService implements FileStore {
     }
 
     @Override
+    @Transactional
+    public UploadSlot initUpload(UUID staffId, String purpose, String contentType, long sizeBytes) {
+        Slot s = init(staffId, purpose, contentType, sizeBytes);
+        return new UploadSlot(s.uploadId(), s.putUrl(), s.maxBytes());
+    }
+
+    @Override
+    @Transactional
+    public UUID completeUpload(UUID uploadId, String purpose) {
+        statusOf(uploadId, purpose).orElseThrow(ApiException::notFound);
+        return complete(uploadId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> statusOf(UUID fileId, String purpose) {
+        return repo.find(tenantContext.current(), fileId).filter(f -> f.purpose().equals(purpose)).map(FileRepository.Row::status);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<FileInfo> info(UUID fileId) {
-        return repo.find(tenantContext.current(), fileId)
+        return repo.find(tenantContext.current(), fileId).filter(f -> !PRIVATE_PURPOSE.equals(f.purpose())) // PHL-020
                 .map(f -> new FileInfo(f.id(), f.status(), f.detectedType() != null ? f.detectedType() : f.declaredType(), f.sizeBytes(), f.patientId(), f.createdAt()));
     }
 
     @Override
     @Transactional
     public boolean bind(UUID fileId, UUID patientId, UUID visitId) {
-        return repo.bindPatient(tenantContext.current(), fileId, patientId, visitId);
+        return info(fileId).isPresent() && repo.bindPatient(tenantContext.current(), fileId, patientId, visitId); // PHL-020: never a private file
     }
 
     @Override

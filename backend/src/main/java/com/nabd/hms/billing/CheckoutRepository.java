@@ -165,12 +165,12 @@ class CheckoutRepository {
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
-                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class, batch_id) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class, batch_id, paper_rx_line_id) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
                     item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(),
-                    issued == null ? null : issued.scheduleClass(), issued == null ? null : issued.batchId());
+                    issued == null ? null : issued.scheduleClass(), issued == null ? null : issued.batchId(), item.paperRxLineId());
         }
         dispensing.record(invoiceId, staffId, dispensed); // PHL-018: dispenses row + stock discrepancies
     }
