@@ -227,6 +227,31 @@ class SmsServiceTest {
     }
 
     @Test
+    void com015_aDeliveryReportPricesTheMessageOnceWithTheBspsOwnCostOrThePriceList() {
+        UUID tenant = UUID.randomUUID();
+        var svc = service("in");
+        var withCost = svc.send(tenant, new SmsService.SendRequest(PHONE, otpText("111222"), null, null));
+        var listPrice = svc.send(tenant, new SmsService.SendRequest(PHONE, otpText("333444"), null, null));
+        String id1 = su.queryForObject("SELECT provider_message_id FROM outbound_messages WHERE id = ?", String.class, withCost.messageId());
+        String id2 = su.queryForObject("SELECT provider_message_id FROM outbound_messages WHERE id = ?", String.class, listPrice.messageId());
+
+        var dlrs = svc.provider().parseDlr(("[{\"id\":\"" + id1 + "\",\"status\":\"DELIVRD\",\"cost\":\"0.18\"},{\"id\":\"" + id2 + "\",\"status\":\"DELIVRD\"}]")
+                .getBytes(StandardCharsets.UTF_8));
+        assertThat(dlrs).containsExactly(new SmsProvider.Dlr(id1, "delivered", null, 180000L), new SmsProvider.Dlr(id2, "delivered", null));
+        svc.storeDlrs(dlrs);
+        svc.drainDlrs();
+
+        assertThat(su.queryForMap("SELECT pricing_category, currency, cost_micros, cost_minor, priced_at IS NOT NULL AS priced FROM outbound_messages WHERE id = ?", withCost.messageId()))
+                .containsEntry("pricing_category", "otp").containsEntry("currency", "INR").containsEntry("cost_micros", 180000L).containsEntry("cost_minor", 18L).containsEntry("priced", true);
+        // no cost in the report: the price list row (0 until the BSP rate is set), still counted under its DLT category
+        assertThat(su.queryForMap("SELECT pricing_category, cost_micros FROM outbound_messages WHERE id = ?", listPrice.messageId()))
+                .containsEntry("pricing_category", "otp").containsEntry("cost_micros", 0L);
+        assertThat(BspSmsProvider.costMicros(JSON.readTree("\"-1\""))).isNull();
+        assertThat(BspSmsProvider.costMicros(JSON.readTree("\"abc\""))).isNull();
+        assertThat(BspSmsProvider.costMicros(JSON.readTree("0.125"))).isEqualTo(125000L);
+    }
+
+    @Test
     void aReportForAMessageNotYetKnownStaysPendingThenIsIgnored() {
         var svc = service("in");
         String unknown = "bsp-unknown-" + UUID.randomUUID();
