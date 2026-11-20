@@ -121,6 +121,15 @@ app:
   # window.location.origin for the manual-relay banner; this is that same value for SmtpEmailSender).
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   patient-web-base-url: ${PATIENT_WEB_BASE_URL:http://localhost:3810} # IDC-009: where the family member opens the consent link (/proxy-invite/<token>)
+  api-base-url: ${API_BASE_URL:http://localhost:8080} # ADM-016: the public certificate link in the leaving owner's email
+  deletion-cert:
+    # ADM-016: keys that sign deletion certificates, a JWKS of EC P-256 private keys with kids (first signs, all verify).
+    # Under prod the erasure worker refuses to start an erasure without them; elsewhere a fresh key per boot.
+    keys-file: ${DELETION_CERT_KEYS_FILE:}
+    keys-json: ${DELETION_CERT_KEYS_JSON:}
+    signer-name: ${DELETION_CERT_SIGNER_NAME:} # the Data Protection Officer named on the certificate; blank = role only
+  offboarding:
+    interval-ms: ${OFFBOARDING_INTERVAL_MS:300000} # ADM-016: how often the erasure worker looks for ended cooling-off periods
   auth:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 30

@@ -63,6 +63,11 @@ public class DataExportService {
         DATASETS.put("files", List.of("file_objects"));
     }
     static final Set<String> FORMATS = Set.of("xlsx", "csv", "fhir_ndjson", "pdf_per_patient");
+
+    /** ADM-016: an export that hands over every dataset; the deletion gate accepts no less. */
+    public static boolean isFull(java.util.Collection<String> datasets) {
+        return datasets.containsAll(DATASETS.keySet());
+    }
     static final String STEP_UP_TARGET = "data-export";
     static final Duration LINK_TTL = Duration.ofHours(72);
     static final int MAX_DOWNLOADS = 3;

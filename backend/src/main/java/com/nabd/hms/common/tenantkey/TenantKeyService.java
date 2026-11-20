@@ -174,6 +174,20 @@ public class TenantKeyService {
         if (approverA == null || approverB == null || approverA.equals(approverB)) {
             throw new IllegalArgumentException("crypto-shred needs two distinct approvers");
         }
+        return destroy(tenant, "operator", approverA, "Platform operator", Map.of("approvers", List.of(approverA.toString(), approverB.toString())));
+    }
+
+    /**
+     * ADM-016: the same crypto-shred as {@link #shred} for a clinic erased on its owner's own request. The two approvals are
+     * the owner's step-up confirmation and the 7-day cooling-off that erase_offboarded_tenant() (V3420) also checks; the caller
+     * is the offboarding worker. Returns 0 when the KMS feature is off or the clinic never had a DEK.
+     */
+    public int shredOffboarded(UUID tenant, UUID offboardingRequestId) {
+        if (!enabled()) return 0;
+        return destroy(tenant, "system", null, "Offboarding erasure worker", Map.of("offboardingRequestId", offboardingRequestId.toString()));
+    }
+
+    private int destroy(UUID tenant, String actorType, UUID actorId, String actorName, Map<String, Object> why) {
         String status = jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, tenant);
         if (!"offboarded".equals(status)) throw new IllegalStateException("only an offboarded tenant can be crypto-shredded");
         kms().destroyTenant(tenant.toString());
@@ -181,8 +195,9 @@ public class TenantKeyService {
             int destroyed = jdbc.update(
                     "UPDATE tenant_data_keys SET status = 'destroyed', wrapped_dek = ''::bytea, destroyed_at = ? WHERE tenant_id = ? AND status <> 'destroyed'",
                     java.sql.Timestamp.from(clock.instant()), tenant);
-            audit.record(tenant, "operator", approverA, "Platform operator", "approver", null, "tenant_key.destroyed", "tenant_data_key", tenant,
-                    null, Map.of("keysDestroyed", destroyed, "approvers", List.of(approverA.toString(), approverB.toString())));
+            Map<String, Object> after = new java.util.LinkedHashMap<>(why);
+            after.put("keysDestroyed", destroyed);
+            audit.record(tenant, actorType, actorId, actorName, "approver", null, "tenant_key.destroyed", "tenant_data_key", tenant, null, after);
             return destroyed;
         });
         evict(tenant);

@@ -72,11 +72,25 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
         repo.markLive(tenantContext.current(), staffId);
     }
 
+    /** ADM-016: the one move out of 'offboarding' that is not 'offboarded': back to where the clinic was, on the owner's cancel. */
+    private static final Set<String> RESTORABLE = Set.of("trialing", "active", "overdue", "suspended");
+
+    @Override
+    @Transactional
+    public void restoreFromOffboarding(String previousStatus, UUID staffId, String reason) {
+        move(tenantContext.current(), previousStatus, null, staffId, reason, null, true);
+    }
+
     @Transactional
     TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
                                          String ipAddress) {
+        return move(tenantId, toStatus, changedBy, changedByStaff, reason, ipAddress, false);
+    }
+
+    private TenantLifecycleResponse move(UUID tenantId, String toStatus, UUID changedBy, UUID changedByStaff, String reason,
+                                         String ipAddress, boolean cancelOffboarding) {
         String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(() -> ApiException.notFound(NOT_FOUND));
-        Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());
+        Set<String> allowed = cancelOffboarding && "offboarding".equals(fromStatus) ? RESTORABLE : ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());
         if (!allowed.contains(toStatus)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-lifecycle-transition", "Invalid lifecycle transition",
                     "A tenant in " + fromStatus + " cannot move to " + toStatus + ".");
