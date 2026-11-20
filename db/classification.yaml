@@ -271,6 +271,47 @@ schemas:
       acknowledged_at: operational
       created_on: operational
       created_at: operational
+    supplier_returns:
+      id: operational
+      tenant_id: operational
+      supplier_id: operational
+      supplier_name_snapshot: operational
+      debit_note_number: financial
+      status: operational
+      value: financial
+      reason: pii # uncertain: free text typed by staff about a stock return; strictest plausible tier
+      created_by: operational
+      created_at: operational
+    supplier_return_lines:
+      id: operational
+      tenant_id: operational
+      return_id: operational
+      line_order: operational
+      batch_id: operational
+      item_id: operational
+      qty: operational
+      rate: financial
+      value: financial
+    stock_write_offs:
+      id: operational
+      tenant_id: operational
+      method: operational
+      note: pii # uncertain: free text typed by staff about a write-off; strictest plausible tier
+      value: financial
+      witness_staff_id: operational
+      approved_by: operational
+      created_at: operational
+    stock_write_off_lines:
+      id: operational
+      tenant_id: operational
+      write_off_id: operational
+      line_order: operational
+      batch_id: operational
+      item_id: operational
+      qty: operational
+      rate: financial
+      value: financial
+      register_type: operational
     stock_batches:
       id: operational
       tenant_id: operational

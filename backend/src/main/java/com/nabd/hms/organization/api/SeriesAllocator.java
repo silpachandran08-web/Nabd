@@ -10,7 +10,9 @@ import java.util.UUID;
 public interface SeriesAllocator {
 
     enum Kind {
-        INVOICE("invoice"), CREDIT_NOTE("credit_note"), RECEIPT("receipt");
+        INVOICE("invoice"), CREDIT_NOTE("credit_note"), RECEIPT("receipt"),
+        /** PHL-009: supplier return notes. */
+        DEBIT_NOTE("debit_note");
 
         private final String column;
 

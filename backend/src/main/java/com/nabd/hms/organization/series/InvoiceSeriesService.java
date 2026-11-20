@@ -31,7 +31,7 @@ public class InvoiceSeriesService implements SeriesAllocator {
     static final int GST_MAX_LENGTH = 16;
     private static final String REGION_IN = "IN";
     private static final Map<Kind, String> DEFAULT_PATTERN = Map.of(
-            Kind.INVOICE, "INV-{FY}-", Kind.CREDIT_NOTE, "CN-{FY}-", Kind.RECEIPT, "RCT-{FY}-");
+            Kind.INVOICE, "INV-{FY}-", Kind.CREDIT_NOTE, "CN-{FY}-", Kind.RECEIPT, "RCT-{FY}-", Kind.DEBIT_NOTE, "DN-{FY}-");
     private static final String COLS = "id, kind, prefix, fiscal_year, next_number, tax_registration_id, prefix_pattern, fy_start_month, pad";
 
     private final JdbcTemplate jdbc;
@@ -115,7 +115,7 @@ public class InvoiceSeriesService implements SeriesAllocator {
     public InvoiceSeriesResponse configure(UUID staffId, String ip, String kindPath, InvoiceSeriesConfigRequest req) {
         Kind kind = java.util.Arrays.stream(Kind.values()).filter(k -> k.column().equals(kindPath)).findFirst()
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "unknown-series-kind", "Unknown series",
-                        "The series kind must be invoice, credit_note or receipt."));
+                        "The series kind must be invoice, credit_note, receipt or debit_note."));
         String pattern = req.prefixPattern().trim();
         if (!pattern.contains("{FY}") || pattern.chars().anyMatch(Character::isWhitespace)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "invalid-prefix-pattern", "Invalid prefix pattern",

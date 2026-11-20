@@ -403,6 +403,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("iam.break_glass.reviewed.v1"); // PLT-013: Plt013BreakGlassReviewApiTest
         expected.remove("billing.package.sold.v1"); // COM-044: Com044PackageMessagingApiTest
         expected.remove("pharmacy.stock.alerts_digest_ready.v1"); // PHL-008: Phl008StockAlertsApiTest
+        expected.remove("pharmacy.batch.quarantined.v1"); // PHL-009: Phl009QuarantineApiTest
         expected.remove("specialty.photo.added.v1"); // CLN-047: Cln047DermPhotosApiTest
         expected.remove("pharmacy.otc_sale.completed.v1"); // PHL-019: Phl019CounterSaleApiTest
         assertThat(seen).isEqualTo(expected);

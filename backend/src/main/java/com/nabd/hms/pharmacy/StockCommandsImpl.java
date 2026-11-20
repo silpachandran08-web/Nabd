@@ -190,6 +190,49 @@ class StockCommandsImpl implements StockCommands {
 
     @Override
     public List<AdjustedBatch> adjustBatches(List<BatchAdjustment> adjustments, UUID actorId, UUID approverId, String sourceType, UUID sourceId) {
+        return applyBatches(adjustments, "adjustment", actorId, approverId, sourceType, sourceId);
+    }
+
+    @Override
+    public UUID quarantine(UUID batchId, String reason) {
+        UUID t = tenant.current();
+        UUID itemId = batches.itemOf(t, batchId).orElseThrow(() -> ApiException.notFound("The requested batch was not found."));
+        lock(itemId); // same lock order as every stock change: item first, then batch
+        Batch b = batches.lock(t, batchId).orElseThrow(() -> ApiException.notFound("The requested batch was not found."));
+        if (!"active".equals(b.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "already-quarantined", "Already quarantined", "This batch is already " + b.status() + ".");
+        }
+        markQuarantined(batchId, reason);
+        return itemId;
+    }
+
+    @Override
+    public List<UUID> quarantineExpired() {
+        UUID t = tenant.current();
+        List<UUID> ids = batches.quarantineExpired(t, clock.today(t));
+        events.publishAll(t, DomainEventType.PHARMACY_BATCH_QUARANTINED,
+                ids.stream().map(id -> Map.<UUID, Map<String, ?>>entry(id, Map.of("batchId", id, "reason", "expired"))).toList());
+        return ids;
+    }
+
+    @Override
+    public List<AdjustedBatch> removeQuarantined(List<BatchAdjustment> removals, String kind, UUID actorId, UUID approverId, String sourceType,
+                                                 UUID sourceId) {
+        if (!List.of("return_out", "write_off").contains(kind) || removals.stream().anyMatch(r -> r.delta() >= 0)) {
+            throw new IllegalArgumentException("removeQuarantined takes negative deltas of kind return_out or write_off");
+        }
+        return applyBatches(removals, kind, actorId, approverId, sourceType, sourceId);
+    }
+
+    private void markQuarantined(UUID batchId, String reason) {
+        UUID t = tenant.current();
+        batches.setStatus(t, batchId, "quarantined");
+        events.publish(t, DomainEventType.PHARMACY_BATCH_QUARANTINED, batchId, Map.of("batchId", batchId, "reason", reason));
+    }
+
+    /** The set-based write behind {@link #adjustBatches} and {@link #removeQuarantined}; any kind but 'adjustment' takes quarantined batches only. */
+    private List<AdjustedBatch> applyBatches(List<BatchAdjustment> adjustments, String kind, UUID actorId, UUID approverId, String sourceType,
+                                             UUID sourceId) {
         if (adjustments.isEmpty()) {
             return List.of();
         }
@@ -213,6 +256,12 @@ class StockCommandsImpl implements StockCommands {
         Map<UUID, Integer> have = repo.lockItems(t, itemIds);
         if (have.size() != itemIds.length) {
             throw ApiException.notFound(NOT_FOUND);
+        }
+        if (!"adjustment".equals(kind)) { // after the item locks, so a batch cannot change status underneath
+            batches.notQuarantined(t, batchIds).stream().findFirst().ifPresent(b -> {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "batch-not-quarantined", "Batch not in quarantine",
+                        "Only quarantined stock can be returned to a supplier or written off; nothing was changed.", Map.of("batchId", b));
+            });
         }
         Map<UUID, Integer> sums = batches.sumQtys(t, itemIds);
         have.forEach((item, qty) -> topUpOpening(item, qty - sums.getOrDefault(item, 0))); // rare: stock that reached stock_qty without a batch
@@ -245,9 +294,9 @@ class StockCommandsImpl implements StockCommands {
             codes[i] = a.reasonCode();
             int onHand = running.merge(items[i], a.delta(), Integer::sum);
             out.add(new AdjustedBatch(a.batchId(), items[i], a.delta(), before[i], after.get(a.batchId())));
-            evs.add(Map.entry(items[i], Map.of("itemId", items[i], "batchId", a.batchId(), "delta", a.delta(), "kind", "adjustment", "onHand", onHand)));
+            evs.add(Map.entry(items[i], Map.of("itemId", items[i], "batchId", a.batchId(), "delta", a.delta(), "kind", kind, "onHand", onHand)));
         }
-        batches.insertAdjustments(t, items, batchIds, deltas, before, reasons, codes, actorId, approverId, sourceType, sourceId);
+        batches.insertMovements(t, kind, items, batchIds, deltas, before, reasons, codes, actorId, approverId, sourceType, sourceId);
         events.publishAll(t, DomainEventType.PHARMACY_STOCK_BATCH_CHANGED, evs);
         return out;
     }
@@ -273,7 +322,7 @@ class StockCommandsImpl implements StockCommands {
             Batch b = all.stream().filter(x -> x.id().equals(l.batchId())).findFirst().orElse(null);
             boolean expired = b != null && b.expiryDate() != null && b.expiryDate().isBefore(today);
             if (expired && "active".equals(b.status())) {
-                batches.setStatus(t, b.id(), "quarantined"); // the whole batch is past expiry, so nothing sellable is locked away
+                markQuarantined(b.id(), "expired"); // the whole batch is past expiry, so nothing sellable is locked away
             }
             out.add(new ReturnedLeg(l.batchId(), l.delta(), expired || (b != null && !"active".equals(b.status()))));
         }

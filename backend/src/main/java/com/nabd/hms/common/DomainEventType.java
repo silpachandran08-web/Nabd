@@ -69,7 +69,9 @@ public enum DomainEventType {
     PHARMACY_STOCK_ALERTS_DIGEST_READY("pharmacy.stock.alerts_digest_ready.v1", "core/pharmacy"),
     SPECIALTY_PHOTO_ADDED("specialty.photo.added.v1", "core/specialty"),
     /** PHL-019: a counter (OTC) sale was invoiced and its stock issued. Ids, a count and the total only. */
-    PHARMACY_OTC_SALE_COMPLETED("pharmacy.otc_sale.completed.v1", "core/pharmacy");
+    PHARMACY_OTC_SALE_COMPLETED("pharmacy.otc_sale.completed.v1", "core/pharmacy"),
+    /** PHL-009: a batch was taken off sale (by hand, by the nightly expiry pass or by a return into an expired batch). Ids and a reason code only. */
+    PHARMACY_BATCH_QUARANTINED("pharmacy.batch.quarantined.v1", "core/pharmacy");
 
     private final String type;
     private final String source;
