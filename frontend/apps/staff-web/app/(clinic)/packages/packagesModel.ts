@@ -21,7 +21,7 @@ export type InstanceT = Omit<Full<InstanceResponse, "validityStart" | "validityE
 /** GET /v1/packages/charge-heads: the price-list heads a component can be linked to. */
 export type ChargeHeadT = { id: string; code: string; name: string; category: string };
 /** GET /v1/packages/instances/{id}/refund-preview: the per-component refund, in minor units. */
-export type RefundPreviewT = Full<RefundPreviewResponse> & {
+export type RefundPreviewT = Omit<Full<RefundPreviewResponse>, "lines"> & { // lines: required here, optional in the generated type
   lines: { component: string; usedQty: number; usedValueMinor: number; refundTaxableMinor: number; refundTaxMinor: number }[];
   refundMinor: number; owedMinor: number;
 };
