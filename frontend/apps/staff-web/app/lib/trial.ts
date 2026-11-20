@@ -35,6 +35,7 @@ const CHECK_TEXT: Record<string, string> = {
   price_list: "A price list is set up",
   whatsapp_sender: "A WhatsApp number is on file",
   dpa_signed: "Data processing agreement signed",
+  staff_phi_training: "Every active staff account has completed the data safety training (Help, F1)",
   waiting_room_tv: "Waiting-room screen paired",
   patients_imported: "Patients imported",
   staff_invited: "Staff invited",

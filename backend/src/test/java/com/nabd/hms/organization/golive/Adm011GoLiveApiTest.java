@@ -22,7 +22,7 @@ class Adm011GoLiveApiTest extends ApiTestBase {
     private record Clinic(SeededTenant tenant, SeededStaff owner, SeededStaff doctor, String token) {
     }
 
-    /** A trialing clinic that satisfies every blocker except the ones named in skip (doctor_schedule, price_list, whatsapp_sender, dpa_signed). */
+    /** A trialing clinic that satisfies every blocker except the ones named in skip (doctor_schedule, price_list, whatsapp_sender, dpa_signed, staff_phi_training). */
     private Clinic clinic(Set<String> skip) {
         return clinic(skip, "IN");
     }
@@ -54,6 +54,9 @@ class Adm011GoLiveApiTest extends ApiTestBase {
         if (!skip.contains("dpa_signed")) {
             su.update("INSERT INTO dpa_acceptances (tenant_id, dpa_version, signer_owner_id, method) VALUES (?, 'test-v1', ?, 'paper')", t.id(), owner.id());
         }
+        if (!skip.contains("staff_phi_training")) { // PLT-054: every active account has passed the PHI-handling module
+            su.update("INSERT INTO training_completions (tenant_id, staff_id, module_id, score) SELECT tenant_id, id, 'phi-handling', 100 FROM staff WHERE tenant_id = ? AND status = 'active'", t.id());
+        }
         return new Clinic(t, owner, doctor, loginAndGetAccessToken(owner));
     }
 
@@ -71,11 +74,11 @@ class Adm011GoLiveApiTest extends ApiTestBase {
 
     @Test
     void eachBlockerOnItsOwnBlocksGoLive_withALinkToFixIt() {
-        for (String missing : List.of("doctor_schedule", "price_list", "whatsapp_sender", "dpa_signed")) {
+        for (String missing : List.of("doctor_schedule", "price_list", "whatsapp_sender", "dpa_signed", "staff_phi_training")) {
             Clinic c = clinic(Set.of(missing));
             Map<?, ?> r = checks(c);
             List<Map<?, ?>> blockers = (List<Map<?, ?>>) r.get("blockers");
-            assertThat(blockers).extracting(b -> (String) b.get("code")).containsExactly("doctor_schedule", "price_list", "whatsapp_sender", "dpa_signed");
+            assertThat(blockers).extracting(b -> (String) b.get("code")).containsExactly("doctor_schedule", "price_list", "whatsapp_sender", "dpa_signed", "staff_phi_training");
             assertThat(blockers.stream().filter(b -> Boolean.FALSE.equals(b.get("ok"))).map(b -> (String) b.get("code"))).as("only " + missing).containsExactly(missing);
             assertThat((String) find(blockers, missing).get("fixUrl")).startsWith("/");
             ResponseEntity<Map> go = goLive(c);

@@ -2,6 +2,7 @@
 // FEF-062: help for the current screen (F1 anywhere, or Help in the user menu via the "nabd:help" event). Content is keyed by
 // screen id in the `help` catalogue (en + hi); the video link is config (help.ts HELP_VIDEOS) and is absent until supplied.
 // ACC-035: replay of the role's tour from Help, and for reception the competency check with the desk task videos.
+// PLT-054: the data safety training (module, quiz, own completion state) for every role.
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -11,6 +12,9 @@ import { HELP_VIDEOS, isTourRole, screenIdFor } from "./help";
 import { useShellNav } from "./useShellNav";
 import { TOUR_EVENT } from "./TourCard";
 import CompetencyChecklist from "./CompetencyChecklist";
+import TrainingModule from "./TrainingModule";
+import { api } from "../lib/api";
+import { key } from "../lib/query";
 
 export const HELP_EVENT = "nabd:help";
 
@@ -39,6 +43,8 @@ export default function HelpPanel() {
           <button type="button" className={styles.chip} onClick={() => { setOpen(false); document.dispatchEvent(new Event(TOUR_EVENT)); }}>{t("menu.replayTour")}</button>
         )}
         {role === "reception" && <CompetencyChecklist />}
+        {/* PLT-054: every staff member takes the data safety training on their own account */}
+        <TrainingModule client={api} path="/training/completions" queryKey={key("training/completions/me")} />
       </div>
     </Dialog>
   );

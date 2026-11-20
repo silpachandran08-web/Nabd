@@ -48,3 +48,8 @@
 .competencyRow { display: flex; align-items: center; gap: var(--nb-space-12); min-block-size: 44px; cursor: pointer; }
 .competencyRow input { inline-size: 20px; block-size: 20px; flex: none; }
 .videoRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-16); min-block-size: 44px; }
+/* PLT-054: data safety training in the Help panel and on the operator console */
+.trainingPoints { margin: 0; padding-inline-start: var(--nb-space-16); display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.trainingQuestion { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; }
+.trainingQuestion legend { padding: 0; font-weight: 600; }
+.trainingActions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
