@@ -67,7 +67,9 @@ public enum DomainEventType {
     PACKAGE_SOLD("billing.package.sold.v1", "core/billing"),
     /** PHL-008: the clinic's daily stock-alert digest was handed to its one named recipient. Ids and counts only. */
     PHARMACY_STOCK_ALERTS_DIGEST_READY("pharmacy.stock.alerts_digest_ready.v1", "core/pharmacy"),
-    SPECIALTY_PHOTO_ADDED("specialty.photo.added.v1", "core/specialty");
+    SPECIALTY_PHOTO_ADDED("specialty.photo.added.v1", "core/specialty"),
+    /** COM-015: produced by services/comms-gateway once per clinic and closed day: message counts and cost by channel and category. No PHI. */
+    USAGE_REPORTED("comms.usage.reported.v1", "core/messaging");
 
     private final String type;
     private final String source;

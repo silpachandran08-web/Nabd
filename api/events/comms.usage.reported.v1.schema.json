@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:comms.usage.reported.v1",
+  "title": "comms.usage.reported.v1",
+  "description": "One clinic's message usage for one closed clinic-local day (COM-015): counts and provider cost by channel and pricing category, published by the Comms Gateway's daily rollup. Counts and amounts only: no recipient, no message content. The envelope id is 'usage:<tenantId>:<day>', so a repeat is the same event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenantId", "day", "items", "version"],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "day": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "items": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["channel", "category", "count", "costMinor", "currency"],
+        "properties": {
+          "channel": { "type": "string", "enum": ["whatsapp", "sms", "email", "voice"] },
+          "category": { "type": "string", "pattern": "^[a-z_]{1,40}$", "description": "Provider pricing category: Meta's (marketing, utility, authentication, service) or the SMS DLT category." },
+          "count": { "type": "integer", "minimum": 0 },
+          "costMinor": { "type": "integer", "minimum": 0, "description": "The day's provider cost in the currency's minor unit, before any Nabd markup." },
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+        }
+      }
+    },
+    "whatsappMonthCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "WhatsApp messages of the calendar month up to and including this day: what a plan allowance is measured against."
+    },
+    "version": { "type": "integer", "minimum": 1, "description": "Epoch day of 'day': monotonic per clinic." }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "day": "2026-11-16",
+      "items": [
+        { "channel": "whatsapp", "category": "utility", "count": 120, "costMinor": 1380, "currency": "INR" },
+        { "channel": "sms", "category": "otp", "count": 4, "costMinor": 72, "currency": "INR" }
+      ],
+      "whatsappMonthCount": 1840,
+      "version": 20773
+    }
+  ]
+}

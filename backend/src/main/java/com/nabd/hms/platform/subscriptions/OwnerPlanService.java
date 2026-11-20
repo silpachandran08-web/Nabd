@@ -105,6 +105,11 @@ public class OwnerPlanService implements PlanAccount {
     // ---- read side ----------------------------------------------------------------------------------------------------
 
     @Override
+    public java.util.OptionalLong whatsappMessageAllowance(UUID tenantId) {
+        return repo.whatsappMessageAllowance(tenantId); // master tables: no RLS, so no tenant transaction is needed
+    }
+
+    @Override
     @Transactional(readOnly = true) // joins SetupService's tenant transaction
     public Optional<Account> account(UUID tenantId) {
         return repo.subscription(tenantId).map(s -> {
