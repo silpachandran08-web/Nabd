@@ -29,9 +29,11 @@ class CheckoutRepository {
     private final com.nabd.hms.pharmacy.api.StockCommands stock;
     private final com.nabd.hms.pharmacy.api.RxDispensing dispensing;
     private final com.nabd.hms.queue.api.VisitQueries visits; // PLT-035: visit facts come from the visit module, never queue_entries SQL
+    private final com.nabd.hms.nursing.api.ProcedureBilling procedures; // PLT-036: procedure_orders is written by nursing only
 
     CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock, com.nabd.hms.pharmacy.api.RxDispensing dispensing,
-                       com.nabd.hms.queue.api.VisitQueries visits) {
+                       com.nabd.hms.queue.api.VisitQueries visits, com.nabd.hms.nursing.api.ProcedureBilling procedures) {
+        this.procedures = procedures;
         this.dispensing = dispensing;
         this.visits = visits;
         this.jdbc = jdbc;
@@ -89,8 +91,7 @@ class CheckoutRepository {
     }
 
     void markProceduresBilled(UUID tenantId, UUID queueEntryId) {
-        jdbc.update("UPDATE procedure_orders SET billed = true WHERE tenant_id = ? AND queue_entry_id = ? " +
-                "AND status = 'completed' AND billed = false", tenantId, queueEntryId);
+        procedures.markVisitBilled(tenantId, queueEntryId);
     }
 
     /** PLT-035: through queue.api.VisitQueries (billing SQL never touches queue_entries). */

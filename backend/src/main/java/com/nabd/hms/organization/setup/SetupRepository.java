@@ -41,7 +41,14 @@ class SetupRepository {
 
     private final ClinicClock clock;
 
-    SetupRepository(JdbcTemplate jdbc, ClinicClock clock) {
+    private final com.nabd.hms.common.TenantSettingsPort tenantSettings; // PLT-036: tenants is written by platform only
+
+    private final com.nabd.hms.organization.api.ChargeHeadWriter chargeHeads; // PLT-036: charge_catalogue is written by billing only
+
+    SetupRepository(JdbcTemplate jdbc, ClinicClock clock, com.nabd.hms.common.TenantSettingsPort tenantSettings,
+                    com.nabd.hms.organization.api.ChargeHeadWriter chargeHeads) {
+        this.chargeHeads = chargeHeads;
+        this.tenantSettings = tenantSettings;
         this.clock = clock;
         this.jdbc = jdbc;
     }
@@ -108,14 +115,12 @@ class SetupRepository {
     }
 
     void updateProfile(UUID tenantId, ClinicProfileWriteRequest req) {
-        jdbc.update("UPDATE tenants SET name = ?, timezone = ?, tax_id = ?, tax_id_type = ?, whatsapp_number = ?, specialties = ?::text[], updated_at = now() WHERE id = ?",
-                req.name(), req.timezone(), req.taxId(), req.taxIdType(), req.whatsappNumber(),
-                req.specialties() == null ? new String[0] : req.specialties().toArray(new String[0]),
-                tenantId);
+        tenantSettings.updateProfile(tenantId, req.name(), req.timezone(), req.taxId(), req.taxIdType(), req.whatsappNumber(),
+                req.specialties() == null ? new String[0] : req.specialties().toArray(new String[0]));
     }
 
     void markSetupCompleted(UUID tenantId) {
-        jdbc.update("UPDATE tenants SET setup_completed_at = now(), updated_at = now() WHERE id = ?", tenantId);
+        tenantSettings.markSetupCompleted(tenantId);
     }
 
     // ── Charge catalogue ──
@@ -142,25 +147,17 @@ class SetupRepository {
 
     /** FIN-017: a head from a starter list also carries its tax class and SAC/HSN (FIN-009 columns). */
     UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req, String taxCategory, String sacHsn) {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, follow_up_amount, " +
-                        "emergency_amount, tax_code, tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order, " +
-                        "tax_category, sac_hsn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, tenantId, req.code(), req.name(), req.category(), req.baseAmount(), req.followUpAmount(),
-                req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
-                Date.valueOf(req.effectiveFrom()), req.effectiveTo() == null ? null : Date.valueOf(req.effectiveTo()),
-                req.displayOrder(), taxCategory, sacHsn);
-        return id;
+        return chargeHeads.insertHead(tenantId, head(req), taxCategory, sacHsn);
+    }
+
+    private static com.nabd.hms.organization.api.ChargeHeadWriter.ChargeHead head(ChargeHeadWriteRequest req) {
+        return new com.nabd.hms.organization.api.ChargeHeadWriter.ChargeHead(req.code(), req.name(), req.category(), req.baseAmount(),
+                req.followUpAmount(), req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
+                req.effectiveFrom(), req.effectiveTo(), req.displayOrder());
     }
 
     void updateCharge(UUID tenantId, UUID id, ChargeHeadWriteRequest req) {
-        jdbc.update("UPDATE charge_catalogue SET code = ?, name = ?, category = ?, base_amount = ?, follow_up_amount = ?, " +
-                        "emergency_amount = ?, tax_code = ?, tax_rate_percent = ?, doctor_override = ?, active = ?, effective_from = ?, " +
-                        "effective_to = ?, display_order = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
-                req.code(), req.name(), req.category(), req.baseAmount(), req.followUpAmount(),
-                req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
-                Date.valueOf(req.effectiveFrom()), req.effectiveTo() == null ? null : Date.valueOf(req.effectiveTo()),
-                req.displayOrder(), tenantId, id);
+        chargeHeads.updateHead(tenantId, id, head(req));
     }
 
     // ── Policies ──
@@ -215,8 +212,7 @@ class SetupRepository {
     }
 
     void updateConsentContact(UUID tenantId, ConsentContactWriteRequest req) {
-        jdbc.update("UPDATE tenants SET consent_contact_name = ?, consent_contact_email = ?, consent_contact_phone = ?, updated_at = now() WHERE id = ?",
-                req.name(), req.email(), req.phone(), tenantId);
+        tenantSettings.updateConsentContact(tenantId, req.name(), req.email(), req.phone());
     }
 
     // ── Holidays ──

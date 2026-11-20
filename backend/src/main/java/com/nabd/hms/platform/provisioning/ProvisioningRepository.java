@@ -179,12 +179,6 @@ class ProvisioningRepository {
                 .stream().findFirst();
     }
 
-    UUID insertOwner(String name, String email) {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO owners (id, name, email, status) VALUES (?,?,?,'active')", id, name, email);
-        return id;
-    }
-
     /** Any one existing region tells us the owner's region lock (NB-002) — an owner never spans regions. */
     Optional<String> findAnyRegionForOwner(UUID ownerId) {
         return jdbc.query("SELECT t.region_code AS region FROM tenants t JOIN brands b ON t.brand_id = b.id WHERE b.owner_id = ? LIMIT 1",
@@ -214,26 +208,10 @@ class ProvisioningRepository {
     }
 
     /** Mirrors ApiTestBase's seedFullAccessRole shape — full grants on every module an Owner's shadow staff row needs. */
-    /** PLT-016: one preset role from RolePresets (only the Owner preset is built_in). */
-    void insertPresetRole(UUID tenantId, String name, boolean builtIn, String grantsJson, String presetCode, int presetVersion) {
-        jdbc.update("INSERT INTO roles (id, tenant_id, name, built_in, grants, preset_code, preset_version) VALUES (?,?,?,?,?::jsonb,?,?)",
-                UUID.randomUUID(), tenantId, name, builtIn, grantsJson, presetCode, presetVersion);
-    }
-
     boolean hasBuiltInRole(UUID tenantId) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM roles WHERE tenant_id = ? AND built_in = true", Integer.class, tenantId);
         return count != null && count > 0;
-    }
-
-    /** Same backfill V37's migration gave every already-provisioned tenant — a brand-new tenant
-     * needs this too, so check-in never breaks for a doctor nobody has assigned a department to yet.
-     * No department_workflow_selection row is seeded here — DepartmentService.resolveStatusSequence()
-     * already falls back to vitals+consultation (the platform's clinic_walkin default) when a
-     * department hasn't picked a template yet. */
-    void seedDefaultDepartment(UUID tenantId) {
-        jdbc.update("INSERT INTO departments (tenant_id, name, is_default) VALUES (?,'General',true)",
-                tenantId);
     }
 
     /** The Owner role seed_masters just created — verify_invite_owner needs its id to invite the owner as staff. */
@@ -252,21 +230,8 @@ class ProvisioningRepository {
     }
 
     // ---- rollback (NB-259) — reverse of the creates above, same FK-ordering constraints ----
-
-    void deleteBuiltInRole(UUID tenantId) {
-        jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND (built_in = true OR preset_code IS NOT NULL)", tenantId);
-    }
-
-    /** Reverses seedDefaultDepartment — departments.tenant_id references tenants(id), so this must
-     * run before undoCreateTenant's deleteTenant or that DELETE hits a FK violation. */
-    void deleteDepartments(UUID tenantId) {
-        jdbc.update("DELETE FROM departments WHERE tenant_id = ?", tenantId);
-    }
-
-    /** NB-353's undo of verify_invite_owner — a fatal later-step failure must leave no login behind either. */
-    void deleteStaffByTenant(UUID tenantId) {
-        jdbc.update("DELETE FROM staff WHERE tenant_id = ?", tenantId);
-    }
+    // PLT-036: owners, roles, staff and departments are created and rolled back through common.ProvisioningSeeds
+    // (their owning modules); this repository writes platform's own tables only.
 
     void deleteTenant(UUID tenantId) {
         jdbc.update("DELETE FROM tenants WHERE id = ?", tenantId);
@@ -274,10 +239,6 @@ class ProvisioningRepository {
 
     void deleteBrand(UUID brandId) {
         jdbc.update("DELETE FROM brands WHERE id = ?", brandId);
-    }
-
-    void deleteOwner(UUID ownerId) {
-        jdbc.update("DELETE FROM owners WHERE id = ?", ownerId);
     }
 
     private RowMapper<Job> jobMapper() {

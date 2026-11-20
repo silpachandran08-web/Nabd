@@ -29,7 +29,10 @@ class PharmacyRepository {
 
     private final ClinicClock clock;
 
-    PharmacyRepository(JdbcTemplate jdbc, ClinicClock clock) {
+    private final com.nabd.hms.pharmacy.api.ItemCatalogueWriter catalogue; // PLT-036: charge_catalogue rows are written by billing; only stock_qty here
+
+    PharmacyRepository(JdbcTemplate jdbc, ClinicClock clock, com.nabd.hms.pharmacy.api.ItemCatalogueWriter catalogue) {
+        this.catalogue = catalogue;
         this.clock = clock;
         this.jdbc = jdbc;
     }
@@ -197,8 +200,7 @@ class PharmacyRepository {
 
     /** One statement for the two single-column item flags (a null argument leaves its column as it is). */
     private void patchItem(UUID tenantId, UUID id, Boolean active, String drugId) {
-        jdbc.update("UPDATE charge_catalogue SET active = COALESCE(?, active), drug_id = COALESCE(?, drug_id), updated_at = now() " +
-                "WHERE tenant_id = ? AND id = ?", active, drugId, tenantId, id);
+        catalogue.patchItem(tenantId, id, active, drugId);
     }
 
     List<StockMovementRow> listMovements(UUID tenantId, UUID itemId) {
@@ -214,24 +216,17 @@ class PharmacyRepository {
     }
 
     UUID insertItem(UUID tenantId, String code, PharmacyItemWriteRequest req) {
-        UUID id = UUID.randomUUID();
-        // stock_qty starts at 0: opening stock goes through StockCommands (movement row + audit). is_rx is set by the profile trigger.
-        jdbc.update(
-                "INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, tax_rate_percent, " +
-                        "is_rx, hsn_code, stock_qty, active, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                id, tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
-                req.isRx(), req.hsnCode(), 0, true, java.sql.Date.valueOf(clock.today(tenantId)));
+        // PLT-036: billing creates the row; the balance is pharmacy's own column. stock_qty starts at 0: opening stock goes through
+        // StockCommands (movement row + audit). is_rx is set by the profile trigger.
+        UUID id = catalogue.insertItem(tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
+                req.isRx(), req.hsnCode(), clock.today(tenantId));
+        jdbc.update("UPDATE charge_catalogue SET stock_qty = 0 WHERE tenant_id = ? AND id = ?", tenantId, id);
         return id;
     }
 
     /** Name, price, tax and HSN only. Stock is never written here (V2-004); is_rx follows the schedule class (PHL-002). */
     int updateItem(UUID tenantId, UUID id, PharmacyItemWriteRequest req) {
-        return jdbc.update(
-                "UPDATE charge_catalogue SET name = ?, base_amount = ?, tax_rate_percent = ?, " +
-                        "hsn_code = ?, updated_at = now() " +
-                        "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
-                req.name(), req.price(), req.taxRatePercentOrZero(), req.hsnCode(),
-                tenantId, id);
+        return catalogue.updateItem(tenantId, id, req.name(), req.price(), req.taxRatePercentOrZero(), req.hsnCode());
     }
 
     /** NB-179: signed prescriptions still ahead of checkout, cross-patient — narrow direct query
