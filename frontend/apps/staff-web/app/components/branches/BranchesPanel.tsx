@@ -16,7 +16,7 @@ import { isOwner } from "../../lib/session";
 import { requestStepUpToken } from "../../lib/stepUp";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { SECTIONS, atLimit, codeOk, draftOk, moving, progress, stepUpTarget, type Branch, type BranchJob, type BranchList, type Draft, type Section } from "./branches";
-import styles from "../plan/planAccount.module.css";
+import styles from "./branches.module.css";
 
 // the same zones the profile tab offers (setup/TimezoneSelect); a feature folder may not import another feature
 const ZONES = [
