@@ -15,21 +15,25 @@ final class PackageModels {
                        String validityStarts, int graceDays, String refundNote) {
     }
 
+    /** FIN-025: chargeCatalogueId is the price-list head whose tax class the component takes (null = taxRatePercent stands). */
     record PackageItemRow(UUID id, String itemType, String name, int quantity, BigDecimal unitListPrice,
-                           BigDecimal taxRatePercent) {
+                           BigDecimal taxRatePercent, UUID chargeCatalogueId) {
     }
 
-    record PackageSettingsRow(BigDecimal priceFloorPercent) {
+    record PackageSettingsRow(BigDecimal priceFloorPercent, boolean taxSplitEnabled, String gstOpinionDecisionId) {
     }
 
     record InstanceRow(UUID id, UUID packageId, UUID patientId, String patientName, UUID invoiceId,
                         String invoiceNumber, String packageName, BigDecimal soldPrice, BigDecimal soldTax,
                         String validityStarts, int validityDays, LocalDate validityStart, LocalDate validityEnd,
-                        int graceDays, String status, Integer lastAlertTier) {
+                        int graceDays, String status, Integer lastAlertTier, boolean taxInclusive) {
     }
 
+    /** FIN-025: invoiceLineId, allocatedMinor (taxable value), taxMinor and taxCategory are what the component's invoice line carries;
+     * null on a package sold before the tax engine stored them. */
     record InstanceItemRow(UUID id, String itemType, String name, int quantityTotal, int quantityConsumed,
-                            BigDecimal unitListPrice, BigDecimal allocatedPrice, BigDecimal taxRatePercent) {
+                            BigDecimal unitListPrice, BigDecimal allocatedPrice, BigDecimal taxRatePercent,
+                            UUID invoiceLineId, Long allocatedMinor, Long taxMinor, String taxCategory) {
     }
 
     record EventRow(String eventType, String note, Integer delta, String actorName, Instant createdAt, String deliveryStatus) {

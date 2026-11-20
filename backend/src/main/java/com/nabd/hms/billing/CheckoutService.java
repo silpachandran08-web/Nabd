@@ -279,6 +279,51 @@ public class CheckoutService {
         return standaloneInvoice(tenantId, staffId, patientId, req, "package", true, true, null);
     }
 
+    /**
+     * FIN-025: the package sale invoiced from its components: one line per component at its allocated share (quantity 1, so the line
+     * total is exact to the minor unit), the tax class from the component's price-list head through the tax engine, and with a
+     * tax-inclusive bundle the tax back-calculated out of each line. list_unit_price carries what the component costs bought
+     * separately (the printed "you save"). The line is not linked to the head, so a stocked take-home item is not dispensed here.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public com.nabd.hms.billing.api.PackageInvoicing.Issued sellPackageComponents(UUID tenantId, UUID staffId, UUID patientId, boolean taxInclusive,
+                                                                                 List<com.nabd.hms.billing.api.PackageInvoicing.Component> components) {
+        dayClose.requireTodayOpen(tenantId);
+        String currency = currencyFor(tenantId);
+        List<LineItemInput> items = new java.util.ArrayList<>();
+        List<com.nabd.hms.billing.tax.TaxService.InLine> in = new java.util.ArrayList<>();
+        for (var c : components) {
+            items.add(new LineItemInput(c.code(), c.quantity() > 1 ? c.name() + " x " + c.quantity() : c.name(), "Package", 1,
+                    money(c.allocatedMinor(), currency), c.fallbackRatePercent(), null, money(c.listValueMinor(), currency), "custom",
+                    null, null, null, false, null, null));
+            in.add(new com.nabd.hms.billing.tax.TaxService.InLine("new" + in.size(), c.allocatedMinor(), c.chargeCatalogueId(),
+                    c.fallbackRatePercent(), false, null, false, false, null, taxInclusive));
+        }
+        var computed = tax.compute(null, in, 0, null);
+        var r = computed.result();
+        for (int i = 0; i < items.size(); i++) items.set(i, items.get(i).withTaxRate(computed.meta().get(i).rate()));
+        var number = series.allocate(SeriesAllocator.Kind.INVOICE);
+        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId, null, money(r.subtotalMinor(), currency), BigDecimal.ZERO,
+                money(r.taxMinor(), currency), money(r.roundOffMinor(), currency), money(r.totalMinor(), currency), staffId, number);
+        repo.insertLineItems(tenantId, invoiceId, items, staffId);
+        tax.persist(invoiceId, computed);
+        List<LineItemRow> stored = repo.findLineItems(tenantId, invoiceId);
+        List<com.nabd.hms.billing.api.PackageInvoicing.Line> lines = new java.util.ArrayList<>();
+        for (int i = 0; i < stored.size(); i++) {
+            lines.add(new com.nabd.hms.billing.api.PackageInvoicing.Line(stored.get(i).id(), r.lines().get(i).taxableMinor(),
+                    r.lines().get(i).taxMinor(), computed.meta().get(i).category()));
+        }
+        log.info("package invoice {} created by {} (tenant {}, total {})", invoiceId, staffId, tenantId, money(r.totalMinor(), currency));
+        return new com.nabd.hms.billing.api.PackageInvoicing.Issued(invoiceId, number.formatted(), r.taxMinor(), r.totalMinor(), lines);
+    }
+
+    /** FIN-025: the active price-list heads a package component can be linked to. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public List<com.nabd.hms.billing.api.PackageInvoicing.ChargeHead> packageChargeHeads(UUID tenantId) {
+        return repo.listActiveCharges(tenantId).stream()
+                .map(c -> new com.nabd.hms.billing.api.PackageInvoicing.ChargeHead(c.id(), c.code(), c.name(), c.category())).toList();
+    }
+
     private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind,
                                               boolean canDiscount, boolean trusted, String ip) {
         tenantContext.set(tenantId);

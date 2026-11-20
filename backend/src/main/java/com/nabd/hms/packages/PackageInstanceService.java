@@ -3,6 +3,7 @@ package com.nabd.hms.packages;
 import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.billing.CheckoutService;
+import com.nabd.hms.billing.api.PackageInvoicing;
 import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.InvoiceResponse;
 import com.nabd.hms.billing.dto.LineItemRequest;
@@ -17,10 +18,12 @@ import com.nabd.hms.packages.dto.InstanceItemResponse;
 import com.nabd.hms.packages.dto.InstanceResponse;
 import com.nabd.hms.packages.dto.LiabilityResponse;
 import com.nabd.hms.packages.dto.RefundPreviewItem;
+import com.nabd.hms.packages.dto.RefundPreviewLine;
 import com.nabd.hms.packages.dto.RefundPreviewResponse;
 import com.nabd.hms.packages.dto.RefundRequestRequest;
 import com.nabd.hms.packages.dto.RefundResponse;
 import com.nabd.hms.packages.dto.SellPackageRequest;
+import com.nabd.hms.shared.money.Money;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,11 +72,16 @@ public class PackageInstanceService {
 
     private final com.nabd.hms.organization.api.SeriesAllocator series;
     private final PackageMessagingService messaging;
+    private final PackageInvoicing billing;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
                             AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors,
                             com.nabd.hms.billing.DayCloseService dayClose,
-                            com.nabd.hms.organization.api.SeriesAllocator series, PackageMessagingService messaging) {
+                            com.nabd.hms.organization.api.SeriesAllocator series, PackageMessagingService messaging,
+                            PackageInvoicing billing, com.nabd.hms.organization.api.RegionRules regions) {
+        this.billing = billing;
+        this.regions = regions;
         this.messaging = messaging;
         this.series = series;
         this.actors = actors;
@@ -99,37 +107,79 @@ public class PackageInstanceService {
                     "This patient already has an active copy of this package.");
         }
         List<PackageItemRow> items = repo.listItems(tenantId, req.packageId());
-        BigDecimal listTotal = items.stream().map(i -> i.unitListPrice().multiply(BigDecimal.valueOf(i.quantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        var region = regions.region(clock.region(tenantId));
+        String currency = region.currency();
 
-        record Allocated(PackageItemRow item, UUID id, BigDecimal allocatedPrice, BigDecimal exTaxUnitPrice) {
+        record Allocated(PackageItemRow item, UUID id, BigDecimal allocatedPrice, PackageInvoicing.Line line) {
         }
         List<Allocated> allocations = new ArrayList<>();
-        BigDecimal allocatedSoFar = BigDecimal.ZERO;
-        for (int i = 0; i < items.size(); i++) {
-            PackageItemRow item = items.get(i);
-            BigDecimal listShare = item.unitListPrice().multiply(BigDecimal.valueOf(item.quantity()));
-            BigDecimal allocated;
-            if (i == items.size() - 1) {
-                allocated = pkg.price().subtract(allocatedSoFar); // last item absorbs rounding drift
-            } else {
-                allocated = pkg.price().multiply(listShare).divide(listTotal, 2, RoundingMode.HALF_UP);
-                allocatedSoFar = allocatedSoFar.add(allocated);
+        UUID invoiceId;
+        String invoiceNumber;
+        BigDecimal soldTax;
+        BigDecimal total;
+        if (taxSplitOn(tenantId, region)) {
+            // FIN-025: the invoice is generated from the components, each at its allocated share with its own tax
+            long[] listValue = items.stream()
+                    .mapToLong(i -> Money.of(i.unitListPrice().multiply(BigDecimal.valueOf(i.quantity())), currency).amountMinor()).toArray();
+            long[] share = PackageSplit.allocate(Money.of(pkg.price(), currency).amountMinor(), listValue);
+            List<UUID> ids = items.stream().map(i -> UUID.randomUUID()).toList();
+            List<PackageInvoicing.Component> components = new ArrayList<>();
+            for (int i = 0; i < items.size(); i++) {
+                PackageItemRow item = items.get(i);
+                components.add(new PackageInvoicing.Component("PKGI-" + ids.get(i).toString().substring(0, 8).toUpperCase(), item.name(),
+                        item.quantity(), share[i], listValue[i], item.chargeCatalogueId(), item.taxRatePercent()));
             }
-            BigDecimal perUnitAllocated = allocated.divide(BigDecimal.valueOf(item.quantity()), 4, RoundingMode.HALF_UP);
-            BigDecimal exTaxUnitPrice = pkg.taxInclusive()
-                    ? perUnitAllocated.divide(BigDecimal.ONE.add(item.taxRatePercent().divide(BigDecimal.valueOf(100))), 2, RoundingMode.HALF_UP)
-                    : perUnitAllocated.setScale(2, RoundingMode.HALF_UP);
-            allocations.add(new Allocated(item, UUID.randomUUID(), allocated, exTaxUnitPrice));
+            PackageInvoicing.Issued issued = billing.issue(tenantId, staffId, req.patientId(), pkg.taxInclusive(), components);
+            for (int i = 0; i < items.size(); i++) {
+                allocations.add(new Allocated(items.get(i), ids.get(i), amount(share[i], currency), issued.lines().get(i)));
+            }
+            invoiceId = issued.invoiceId();
+            invoiceNumber = issued.invoiceNumber();
+            soldTax = amount(issued.taxMinor(), currency);
+            total = amount(issued.totalMinor(), currency);
+        } else {
+            BigDecimal listTotal = items.stream().map(i -> i.unitListPrice().multiply(BigDecimal.valueOf(i.quantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<UUID> ids = new ArrayList<>();
+            List<BigDecimal> shares = new ArrayList<>();
+            List<LineItemRequest> lineItems = new ArrayList<>();
+            BigDecimal allocatedSoFar = BigDecimal.ZERO;
+            for (int i = 0; i < items.size(); i++) {
+                PackageItemRow item = items.get(i);
+                BigDecimal listShare = item.unitListPrice().multiply(BigDecimal.valueOf(item.quantity()));
+                BigDecimal allocated;
+                if (i == items.size() - 1) {
+                    allocated = pkg.price().subtract(allocatedSoFar); // last item absorbs rounding drift
+                } else {
+                    allocated = pkg.price().multiply(listShare).divide(listTotal, 2, RoundingMode.HALF_UP);
+                    allocatedSoFar = allocatedSoFar.add(allocated);
+                }
+                BigDecimal perUnitAllocated = allocated.divide(BigDecimal.valueOf(item.quantity()), 4, RoundingMode.HALF_UP);
+                BigDecimal exTaxUnitPrice = pkg.taxInclusive()
+                        ? perUnitAllocated.divide(BigDecimal.ONE.add(item.taxRatePercent().divide(BigDecimal.valueOf(100))), 2, RoundingMode.HALF_UP)
+                        : perUnitAllocated.setScale(2, RoundingMode.HALF_UP);
+                UUID id = UUID.randomUUID();
+                ids.add(id);
+                shares.add(allocated);
+                lineItems.add(new LineItemRequest("PKGI-" + id.toString().substring(0, 8).toUpperCase(),
+                        item.name(), "Package", item.quantity(), exTaxUnitPrice, item.taxRatePercent()));
+            }
+            InvoiceResponse invoice = checkoutService.sellPackageInvoice(tenantId, staffId, req.patientId(),
+                    new CheckoutRequest(lineItems, BigDecimal.ZERO));
+            for (int i = 0; i < items.size(); i++) {
+                // the line as invoiced, so a refund reverses exactly what this component was charged
+                var li = invoice.lineItems().get(i);
+                long tax = li.taxes().stream().mapToLong(t -> t.amountMinor()).sum();
+                long taxable = li.taxableMinor() != null ? li.taxableMinor() : Money.of(li.lineTotal(), currency).amountMinor();
+                allocations.add(new Allocated(items.get(i), ids.get(i), shares.get(i),
+                        new PackageInvoicing.Line(li.id(), taxable, tax, tax > 0 ? "TAXABLE" : "NIL")));
+            }
+            invoiceId = invoice.id();
+            invoiceNumber = invoice.invoiceNumber();
+            soldTax = invoice.tax();
+            total = invoice.total();
         }
-
-        List<LineItemRequest> lineItems = allocations.stream()
-                .map(a -> new LineItemRequest("PKGI-" + a.id().toString().substring(0, 8).toUpperCase(),
-                        a.item().name(), "Package", a.item().quantity(), a.exTaxUnitPrice(), a.item().taxRatePercent()))
-                .toList();
-        InvoiceResponse invoice = checkoutService.sellPackageInvoice(tenantId, staffId, req.patientId(),
-                new CheckoutRequest(lineItems, BigDecimal.ZERO));
-        checkoutService.recordPayment(tenantId, invoice.id(), staffId, new PaymentRequest(req.paymentMethod(), invoice.total()));
+        checkoutService.recordPayment(tenantId, invoiceId, staffId, new PaymentRequest(req.paymentMethod(), total));
 
         LocalDate today = clock.today(tenantId);
         boolean startsNow = "purchase_date".equals(pkg.validityStarts());
@@ -137,16 +187,17 @@ public class PackageInstanceService {
         LocalDate validityEnd = startsNow ? today.plusDays(pkg.validityDays()) : null;
 
         UUID instanceId = UUID.randomUUID();
-        repo.insertInstance(instanceId, tenantId, pkg.id(), req.patientId(), invoice.id(), pkg.name(),
-                pkg.price(), invoice.tax(), pkg.validityStarts(), pkg.validityDays(), validityStart, validityEnd,
-                pkg.graceDays(), staffId);
+        repo.insertInstance(instanceId, tenantId, pkg.id(), req.patientId(), invoiceId, pkg.name(),
+                pkg.price(), soldTax, pkg.validityStarts(), pkg.validityDays(), validityStart, validityEnd,
+                pkg.graceDays(), staffId, pkg.taxInclusive());
         for (Allocated a : allocations) {
             repo.insertInstanceItem(a.id(), tenantId, instanceId, a.item().itemType(), a.item().name(),
-                    a.item().quantity(), a.item().unitListPrice(), a.allocatedPrice(), a.item().taxRatePercent());
+                    a.item().quantity(), a.item().unitListPrice(), a.allocatedPrice(), a.item().taxRatePercent(),
+                    a.line().invoiceLineId(), a.line().taxableMinor(), a.line().taxMinor(), a.line().taxCategory());
         }
         repo.insertEvent(tenantId, instanceId, "sold", pkg.name() + " · " + pkg.price(), null, staffId);
         repo.insertEvent(tenantId, instanceId, "payment_received", req.paymentMethod(), null, staffId);
-        repo.insertEvent(tenantId, instanceId, "invoice_issued", "GST invoice · " + invoice.invoiceNumber(), null, staffId);
+        repo.insertEvent(tenantId, instanceId, "invoice_issued", "GST invoice · " + invoiceNumber, null, staffId);
         messaging.sold(tenantId, instanceId, req.patientId(), req.nudgeIntervalDays()); // COM-044: the card goes out from the event
 
         return detail(tenantId, instanceId);
@@ -306,19 +357,49 @@ public class PackageInstanceService {
     public RefundPreviewResponse refundPreview(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
         InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(ApiException::notFound);
-        List<InstanceItemRow> items = repo.listInstanceItems(tenantId, id);
-        BigDecimal usedListValue = items.stream()
-                .map(i -> i.unitListPrice().multiply(BigDecimal.valueOf(i.quantityConsumed())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal paid = instance.soldPrice().add(instance.soldTax());
-        BigDecimal diff = paid.subtract(usedListValue);
-        BigDecimal refundAmount = diff.max(BigDecimal.ZERO);
-        BigDecimal owed = diff.signum() < 0 ? diff.negate() : BigDecimal.ZERO;
-        List<RefundPreviewItem> previewItems = items.stream()
-                .map(i -> new RefundPreviewItem(i.name(), i.quantityConsumed(),
-                        i.unitListPrice().multiply(BigDecimal.valueOf(i.quantityConsumed()))))
-                .toList();
-        return new RefundPreviewResponse(paid, usedListValue, refundAmount, owed, previewItems);
+        String currency = currency(tenantId);
+        PackageSplit.Refund r = refund(instance, repo.listInstanceItems(tenantId, id), currency);
+        List<RefundPreviewItem> previewItems = r.lines().stream()
+                .map(l -> new RefundPreviewItem(l.component(), l.usedQty(), amount(l.usedValueMinor(), currency))).toList();
+        List<RefundPreviewLine> lines = r.lines().stream()
+                .map(l -> new RefundPreviewLine(l.component(), l.usedQty(), l.usedValueMinor(), l.refundTaxableMinor(), l.refundTaxMinor())).toList();
+        return new RefundPreviewResponse(amount(r.paidMinor(), currency), amount(r.usedMinor(), currency), amount(r.refundMinor(), currency),
+                amount(r.owedMinor(), currency), previewItems, lines, r.refundMinor(), r.owedMinor());
+    }
+
+    /** FIN-025: the per-component refund (PackageSplit.refund) over what each component's invoice line carries. */
+    private PackageSplit.Refund refund(InstanceRow instance, List<InstanceItemRow> items, String currency) {
+        return PackageSplit.refund(instance.taxInclusive(), items.stream().map(i -> {
+            long[] line = lineMinor(instance, i, currency);
+            return new PackageSplit.Sold(i.name(), i.quantityConsumed(), Money.of(i.unitListPrice(), currency).amountMinor(), line[0], line[1]);
+        }).toList());
+    }
+
+    /** {taxable, tax} of the component's invoice line; a package sold before the tax engine stored them gets them from its allocated price and rate. */
+    private static long[] lineMinor(InstanceRow instance, InstanceItemRow i, String currency) {
+        if (i.allocatedMinor() != null && i.taxMinor() != null) {
+            return new long[]{i.allocatedMinor(), i.taxMinor()};
+        }
+        BigDecimal allocated = BigDecimal.valueOf(Money.of(i.allocatedPrice(), currency).amountMinor());
+        long tax = (instance.taxInclusive()
+                ? allocated.multiply(i.taxRatePercent()).divide(i.taxRatePercent().add(BigDecimal.valueOf(100)), 0, RoundingMode.HALF_UP)
+                : allocated.multiply(i.taxRatePercent()).movePointLeft(2).setScale(0, RoundingMode.HALF_UP)).longValueExact();
+        return new long[]{instance.taxInclusive() ? allocated.longValueExact() - tax : allocated.longValueExact(), tax};
+    }
+
+    private String currency(UUID tenantId) {
+        return regions.region(clock.region(tenantId)).currency();
+    }
+
+    private static BigDecimal amount(long minor, String currency) {
+        return new Money(minor, java.util.Currency.getInstance(currency)).amount();
+    }
+
+    /** FIN-025: the split is on when the clinic turned it on, and never for a GST clinic without the GST opinion decision id on record. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    private boolean taxSplitOn(UUID tenantId, com.nabd.hms.organization.api.RegionRules.Region region) {
+        return repo.findSettings(tenantId)
+                .map(s -> s.taxSplitEnabled() && (!PackageSplit.needsGstOpinion(region) || s.gstOpinionDecisionId() != null)).orElse(false);
     }
 
     @Transactional
@@ -375,10 +456,12 @@ public class PackageInstanceService {
                     java.util.Map.of("requestedAmount", refund.refundAmount(), "currentAmount", current.refundAmount(),
                             "currentAmountOwed", current.amountOwed()));
         }
-        String creditNoteNumber = series.allocate(com.nabd.hms.organization.api.SeriesAllocator.Kind.CREDIT_NOTE).formatted(); // FIN-006: own gapless series
+        var creditNote = series.allocate(com.nabd.hms.organization.api.SeriesAllocator.Kind.CREDIT_NOTE); // FIN-006: own gapless series
+        String creditNoteNumber = creditNote.formatted();
         if (repo.approveRefund(tenantId, refundId, staffId, creditNoteNumber, current.refundAmount()) != 1) {
             throw alreadyDecided();
         }
+        issueCreditNote(tenantId, staffId, refund.instanceId(), creditNote);
         repo.updateInstanceStatus(tenantId, refund.instanceId(), "refunded");
         repo.insertEvent(tenantId, refund.instanceId(), "refunded",
                 "credit note " + creditNoteNumber + " · " + current.refundAmount(), null, staffId);
@@ -390,6 +473,23 @@ public class PackageInstanceService {
                 "refundMinor", minor(current.refundAmount()), "owedMinor", minor(current.amountOwed()),
                 "creditNoteNumber", creditNoteNumber));
         return approved;
+    }
+
+    /** FIN-025: the FIN-013 credit note against the package invoice, one line per component with the tax it reverses. A package sold
+     * before invoice lines were linked (no invoice_line_id) keeps the number only, as before. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    private void issueCreditNote(UUID tenantId, UUID staffId, UUID instanceId, com.nabd.hms.organization.api.SeriesAllocator.Allocation number) {
+        InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(ApiException::notFound);
+        List<InstanceItemRow> items = repo.listInstanceItems(tenantId, instanceId);
+        PackageSplit.Refund r = refund(instance, items, currency(tenantId)); // same figures as the approved preview: the instance is locked
+        if (r.refundMinor() < 1 || items.stream().anyMatch(i -> i.invoiceLineId() == null)) {
+            return;
+        }
+        List<PackageInvoicing.CreditLine> lines = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            lines.add(new PackageInvoicing.CreditLine(items.get(i).invoiceLineId(), r.lines().get(i).refundTaxableMinor(), r.lines().get(i).refundTaxMinor()));
+        }
+        billing.creditNote(tenantId, staffId, instance.invoiceId(), number.seriesId(), number.formatted(), lines);
     }
 
     @Transactional
@@ -452,9 +552,14 @@ public class PackageInstanceService {
     }
 
     private InstanceResponse toResponse(UUID tenantId, InstanceRow row, boolean withEvents) {
+        String currency = currency(tenantId);
         List<InstanceItemResponse> items = repo.listInstanceItems(tenantId, row.id()).stream()
-                .map(i -> new InstanceItemResponse(i.id().toString(), i.itemType(), i.name(), i.quantityTotal(),
-                        i.quantityConsumed(), i.unitListPrice(), i.allocatedPrice(), i.taxRatePercent()))
+                .map(i -> {
+                    long[] line = lineMinor(row, i, currency);
+                    return new InstanceItemResponse(i.id().toString(), i.itemType(), i.name(), i.quantityTotal(),
+                            i.quantityConsumed(), i.unitListPrice(), i.allocatedPrice(), i.taxRatePercent(), line[0], line[1],
+                            i.taxCategory() != null ? i.taxCategory() : line[1] > 0 ? "TAXABLE" : "NIL");
+                })
                 .toList();
         List<InstanceEventResponse> events = withEvents
                 ? repo.listEvents(tenantId, row.id()).stream()

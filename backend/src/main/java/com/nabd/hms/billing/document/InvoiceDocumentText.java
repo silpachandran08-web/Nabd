@@ -93,6 +93,17 @@ final class InvoiceDocumentText {
             }
             if (i < lineNotes.size() && lineNotes.get(i) != null) for (String n : lineNotes.get(i).split("\n")) out.add("    " + n);
         }
+        // FIN-025 (PR-01): package lines sit at their share of the bundle price; the saving is printed as information, not as a discount
+        BigDecimal separately = BigDecimal.ZERO, bundle = BigDecimal.ZERO;
+        for (LineItemResponse l : inv.lineItems()) {
+            if ("Package".equals(l.category()) && l.listUnitPrice() != null) {
+                separately = separately.add(l.listUnitPrice().multiply(BigDecimal.valueOf(l.quantity())));
+                bundle = bundle.add(l.lineTotal());
+            }
+        }
+        if (separately.compareTo(bundle) > 0) {
+            out.add("Total if bought separately " + money(separately) + " / you save " + money(separately.subtract(bundle)));
+        }
     }
 
     private static void taxTotals(InvoiceResponse inv, List<String> out, int cols) {

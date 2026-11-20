@@ -11,6 +11,8 @@ import { getIdentity } from "../../lib/session";
 import { api, ApiError, type intentKeys } from "../../lib/api";
 import { ErrorSummary, useFormErrors } from "../../lib/formErrors";
 import { usePatientSearch } from "../../lib/usePatientSearch";
+import { fromMinor } from "../../components/checkout/discountApproval";
+import { taxNote } from "./packageSplit";
 import { BLOCKING_STATUSES, SELL_STEPS, money, type InstanceT, type PackageT, type SoldInvoice, type StaffOption } from "./packagesModel";
 
 export default function SellWizard({ packages, instances, staff, sellKeys, loadAll, onCancel, onOpenInstance }: {
@@ -238,30 +240,17 @@ function SoldSummary({ sold, soldInvoice }: { sold: InstanceT; soldInvoice: Sold
           <div className={styles.statCard}><div className={styles.statLabel}>Invoice</div><div className={styles.statValue}>{sold.invoiceNumber}</div></div>
         </div>
       )}
-      <h3 className={styles.cardTitle}>{soldInvoice ? "Invoice lines" : "Tax allocated by list-price ratio"}</h3>
-      {soldInvoice ? (
-        // One invoice line per package item: the server's ex-tax line total and its tax at the item's rate.
-        soldInvoice.lineItems.map((l, n) => (
-          <div key={n} className={styles.itemLine}>
-            <span>
-              {l.chargeName} × {l.quantity}
-              <span className={styles.muted}> · net {formatMoney(l.lineTotal, soldInvoice.currency)} · {l.taxRatePercent > 0 ? `tax ${l.taxRatePercent}%` : "exempt"}</span>
-            </span>
-            <span>{formatMoney(Math.round(l.lineTotal * l.taxRatePercent) / 100, soldInvoice.currency)} tax</span>
-          </div>
-        ))
-      ) : (() => {
-        const listTotal = sold.items.reduce((sum, i) => sum + i.unitListPrice * i.quantityTotal, 0);
-        return sold.items.map((i) => (
-          <div key={i.id} className={styles.itemLine}>
-            <span>
-              {i.name}
-              <span className={styles.muted}> · {listTotal > 0 ? Math.round((i.unitListPrice * i.quantityTotal / listTotal) * 100) : 0}% of list · {i.taxRatePercent > 0 ? `tax ${i.taxRatePercent}%` : "exempt"}</span>
-            </span>
-            <span>{money(i.allocatedPrice)}</span>
-          </div>
-        ));
-      })()}
+      {/* FIN-025: one invoice line per component: its taxable value and tax as the server invoiced them, never a client-side estimate. */}
+      <h3 className={styles.cardTitle}>Split per component</h3>
+      {sold.items.map((i) => (
+        <div key={i.id} className={styles.itemLine}>
+          <span>
+            {i.name} × {i.quantityTotal}
+            <span className={styles.muted}> · taxable value {money(fromMinor(i.allocatedMinor))} · {taxNote(i.taxCategory, i.taxMinor)}</span>
+          </span>
+          <span>{money(fromMinor(i.taxMinor))} tax</span>
+        </div>
+      ))}
       <h3 className={styles.cardTitle}>Digital package card</h3>
       <p className={styles.muted}>Sending the card on WhatsApp isn&apos;t available yet. Open the active package to see its sessions and ledger.</p>
     </>

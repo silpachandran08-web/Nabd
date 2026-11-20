@@ -13,21 +13,29 @@ import { key, prefix } from "../../lib/query";
 import { ErrorSummary, FieldError, useFormErrors, type FormErrors } from "../../lib/formErrors";
 import type { Full } from "../../lib/gen";
 import type { PackageSettingsResponse } from "@nabd/api-client/generated";
-import { STATUS_PILL, TABS, money, why, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundT, type StaffOption, type Tab } from "./packagesModel";
+import {
+  STATUS_PILL, TABS, money, why, type ChargeHeadT, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundPreviewT,
+  type RefundT, type SplitSettings, type StaffOption, type Tab,
+} from "./packagesModel";
 import PackageForm from "./PackageForm";
 import SellWizard from "./SellWizard";
 import InstanceTable from "./InstanceTable";
-import { CatalogueTab, ExpiringTab, LiabilityTab, RefundsTab, SessionsTab, SettingsTab, type CatalogueFilter } from "./PackageTabs";
+import { CatalogueTab, ExpiringTab, LiabilityTab, RefundLines, RefundsTab, SessionsTab, SettingsTab, type CatalogueFilter } from "./PackageTabs";
+
+type SettingsT = Full<PackageSettingsResponse> & SplitSettings;
 import { useInstanceActions } from "./useInstanceActions";
 
 export default function PackagesPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("packages");
   const [floorEdit, setFloorEdit] = useState<string | null>(null);
+  // FIN-025: the tax-split switch and the GST opinion decision id, edited on the settings tab (null = as loaded)
+  const [splitEdit, setSplitEdit] = useState<boolean | null>(null);
+  const [decisionEdit, setDecisionEdit] = useState<string | null>(null);
   const [catalogueFilter, setCatalogueFilter] = useState<CatalogueFilter>("all");
   const [mode, setMode] = useState<"list" | "form" | "sell">("list");
   const [editing, setEditing] = useState<PackageT | null>(null);
-  const fe = useFormErrors("pk", { newValidityEnd: "New expiry date", reason: "Reason", priceFloorPercent: "Price floor", expectedAmount: "Amount" }); // page actions
+  const fe = useFormErrors("pk", { newValidityEnd: "New expiry date", reason: "Reason", priceFloorPercent: "Price floor", expectedAmount: "Amount", gstOpinionDecisionId: "GST opinion decision id" }); // page actions
   const sellKeys = useRef(intentKeys()); // one Idempotency-Key per sale intent, reused when the same sale is re-sent after an error
 
   // One bundle for the screen: the catalogue and the instances must load (403 = no access); the rest are best effort.
@@ -35,10 +43,11 @@ export default function PackagesPage() {
     queryKey: key("packages"),
     queryFn: async ({ signal }) => {
       const get = <T,>(path: string) => api.get<T>(path, { signal });
-      const [pkgs, insts, refunds, expiring, liability, settings, staff] = await Promise.allSettled([
+      const [pkgs, insts, refunds, expiring, liability, settings, staff, heads] = await Promise.allSettled([
         get<PackageT[]>("/packages"), get<InstanceT[]>("/packages/instances"), get<RefundT[]>("/packages/refunds"),
-        get<ExpiringT[]>("/packages/expiring-soon"), get<LiabilityT>("/packages/liability"), get<Full<PackageSettingsResponse>>("/packages/settings"),
+        get<ExpiringT[]>("/packages/expiring-soon"), get<LiabilityT>("/packages/liability"), get<SettingsT>("/packages/settings"),
         can("queue:view") ? get<StaffOption[]>("/staff/roster") : Promise.resolve([] as StaffOption[]),
+        get<ChargeHeadT[]>("/packages/charge-heads"),
       ]);
       if (pkgs.status === "rejected") throw pkgs.reason;
       if (insts.status === "rejected") throw insts.reason;
@@ -46,7 +55,7 @@ export default function PackagesPage() {
       return {
         packages: pkgs.value, instances: insts.value, refunds: ok(refunds, [] as RefundT[]), expiring: ok(expiring, [] as ExpiringT[]),
         liability: ok<LiabilityT | null>(liability, null), floor: settings.status === "fulfilled" ? String(settings.value.priceFloorPercent) : "",
-        staff: ok(staff, [] as StaffOption[]),
+        settings: ok<SettingsT | null>(settings, null), staff: ok(staff, [] as StaffOption[]), heads: ok(heads, [] as ChargeHeadT[]),
       };
     },
   });
@@ -57,6 +66,10 @@ export default function PackagesPage() {
   const liability = bundleQ.data?.liability ?? null;
   const staff = bundleQ.data?.staff ?? [];
   const floorInput = floorEdit ?? bundleQ.data?.floor ?? "";
+  const settings = bundleQ.data?.settings ?? null;
+  const heads = bundleQ.data?.heads ?? [];
+  const splitOn = splitEdit ?? settings?.taxSplitEnabled ?? false;
+  const decisionId = decisionEdit ?? settings?.gstOpinionDecisionId ?? "";
   const loading = bundleQ.isPending;
   const forbidden = bundleQ.error instanceof ApiError && bundleQ.error.status === 403;
   const error = !bundleQ.error || forbidden ? null : bundleQ.error instanceof ApiError ? "Couldn't load treatment packages. Try again." : "Couldn't reach the server. Check your connection and try again.";
@@ -82,7 +95,9 @@ export default function PackagesPage() {
   }
 
   async function saveSettings() {
-    if (await x.act(() => api.patch("/packages/settings", { priceFloorPercent: Number(floorInput) || 0 }), "Action failed.")) setFloorEdit(null);
+    // the server refuses the split for a GST clinic without the decision id (422 gst-opinion-required) and says so
+    const body = { priceFloorPercent: Number(floorInput) || 0, taxSplitEnabled: splitOn, gstOpinionDecisionId: decisionId.trim() };
+    if (await x.act(() => api.patch("/packages/settings", body), "Action failed.")) { setFloorEdit(null); setSplitEdit(null); setDecisionEdit(null); }
   }
 
   if (loading) return <main className={styles.page}><Skeleton rows={6} label="Loading treatment packages" /></main>;
@@ -131,7 +146,7 @@ export default function PackagesPage() {
           onRequestRefund={() => x.submitRefundRequest(inst.id)}
         />
       ) : mode === "form" ? (
-        <PackageForm editing={editing} staff={staff} onCancel={() => setMode("list")} onSaved={async () => { setMode("list"); await loadAll(); }} />
+        <PackageForm editing={editing} staff={staff} heads={heads} onCancel={() => setMode("list")} onSaved={async () => { setMode("list"); await loadAll(); }} />
       ) : mode === "sell" && canCreate ? (
         <SellWizard packages={packages} instances={instances} staff={staff} sellKeys={sellKeys} loadAll={loadAll}
           onCancel={() => setMode("list")} onOpenInstance={(id) => { setMode("list"); void x.openInstance(id); }} />
@@ -159,7 +174,10 @@ export default function PackagesPage() {
               onReview={(r) => void x.openDecision(r)} onApprove={() => void x.approveRefund()} onReject={() => void x.rejectRefund()} />
           )}
           {tab === "liability" && canApprove && liability && <LiabilityTab liability={liability} />}
-          {tab === "settings" && canEdit && <SettingsTab fe={fe} floorInput={floorInput} setFloorEdit={setFloorEdit} onSave={saveSettings} />}
+          {tab === "settings" && canEdit && (
+            <SettingsTab fe={fe} floorInput={floorInput} setFloorEdit={setFloorEdit} onSave={saveSettings}
+              split={settings ? { on: splitOn, setOn: setSplitEdit, decisionId, setDecisionId: setDecisionEdit, opinionRequired: settings.gstOpinionRequired } : null} />
+          )}
         </>
       )}
     </main>
@@ -177,7 +195,7 @@ function InstanceDetail({
   extendDate: string; setExtendDate: (v: string) => void;
   extendReason: string; setExtendReason: (v: string) => void;
   onExtend: () => void;
-  refundPreview: { paid: number; usedListValue: number; refundAmount: number; amountOwed: number } | null;
+  refundPreview: RefundPreviewT | null;
   onLoadRefundPreview: () => void;
   refundReason: string; setRefundReason: (v: string) => void;
   onRequestRefund: () => void;
@@ -247,6 +265,8 @@ function InstanceDetail({
             <>
               <div className={styles.itemLine}><span>Paid</span><span>{money(refundPreview.paid)}</span></div>
               <div className={styles.itemLine}><span>Used at list price</span><span>{money(refundPreview.usedListValue)}</span></div>
+              <RefundLines lines={refundPreview.lines} />
+              <p className={styles.muted}>No processing fee is deducted.</p>
               {refundPreview.amountOwed > 0 ? (
                 <div className={styles.bannerWarn}>Consumed services exceed the amount paid by {money(refundPreview.amountOwed)}. There is no refund; the difference must be collected.</div>
               ) : (
