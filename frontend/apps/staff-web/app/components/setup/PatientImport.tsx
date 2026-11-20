@@ -5,6 +5,8 @@ import s from "./patientImport.module.css";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { ApiError, api } from "../../lib/api";
+import { can } from "../../lib/permissions";
+import PaperQuickEntry from "./PaperQuickEntry";
 
 // ADM-012: upload -> dry-run diff -> mapping -> commit -> progress. Mounted by the setup page only for setup:edit.
 // Nothing is written to patients until the owner taps "Import"; the commit runs in the background.
@@ -168,6 +170,7 @@ export default function PatientImport() {
       {pane === "software" && <p className={s.note}>Export your patient list from the old software as Excel or CSV, then use the Excel / CSV tab. Columns are matched by their headings.</p>}
       {pane === "paper" && (
         <div className={s.panel}>
+          {can("patients:create") && <PaperQuickEntry />}
           <p className={s.note}>Type the register into the template, one patient per row, then upload it from the Excel / CSV tab.</p>
           <div className={s.row}><button type="button" className={s.btn} onClick={downloadTemplate}>Download template (CSV)</button></div>
         </div>

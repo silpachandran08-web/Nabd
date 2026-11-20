@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styles from "./patients.module.css";
 import GuardianReviews from "./GuardianReviews";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
@@ -30,8 +31,9 @@ function PatientsList() {
   const [perms, setPerms] = useState<Perms>(NO_PERMS);
   const [drawerId, setDrawerId] = useState<string | null>(null); // set while the drawer is open
   const [checkInFor, setCheckInFor] = useState<RegistryRow | null>(null);
-  const [overlay, setOverlay] = useState<"phones" | "duplicates" | "register" | null>(null); // ACC-028 / ACC-030 / register
+  const [overlay, setOverlay] = useState<"phones" | "duplicates" | "register" | "paper" | null>(null); // ACC-028 / ACC-030 / register / ADM-014
   const [flash, setFlash] = useState<string | null>(null);
+  const tPaper = useTranslations("shell.paperEntry");
   const { register: canRegister, billingView, patientsEdit, merge: canMerge } = perms;
   const reload = () => void load(q, filter);
 
@@ -62,6 +64,9 @@ function PatientsList() {
           )}
           {canMerge && !forbidden && (
             <button type="button" className={styles.secondaryBtn} style={{ minBlockSize: 44 }} onClick={() => setOverlay("duplicates")}>Possible duplicates</button>
+          )}
+          {canRegister && !forbidden && (
+            <button type="button" className={styles.secondaryBtn} style={{ minBlockSize: 44 }} onClick={() => setOverlay("paper")}>{tPaper("open")}</button>
           )}
           {canRegister && !forbidden && (
             <button type="button" className={styles.primaryBtn} onClick={() => setOverlay("register")}>＋ Register patient</button>
@@ -108,7 +113,7 @@ function PatientsList() {
         )}
       </div>
 
-      <RegistryOverlays checkInFor={checkInFor} fixingPhones={overlay === "phones"} reviewingDuplicates={overlay === "duplicates"} registering={overlay === "register"}
+      <RegistryOverlays checkInFor={checkInFor} fixingPhones={overlay === "phones"} reviewingDuplicates={overlay === "duplicates"} registering={overlay === "register"} typingPaper={overlay === "paper"}
         close={(w) => { if (w === "checkIn") setCheckInFor(null); else setOverlay(null); }} setFlash={setFlash} reload={reload} openDrawer={setDrawerId} />
 
       {drawerId && (

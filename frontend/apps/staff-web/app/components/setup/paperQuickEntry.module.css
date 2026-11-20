@@ -1,0 +1,20 @@
+.panel { display: grid; gap: var(--nb-space-12); }
+.card { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--nb-space-12); margin: 0; padding: 0; border: 0; min-inline-size: 0; }
+.card:disabled { opacity: 0.5; }
+.field { display: grid; gap: var(--nb-space-4); align-content: start; }
+.label { font-size: 12px; font-weight: 600; color: var(--nb-text-secondary); }
+.input { min-block-size: 44px; inline-size: 100%; padding-inline: var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-3); color: var(--nb-text-primary); font: inherit; }
+.input[aria-invalid="true"] { border-color: var(--nb-danger-500); }
+.note { margin: 0; font-size: 13px; color: var(--nb-text-secondary); }
+.err { font-size: 13px; color: var(--nb-danger-500); }
+.ok { font-size: 13px; color: var(--nb-ok-500); }
+.warn { font-size: 13px; font-weight: 600; color: var(--nb-warn-500); }
+.pill { min-block-size: 20px; }
+.match { display: grid; gap: var(--nb-space-8); padding: var(--nb-space-8); border: 1px solid var(--nb-warn-500); border-radius: var(--nb-radius-md); }
+.hits { margin: 0; padding-inline-start: var(--nb-space-16); font-size: 14px; color: var(--nb-text-primary); }
+.row { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; }
+.btn { min-block-size: 44px; padding-inline: var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; cursor: pointer; }
+.btnPrimary { composes: btn; border-color: var(--nb-accent-fill); background: var(--nb-accent-fill); color: var(--nb-on-accent); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.blocked { display: grid; gap: var(--nb-space-4); padding: var(--nb-space-12); border: 1px solid var(--nb-warn-500); border-radius: var(--nb-radius-md); color: var(--nb-text-primary); }
+.counter { margin: 0; font-size: 14px; font-weight: 600; color: var(--nb-text-primary); }

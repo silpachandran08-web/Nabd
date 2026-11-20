@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatNumber } from "@nabd/i18n";
+import { useTranslations } from "next-intl";
 import styles from "../patients.module.css";
 import BillingStatePill from "../../../components/ui/BillingStatePill";
 import { formatLastVisit } from "../../../lib/lastVisit";
@@ -22,6 +23,7 @@ export default function OverviewTab({ patient, listLastVisit, perms, onRegistryC
   const { clinicalView, clinicalEdit, billingView, register: canRegister, patientsEdit } = perms;
   const drawerPatient = patient;
   const [phoneShown, setPhoneShown] = useState(false);
+  const tPaper = useTranslations("shell.paperEntry");
   // A write that failed must say so — never leave the clinician thinking an allergy/guardian change landed.
   const fe = useFormErrors("pt", { substance: "Substance", severity: "Severity", reaction: "Reaction", category: "Category", condition: "Condition", reviewDueDate: "Review due date" });
   return (
@@ -31,6 +33,12 @@ export default function OverviewTab({ patient, listLastVisit, perms, onRegistryC
       <AllergyBanner patient={patient} clinicalView={clinicalView} />
 
       <div className={styles.statGrid}>
+        {drawerPatient.paperNote && (
+          <div className={styles.section}>
+            <div className={styles.sectionLabel}>{tPaper("paperNote")}</div>
+            <div className={styles.sectionValue}>{drawerPatient.paperNote}</div>
+          </div>
+        )}
         <div className={styles.section}>
           <div className={styles.sectionLabel}>Last visit</div>
           <div className={styles.sectionValue}>{/* LIVE-03: the list row's value first so list and drawer agree; detail when the row is not on this page */}
