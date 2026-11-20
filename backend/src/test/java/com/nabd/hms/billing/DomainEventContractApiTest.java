@@ -289,6 +289,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.APPOINTMENT_NO_SHOW.type()); // ACC-025: Acc025NoShowApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
         expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
+        expected.remove(DomainEventType.USAGE_REPORTED.type()); // COM-015: produced by services/comms-gateway (Com015UsageTest)
         expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
         expected.remove(DomainEventType.PATIENT_LINK_OPENED.type()); // PLT-041: written by LinkOpenRecorder when the secure-link service reports an open, Plt041LinkOpenApiTest
         expected.remove(DomainEventType.PHARMACY_STOCK_BATCH_CHANGED.type()); // PHL-005: Phl005StockBatchesApiTest

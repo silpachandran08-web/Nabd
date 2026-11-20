@@ -64,7 +64,9 @@ public enum NotificationPurpose {
     WHITE_GLOVE_SUMMARY("white_glove_summary", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** PHL-008: the pharmacy's daily stock-alert digest to its one named recipient (staff); 7 params: day, five counts, secure link.
      * Counts only, never a drug name. REMINDER, so COM-024 quiet hours apply. */
-    STOCK_ALERTS_DIGEST("stock_alerts_digest", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY);
+    STOCK_ALERTS_DIGEST("stock_alerts_digest", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY),
+    /** COM-015: the owner is told the clinic used 80% (or all) of the plan's WhatsApp allowance (staff recipient); 3 params: percent, used, allowance. */
+    MESSAGE_USAGE_ALERT("message_usage_alert", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;

@@ -312,5 +312,42 @@
     "slotAt": "Call at {time}",
     "covered": "Set up for you: {steps}",
     "grantNote": "Nabd works inside your clinic only after you approve a time-limited support access request."
+  },
+  "messageUsage": {
+    "title": "Messages and cost",
+    "month": "Month {month}",
+    "previous": "Previous month",
+    "next": "Next month",
+    "loading": "Loading message usage",
+    "loadFailed": "Couldn't load message usage.",
+    "allowance": "WhatsApp messages in your plan",
+    "usedOf": "{used} of {limit} used",
+    "alertsAt": "You get one alert at 80% and one at 100% of the allowance.",
+    "alert80": "You have used {pct}% of this month's WhatsApp messages in your plan.",
+    "alert100": "You have used all of this month's WhatsApp messages in your plan.",
+    "empty": "No messages counted this month",
+    "emptyHint": "Messages appear here once they are delivered and priced.",
+    "caption": "Cost is what the message provider charges, before tax.",
+    "colChannel": "Channel",
+    "colCategory": "Type",
+    "colCount": "Messages",
+    "colCost": "Cost",
+    "total": "Total ({currency})",
+    "channel": {
+      "whatsapp": "WhatsApp",
+      "sms": "SMS",
+      "email": "Email",
+      "voice": "Voice"
+    },
+    "category": {
+      "marketing": "Marketing",
+      "utility": "Utility",
+      "authentication": "Verification codes",
+      "service": "Replies to patients",
+      "otp": "Verification codes",
+      "service_implicit": "Service",
+      "service_explicit": "Service (opted in)",
+      "promotional": "Promotional"
+    }
   }
 }

@@ -31,3 +31,9 @@
 .field { display: flex; flex-direction: column; gap: var(--nb-space-4); }
 .input { min-block-size: 44px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; }
 .actions { display: flex; justify-content: flex-end; gap: var(--nb-space-8); }
+/* COM-015: message usage table */
+.tableWrap { overflow-x: auto; }
+.table { inline-size: 100%; border-collapse: collapse; color: var(--nb-text-primary); }
+.table caption { caption-side: bottom; padding-block-start: var(--nb-space-8); text-align: start; font-size: 13px; }
+.table th, .table td { padding: var(--nb-space-8) var(--nb-space-12); border-block-end: 1px solid var(--nb-border-subtle); text-align: start; }
+.table .num { text-align: end; font-variant-numeric: tabular-nums; }

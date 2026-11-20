@@ -71,7 +71,7 @@ public class BspSmsProvider implements SmsProvider {
         }
     }
 
-    /** One report or an array of reports: {"id", "status", "errorCode"?}. Intermediate states (SENT, ACCEPTED ...) are dropped. */
+    /** One report or an array of reports: {"id", "status", "errorCode"?, "cost"?}. Intermediate states (SENT, ACCEPTED ...) are dropped. */
     @Override
     public List<Dlr> parseDlr(byte[] body) {
         JsonNode root;
@@ -89,10 +89,20 @@ public class BspSmsProvider implements SmsProvider {
             String status = DELIVERED.contains(st) ? "delivered" : FAILED.contains(st) ? "failed" : null;
             if (status != null) {
                 String err = n.path("errorCode").asString(null);
-                out.add(new Dlr(id, status, err == null ? null : err.substring(0, Math.min(err.length(), 40))));
+                out.add(new Dlr(id, status, err == null ? null : err.substring(0, Math.min(err.length(), 40)), costMicros(n.path("cost"))));
             }
         }
         return out;
+    }
+
+    /** COM-015: "cost" is the charge in rupees (number or decimal string, e.g. "0.18"); absent, negative or unreadable = unknown. */
+    static Long costMicros(JsonNode cost) {
+        try {
+            java.math.BigDecimal v = cost.isNumber() ? cost.decimalValue() : cost.isString() ? new java.math.BigDecimal(cost.asString().trim()) : null;
+            return v == null || v.signum() < 0 || v.precision() - v.scale() > 6 ? null : v.movePointRight(6).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact();
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** COM-028: one MO or an array: {"id", "from", "text"}. from may be 10 digits or 91 + 10 digits, with or without '+'. */

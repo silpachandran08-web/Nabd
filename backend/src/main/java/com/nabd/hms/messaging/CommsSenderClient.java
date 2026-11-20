@@ -13,7 +13,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * COM-022: GET {gateway}/internal/v1/senders/**. Read only, no transaction, never logs a body. shortcut: the X-Internal-Token service token
+ * COM-022: GET {gateway}/internal/v1/senders/** (and COM-015: /internal/v1/usage). Read only, no transaction, never logs a body. shortcut: the X-Internal-Token service token
  * (app.comms.gateway.service-token) stands in for the mTLS aud=internal identity, like the gateway's inbox API (PLT-009).
  */
 @Component
@@ -51,6 +51,12 @@ class CommsSenderClient implements SenderDirectory {
                         .queryParam("limit", limit).build()).header("X-Internal-Token", token).retrieve().body(FleetPage.class));
     }
 
+    /** COM-015: GET {gateway}/internal/v1/usage?month=YYYY-MM, the clinic's message counts and cost for one calendar month. */
+    MessageUsageService.GatewayMonth usage(UUID tenantId, java.time.YearMonth month) {
+        return call(() -> http.get().uri(u -> u.path("/internal/v1/usage").queryParam("month", month.toString()).build())
+                .header("X-Tenant-Id", tenantId.toString()).header("X-Internal-Token", token).retrieve().body(MessageUsageService.GatewayMonth.class));
+    }
+
     private <T> T call(Supplier<T> request) {
         if (!configured || token.isBlank()) {
             throw unavailable();
@@ -64,6 +70,6 @@ class CommsSenderClient implements SenderDirectory {
 
     private static ApiException unavailable() {
         return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "messaging-unavailable", "WhatsApp status unavailable",
-                "The WhatsApp status could not be loaded right now. Try again in a minute.");
+                "The WhatsApp information could not be loaded right now. Try again in a minute.");
     }
 }

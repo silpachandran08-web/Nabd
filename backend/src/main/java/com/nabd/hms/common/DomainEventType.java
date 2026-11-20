@@ -71,7 +71,9 @@ public enum DomainEventType {
     /** PHL-019: a counter (OTC) sale was invoiced and its stock issued. Ids, a count and the total only. */
     PHARMACY_OTC_SALE_COMPLETED("pharmacy.otc_sale.completed.v1", "core/pharmacy"),
     /** PHL-009: a batch was taken off sale (by hand, by the nightly expiry pass or by a return into an expired batch). Ids and a reason code only. */
-    PHARMACY_BATCH_QUARANTINED("pharmacy.batch.quarantined.v1", "core/pharmacy");
+    PHARMACY_BATCH_QUARANTINED("pharmacy.batch.quarantined.v1", "core/pharmacy"),
+    /** COM-015: produced by services/comms-gateway once per clinic and closed day: message counts and cost by channel and category. No PHI. */
+    USAGE_REPORTED("comms.usage.reported.v1", "core/messaging");
 
     private final String type;
     private final String source;

@@ -257,6 +257,13 @@ schemas:
       owner_staff_id: operational
       reason: operational
       created_at: operational
+    message_usage_alerts:
+      tenant_id: operational
+      month: operational
+      threshold_pct: operational
+      used: operational
+      allowance: operational
+      created_at: operational
     stock_alerts:
       id: operational
       tenant_id: operational
