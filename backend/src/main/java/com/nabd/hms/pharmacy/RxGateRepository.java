@@ -52,6 +52,17 @@ class RxGateRepository {
         return out;
     }
 
+    /** PHL-020: units already billed against each paper prescription line on invoices that are not void. */
+    Map<UUID, Long> paperDispensed(UUID tenantId, Collection<UUID> lineIds) {
+        Map<UUID, Long> out = new HashMap<>();
+        jdbc.query("SELECT li.paper_rx_line_id, SUM(li.quantity) AS qty FROM invoice_line_items li " +
+                        "JOIN invoices i ON i.id = li.invoice_id AND i.tenant_id = li.tenant_id " +
+                        "WHERE li.tenant_id = ? AND li.paper_rx_line_id = ANY (?) AND i.status <> 'void' GROUP BY li.paper_rx_line_id",
+                (RowCallbackHandler) rs -> out.put(rs.getObject("paper_rx_line_id", UUID.class), rs.getLong("qty")),
+                tenantId, lineIds.toArray(new UUID[0]));
+        return out;
+    }
+
     List<RxGate.RxLineResponse> searchByPhone(UUID tenantId, String digits) {
         return jdbc.query("SELECT pi.id, p.id AS patient_id, p.name AS patient_name, pi.drug_name, pi.dosage, pi.quantity, pi.refills_allowed, pr.signed_at, " +
                         "(SELECT COALESCE(SUM(li.quantity), 0) FROM invoice_line_items li JOIN invoices i ON i.id = li.invoice_id " +

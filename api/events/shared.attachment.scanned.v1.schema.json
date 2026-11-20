@@ -29,7 +29,8 @@
         "outside_report",
         "clinical_photo",
         "xray",
-        "consent_form"
+        "consent_form",
+        "paper_rx"
       ]
     },
     "status": {

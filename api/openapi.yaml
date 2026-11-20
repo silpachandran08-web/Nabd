@@ -5452,6 +5452,9 @@ paths:
         a line with no prescribed quantity has none left). Refusals are 422 Problem+JSON: rx-required (no link, or the id is unknown in this
         tenant), rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted. Each refusal writes audit `pharmacy.rx_gate_blocked` and event
         `pharmacy.rx_gate.blocked.v1` { tenantId, itemId, reason, actorId }; nothing else is written and stock is unchanged.
+        PHL-020: instead of `prescriptionItemId` a line may carry `paperRxLineId` (uuid) of an outside prescription recorded with
+        POST /pharmacy/paper-prescriptions (never both: 400). Extra 422 refusals: rx-item-mismatch, rx-copy-required (the item's schedule
+        class keeps a duplicate copy: tick and photo needed), document-not-clean (the photo failed or lost its scan), rx-expired.
         A counter sale with linked Rx lines is recorded against that prescription's patient (patientId set); lines from two patients are
         rx-patient-mismatch. Sales against an outside (paper/photo) prescription are PHL-020.
         PHL-019: optional `payments: [{ method: cash|card|upi|other, amount, reference? }]` (at most 4) settle the new invoice in the same

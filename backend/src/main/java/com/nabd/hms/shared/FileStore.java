@@ -33,4 +33,20 @@ public interface FileStore {
 
     /** The bytes of an available file of the bound tenant; empty when it does not exist or is not available. */
     Optional<byte[]> content(UUID fileId);
+
+    /** PHL-020: a file readable only through the module that owns it. {@link #info} and {@link #bind} do not see it, so no
+     * generic path (visit attachment, secure link, signature) can pick it up by id. */
+    String PRIVATE_PURPOSE = "paper_rx";
+
+    record UploadSlot(UUID uploadId, String putUrl, long maxBytes) {
+    }
+
+    /** PHL-020: the PLT-029 upload slot for a caller that gates the upload with its own permission. Same type, size and scan rules. */
+    UploadSlot initUpload(UUID staffId, String purpose, String contentType, long sizeBytes);
+
+    /** Starts the scan of an uploaded slot of exactly this purpose (404 otherwise); returns the file id. */
+    UUID completeUpload(UUID uploadId, String purpose);
+
+    /** The scan status of a file of the bound tenant with exactly this purpose; empty when there is none. */
+    Optional<String> statusOf(UUID fileId, String purpose);
 }

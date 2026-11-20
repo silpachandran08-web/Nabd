@@ -13,7 +13,8 @@ import java.util.UUID;
  * and tax. chargeName/category/unitPrice/taxRatePercent are read ONLY for a free-text line (no active catalogue row),
  * which needs billing.discount; for a catalogue line they are ignored.
  * FIN-016: tier (optional) is the receptionist's pick for a Consultation head: normal | follow_up | emergency; absent = server default.
- * PHL-001: prescriptionItemId links the line to a signed prescription line; required when the catalogue item is_rx.
+ * PHL-001: prescriptionItemId links the line to a signed prescription line; required when the catalogue item is_rx
+ * (PHL-020: or paperRxLineId, never both).
  */
 public record LineItemRequest(
         @NotBlank String chargeCode,
@@ -26,12 +27,14 @@ public record LineItemRequest(
         UUID prescriptionItemId,
         String tier,
         /** PHL-018: "dispense anyway" for a stocked item when the shelf holds less than {@code quantity}; the missing units become a stock discrepancy. */
-        @jakarta.validation.constraints.Size(max = 200) String shortfallReason
+        @jakarta.validation.constraints.Size(max = 200) String shortfallReason,
+        /** PHL-020: links the line to a recorded outside (paper) prescription line instead of prescriptionItemId. */
+        UUID paperRxLineId
 ) {
     /** Existing callers: no tier (server default) and no shortfall reason. */
     public LineItemRequest(String chargeCode, String chargeName, String category, int quantity, BigDecimal unitPrice,
                            BigDecimal taxRatePercent, Override override, UUID prescriptionItemId) {
-        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, override, prescriptionItemId, null, null);
+        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, override, prescriptionItemId, null, null, null);
     }
 
     public record Override(@DecimalMin(value = "0") BigDecimal unitPrice, String reasonCode, String note) {
@@ -40,6 +43,6 @@ public record LineItemRequest(
     /** Server-built lines (package sales): no override. */
     public LineItemRequest(String chargeCode, String chargeName, String category, int quantity,
                            BigDecimal unitPrice, BigDecimal taxRatePercent) {
-        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, null, null, null, null);
+        this(chargeCode, chargeName, category, quantity, unitPrice, taxRatePercent, null, null, null, null, null);
     }
 }
