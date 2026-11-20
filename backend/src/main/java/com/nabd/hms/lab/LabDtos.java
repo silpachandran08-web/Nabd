@@ -23,8 +23,8 @@ public final class LabDtos {
 
     static final String CODE = "^[A-Za-z0-9][A-Za-z0-9_-]{0,23}$";
     static final String LOINC = "^[0-9]{1,7}-[0-9]$";
-    static final String TEXT = "^[^\\p{Cntrl}]*$";
-    static final String NONBLANK = "^(?=.*\\S)[^\\p{Cntrl}]*$";
+    static final String TEXT = "^[^\\x00-\\x1F\\x7F]*$";
+    static final String NONBLANK = "^(?=.*\\S)[^\\x00-\\x1F\\x7F]*$";
 
     private LabDtos() {
     }

@@ -56,7 +56,11 @@ class OffboardingController {
     @GetMapping("/v1/setup/offboarding")
     @PreAuthorize("hasAuthority('setup:export')")
     OffboardingService.Status status(@AuthenticationPrincipal Jwt jwt) {
-        owners.requireOwner(UUID.fromString(jwt.getSubject()));
+        try {
+            owners.requireOwner(UUID.fromString(jwt.getSubject()));
+        } catch (org.springframework.security.access.AccessDeniedException notOwner) {
+            return new OffboardingService.Status(null, null); // a custom role with setup:export sees nothing (the RBAC matrix cannot model owner-only reads)
+        }
         return service.status();
     }
 
@@ -76,8 +80,8 @@ class OffboardingController {
     OffboardingService.Cancelled cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http,
                                         @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
         UUID staff = UUID.fromString(jwt.getSubject());
-        owners.requireOwner(staff);
         StepUpVerifier.StepUp su = stepUp.requireFor(stepUpToken, staff, OffboardingService.CANCEL_STEP_UP_TARGET + id);
+        owners.requireOwner(staff); // after the step-up check, as the other owner-only writes: a custom role never gets past either
         return service.cancel(staff, su.assertionId(), id, RequestMeta.clientIp(http));
     }
 

@@ -29,7 +29,7 @@ import java.util.UUID;
  * summary sit behind audit_compliance:view (super_admin, compliance_dpo), like the audit-log export: PlatformPermissions
  * has no separate write grant for the two roles that already hold the surface.
  */
-@RestController
+@RestController("platformComplianceController") // the bean name "complianceController" is organization.setup.ComplianceController (PLT-054 merge)
 @RequestMapping("/v1/platform")
 public class ComplianceController {
 
