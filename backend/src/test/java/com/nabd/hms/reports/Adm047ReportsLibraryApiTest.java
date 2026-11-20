@@ -220,7 +220,7 @@ class Adm047ReportsLibraryApiTest extends ApiTestBase {
         assertThat(xlsx.getBody().get("contentType")).isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
         byte[] pdf = file(export(f.token(), "takings", "pdf", today, today));
-        assertThat(new String(pdf, StandardCharsets.ISO_8859_1)).startsWith("%PDF").contains("Daily money");
+        assertThat(new String(pdf, StandardCharsets.ISO_8859_1)).startsWith("%PDF").contains("DAILY MONEY");
 
         // one audit row per export: actor, report, filters, row count, masked flag
         List<String> audits = inTenantTx(f.tenant().id(), () -> jdbc.queryForList(
@@ -232,7 +232,7 @@ class Adm047ReportsLibraryApiTest extends ApiTestBase {
         // the event: ids, report key, format and row count; never a name
         List<String> evs = inTenantTx(f.tenant().id(), () -> jdbc.queryForList(
                 "SELECT payload::text FROM outbox_events WHERE event_type = 'reporting.export.created.v1'", String.class));
-        assertThat(evs).hasSize(3).allSatisfy(e -> assertThat(e).contains("\"reportId\":\"takings\"").contains("\"rows\":1").doesNotContain("Rollup"));
+        assertThat(evs).hasSize(3).allSatisfy(e -> assertThat(e).contains("\"reportId\": \"takings\"").contains("\"rows\": 1").doesNotContain("Rollup"));
 
         // no reports:export -> 403 and nothing audited; bad format -> 400
         assertThat(export(viewer, "takings", "csv", today, today).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
