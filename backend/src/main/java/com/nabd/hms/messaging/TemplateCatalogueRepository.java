@@ -42,6 +42,11 @@ class TemplateCatalogueRepository {
                 (Object) languages.toArray(new String[0]));
     }
 
+    List<String> languages(UUID tenantId) {
+        return jdbc.queryForList("SELECT DISTINCT language FROM whatsapp_templates WHERE tenant_id = ? AND catalogue_key IS NOT NULL ORDER BY 1",
+                String.class, tenantId);
+    }
+
     boolean instantiated(UUID tenantId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM whatsapp_templates WHERE tenant_id = ? AND catalogue_key IS NOT NULL)", Boolean.class, tenantId));
