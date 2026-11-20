@@ -44,6 +44,11 @@ modules:
     packages: [iam, auth, staff]
     owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences, training_completions]
     reads: [patients, phi_read_log, specialty_profiles, staff_specialty_profiles]  # CLN-042: the access token carries the staff member's specialty claim and specialty_<code> permissions; PLT-013: the owner's break-glass review lists what the holder read (phi_read_log by grant) with the patient's name and MRN
+  lab:
+    # PHL-041: the test and panel catalogue. Prices live on charge_catalogue and are read and written through
+    # organization.api.ChargeCatalogue, never by SQL from here.
+    owns: [lab_panel_tests, lab_panels, lab_tests]
+    reads: []
   messaging:
     owns: [comms_cutover_flags, message_usage_alerts, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands

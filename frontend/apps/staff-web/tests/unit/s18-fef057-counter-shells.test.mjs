@@ -149,7 +149,8 @@ test("route skeletons: every planned counter item has its thin page on the Plann
       const page = new URL(`../../app/(clinic)${i.href.split("?")[0]}/page.tsx`, import.meta.url);
       if (i.planned) {
         assert.ok(existsSync(page), i.href);
-        assert.match(readFileSync(page, "utf8"), new RegExp(`<PlannedScreen id="${i.id}" />`), i.href);
+        // bare skeleton, or (PHL-041: a built screen behind a still-`planned` item) the same gate wrapping its screen as children
+        assert.match(readFileSync(page, "utf8"), new RegExp(`<PlannedScreen id="${i.id}"( />|>)`), i.href);
       }
     }
   }

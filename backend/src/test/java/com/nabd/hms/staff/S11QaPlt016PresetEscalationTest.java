@@ -109,9 +109,9 @@ class S11QaPlt016PresetEscalationTest extends ApiTestBase {
         UUID tenantId = provisionTenant("q3p" + UUID.randomUUID().toString().substring(0, 8));
         List<Map<String, Object>> roles = inTenantTx(tenantId, () -> jdbc.queryForList(
                 "SELECT name, built_in, preset_code, grants::text AS grants FROM roles WHERE tenant_id = ?", tenantId));
-        assertThat(roles).hasSize(6);
+        assertThat(roles).hasSize(7); // PHL-041: plus Lab technician
         assertThat(roles).extracting(r -> r.get("name")).containsExactlyInAnyOrder(
-                "Owner", "Owner-doctor", "Doctor", "Nurse", "Receptionist", "Front-desk + Vitals");
+                "Owner", "Owner-doctor", "Doctor", "Nurse", "Receptionist", "Front-desk + Vitals", "Lab technician");
         for (Map<String, Object> r : roles) {
             RolePresets.Preset p = RolePresets.byCode((String) r.get("preset_code")).orElseThrow();
             List<ModuleGrant> seeded = readGrants((String) r.get("grants"));

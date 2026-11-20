@@ -827,5 +827,139 @@
     "col_delays": "Delays",
     "col_avg": "Average (min)",
     "col_repeat": "Days with 2+ delays"
+  },
+  "lab": {
+    "title": "Lab test catalogue",
+    "subtitle": "Tests and panels with their sample, container, turnaround time and price. Orders, labels, billing and reports use these definitions.",
+    "tabsLabel": "Catalogue section",
+    "tab": {
+      "tests": "Tests",
+      "panels": "Panels"
+    },
+    "loading": "Loading the lab catalogue",
+    "loadFailed": "Couldn't load the lab catalogue.",
+    "more": "Load more",
+    "save": "Save",
+    "saving": "Saving…",
+    "close": "Close",
+    "volume": "{ml} mL",
+    "tests": {
+      "title": "Tests",
+      "search": "Search",
+      "searchHint": "Code, name or LOINC",
+      "searchGo": "Search",
+      "add": "Add test",
+      "edit": "Edit",
+      "editOf": "Edit {name}",
+      "empty": "No tests in the catalogue yet.",
+      "emptyHint": "The lab manager adds tests here.",
+      "emptyHintEdit": "Add a test, or import the starter pack and set your prices.",
+      "noMatch": "No test matches your search.",
+      "noPrice": "Not set",
+      "saved": "{name} saved."
+    },
+    "col": {
+      "code": "Code",
+      "name": "Name",
+      "loinc": "LOINC",
+      "sample": "Sample",
+      "container": "Container",
+      "unit": "Unit",
+      "tat": "Turnaround",
+      "price": "Price",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "needsPrice": "Needs a price"
+    },
+    "tat": {
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "hours": "{count, plural, one {# hour} other {# hours}}",
+      "days": "{count, plural, one {# day} other {# days}}"
+    },
+    "sample": {
+      "whole_blood": "Whole blood",
+      "serum": "Serum",
+      "plasma": "Plasma",
+      "urine": "Urine",
+      "urine_24h": "24-hour urine",
+      "arterial_blood": "Arterial blood"
+    },
+    "container": {
+      "edta_lavender": "EDTA tube (lavender)",
+      "sst_gold": "Serum gel tube (gold)",
+      "plain_red": "Plain tube (red)",
+      "citrate_blue": "Citrate tube (light blue)",
+      "fluoride_grey": "Fluoride tube (grey)",
+      "heparin_green": "Heparin tube (green)",
+      "heparin_syringe": "Heparinised syringe",
+      "urine_container": "Urine container",
+      "urine_24h_container": "24-hour urine container"
+    },
+    "drawer": {
+      "addTitle": "Add test",
+      "editTitle": "Edit {name}",
+      "loinc": "LOINC code (optional)",
+      "volume": "Sample volume (mL)",
+      "method": "Method (optional)",
+      "tat": "Turnaround time (minutes)",
+      "price": "Price",
+      "taxCode": "Tax code (optional)",
+      "active": "Active: can be ordered and billed",
+      "activateHint": "This test came from the starter pack without a price. Set its price, then tick Active.",
+      "priceHint": "The price is kept on the clinic price list. A change applies to new bills; bills already issued keep their price."
+    },
+    "errors": {
+      "code": "Enter a code of up to 24 letters, digits, - or _.",
+      "name": "Enter a name of up to 120 characters.",
+      "loinc": "A LOINC code looks like 2345-7.",
+      "volume": "Enter the sample volume in mL.",
+      "unit": "Enter the result unit.",
+      "tat": "Enter the turnaround time in minutes, from 1 to 43200.",
+      "price": "Enter a price of 0 or more with up to two decimals.",
+      "duplicate": "That code is already in use. Choose another code.",
+      "saveFailed": "Couldn't save. Try again."
+    },
+    "import": {
+      "open": "Import starter pack",
+      "title": "Import the starter pack",
+      "checking": "Checking what the starter pack would add",
+      "failed": "Couldn't check the starter pack.",
+      "willAdd": "{count, plural, =0 {Nothing to add: your catalogue already has every test of the starter pack.} one {# test will be added.} other {# tests will be added.}}",
+      "skipped": "{count, plural, one {# test is already in your catalogue and stays as it is.} other {# tests are already in your catalogue and stay as they are.}}",
+      "unreviewed": "This list has not been reviewed by a pathologist yet. Check each LOINC code, sample type, container and unit before you rely on it, and set your own turnaround times.",
+      "noPrices": "The starter pack has no prices. Each imported test stays inactive until you set its price.",
+      "showCodes": "Show the codes",
+      "confirm": "{count, plural, one {Import # test} other {Import # tests}}",
+      "running": "Importing…",
+      "done": "{count, plural, one {# test imported. Set its price to activate it.} other {# tests imported. Set their prices to activate them.}}"
+    },
+    "panels": {
+      "title": "Panels",
+      "subtitle": "A panel is ordered as its tests and billed once at the panel price.",
+      "add": "Add panel",
+      "addTitle": "Add panel",
+      "empty": "No panels yet.",
+      "emptyHintEdit": "Group tests that are ordered together, such as a lipid profile, and give the group one price.",
+      "tests": "Tests",
+      "separately": "If billed separately",
+      "price": "Panel price",
+      "saving": "Saving",
+      "count": "{count, plural, one {# test} other {# tests}}",
+      "saved": "{name} saved.",
+      "noTests": "Add and activate tests before you build a panel.",
+      "pick": "{count, plural, =0 {Choose the tests} one {# test chosen} other {# tests chosen}}",
+      "filter": "Filter the tests",
+      "maths": "Tests billed separately: {total}. The panel saves the patient {saving}."
+    },
+    "panelErrors": {
+      "code": "Enter a code of up to 24 letters, digits, - or _.",
+      "name": "Enter a name of up to 120 characters.",
+      "tests": "Choose between 1 and 60 tests.",
+      "price": "Enter a price of 0 or more with up to two decimals."
+    }
   }
 }

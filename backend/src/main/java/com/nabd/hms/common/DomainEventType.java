@@ -80,7 +80,9 @@ public enum DomainEventType {
     /** ADM-016: a leaving clinic's rows were erased and its deletion certificate issued. Ids, the erase time and totals only. */
     ORGANIZATION_OFFBOARDING_ERASED("organization.offboarding.erased.v1", "core/organization"),
     /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
-    REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting");
+    REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
+    /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
+    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab");
 
     private final String type;
     private final String source;

@@ -1242,6 +1242,42 @@ schemas:
       buyer_gstin: financial
       change_seq: operational
       updated_at: operational
+    lab_panel_tests:
+      tenant_id: operational
+      panel_id: operational
+      test_id: operational
+      display_order: operational
+    lab_panels:
+      id: operational
+      tenant_id: operational
+      code: operational
+      name: operational
+      charge_item_id: operational
+      active: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
+    lab_tests:
+      id: operational
+      tenant_id: operational
+      code: operational
+      name: operational
+      loinc: operational
+      sample_type: operational
+      container: operational
+      volume_ml: operational
+      method: operational
+      unit: operational
+      decimals: operational
+      tat_minutes: operational
+      charge_item_id: operational
+      outsourced_partner_id: operational
+      active: operational
+      sensitive: operational
+      auto_release_to_patient: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
     legal_entities:
       id: operational
       owner_id: operational

@@ -141,6 +141,21 @@ class SetupRepository {
                 chargeMapper(), tenantId, id).stream().findFirst();
     }
 
+    /** PHL-041: several heads by id (the lab catalogue shows each test's price from here). */
+    List<ChargeHeadRow> findCharges(UUID tenantId, java.util.Collection<UUID> ids) {
+        return jdbc.query(
+                "SELECT id, code, name, category, base_amount, follow_up_amount, emergency_amount, tax_code, " +
+                        "tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order " +
+                        "FROM charge_catalogue WHERE tenant_id = ? AND id = ANY (?)",
+                chargeMapper(), tenantId, ids.toArray(new UUID[0]));
+    }
+
+    /** PHL-041: those of the given codes the price master already has. */
+    java.util.Set<String> chargeCodesIn(UUID tenantId, java.util.Collection<String> codes) {
+        return new java.util.HashSet<>(jdbc.queryForList("SELECT code FROM charge_catalogue WHERE tenant_id = ? AND code = ANY (?)",
+                String.class, tenantId, codes.toArray(new String[0])));
+    }
+
     UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req) {
         return insertCharge(tenantId, req, null, null);
     }

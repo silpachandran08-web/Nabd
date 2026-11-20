@@ -204,7 +204,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
         Set<String> modules = grants.stream().map(ModuleGrant::module).collect(Collectors.toSet());
 
         assertThat(modules).containsExactlyInAnyOrder("staff", "patients", "queue", "setup", "clinical",
-                "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing", "departments", "compliance");
+                "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing", "departments", "compliance", "lab");
         // PLT-016: the Owner preset now follows the RBAC matrix (+ MF-52), so it is no longer all-true; the exact
         // grants are checked against the golden file in RolePresetSeedApiTest. Every module stays visible to the Owner,
         // and the Owner may still hand out clinical access (RoleService treats the Owner as holding every grant).

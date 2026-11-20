@@ -242,7 +242,7 @@ class ProvisioningStepRunner {
         log.info("provisioning job {} created tenant {} (owner {}, brand {})", job.id(), tenantId, ownerId, brandId);
     }
 
-    /** PLT-016: seeds the six preset role bundles from the iam preset catalogue (RolePresets). */
+    /** PLT-016: seeds the preset role bundles from the iam preset catalogue (RolePresets). */
     private void seedMasters(Job job) {
         UUID tenantId = job.createdTenantId();
         if (tenantId == null) {
