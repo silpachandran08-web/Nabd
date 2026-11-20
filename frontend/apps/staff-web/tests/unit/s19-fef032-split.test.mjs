@@ -79,7 +79,7 @@ const OTHER_TAB_MODULES = ["components/setup/PharmacyPanel.tsx", "components/set
   "(clinic)/setup/WhatsAppTemplates.tsx", "(clinic)/setup/DisplayDevices.tsx", "(clinic)/setup/TimezoneSelect.tsx"];
 
 test("AC2: every setup tab except Checklist / Departments is its own route segment under the shared setup layout", () => {
-  assert.equal(TAB_ROUTES.length, 15);
+  assert.equal(TAB_ROUTES.length, 16); // PLT-022 added Branches
   for (const k of TAB_ROUTES) assert.ok(existsSync(join(APP, SETUP, k, "page.tsx")), k);
   assert.ok(existsSync(join(APP, SETUP, "page.tsx")) && existsSync(join(APP, SETUP, "layout.tsx")));
   // the wizard (FIN-017 price step), Departments and Booking rules keep their own routes, and the layout leaves them unframed

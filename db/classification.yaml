@@ -78,6 +78,15 @@ schemas:
       decision_source_before_no_show: operational
       late_arrival_queue_entry_id: operational
       cancel_reason_code: operational
+    config_bundle_imports:
+      id: operational
+      tenant_id: operational
+      source_tenant_id: operational
+      sections: operational
+      status: operational
+      started_at: operational
+      finished_at: operational
+      error: operational
     reason_code_catalogue:
       kind: operational
       code: operational
@@ -2443,6 +2452,9 @@ schemas:
       secure_link_ttl_days: operational
       consent_two_witnesses: operational
       day_start_minute: operational
+      branch_code: operational
+      branch_label: operational
+      branch_address: operational
     vaccine_records:
       id: operational
       tenant_id: operational

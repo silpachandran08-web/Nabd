@@ -131,7 +131,8 @@ public class ProvisioningService {
         repo.updateJobStatus(jobId, "running");
         StepResult result = StepResult.NONE;
         try {
-            result = stepRunner.run(job, next.stepName());
+            // PLT-022: the source clinic is read here, in its own transaction, before the step binds one to the new clinic
+            result = stepRunner.run(job, next.stepName(), stepRunner.bundleFor(job, next.stepName()));
             repo.markStepDone(next.id());
             sendEmails(next, result);
             boolean allDone = !repo.hasIncompleteSteps(jobId);

@@ -349,5 +349,70 @@
       "service_explicit": "Service (opted in)",
       "promotional": "Promotional"
     }
+  },
+  "branches": {
+    "title": "Branches",
+    "loading": "Loading your branches",
+    "loadFailed": "Your branches could not be loaded.",
+    "empty": "No branches yet.",
+    "add": "Add branch",
+    "upgrade": "See plans",
+    "planLimit": "Your plan allows {limit, plural, one {# branch} other {# branches}} and all are in use. Upgrade your plan to add another.",
+    "started": "{name} is being set up. You can keep working; progress shows here.",
+    "progress": "{done} of {total} steps done",
+    "progressLabel": "Setting up {name}",
+    "stoppedAt": "Stopped at: {step}",
+    "failedHint": "Setting up stopped at \"{step}\". Nothing from that step was saved. Retry to continue from there.",
+    "retry": "Retry",
+    "retrying": "Retrying…",
+    "retryFailed": "The retry could not be started.",
+    "step": {
+      "create_tenant": "Create the branch",
+      "seed_masters": "Set up roles and defaults",
+      "copy_config": "Copy your configuration",
+      "provision_whatsapp": "Prepare WhatsApp templates",
+      "go_live": "Open the branch"
+    },
+    "stepStatus": {
+      "queued": "waiting",
+      "running": "in progress",
+      "done": "done",
+      "failed": "stopped"
+    },
+    "status": {
+      "provisioning": "Being set up",
+      "trialing": "Trial",
+      "active": "Active",
+      "overdue": "Payment overdue",
+      "suspended": "Suspended",
+      "offboarding": "Closing",
+      "offboarded": "Closed"
+    },
+    "wizardTitle": "Add branch: step {step} of {total}",
+    "name": "Branch name",
+    "code": "Branch code",
+    "codeHint": "2 to 20 letters, digits or hyphens, for example BLR-2. Staff sign in with your clinic code followed by this code.",
+    "address": "Address",
+    "timezone": "Timezone",
+    "regionPinned": "Region: {region}. A branch is always in your region; this cannot be changed.",
+    "copyFrom": "Copy from",
+    "copyWhat": "What to copy",
+    "copyNothing": "Nothing",
+    "section": {
+      "departments": "Departments and service points",
+      "charges": "Charges and fees",
+      "policies": "Clinic policies",
+      "roles": "Roles",
+      "templates": "WhatsApp template languages",
+      "hours": "Holidays and quiet hours"
+    },
+    "neverCopied": "Patients, staff accounts, doctor schedules, stock and clinical records are never copied.",
+    "mfaCode": "6-digit code from your authenticator app",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Add branch",
+    "adding": "Adding…",
+    "addFailed": "The branch could not be added."
   }
 }

@@ -56,6 +56,16 @@ public class TemplateCatalogueService implements CatalogueTemplates {
     }
 
     @Override
+    public List<String> languages(UUID tenantId) {
+        return tenantScope.run(tenantId, () -> catalogue.languages(tenantId)); // joins the caller's transaction for this clinic
+    }
+
+    @Override
+    public int instantiateIfAbsent(UUID tenantId, List<String> languages) {
+        return instantiate(tenantId, languages, false);
+    }
+
+    @Override
     public void removeInstantiated(UUID tenantId) {
         tenantScope.run(tenantId, () -> catalogue.deleteInstantiated(tenantId));
     }

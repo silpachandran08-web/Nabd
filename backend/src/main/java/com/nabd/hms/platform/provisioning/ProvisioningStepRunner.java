@@ -51,14 +51,16 @@ class ProvisioningStepRunner {
     private final com.nabd.hms.common.EventPublisher events;
     private final com.nabd.hms.organization.api.RegionRules regions;
     private final com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys;
+    private final com.nabd.hms.common.ConfigBundle configBundle;
 
-    ProvisioningStepRunner(com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys, ProvisioningRepository repo, TenantContext tenantContext,
+    ProvisioningStepRunner(com.nabd.hms.common.ConfigBundle configBundle, com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys, ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
                             OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
                             com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates) {
         this.tenantKeys = tenantKeys;
+        this.configBundle = configBundle;
         this.catalogueTemplates = catalogueTemplates;
         this.events = events;
         this.regions = regions;
@@ -75,18 +77,38 @@ class ProvisioningStepRunner {
     /** Returns both reveal-once invite tokens when this step is verify_invite_owner (StepResult.NONE otherwise, never persisted). */
     @Transactional
     StepResult run(Job job, String stepName) {
+        return run(job, stepName, null);
+    }
+
+    /** PLT-022: what copy_config of an add-branch job will write; null for every other step. Not transactional on purpose:
+     * the export opens its own transaction bound to the source clinic, so it must run before {@link #run} binds the new one. */
+    com.nabd.hms.common.ConfigBundle.Bundle bundleFor(Job job, String stepName) {
+        return job.isBranch() && "copy_config".equals(stepName)
+                ? configBundle.export(job.branch().sourceTenantId(), job.branch().copySections()) : null;
+    }
+
+    /** PLT-022: bundle is the source clinic's configuration for copy_config (read by the caller before this transaction), else null. */
+    @Transactional
+    StepResult run(Job job, String stepName, com.nabd.hms.common.ConfigBundle.Bundle bundle) {
         // PLT-058: the effect and its idempotency key commit together, so a retry after a crash never redoes the effect.
         if (repo.effectCommitted(job.id(), stepName)) {
             log.info("provisioning job {} step {} effect already committed; marking done without re-running", job.id(), stepName); // log-phi-ok: workflow step name
             return StepResult.NONE;
         }
-        StepResult result = execute(job, stepName);
+        StepResult result = execute(job, stepName, bundle);
         repo.recordEffect(job.id(), stepName);
         return result;
     }
 
-    private StepResult execute(Job job, String stepName) {
+    private StepResult execute(Job job, String stepName, com.nabd.hms.common.ConfigBundle.Bundle bundle) {
         return switch (stepName) {
+            case "copy_config" -> {
+                if (job.createdTenantId() == null || bundle == null) {
+                    throw new IllegalStateException("copy_config needs the new clinic and the source clinic's configuration");
+                }
+                configBundle.apply(job.createdTenantId(), bundle); // binds this transaction to the new clinic
+                yield StepResult.NONE;
+            }
             case "create_tenant" -> {
                 createTenant(job);
                 yield StepResult.NONE;
@@ -119,6 +141,11 @@ class ProvisioningStepRunner {
     @Transactional
     void undo(Job job, String stepName) {
         switch (stepName) {
+            case "copy_config" -> {
+                if (job.createdTenantId() != null) {
+                    configBundle.remove(job.createdTenantId());
+                }
+            }
             case "seed_masters" -> undoSeedMasters(job);
             case "create_tenant" -> undoCreateTenant(job);
             case "verify_invite_owner" -> undoInviteOwner(job);
@@ -198,7 +225,8 @@ class ProvisioningStepRunner {
         boolean brandIsNew = existingBrand.isEmpty();
         UUID brandId = existingBrand.orElseGet(() -> repo.insertBrand(ownerId, job.brandName()));
 
-        UUID tenantId = repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
+        UUID tenantId = job.isBranch() ? repo.insertBranchTenant(job.branch(), job.tenantSlug(), job.tenantName(), brandId)
+                : repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
         repo.setJobCreatedRefs(job.id(), tenantId, ownerId, brandId);
         repo.setJobCreationFlags(job.id(), ownerIsNew, brandIsNew);
         tenantKeys.provision(tenantId, job.region()); // PLT-045: the tenant's DEK exists before any patient row can be written
@@ -279,6 +307,10 @@ class ProvisioningStepRunner {
         // OPS-061: the region is now immutable; the control plane records the tenant's cell routing from this
         events.publish(tenantId, com.nabd.hms.common.DomainEventType.TENANT_REGION_PINNED, tenantId,
                 java.util.Map.of("regionCode", job.region(), "cell", regions.region(job.region()).cell()));
+        if (job.isBranch()) { // PLT-022: subscriptions and the template gateway learn about the new branch
+            events.publish(tenantId, com.nabd.hms.common.DomainEventType.ORGANIZATION_BRANCH_CREATED, tenantId, java.util.Map.of(
+                    "ownerId", job.createdOwnerId(), "brandId", job.createdBrandId(), "sourceTenantId", job.branch().sourceTenantId()));
+        }
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {
