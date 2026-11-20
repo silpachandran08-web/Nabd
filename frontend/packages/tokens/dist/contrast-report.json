@@ -783,5 +783,29 @@
       "min": 3,
       "pass": true
     }
-  ]
+  ],
+  "chartPalette": {
+    "dark": {
+      "pass": true,
+      "failures": [],
+      "worst": {
+        "normal": 19.4,
+        "protan": 10.07,
+        "deutan": 9.53,
+        "tritan": 3,
+        "contrast": 3.24
+      }
+    },
+    "light": {
+      "pass": true,
+      "failures": [],
+      "worst": {
+        "normal": 20.64,
+        "protan": 10.79,
+        "deutan": 10.27,
+        "tritan": 5.93,
+        "contrast": 3.49
+      }
+    }
+  }
 }

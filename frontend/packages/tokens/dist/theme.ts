@@ -37,7 +37,13 @@ export const theme = {
       "text-secondary": "#a6b0b8",
       "text-tertiary": "#8b97a0",
       "text-disabled": "#657078",
-      "focus-ring": "#2ed3e0"
+      "focus-ring": "#2ed3e0",
+      "chart-1": "#27a2b1",
+      "chart-2": "#8c611a",
+      "chart-3": "#ad6ffa",
+      "chart-4": "#00b502",
+      "chart-5": "#dc2d72",
+      "chart-6": "#0a64cf"
     },
     "light": {
       "bg-root": "#eef2f4",
@@ -75,7 +81,13 @@ export const theme = {
       "text-secondary": "#4b565e",
       "text-tertiary": "#616d75",
       "text-disabled": "#98a2a9",
-      "focus-ring": "#0a6c76"
+      "focus-ring": "#0a6c76",
+      "chart-1": "#11989f",
+      "chart-2": "#b6780a",
+      "chart-3": "#ad55ec",
+      "chart-4": "#206007",
+      "chart-5": "#b70f6b",
+      "chart-6": "#2551aa"
     }
   },
   "space": {

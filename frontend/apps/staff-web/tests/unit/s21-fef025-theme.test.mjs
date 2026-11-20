@@ -30,7 +30,7 @@ const MAP = {
   "urgent-500": "urg", "urgent-tint": "urg-t", "text-primary": "tx", "text-secondary": "tx2", "text-tertiary": "tx3", "text-disabled": "tx4",
   "focus-ring": "acc-300", "shadow-md": "shadow-md",
 };
-const NO_PROTOTYPE = ["danger-600", "info-600"];
+const NO_PROTOTYPE = ["danger-600", "info-600", "chart-1", "chart-2", "chart-3", "chart-4", "chart-5", "chart-6"]; // FEF-026: validated chart palette, not in the prototype
 const norm = (v) => String(v).toLowerCase().replace(/\s+/g, "").replace(/(^|[^\d])\.(\d)/g, "$10.$2").replace(/(\.\d*?)0+(?=[),])/g, "$1").replace(/\.(?=[),])/g, "");
 function block(css, selector) {
   const i = css.indexOf(`${selector} {`);

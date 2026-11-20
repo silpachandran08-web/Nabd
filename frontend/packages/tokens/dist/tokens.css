@@ -39,6 +39,12 @@
   --nb-text-tertiary: #8b97a0;
   --nb-text-disabled: #657078;
   --nb-focus-ring: #2ed3e0;
+  --nb-chart-1: #27a2b1;
+  --nb-chart-2: #8c611a;
+  --nb-chart-3: #ad6ffa;
+  --nb-chart-4: #00b502;
+  --nb-chart-5: #dc2d72;
+  --nb-chart-6: #0a64cf;
   --nb-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.55);
   --nb-space-2: 2px;
   --nb-space-4: 4px;
@@ -127,5 +133,11 @@
   --nb-text-tertiary: #616d75;
   --nb-text-disabled: #98a2a9;
   --nb-focus-ring: #0a6c76;
+  --nb-chart-1: #11989f;
+  --nb-chart-2: #b6780a;
+  --nb-chart-3: #ad55ec;
+  --nb-chart-4: #206007;
+  --nb-chart-5: #b70f6b;
+  --nb-chart-6: #2551aa;
   --nb-shadow-md: 0 10px 28px rgba(10, 14, 18, 0.14);
 }
