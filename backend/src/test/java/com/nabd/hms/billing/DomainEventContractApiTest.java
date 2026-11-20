@@ -312,6 +312,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.BREAK_GLASS_REVIEWED.type()); // PLT-013: Plt013BreakGlassReviewApiTest
         expected.remove(DomainEventType.PACKAGE_SOLD.type()); // COM-044: Com044PackageMessagingApiTest
         expected.remove(DomainEventType.SPECIALTY_PHOTO_ADDED.type()); // CLN-047: Cln047DermPhotosApiTest
+        expected.remove(DomainEventType.LAB_CATALOGUE_CHANGED.type()); // PHL-041: Phl041LabCatalogueApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

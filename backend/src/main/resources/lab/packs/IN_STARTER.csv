@@ -1,0 +1,159 @@
+# PHL-041 starter pack IN_STARTER: 150 common quantitative tests for a clinic laboratory in India.
+# NEEDS LAB REVIEW: drafted as reference data, not yet signed off by a pathologist. Before a clinic relies on it a reviewer
+# confirms every LOINC code, sample type, container and unit, and each lab sets its own turnaround times.
+# No prices, no reference ranges and no methods are shipped: the clinic sets them. tat_minutes are placeholders by test group
+# (30 blood gas, 240 routine, 1440 immunoassay and drug levels), not a promise.
+# LOINC codes are (c) Regenstrief Institute, used under the LOINC licence; the product must carry the LOINC notice before go-live.
+# reviewed: false
+# review-note: Not yet reviewed by a pathologist. Check each LOINC code, sample type, container and unit, and set your own turnaround times and prices.
+code,name,loinc,sample_type,container,unit,tat_minutes
+HB,Haemoglobin,718-7,whole_blood,edta_lavender,g/dL,240
+HCT,Haematocrit,4544-3,whole_blood,edta_lavender,%,240
+RBC,Red cell count,789-8,whole_blood,edta_lavender,10*6/uL,240
+WBC,White cell count,6690-2,whole_blood,edta_lavender,10*3/uL,240
+PLT,Platelet count,777-3,whole_blood,edta_lavender,10*3/uL,240
+MCV,Mean corpuscular volume,787-2,whole_blood,edta_lavender,fL,240
+MCH,Mean corpuscular haemoglobin,785-6,whole_blood,edta_lavender,pg,240
+MCHC,Mean corpuscular haemoglobin concentration,786-4,whole_blood,edta_lavender,g/dL,240
+RDW,Red cell distribution width,788-0,whole_blood,edta_lavender,%,240
+MPV,Mean platelet volume,32623-1,whole_blood,edta_lavender,fL,240
+NEUT-PCT,Neutrophils percent,770-8,whole_blood,edta_lavender,%,240
+LYMPH-PCT,Lymphocytes percent,736-9,whole_blood,edta_lavender,%,240
+MONO-PCT,Monocytes percent,5905-5,whole_blood,edta_lavender,%,240
+EOS-PCT,Eosinophils percent,713-8,whole_blood,edta_lavender,%,240
+BASO-PCT,Basophils percent,706-2,whole_blood,edta_lavender,%,240
+NEUT-ABS,Neutrophils absolute,751-8,whole_blood,edta_lavender,10*3/uL,240
+LYMPH-ABS,Lymphocytes absolute,731-0,whole_blood,edta_lavender,10*3/uL,240
+MONO-ABS,Monocytes absolute,742-7,whole_blood,edta_lavender,10*3/uL,240
+EOS-ABS,Eosinophils absolute,711-2,whole_blood,edta_lavender,10*3/uL,240
+BASO-ABS,Basophils absolute,704-7,whole_blood,edta_lavender,10*3/uL,240
+RETIC-PCT,Reticulocytes percent,17849-1,whole_blood,edta_lavender,%,240
+ESR,Erythrocyte sedimentation rate (Westergren),4537-7,whole_blood,edta_lavender,mm/h,240
+HBA1C,Glycated haemoglobin (HbA1c),4548-4,whole_blood,edta_lavender,%,240
+HBA2,Haemoglobin A2,4551-8,whole_blood,edta_lavender,%,240
+HBF,Haemoglobin F,4576-5,whole_blood,edta_lavender,%,240
+G6PD,Glucose-6-phosphate dehydrogenase,32546-4,whole_blood,edta_lavender,U/g{Hb},240
+CD4,CD4 count,24467-3,whole_blood,edta_lavender,/uL,240
+PT,Prothrombin time,5902-2,plasma,citrate_blue,s,240
+INR,International normalised ratio,6301-6,plasma,citrate_blue,{INR},240
+APTT,Activated partial thromboplastin time,14979-9,plasma,citrate_blue,s,240
+FIB,Fibrinogen,3255-7,plasma,citrate_blue,mg/dL,240
+DDIMER,D-dimer,48065-7,plasma,citrate_blue,ug/mL{FEU},240
+GLU-F,Glucose fasting,1558-6,plasma,fluoride_grey,mg/dL,240
+GLU-PP,Glucose 2 hours post meal,1521-4,plasma,fluoride_grey,mg/dL,240
+GLU-R,Glucose random,2345-7,plasma,fluoride_grey,mg/dL,240
+LACT,Lactate,2524-7,plasma,fluoride_grey,mmol/L,240
+UREA,Urea,3091-6,serum,sst_gold,mg/dL,240
+BUN,Blood urea nitrogen,3094-0,serum,sst_gold,mg/dL,240
+CREAT,Creatinine,2160-0,serum,sst_gold,mg/dL,240
+EGFR,Estimated GFR (CKD-EPI),62238-1,serum,sst_gold,mL/min/{1.73_m2},240
+URIC,Uric acid,3084-1,serum,sst_gold,mg/dL,240
+NA,Sodium,2951-2,serum,sst_gold,mmol/L,240
+K,Potassium,2823-3,serum,sst_gold,mmol/L,240
+CL,Chloride,2075-0,serum,sst_gold,mmol/L,240
+HCO3,Bicarbonate,1963-8,serum,sst_gold,mmol/L,240
+AGAP,Anion gap,33037-3,serum,sst_gold,mmol/L,240
+CA,Calcium,17861-6,serum,sst_gold,mg/dL,240
+PHOS,Phosphate,2777-1,serum,sst_gold,mg/dL,240
+MG,Magnesium,19123-9,serum,sst_gold,mg/dL,240
+TBIL,Bilirubin total,1975-2,serum,sst_gold,mg/dL,240
+DBIL,Bilirubin direct,1968-7,serum,sst_gold,mg/dL,240
+IBIL,Bilirubin indirect,1971-1,serum,sst_gold,mg/dL,240
+AST,Aspartate aminotransferase (AST),1920-8,serum,sst_gold,U/L,240
+ALT,Alanine aminotransferase (ALT),1742-6,serum,sst_gold,U/L,240
+ALP,Alkaline phosphatase,6768-6,serum,sst_gold,U/L,240
+GGT,Gamma glutamyl transferase,2324-2,serum,sst_gold,U/L,240
+TP,Protein total,2885-2,serum,sst_gold,g/dL,240
+ALB,Albumin,1751-7,serum,sst_gold,g/dL,240
+GLOB,Globulin,10834-0,serum,sst_gold,g/dL,240
+AGR,Albumin/globulin ratio,1759-0,serum,sst_gold,{ratio},240
+CHOL,Cholesterol total,2093-3,serum,sst_gold,mg/dL,240
+TG,Triglycerides,2571-8,serum,sst_gold,mg/dL,240
+HDL,HDL cholesterol,2085-9,serum,sst_gold,mg/dL,240
+LDL-CALC,LDL cholesterol calculated,13457-7,serum,sst_gold,mg/dL,240
+LDL-DIR,LDL cholesterol direct,18262-6,serum,sst_gold,mg/dL,240
+VLDL,VLDL cholesterol calculated,13458-5,serum,sst_gold,mg/dL,240
+NONHDL,Non-HDL cholesterol,43396-1,serum,sst_gold,mg/dL,240
+CHOL-HDL,Cholesterol/HDL ratio,9830-1,serum,sst_gold,{ratio},240
+LDH,Lactate dehydrogenase,2532-0,serum,sst_gold,U/L,240
+CK,Creatine kinase,2157-6,serum,sst_gold,U/L,240
+CKMB,Creatine kinase MB mass,13969-1,serum,sst_gold,ng/mL,240
+AMY,Amylase,1798-8,serum,sst_gold,U/L,240
+LIPASE,Lipase,3040-3,serum,sst_gold,U/L,240
+FE,Iron,2498-4,serum,sst_gold,ug/dL,240
+TIBC,Total iron binding capacity,2500-7,serum,sst_gold,ug/dL,240
+TSAT,Transferrin saturation,2502-3,serum,sst_gold,%,240
+CRP,C-reactive protein,1988-5,serum,sst_gold,mg/L,240
+TROPI,Troponin I,10839-9,serum,sst_gold,ng/mL,1440
+HSTROPI,Troponin I high sensitivity,89579-7,serum,sst_gold,ng/L,1440
+HSTROPT,Troponin T high sensitivity,67151-1,serum,sst_gold,ng/L,1440
+NTPROBNP,NT-proBNP,33762-6,serum,sst_gold,pg/mL,1440
+BNP,B-type natriuretic peptide,30934-4,plasma,edta_lavender,pg/mL,serum
+FERR,Ferritin,2276-4,serum,sst_gold,ng/mL,1440
+B12,Vitamin B12,2132-9,serum,sst_gold,pg/mL,1440
+FOLATE,Folate,2284-8,serum,sst_gold,ng/mL,1440
+VITD,Vitamin D 25-hydroxy total,62292-8,serum,sst_gold,ng/mL,1440
+HSCRP,C-reactive protein high sensitivity,30522-7,serum,sst_gold,mg/L,1440
+PCT,Procalcitonin,33959-8,serum,sst_gold,ng/mL,1440
+RF,Rheumatoid factor,11572-5,serum,sst_gold,[IU]/mL,1440
+C3,Complement C3,4485-9,serum,sst_gold,mg/dL,1440
+C4,Complement C4,4498-2,serum,sst_gold,mg/dL,1440
+IGG,Immunoglobulin G,2465-3,serum,sst_gold,mg/dL,1440
+IGA,Immunoglobulin A,2458-8,serum,sst_gold,mg/dL,1440
+IGM,Immunoglobulin M,2472-9,serum,sst_gold,mg/dL,1440
+IGE,Immunoglobulin E total,19113-0,serum,sst_gold,[IU]/mL,1440
+TSH,Thyroid stimulating hormone,3016-3,serum,sst_gold,m[IU]/L,1440
+FT4,Free T4,3024-7,serum,sst_gold,ng/dL,1440
+FT3,Free T3,3051-0,serum,sst_gold,pg/mL,1440
+T4,T4 total,3026-2,serum,sst_gold,ug/dL,1440
+T3,T3 total,3053-6,serum,sst_gold,ng/dL,1440
+ANTI-TPO,Thyroid peroxidase antibody,8099-4,serum,sst_gold,[IU]/mL,1440
+THYROGLOB,Thyroglobulin,3013-0,serum,sst_gold,ng/mL,1440
+CORT,Cortisol,2143-6,serum,sst_gold,ug/dL,1440
+INSULIN,Insulin,20448-7,serum,sst_gold,u[IU]/mL,1440
+CPEP,C-peptide,1986-9,serum,sst_gold,ng/mL,1440
+PTH,Parathyroid hormone intact,2731-8,serum,sst_gold,pg/mL,1440
+PRL,Prolactin,2842-3,serum,sst_gold,ng/mL,1440
+LH,Luteinising hormone,10501-5,serum,sst_gold,m[IU]/mL,1440
+FSH,Follicle stimulating hormone,15067-2,serum,sst_gold,m[IU]/mL,1440
+E2,Estradiol,2243-4,serum,sst_gold,pg/mL,1440
+PROG,Progesterone,2839-9,serum,sst_gold,ng/mL,1440
+TESTO,Testosterone total,2986-8,serum,sst_gold,ng/dL,1440
+CYSC,Cystatin C,33863-2,serum,sst_gold,mg/L,1440
+BHCG,Beta hCG quantitative,21198-7,serum,sst_gold,m[IU]/mL,1440
+ACTH,Adrenocorticotropic hormone,2141-0,plasma,edta_lavender,pg/mL,serum
+PSA,Prostate specific antigen total,2857-1,serum,sst_gold,ng/mL,1440
+FPSA,Prostate specific antigen free,10886-0,serum,sst_gold,ng/mL,1440
+CEA,Carcinoembryonic antigen,2039-6,serum,sst_gold,ng/mL,1440
+AFP,Alpha-fetoprotein,1834-1,serum,sst_gold,ng/mL,1440
+CA125,Cancer antigen 125,10334-1,serum,sst_gold,U/mL,1440
+CA199,Cancer antigen 19-9,24108-3,serum,sst_gold,U/mL,1440
+CA153,Cancer antigen 15-3,6875-9,serum,sst_gold,U/mL,1440
+HCY,Homocysteine,13965-9,serum,sst_gold,umol/L,1440
+LPA,Lipoprotein (a),10835-7,serum,sst_gold,mg/dL,1440
+APOA1,Apolipoprotein A1,1869-7,serum,sst_gold,mg/dL,1440
+APOB,Apolipoprotein B,1884-6,serum,sst_gold,mg/dL,1440
+TRANSFERRIN,Transferrin,3034-6,serum,sst_gold,mg/dL,1440
+ANTI-HBS,Hepatitis B surface antibody quantitative,16935-9,serum,sst_gold,m[IU]/mL,1440
+RUBELLA-IGG,Rubella IgG antibody,5334-8,serum,sst_gold,[IU]/mL,1440
+ANTI-TTG-IGA,Tissue transglutaminase IgA antibody,31017-7,serum,sst_gold,U/mL,1440
+LITHIUM,Lithium,14334-7,serum,plain_red,mmol/L,1440
+DIGOXIN,Digoxin,10535-3,serum,plain_red,ng/mL,1440
+PHENYTOIN,Phenytoin,3968-5,serum,plain_red,ug/mL,1440
+VALPROATE,Valproate,4086-5,serum,plain_red,ug/mL,1440
+CARBAMAZEPINE,Carbamazepine,3432-2,serum,plain_red,ug/mL,1440
+VANCO-TROUGH,Vancomycin trough,4092-3,serum,plain_red,ug/mL,1440
+U-CREAT,Urine creatinine,2161-8,urine,urine_container,mg/dL,240
+U-MALB,Urine microalbumin,14957-5,urine,urine_container,mg/L,240
+U-ACR,Urine albumin/creatinine ratio,9318-7,urine,urine_container,mg/g{creat},240
+U-PCR,Urine protein/creatinine ratio,2890-2,urine,urine_container,mg/g{creat},240
+U-PROT-24H,Urine protein 24 hour,2889-4,urine_24h,urine_24h_container,mg/(24.h),1440
+U-PH,Urine pH,5803-2,urine,urine_container,[pH],240
+U-NA,Urine sodium,2955-3,urine,urine_container,mmol/L,240
+U-K,Urine potassium,2828-2,urine,urine_container,mmol/L,240
+ABG-PH,Arterial pH,2744-1,arterial_blood,heparin_syringe,[pH],30
+ABG-PCO2,Arterial pCO2,2019-8,arterial_blood,heparin_syringe,mm[Hg],30
+ABG-PO2,Arterial pO2,2703-7,arterial_blood,heparin_syringe,mm[Hg],30
+ABG-HCO3,Arterial bicarbonate,1960-4,arterial_blood,heparin_syringe,mmol/L,30
+ABG-BE,Arterial base excess,1925-7,arterial_blood,heparin_syringe,mmol/L,30
+ABG-SO2,Arterial oxygen saturation,2708-6,arterial_blood,heparin_syringe,%,30

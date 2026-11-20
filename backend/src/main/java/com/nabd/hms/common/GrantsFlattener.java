@@ -24,6 +24,15 @@ public final class GrantsFlattener {
             if (g.approve() && "pharmacy".equals(g.module())) out.add("pharmacy:adjust_approve");
             // PHL-012: editing the pharmacy (the pharmacist's grant) also lets the holder work the in-house dispensing worklist.
             if (g.edit() && "pharmacy".equals(g.module())) out.add("pharmacy:dispense");
+            // PHL-041: the lab's named permissions follow the lab module's flags: create = order tests (doctors), edit = collect
+            // samples and enter results (the technician), approve = validate and release (the pathologist), delete = manage the
+            // catalogue and QC (the lab manager).
+            if ("lab".equals(g.module())) {
+                if (g.create()) out.add("lab:order");
+                if (g.edit()) out.addAll(List.of("lab:collect", "lab:result"));
+                if (g.approve()) out.addAll(List.of("lab:validate", "lab:release"));
+                if (g.delete()) out.addAll(List.of("lab:catalogue", "lab:qc"));
+            }
             if (g.export()) out.add(g.module() + ":export");
             if (g.breakGlass() && "clinical".equals(g.module())) out.add("clinical:breakGlass");
         }

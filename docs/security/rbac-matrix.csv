@@ -5,6 +5,8 @@
 #   clinical:approve; owner_doctor = owner OR doctor plus clinical:approve; breakGlass (not a sheet column) stays with the Owner (RolePresets);
 #   PHL-010: pharmacy adjust_approve (not a sheet column) is derived from pharmacy approve (GrantsFlattener), so it is listed wherever that is;
 #   PHL-012: pharmacy dispense (not a sheet column) is derived from pharmacy edit (GrantsFlattener) in the same way.
+#   PHL-041: the lab module (not a sheet row; 'extension' in the golden file) and the lab_technician preset. Its named actions are derived from the
+#   lab flags (GrantsFlattener): order from create, collect|result from edit, validate|release from approve, catalogue|qc from delete.
 # plane=operator: 'SaaS Operator Roles' sheet as coded in PlatformPermissions (SSA-02, V2-005, V3-001, PLT-056, CLN-004, ADM-005/006 onboarding).
 # A change here must be matched in RolePresets / PlatformPermissions and the generated cases regenerated: mvn test -Dtest=RbacMatrixApiTest,OperatorMatrixApiTest -Drbac.write=true
 plane,role,module,actions
@@ -21,6 +23,7 @@ clinic,owner,compliance,view|delete|approve|export
 clinic,owner,nursing,view|create|edit|delete|approve|refundDiscount|export
 clinic,owner,specialty_dental,view|create|edit|delete|approve|refundDiscount|export
 clinic,owner,departments,view|create|edit|delete|approve|refundDiscount|export
+clinic,owner,lab,view|create|edit|delete|approve|refundDiscount|export|order|collect|result|validate|release|catalogue|qc
 clinic,owner_doctor,patients,view|create|edit|delete|approve|export
 clinic,owner_doctor,queue,view|create|edit|delete|approve|export
 clinic,owner_doctor,clinical,view|create|edit|delete|approve|export|breakGlass
@@ -34,6 +37,7 @@ clinic,owner_doctor,compliance,view|delete|approve|export
 clinic,owner_doctor,nursing,view|create|edit|delete|approve|refundDiscount|export
 clinic,owner_doctor,specialty_dental,view|create|edit|delete|approve|refundDiscount|export
 clinic,owner_doctor,departments,view|create|edit|delete|approve|refundDiscount|export
+clinic,owner_doctor,lab,view|create|edit|delete|approve|refundDiscount|export|order|collect|result|validate|release|catalogue|qc
 clinic,doctor,patients,view|create|edit
 clinic,doctor,queue,view|edit
 clinic,doctor,clinical,view|create|edit|delete
@@ -47,6 +51,7 @@ clinic,doctor,compliance,
 clinic,doctor,nursing,view|create
 clinic,doctor,specialty_dental,view|create|edit
 clinic,doctor,departments,view
+clinic,doctor,lab,view|create|order
 clinic,nurse,patients,view|edit
 clinic,nurse,queue,view|edit
 clinic,nurse,clinical,view|create|edit
@@ -60,6 +65,7 @@ clinic,nurse,compliance,
 clinic,nurse,nursing,view|create|edit
 clinic,nurse,specialty_dental,view
 clinic,nurse,departments,view
+clinic,nurse,lab,
 clinic,receptionist,patients,view|create|edit
 clinic,receptionist,queue,view|create|edit
 clinic,receptionist,clinical,
@@ -73,6 +79,7 @@ clinic,receptionist,compliance,
 clinic,receptionist,nursing,
 clinic,receptionist,specialty_dental,
 clinic,receptionist,departments,view
+clinic,receptionist,lab,
 clinic,frontdesk_vitals,patients,view|create|edit
 clinic,frontdesk_vitals,queue,view|create|edit
 clinic,frontdesk_vitals,clinical,view|create
@@ -86,6 +93,21 @@ clinic,frontdesk_vitals,compliance,
 clinic,frontdesk_vitals,nursing,
 clinic,frontdesk_vitals,specialty_dental,
 clinic,frontdesk_vitals,departments,view
+clinic,frontdesk_vitals,lab,
+clinic,lab_technician,patients,view
+clinic,lab_technician,queue,
+clinic,lab_technician,clinical,
+clinic,lab_technician,billing,
+clinic,lab_technician,packages,
+clinic,lab_technician,pharmacy,
+clinic,lab_technician,reports,
+clinic,lab_technician,staff,
+clinic,lab_technician,setup,
+clinic,lab_technician,compliance,
+clinic,lab_technician,nursing,
+clinic,lab_technician,specialty_dental,
+clinic,lab_technician,departments,view
+clinic,lab_technician,lab,view|edit|collect|result
 operator,super_admin,command_centre,view
 operator,super_admin,clinics_fleet,view
 operator,super_admin,tenant_detail,view|edit

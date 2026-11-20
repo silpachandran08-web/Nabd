@@ -18,7 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** PLT-016 (T-090): a newly provisioned tenant has exactly the six presets, with grants equal to the RBAC matrix golden file. */
+/** PLT-016 (T-090): a newly provisioned tenant has exactly the presets (the six of the matrix plus PHL-041 Lab technician), with grants equal to the RBAC matrix golden file. */
 class RolePresetSeedApiTest extends ApiTestBase {
 
     @Autowired
@@ -34,9 +34,9 @@ class RolePresetSeedApiTest extends ApiTestBase {
                 "SELECT name, built_in, preset_code, preset_version, grants::text AS grants FROM roles WHERE tenant_id = ?", tenantId));
 
         assertThat(roles).extracting(r -> r.get("name")).containsExactlyInAnyOrder(
-                "Owner", "Owner-doctor", "Doctor", "Nurse", "Receptionist", "Front-desk + Vitals");
+                "Owner", "Owner-doctor", "Doctor", "Nurse", "Receptionist", "Front-desk + Vitals", "Lab technician");
         assertThat(roles).extracting(r -> r.get("preset_code")).containsExactlyInAnyOrder(
-                "owner", "owner_doctor", "doctor", "nurse", "receptionist", "frontdesk_vitals");
+                "owner", "owner_doctor", "doctor", "nurse", "receptionist", "frontdesk_vitals", "lab_technician");
         assertThat(roles).allMatch(r -> Integer.valueOf(RolePresets.VERSION).equals(r.get("preset_version")));
         assertThat(roles).filteredOn(r -> Boolean.TRUE.equals(r.get("built_in"))).extracting(r -> r.get("name")).containsExactly("Owner");
 
@@ -69,7 +69,7 @@ class RolePresetSeedApiTest extends ApiTestBase {
         stepRunner.run(job, "seed_masters");
         Integer count = inTenantTx(tenantId, () -> jdbc.queryForObject(
                 "SELECT count(*) FROM roles WHERE tenant_id = ? AND preset_code IS NOT NULL", Integer.class, tenantId));
-        assertThat(count).isEqualTo(6);
+        assertThat(count).isEqualTo(7);
     }
 
     /** Golden file (matrix + extension rows), then MF-52 on the Owner and Owner-doctor = Owner OR Doctor plus clinical:approve. */
@@ -86,7 +86,7 @@ class RolePresetSeedApiTest extends ApiTestBase {
             }
             out.computeIfAbsent(c[0], k -> new HashMap<>()).put(c[1], f);
         }
-        assertThat(out.values().stream().mapToInt(Map::size).sum()).isEqualTo(65); // 5 roles x (10 matrix + 3 extension)
+        assertThat(out.values().stream().mapToInt(Map::size).sum()).isEqualTo(84); // 5 matrix roles + PHL-041 lab_technician, each x (10 matrix + 4 extension modules)
         out.get("owner").get("clinical")[4] = false; // MF-52
         Map<String, boolean[]> ownerDoctor = new HashMap<>();
         out.get("owner").forEach((module, o) -> {
