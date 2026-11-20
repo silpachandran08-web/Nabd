@@ -20,7 +20,7 @@ import static com.nabd.hms.patient.PatientModels.PatientRow;
 class PatientRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, mrn, name, phone, dob, gender, guardian_id, address, status, created_at ";
+            "id, tenant_id, mrn, name, phone, dob, gender, guardian_id, address, status, created_at, dob_year_only, paper_note ";
 
     /**
      * NB-053: consent is checked here, in the query, not filtered after the fact in the service or
@@ -400,6 +400,12 @@ class PatientRepository {
                 id, tenantId, name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc, synthetic);
     }
 
+    /** ADM-014: marks a row just inserted from a paper card (year of birth only, optional card note). */
+    void markPaperImport(UUID tenantId, UUID id, String note) {
+        jdbc.update("UPDATE patients SET registration_source = 'paper_import', dob_year_only = true, paper_note = ? WHERE tenant_id = ? AND id = ?",
+                note, tenantId, id);
+    }
+
     /**
      * Partial update: writes ONLY the given columns (column name -> value; a null value clears that
      * column). Columns not in the map are never touched, so PATCH cannot wipe address, national_id_enc
@@ -528,7 +534,9 @@ class PatientRepository {
                     guardianId == null ? null : UUID.fromString(guardianId),
                     rs.getString("address"),
                     rs.getString("status"),
-                    rs.getTimestamp("created_at").toInstant());
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getBoolean("dob_year_only"),
+                    rs.getString("paper_note"));
         };
     }
 
