@@ -2340,6 +2340,13 @@ schemas:
       tour_key: operational
       completed_at: operational
       competency_passed_at: operational
+    training_completions:
+      id: operational
+      tenant_id: operational
+      staff_id: operational
+      module_id: operational
+      score: operational
+      completed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational
