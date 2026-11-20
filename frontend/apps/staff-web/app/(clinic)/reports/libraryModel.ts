@@ -67,11 +67,20 @@ export function framePath(q: FrameQuery): string {
   return `/reports/${q.key}?${p}`;
 }
 
-/** Base64 (the export answer) to bytes, as an ArrayBuffer a Blob takes. */
+/** Base64 (the export answer) to bytes, as an ArrayBuffer a Blob takes. Decoded by hand: the lint rule bans atob. */
 export function decodeBase64(b64: string): ArrayBuffer {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const clean = b64.replace(/=+$/, "");
+  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let bits = 0, acc = 0, n = 0;
+  for (const ch of clean) {
+    acc = (acc << 6) | A.indexOf(ch);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[n++] = (acc >> bits) & 0xff;
+    }
+  }
   return out.buffer as ArrayBuffer;
 }
 
