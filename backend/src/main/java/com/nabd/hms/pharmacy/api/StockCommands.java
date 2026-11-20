@@ -90,6 +90,24 @@ public interface StockCommands {
      * maker as actor and {@code approverId} as second signer (null when none was needed). A batch may appear once only. */
     List<AdjustedBatch> adjustBatches(List<BatchAdjustment> adjustments, UUID actorId, UUID approverId, String sourceType, UUID sourceId);
 
+    // ---- PHL-009: quarantine, supplier returns and write-offs ----
+
+    /** Takes a batch off sale: status 'quarantined', so it is never picked. Publishes pharmacy.batch.quarantined.v1.
+     * 404 for an unknown batch, 409 already-quarantined when it is not active.
+     * @param reason expired, damaged or other (the caller validates the list)
+     * @return the batch's item */
+    UUID quarantine(UUID batchId, String reason);
+
+    /** The nightly pass for the bound clinic: every active batch with stock whose expiry date is before the clinic's today
+     * (the same "expired" rule as {@link #pick}) is quarantined, one event each. @return the batches quarantined */
+    List<UUID> quarantineExpired();
+
+    /** Units leave quarantine for good, set-based like {@link #adjustBatches}: one immutable movement of {@code kind}
+     * ('return_out' or 'write_off') per batch, {@code approverId} as second signer (the witness of a write-off; null when none).
+     * Every delta is negative. 422 batch-not-quarantined when a batch is not quarantined, 400 insufficient-stock when one holds
+     * less; nothing changes then. An emptied batch stays 'quarantined' (the movements say where it went). */
+    List<AdjustedBatch> removeQuarantined(List<BatchAdjustment> removals, String kind, UUID actorId, UUID approverId, String sourceType, UUID sourceId);
+
     /** Preview of the FEFO pick for {@code qty}, no stock change. Expired, quarantined and empty batches are never picked;
      * with {@code courseDays}, batches that expire mid-course are skipped when the rest of the stock covers the quantity.
      * 422 batch-expired when only expired stock is left, 400 insufficient-stock when there is too little. */

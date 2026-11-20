@@ -148,8 +148,8 @@ class BatchRepository {
         return out;
     }
 
-    /** One 'adjustment' movement per batch in one INSERT; arrays are parallel. */
-    void insertAdjustments(UUID tenantId, UUID[] itemIds, UUID[] batchIds, Integer[] deltas, Integer[] before, String[] reasons, String[] reasonCodes,
+    /** One movement of {@code kind} per batch in one INSERT; arrays are parallel. */
+    void insertMovements(UUID tenantId, String kind, UUID[] itemIds, UUID[] batchIds, Integer[] deltas, Integer[] before, String[] reasons, String[] reasonCodes,
                            UUID actorId, UUID approverId, String sourceType, UUID sourceId) {
         UUID[] ids = new UUID[batchIds.length];
         for (int i = 0; i < ids.length; i++) {
@@ -158,21 +158,22 @@ class BatchRepository {
         jdbc.update(con -> {
             var ps = con.prepareStatement("INSERT INTO pharmacy_stock_movements (id, tenant_id, item_id, batch_id, kind, delta, qty_before, qty_after, " +
                     "reason, reason_code, actor_id, approved_by, source_type, source_id) " +
-                    "SELECT m.id, ?::uuid, m.item_id, m.batch_id, 'adjustment', m.delta, m.before, m.before + m.delta, m.reason, m.code, ?::uuid, ?::uuid, ?::text, ?::uuid " +
+                    "SELECT m.id, ?::uuid, m.item_id, m.batch_id, ?::text, m.delta, m.before, m.before + m.delta, m.reason, m.code, ?::uuid, ?::uuid, ?::text, ?::uuid " +
                     "FROM unnest(?::uuid[], ?::uuid[], ?::uuid[], ?::int[], ?::int[], ?::text[], ?::text[]) " +
                     "AS m(id, item_id, batch_id, delta, before, reason, code)");
             ps.setObject(1, tenantId);
-            ps.setObject(2, actorId);
-            ps.setObject(3, approverId);
-            ps.setString(4, sourceType);
-            ps.setObject(5, sourceId);
-            ps.setArray(6, con.createArrayOf("uuid", ids));
-            ps.setArray(7, con.createArrayOf("uuid", itemIds));
-            ps.setArray(8, con.createArrayOf("uuid", batchIds));
-            ps.setArray(9, con.createArrayOf("int4", deltas));
-            ps.setArray(10, con.createArrayOf("int4", before));
-            ps.setArray(11, con.createArrayOf("text", reasons));
-            ps.setArray(12, con.createArrayOf("text", reasonCodes));
+            ps.setString(2, kind);
+            ps.setObject(3, actorId);
+            ps.setObject(4, approverId);
+            ps.setString(5, sourceType);
+            ps.setObject(6, sourceId);
+            ps.setArray(7, con.createArrayOf("uuid", ids));
+            ps.setArray(8, con.createArrayOf("uuid", itemIds));
+            ps.setArray(9, con.createArrayOf("uuid", batchIds));
+            ps.setArray(10, con.createArrayOf("int4", deltas));
+            ps.setArray(11, con.createArrayOf("int4", before));
+            ps.setArray(12, con.createArrayOf("text", reasons));
+            ps.setArray(13, con.createArrayOf("text", reasonCodes));
             return ps;
         });
     }
@@ -183,6 +184,22 @@ class BatchRepository {
                         "AND invoice_id = ? AND batch_id IS NOT NULL AND kind IN ('dispense', 'restock', 'return_in') GROUP BY batch_id HAVING -sum(delta) > 0 " +
                         "ORDER BY batch_id",
                 (rs, i) -> new Object[]{UUID.fromString(rs.getString(1)), rs.getInt(2)}, tenantId, itemId, invoiceId);
+    }
+
+    /** PHL-009: the batches among {@code batchIds} that are not quarantined (none = all may leave quarantine). */
+    List<UUID> notQuarantined(UUID tenantId, UUID[] batchIds) {
+        return jdbc.query(con -> {
+            var ps = con.prepareStatement("SELECT id FROM stock_batches WHERE tenant_id = ? AND id = ANY (?) AND status <> 'quarantined' ORDER BY id");
+            ps.setObject(1, tenantId);
+            ps.setArray(2, con.createArrayOf("uuid", batchIds));
+            return ps;
+        }, (rs, i) -> rs.getObject(1, UUID.class));
+    }
+
+    /** PHL-009 nightly pass: active batches with stock past their expiry date become 'quarantined'; returns their ids. */
+    List<UUID> quarantineExpired(UUID tenantId, LocalDate today) {
+        return jdbc.query("UPDATE stock_batches SET status = 'quarantined' WHERE tenant_id = ? AND status = 'active' AND qty_on_hand > 0 " +
+                "AND expiry_date < ? RETURNING id", (rs, i) -> rs.getObject(1, UUID.class), tenantId, Date.valueOf(today));
     }
 
     /** PHL-011: an expired batch that takes back a customer return becomes 'quarantined' (never picked by FEFO). */
