@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams, useSelectedLayoutSegment } fro
 import styles from "./setup.module.css";
 import AccessGate from "../../components/ui/AccessGate";
 import { can } from "../../lib/permissions";
+import { isOwner } from "../../lib/session";
 import { TABS, isSetupTab, isTabRoute, tabHref } from "./setupTabs";
 import { SetupStoreProvider } from "./setupStore";
 import { SaveFailBanner } from "./setupTab";
@@ -57,12 +58,13 @@ function SetupTabs() {
   const segment = pathname.split("/")[2] ?? null;
   const tab = pathname === "/setup" ? (isSetupTab(tabParam) ? tabParam : "checklist") : segment;
   const [canPharmacy, setCanPharmacy] = useState(false);
+  const [owner, setOwner] = useState(false); // PLT-022: the Branches tab is absent for everyone but the owner
   useEffect(() => {
-    void Promise.resolve().then(() => setCanPharmacy(can("pharmacy:view")));
+    void Promise.resolve().then(() => { setCanPharmacy(can("pharmacy:view")); setOwner(isOwner()); });
   }, []);
   return (
     <div className={styles.tabs}>
-      {TABS.filter((t) => t.key !== "pharmacy" || canPharmacy).map((t) => (
+      {TABS.filter((t) => (t.key !== "pharmacy" || canPharmacy) && (t.key !== "branches" || owner)).map((t) => (
         <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => router.replace(tabHref(t.key), { scroll: false })}>
           {t.label}
         </button>

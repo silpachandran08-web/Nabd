@@ -15,6 +15,7 @@ export const TABS = [
   { key: "shifts", label: "Shifts" },
   { key: "payroll", label: "Payroll" },
   { key: "subscription", label: "Subscription" },
+  { key: "branches", label: "Branches" },
   { key: "data", label: "Import / Export" },
   { key: "licences", label: "Licences" },
   { key: "pharmacy", label: "Pharmacy" },
