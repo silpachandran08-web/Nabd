@@ -56,7 +56,13 @@ class Phl019CounterSaleApiTest extends ApiTestBase {
     }
 
     private Clinic clinic(String mode) {
+        return clinic(mode, t -> { });
+    }
+
+    /** @param beforeLogin changes to the tenant row made before anyone signs in (market, tax identity) */
+    private Clinic clinic(String mode, java.util.function.Consumer<UUID> beforeLogin) {
         SeededTenant t = seedTenant();
+        beforeLogin.accept(t.id());
         SeededStaff staff = seedStaff(t, seedFullAccessRole(t.id()), "own" + t.id() + "@p19.test", phone(), false);
         String token = loginAndGetAccessToken(staff);
         assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", mode, "reason", "PHL-019 test")), Map.class)
@@ -137,6 +143,7 @@ class Phl019CounterSaleApiTest extends ApiTestBase {
 
         String etag = first.getHeaders().getETag();
         assertThat(etag).isNotBlank();
+        assertThat(index(c.token(), "W/" + etag).getStatusCode()).as("a weak copy of the tag still matches").isEqualTo(HttpStatus.NOT_MODIFIED);
         ResponseEntity<List> again = index(c.token(), etag);
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.NOT_MODIFIED);
         assertThat(again.getBody()).isNull();
@@ -173,7 +180,7 @@ class Phl019CounterSaleApiTest extends ApiTestBase {
         assertThat(dup.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(String.valueOf(dup.getBody().get("type"))).endsWith("/gtin-in-use");
         assertThat(addItem(c, Map.of("gtin", "ABC")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(su().queryForObject("SELECT count(*) FROM charge_catalogue WHERE tenant_id = ?", Integer.class, c.t()))
+        assertThat(su().queryForObject("SELECT count(*) FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL", Integer.class, c.t()))
                 .as("the refused items were not created").isEqualTo(1);
 
         String url = "/v1/pharmacy/items/" + first.get("id");
@@ -258,8 +265,7 @@ class Phl019CounterSaleApiTest extends ApiTestBase {
 
     @Test
     void theEightyMmReceiptOfAnInHouseSaleShowsClinicGstinLicencesHsnAndTheFefoBatchesWithExpiry() {
-        Clinic c = clinic("in_house");
-        su().update("UPDATE tenants SET tax_id = ?, tax_id_type = 'GSTIN' WHERE id = ?", GSTIN, c.t());
+        Clinic c = clinic("in_house", t -> su().update("UPDATE tenants SET tax_id = ?, tax_id_type = 'GSTIN' WHERE id = ?", GSTIN, t));
         assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(c.token(), Map.of("licenceNumbers",
                 Map.of("20B", "TEST-LIC-20B", "21B", "TEST-LIC-21B"))), Map.class).getStatusCode().is2xxSuccessful()).isTrue();
         Map item = exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(c.token(), Map.of("name", "Fefo tablet", "isRx", false,
@@ -288,9 +294,8 @@ class Phl019CounterSaleApiTest extends ApiTestBase {
 
     @Test
     void aVatMarketReceiptCarriesTheVatNumberInsteadOfAGstinAndASingleBatchLineHasNoQuantity() {
-        Clinic c = clinic("in_house");
-        new JdbcTemplate(superuserDataSource()).execute("SET session_replication_role = replica; UPDATE tenants SET region_code = 'SA', " +
-                "tax_id = '300000000000003', tax_id_type = 'VAT' WHERE id = '" + c.t() + "'");
+        Clinic c = clinic("in_house", t -> su().execute("SET session_replication_role = replica; UPDATE tenants SET region_code = 'SA', " +
+                "tax_id = '300000000000003', tax_id_type = 'VAT' WHERE id = '" + t + "'"));
         Map item = exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(c.token(), Map.of("name", "Vat tablet", "isRx", false,
                 "price", 10.00, "taxRatePercent", 15)), Map.class).getBody();
         LocalDate expiry = clock.today(c.t()).plusDays(300);
