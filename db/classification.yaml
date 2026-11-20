@@ -87,6 +87,24 @@ schemas:
       started_at: operational
       finished_at: operational
       error: operational
+    offboarding_requests:
+      id: operational
+      tenant_id: operational
+      requested_by: operational
+      export_id: operational
+      waived: operational
+      reason: pii  # uncertain: the owner's own words; kept after the erasure as part of the request record
+      previous_status: operational
+      step_up_id: operational
+      cancel_step_up_id: operational
+      notify_email: pii
+      status: operational
+      requested_at: operational
+      cooling_off_ends_at: operational
+      cancelled_at: operational
+      erased_at: operational
+      row_counts: operational
+      certificate_id: operational
     reason_code_catalogue:
       kind: operational
       code: operational

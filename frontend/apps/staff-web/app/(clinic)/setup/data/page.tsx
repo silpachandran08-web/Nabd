@@ -8,6 +8,7 @@ import { useHasMounted } from "../../../lib/useHasMounted";
 import { SetupTabBody, useSetupTab } from "../setupTab";
 import { useState } from "react";
 import ExportDrawer from "../../../components/setup/ExportDrawer";
+import LeavingCard from "../../../components/setup/LeavingCard";
 
 type ImportJob = { id: string; importType: string; fileName: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
@@ -62,6 +63,8 @@ export default function DataTab() {
         </div>
       </SetupTabBody>
       {/* Outside SetupTabBody: the refresh after a start shows the skeleton, which must not unmount the drawer and its job state. */}
+      {/* ADM-016: owner only, like the export; outside SetupTabBody so a refresh of the tab does not drop a half-typed request. */}
+      {canExport && <LeavingCard />}
       {exporting && <ExportDrawer onClose={() => { setExporting(false); tab.loadAll(); }} onStarted={() => tab.loadAll()} />}
     </>
   );

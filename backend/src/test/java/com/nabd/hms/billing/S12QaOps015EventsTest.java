@@ -396,6 +396,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("patient.guardian.handover_due.v1"); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove("patient.guardian.handover_completed.v1"); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove("organization.export.ready.v1"); // ADM-015: Adm015DataExportApiTest
+        expected.remove("organization.offboarding.erased.v1"); // ADM-016: produced by the erasure worker, Adm016OffboardingApiTest
         expected.remove("comms.template.status_changed.v1"); // COM-013: Com013TemplateLifecycleApiTest
         expected.remove("scheduling.appointment.confirmed.v1"); // COM-043: Com043ReminderApiTest
         expected.remove("engagement.recall.created.v1"); // COM-052: Com052RecallOrderApiTest

@@ -76,7 +76,9 @@ public enum DomainEventType {
     /** PHL-009: a batch was taken off sale (by hand, by the nightly expiry pass or by a return into an expired batch). Ids and a reason code only. */
     PHARMACY_BATCH_QUARANTINED("pharmacy.batch.quarantined.v1", "core/pharmacy"),
     /** COM-015: produced by services/comms-gateway once per clinic and closed day: message counts and cost by channel and category. No PHI. */
-    USAGE_REPORTED("comms.usage.reported.v1", "core/messaging");
+    USAGE_REPORTED("comms.usage.reported.v1", "core/messaging"),
+    /** ADM-016: a leaving clinic's rows were erased and its deletion certificate issued. Ids, the erase time and totals only. */
+    ORGANIZATION_OFFBOARDING_ERASED("organization.offboarding.erased.v1", "core/organization");
 
     private final String type;
     private final String source;

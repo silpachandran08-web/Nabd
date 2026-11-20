@@ -13,4 +13,8 @@ public interface TenantLifecyclePort {
 
     /** Go live: stamps setup_completed_at (kept if already set) and go_live_by on the bound tenant. */
     void markLive(UUID staffId);
+
+    /** ADM-016: the owner cancelled a deletion request during cooling-off: the BOUND tenant goes from 'offboarding' back to the
+     * status it had before (trialing, active, overdue or suspended), audited like any other move. 400 for anything else. */
+    void restoreFromOffboarding(String previousStatus, UUID staffId, String reason);
 }
