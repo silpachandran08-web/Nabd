@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import com.nabd.comms.i18n.PatientCatalogue;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -163,10 +164,10 @@ public class SmsService {
             Timestamp now = Timestamp.from(clock.instant());
             jdbc.update("""
                     INSERT INTO outbound_messages (id, tenant_id, request_id, channel, patient_ref, to_address_enc, to_hash, template_id, template_name,
-                      language, status, error_code, fallback_of, created_at, updated_at)
-                    VALUES (?,?,?, 'sms', ?,?,?,?,?, ?,?,?,?,?,?)""",
+                      language, status, error_code, fallback_of, created_at, updated_at, catalogue_version)
+                    VALUES (?,?,?, 'sms', ?,?,?,?,?, ?,?,?,?,?,?,?)""",
                     id, tenant, r.requestId(), r.patientRef(), crypto.encrypt(r.to()), crypto.hash(r.to()), t.id(), t.key(), t.language(),
-                    status, decision.reason(), fallbackOf, now, now);
+                    status, decision.reason(), fallbackOf, now, now, PatientCatalogue.get().version());
             return new Prepared(new Sent(id, status), t);
         });
     }

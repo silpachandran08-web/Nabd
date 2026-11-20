@@ -127,6 +127,8 @@ class SmsServiceTest {
 
         var row = su.queryForMap("SELECT channel, status, provider_message_id, template_name, to_address_enc FROM outbound_messages WHERE id = ?", sent.messageId());
         assertThat(row.get("channel")).isEqualTo("sms");
+        assertThat(su.queryForObject("SELECT catalogue_version FROM outbound_messages WHERE id = ?", String.class, sent.messageId()))
+                .as("FEF-041: the catalogue artefact version is recorded per send").isEqualTo(com.nabd.comms.i18n.PatientCatalogue.get().version());
         assertThat(row.get("status")).isEqualTo("sent");
         assertThat((String) row.get("provider_message_id")).startsWith("bsp-");
         assertThat(row.get("template_name")).isEqualTo("otp");

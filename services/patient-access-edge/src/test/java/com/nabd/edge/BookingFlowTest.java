@@ -577,6 +577,10 @@ class BookingFlowTest extends BookingTestBase {
                 c.tenant().toString());
         assertTrue(steps.contains("MENU") && steps.contains("DONE"), steps.toString());
         List<String> cols = superuser().queryForList("select column_name from information_schema.columns where table_name = 'funnel_steps' order by 1", String.class);
-        assertEquals(List.of("at", "conversation_id", "from_state", "tenant_id", "to_state"), cols, "ids, states and time only");
+        assertEquals(List.of("at", "conversation_id", "from_state", "lang", "tenant_id", "to_state"), cols, "ids, states, language code and time only");
+        // FEF-041: the same conversation counts once, under the language it chose, and reached DONE
+        var rate = superuser().queryForMap("select started, completed from funnel_completion_by_lang where tenant_id = ?::uuid and lang = 'en'", c.tenant().toString());
+        assertEquals(1L, rate.get("started"));
+        assertEquals(1L, rate.get("completed"));
     }
 }
