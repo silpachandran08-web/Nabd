@@ -67,7 +67,7 @@ export function framePath(q: FrameQuery): string {
   return `/reports/${q.key}?${p}`;
 }
 
-/** Base64 (the export answer) to bytes, as an ArrayBuffer a Blob takes. Decoded by hand: the lint rule bans atob. */
+/** Base64 (the export answer) to bytes, as an ArrayBuffer a Blob takes. Decoded by hand: the browser Base64 global is banned by lint (app/lib/jwt.ts owns it). */
 export function decodeBase64(b64: string): ArrayBuffer {
   const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   const clean = b64.replace(/=+$/, "");
