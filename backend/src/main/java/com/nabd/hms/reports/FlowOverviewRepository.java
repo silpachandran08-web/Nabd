@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * ADM-041 read side of the owner overview. Rollups ONLY: every statement here reads tenant_daily_metrics or
- * doctor_daily_metrics and nothing else (Adm041FlowOverviewSqlScanTest fails the build on any other table).
+ * doctor_daily_metrics and nothing else (Adm041FlowOverviewApiTest fails the build on any other table).
  */
 @Repository
 class FlowOverviewRepository {
