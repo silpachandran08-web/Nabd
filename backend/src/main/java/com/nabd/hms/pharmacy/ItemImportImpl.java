@@ -42,7 +42,7 @@ class ItemImportImpl implements ItemImport {
     @Override
     public UUID create(NewItem i, UUID actorId) {
         return UUID.fromString(service.addItem(tenant.current(), actorId, null, new PharmacyItemWriteRequest(i.name(), i.rx(), i.hsnCode(), i.price(),
-                i.taxRatePercent(), null, null, null, i.genericName(), i.packSize(), i.unit(), null, null, null, i.mrp(), null, null, null)).id());
+                i.taxRatePercent(), null, null, null, i.genericName(), i.packSize(), i.unit(), null, null, null, i.mrp(), null, null, null, null)).id());
     }
 
     @Override
