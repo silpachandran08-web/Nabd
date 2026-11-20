@@ -295,7 +295,7 @@ public class CheckoutService {
         for (var c : components) {
             items.add(new LineItemInput(c.code(), c.quantity() > 1 ? c.name() + " x " + c.quantity() : c.name(), "Package", 1,
                     money(c.allocatedMinor(), currency), c.fallbackRatePercent(), null, money(c.listValueMinor(), currency), "custom",
-                    null, null, null, false, null, null));
+                    null, null, null, false, null, null, null));
             in.add(new com.nabd.hms.billing.tax.TaxService.InLine("new" + in.size(), c.allocatedMinor(), c.chargeCatalogueId(),
                     c.fallbackRatePercent(), false, null, false, false, null, taxInclusive));
         }

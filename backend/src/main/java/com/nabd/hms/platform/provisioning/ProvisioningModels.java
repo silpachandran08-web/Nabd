@@ -14,11 +14,16 @@ final class ProvisioningModels {
                String ownerEmail, String ownerName, String ownerMobile, String brandName, String status, String path,
                UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId,
                boolean ownerNewlyCreated, boolean brandNewlyCreated,
-               Instant approvedAt, UUID approvedBy, Branch branch) {
+               Instant approvedAt, UUID approvedBy, Branch branch, String edition) {
 
         /** PLT-022: started by an owner to add a branch; requestedBy (an operator) is null for these. */
         boolean isBranch() {
             return branch != null;
+        }
+
+        /** PHL-032: a pharmacy-only tenant. An add-branch job is never one; the default edition is a clinic. */
+        boolean pharmacy() {
+            return branch == null && "pharmacy".equals(edition);
         }
 
         boolean isGatedAndUnapproved() {
