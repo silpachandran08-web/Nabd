@@ -239,7 +239,6 @@
     "contents": "Contains the invoice, the receipt and the consultation summary (diagnosis, procedures, prescription): no full clinical notes.",
     "close": "Close"
   },
-<<<<<<< HEAD
   "pos": {
     "surface": "Counter sale (POS)",
     "title": "Counter sale (POS)",
@@ -301,7 +300,7 @@
     "cameraStarting": "Starting the camera…",
     "cameraBlocked": "The camera could not be used. Allow camera access, or type the barcode.",
     "cameraHint": "Hold the barcode in front of the camera."
-=======
+  },
   "paperRx": {
     "dialog": "Paper prescription for {item}",
     "title": "Paper prescription · {item}",
@@ -335,6 +334,5 @@
     "expired": "This prescription has passed its validity date and can no longer be dispensed.",
     "itemMismatch": "The paper prescription was recorded for a different item.",
     "saveFailed": "The paper prescription could not be saved. Try again."
->>>>>>> team/s25-e14
   }
 }
