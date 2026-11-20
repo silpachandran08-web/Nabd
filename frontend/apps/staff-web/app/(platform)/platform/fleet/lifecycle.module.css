@@ -1,0 +1,152 @@
+/* ADM-020: lifecycle stepper, reason form and history on the tenant detail page. */
+.section {
+  padding: var(--nb-space-16);
+  margin-block-end: var(--nb-space-24);
+}
+
+.h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 var(--nb-space-12);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  color: var(--nb-text-secondary);
+  font-size: 13px;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  list-style: none;
+  margin: 0 0 var(--nb-space-16);
+  padding: 0;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nb-space-8);
+  flex: 1 1 120px;
+  padding: var(--nb-space-12);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-secondary);
+  font-size: 13px;
+}
+
+.stepCurrent {
+  composes: step;
+  border-color: var(--nb-accent-500);
+  background: var(--nb-accent-tint);
+  color: var(--nb-text-primary);
+  font-weight: 600;
+}
+
+.stepHint {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--nb-text-tertiary);
+}
+
+.moveBtn {
+  min-block-size: 44px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-1);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.moveBtn[aria-pressed="true"] {
+  border-color: var(--nb-accent-500);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-12);
+  max-inline-size: 640px;
+}
+
+.note {
+  margin: 0;
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-info-tint);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.noteDanger {
+  composes: note;
+  background: var(--nb-danger-tint);
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nb-text-secondary);
+}
+
+.textarea {
+  min-block-size: 88px;
+  padding: var(--nb-space-8) var(--nb-space-12);
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  color: var(--nb-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--nb-text-tertiary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+}
+
+.confirm {
+  composes: moveBtn;
+  border: none;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-weight: 600;
+}
+
+.confirmDanger {
+  composes: moveBtn;
+  border-color: var(--nb-danger-500);
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+  font-weight: 600;
+}
+
+.error {
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  font-size: 13px;
+}
+
+.reason {
+  white-space: normal;
+  min-inline-size: 220px;
+}

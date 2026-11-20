@@ -66,7 +66,9 @@ public enum NotificationPurpose {
      * Counts only, never a drug name. REMINDER, so COM-024 quiet hours apply. */
     STOCK_ALERTS_DIGEST("stock_alerts_digest", ConsentClass.NONE, Priority.REMINDER, ChannelPolicy.WHATSAPP_ONLY),
     /** COM-015: the owner is told the clinic used 80% (or all) of the plan's WhatsApp allowance (staff recipient); 3 params: percent, used, allowance. */
-    MESSAGE_USAGE_ALERT("message_usage_alert", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
+    MESSAGE_USAGE_ALERT("message_usage_alert", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
+    /** ADM-020: the owner is told the clinic was suspended or is being offboarded (staff recipient); 1 param: the new status. */
+    TENANT_STATUS_CHANGED("tenant_status_changed", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS);
 
     private final String code;
     private final ConsentClass consentClass;

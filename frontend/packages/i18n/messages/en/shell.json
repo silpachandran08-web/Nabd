@@ -683,5 +683,11 @@
     "saveFailed": "Could not save the card.",
     "yearOnly": "year of birth only",
     "paperNote": "From the paper card"
+  },
+  "tenantStatus": {
+    "suspended": "This clinic is suspended. You can view and export records, but nothing can be changed. Contact Nabd support.",
+    "overdue": "Your Nabd payment is overdue: {amount} is due. Clinic work is not affected.",
+    "overdueNoAmount": "Your Nabd payment is overdue. Clinic work is not affected.",
+    "pay": "Pay now"
   }
 }

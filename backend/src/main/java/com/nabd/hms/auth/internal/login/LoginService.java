@@ -37,9 +37,9 @@ public class LoginService {
         this.tokens = tokens;
     }
 
-    /** Offboarded and suspended clinics sign in nobody (shared with the OTP and PIN-reset flows). */
+    /** An offboarded clinic signs in nobody (shared with the OTP and PIN-reset flows). ADM-020: a suspended one signs in read-only. */
     public static boolean active(Tenant t) {
-        return !"offboarded".equals(t.status()) && !"suspended".equals(t.status());
+        return !com.nabd.hms.common.SessionRevocation.CLOSED_TENANT_STATUS.equals(t.status());
     }
 
     // noRollbackFor: recordLoginAttempt() below is the lockout counter's only durable state, and
