@@ -38,8 +38,9 @@ function problem(e: unknown, fallback: string): string {
   return e.detail || fallback;
 }
 
-export default function PatientImport() {
-  const [pane, setPane] = useState<"file" | "software" | "paper">("file");
+/** PHL-032: the pharmacy wizard opens this on the old-software pane with the opening-stock list already chosen. */
+export default function PatientImport({ startWith }: { startWith?: { importType: ImportType; source: string } } = {}) {
+  const [pane, setPane] = useState<"file" | "software" | "paper">(startWith ? "software" : "file");
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,8 +52,8 @@ export default function PatientImport() {
   const [dupError, setDupError] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Action>>({});
   const fileRef = useRef<HTMLInputElement>(null);
-  const [source, setSource] = useState(SOURCES[0].key);
-  const [importType, setImportType] = useState<ImportType>("patients");
+  const [source, setSource] = useState(startWith?.source ?? SOURCES[0].key);
+  const [importType, setImportType] = useState<ImportType>(startWith?.importType ?? "patients");
 
   // The mapping form follows the server's mapping whenever a new job state arrives.
   const adopt = useCallback((j: Job) => {
