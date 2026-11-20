@@ -13,6 +13,7 @@ import { api, ApiError, reasonText } from "../../lib/api";
 import { DpaReacceptBanner } from "../../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
 import EtaAccuracyTile from "./EtaAccuracyTile";
+import FlowOverviewSection from "./FlowOverview";
 import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
@@ -201,6 +202,8 @@ function OverviewInner() {
           <p className={styles.stepNote}>Open a step to finish it. Hiding this card only affects this browser.</p>
         </section>
       )}
+
+      <FlowOverviewSection />
 
       <div className={styles.kpis}>
         <div className={styles.card}>
