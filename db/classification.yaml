@@ -1662,6 +1662,7 @@ schemas:
       drug_licence_numbers: operational
       pharmacist_in_charge_staff_id: operational
       alert_recipient_staff_id: operational
+      printer_tested_at: operational
       expiry_alert_days: operational
       dead_stock_days: operational
       digest_local_time: operational

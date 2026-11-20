@@ -39,7 +39,10 @@ class ProvisioningStepRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ProvisioningStepRunner.class);
 
+    private static final String PHARMACY_PLAN = "pharmacy_basic";
+
     private final ProvisioningRepository repo;
+    private final com.nabd.hms.pharmacy.api.PharmacyEdition pharmacyEdition;
     private final TenantContext tenantContext;
     private final WabaProvisioningGateway wabaGateway;
     private final CatalogueTemplates catalogueTemplates;
@@ -57,7 +60,9 @@ class ProvisioningStepRunner {
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
                             OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
-                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates) {
+                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates,
+                            com.nabd.hms.pharmacy.api.PharmacyEdition pharmacyEdition) {
+        this.pharmacyEdition = pharmacyEdition;
         this.tenantKeys = tenantKeys;
         this.catalogueTemplates = catalogueTemplates;
         this.events = events;
@@ -146,6 +151,7 @@ class ProvisioningStepRunner {
             return;
         }
         tenantContext.set(tenantId);
+        repo.deleteSubscription(tenantId);
         repo.deleteBuiltInRole(tenantId);
         repo.deleteDepartments(tenantId);
     }
@@ -199,6 +205,7 @@ class ProvisioningStepRunner {
         UUID brandId = existingBrand.orElseGet(() -> repo.insertBrand(ownerId, job.brandName()));
 
         UUID tenantId = repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
+        if (job.pharmacy()) repo.setFacilityType(tenantId, job.edition());
         repo.setJobCreatedRefs(job.id(), tenantId, ownerId, brandId);
         repo.setJobCreationFlags(job.id(), ownerIsNew, brandIsNew);
         tenantKeys.provision(tenantId, job.region()); // PLT-045: the tenant's DEK exists before any patient row can be written
@@ -217,10 +224,14 @@ class ProvisioningStepRunner {
         if (repo.hasBuiltInRole(tenantId)) {
             return; // retry after a later step failed — already seeded (all presets in this one transaction), nothing to redo
         }
-        for (RolePresets.Preset p : RolePresets.ALL) {
+        for (RolePresets.Preset p : RolePresets.forEdition(job.edition())) {
             repo.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
         }
         repo.seedDefaultDepartment(tenantId);
+        if (job.pharmacy()) { // PHL-032: the pharmacy edition keeps stock in-house from day one and sells on the pharmacy plan
+            pharmacyEdition.startInHouse(tenantId);
+            repo.subscribeToPlan(tenantId, PHARMACY_PLAN, regions.region(job.region()).currency());
+        }
     }
 
     /** NB-353: reuses StaffService's existing invite/accept machinery instead of inventing a second

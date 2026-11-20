@@ -62,6 +62,8 @@ public class ProvisioningService {
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
                 req.ownerEmail().toLowerCase(), req.ownerName(), ownerMobile, req.brandName(), req.path());
+        String edition = req.edition() == null ? "clinic" : req.edition();
+        if (!"clinic".equals(edition)) repo.setJobEdition(jobId, edition);
         for (int i = 0; i < STEP_ORDER.size(); i++) {
             repo.insertStep(UUID.randomUUID(), jobId, STEP_ORDER.get(i), i + 1);
         }
@@ -73,6 +75,7 @@ public class ProvisioningService {
         after.put("tenantName", req.tenantName());
         after.put("region", req.region());
         after.put("path", req.path());
+        after.put("edition", edition);
         audit.record(null, requestedBy, ip, "platform_provisioning.job_created", "provisioning_job", jobId, after);
         return toResponse(jobId);
     }
@@ -219,6 +222,6 @@ public class ProvisioningService {
                 .toList();
         return new ProvisioningJobResponse(job.id(), job.tenantSlug(), job.tenantName(), job.region(),
                 job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps,
-                ownerInviteToken, ownerAccountInviteToken);
+                ownerInviteToken, ownerAccountInviteToken, job.edition());
     }
 }

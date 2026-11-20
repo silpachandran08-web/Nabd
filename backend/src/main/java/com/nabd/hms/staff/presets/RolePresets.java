@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * PLT-016: the six preset role bundles every new clinic starts with, versioned in code.
@@ -59,11 +60,35 @@ public final class RolePresets {
 
     public static final List<Preset> ALL = List.of(OWNER, OWNER_DOCTOR, DOCTOR, NURSE, RECEPTIONIST, FRONTDESK_VITALS);
 
+    /** PHL-032: the roles a pharmacy-only tenant starts with (the Owner plus three pharmacy roles); no clinical or scheduling module is granted.
+     * Kept out of ALL: ALL is the clinic bundle the RBAC golden file and matrix tests are written against. */
+    private static final Preset PHARMACIST_IN_CHARGE = new Preset("pharmacist_in_charge", "Pharmacist-in-charge", false, pharmacyGrants(
+            "YYY----", "YYYNYYY", "YYYYYYY", "Y---N-Y", "Y------", "Y-Y----", "Y------"));
+    private static final Preset PHARMACIST = new Preset("pharmacist", "Pharmacist", false, pharmacyGrants(
+            "YYY----", "YYYN-N-", "YYYN---", "Y------", "N------", "N------", "N------"));
+    private static final Preset COUNTER_STAFF = new Preset("counter_staff", "Counter staff", false, pharmacyGrants(
+            "YYY----", "YYY----", "YYY----", "N------", "N------", "N------", "N------"));
+
+    public static final List<Preset> PHARMACY = List.of(OWNER, PHARMACIST_IN_CHARGE, PHARMACIST, COUNTER_STAFF);
+
     private RolePresets() {
     }
 
+    /** The presets a new tenant of this edition is seeded with. */
+    public static List<Preset> forEdition(String edition) {
+        return "pharmacy".equals(edition) ? PHARMACY : ALL;
+    }
+
     public static Optional<Preset> byCode(String code) {
-        return ALL.stream().filter(p -> p.code().equals(code)).findFirst();
+        return Stream.concat(ALL.stream(), PHARMACY.stream()).filter(p -> p.code().equals(code)).findFirst();
+    }
+
+    /** Flags per module in the order patients, billing, pharmacy, reports, staff, setup, compliance; every other module is none. */
+    private static List<ModuleGrant> pharmacyGrants(String patients, String billing, String pharmacy, String reports, String staff,
+                                                   String setup, String compliance) {
+        return List.of(g("patients", patients), g("queue", "N------"), g("clinical", "N------"), g("billing", billing),
+                g("packages", "N------"), g("pharmacy", pharmacy), g("reports", reports), g("staff", staff), g("setup", setup),
+                g("compliance", compliance), g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"));
     }
 
     private static List<ModuleGrant> ownerDoctorGrants() {

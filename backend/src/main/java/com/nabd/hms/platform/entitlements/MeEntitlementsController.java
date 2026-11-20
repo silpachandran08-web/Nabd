@@ -14,7 +14,8 @@ public class MeEntitlementsController {
     public record ModuleState(String code, boolean enabled) {
     }
 
-    public record MeEntitlements(List<ModuleState> modules, List<String> killedFeatures, Integer seatLimit) {
+    /** edition (PHL-032): "pharmacy" for a pharmacy-only tenant, whose navigation is pharmacy only; "clinic" for every other facility type. */
+    public record MeEntitlements(List<ModuleState> modules, List<String> killedFeatures, Integer seatLimit, String edition) {
     }
 
     private final PlanEntitlements entitlements;
@@ -31,6 +32,7 @@ public class MeEntitlementsController {
         List<String> killed = PlanEntitlements.FEATURES.stream().sorted()
                 .filter(f -> entitlements.state(t, f) == PlanEntitlements.State.KILLED).toList();
         int seats = entitlements.seatLimit();
-        return new MeEntitlements(mods, killed, seats == Integer.MAX_VALUE ? null : seats);
+        return new MeEntitlements(mods, killed, seats == Integer.MAX_VALUE ? null : seats,
+                "pharmacy".equals(entitlements.facilityType(t)) ? "pharmacy" : "clinic");
     }
 }

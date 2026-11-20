@@ -88,7 +88,7 @@ public class PharmacyService {
                 .orElse(new PharmacySettingsResponse("external", null, Map.of(), null, null));
     }
 
-    private static Map<String, String> licences(String json) {
+    static Map<String, String> licences(String json) {
         try {
             return json == null ? Map.of() : JSON.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() { });
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {

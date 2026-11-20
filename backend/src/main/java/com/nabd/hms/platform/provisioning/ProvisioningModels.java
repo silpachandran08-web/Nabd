@@ -14,7 +14,11 @@ final class ProvisioningModels {
                String ownerEmail, String ownerName, String ownerMobile, String brandName, String status, String path,
                UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId,
                boolean ownerNewlyCreated, boolean brandNewlyCreated,
-               Instant approvedAt, UUID approvedBy) {
+               Instant approvedAt, UUID approvedBy, String edition) {
+
+        boolean pharmacy() {
+            return "pharmacy".equals(edition);
+        }
 
         boolean isGatedAndUnapproved() {
             return "enterprise".equals(path) && approvedAt == null;
