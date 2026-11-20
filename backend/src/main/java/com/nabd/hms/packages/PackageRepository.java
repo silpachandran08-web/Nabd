@@ -74,11 +74,11 @@ class PackageRepository {
 
     List<PackageItemRow> listItems(UUID tenantId, UUID packageId) {
         return jdbc.query(
-                "SELECT id, item_type, name, quantity, unit_list_price, tax_rate_percent FROM package_items " +
+                "SELECT id, item_type, name, quantity, unit_list_price, tax_rate_percent, charge_catalogue_id FROM package_items " +
                         "WHERE tenant_id = ? AND package_id = ? ORDER BY display_order",
                 (rs, i) -> new PackageItemRow(UUID.fromString(rs.getString("id")), rs.getString("item_type"),
                         rs.getString("name"), rs.getInt("quantity"), rs.getBigDecimal("unit_list_price"),
-                        rs.getBigDecimal("tax_rate_percent")),
+                        rs.getBigDecimal("tax_rate_percent"), rs.getObject("charge_catalogue_id", UUID.class)),
                 tenantId, packageId);
     }
 
@@ -88,9 +88,9 @@ class PackageRepository {
         for (PackageItemInput item : items) {
             jdbc.update(
                     "INSERT INTO package_items (tenant_id, package_id, item_type, name, quantity, " +
-                            "unit_list_price, tax_rate_percent, display_order) VALUES (?,?,?,?,?,?,?,?)",
+                            "unit_list_price, tax_rate_percent, display_order, charge_catalogue_id) VALUES (?,?,?,?,?,?,?,?,?)",
                     tenantId, packageId, item.itemType(), item.name(), item.quantity(), item.unitListPrice(),
-                    item.taxRatePercentOrZero(), order++);
+                    item.taxRatePercentOrZero(), order++, item.chargeCatalogueId());
         }
     }
 
@@ -125,14 +125,16 @@ class PackageRepository {
     // ── settings ──────────────────────────────────────────────────────────
 
     Optional<PackageSettingsRow> findSettings(UUID tenantId) {
-        return jdbc.query("SELECT price_floor_percent FROM package_settings WHERE tenant_id = ?",
-                (rs, i) -> new PackageSettingsRow(rs.getBigDecimal("price_floor_percent")), tenantId).stream().findFirst();
+        return jdbc.query("SELECT price_floor_percent, tax_split_enabled, gst_opinion_decision_id FROM package_settings WHERE tenant_id = ?",
+                (rs, i) -> new PackageSettingsRow(rs.getBigDecimal("price_floor_percent"), rs.getBoolean("tax_split_enabled"),
+                        rs.getString("gst_opinion_decision_id")), tenantId).stream().findFirst();
     }
 
-    void upsertSettings(UUID tenantId, BigDecimal priceFloorPercent) {
-        jdbc.update("INSERT INTO package_settings (tenant_id, price_floor_percent) VALUES (?,?) " +
-                        "ON CONFLICT (tenant_id) DO UPDATE SET price_floor_percent = EXCLUDED.price_floor_percent",
-                tenantId, priceFloorPercent);
+    void upsertSettings(UUID tenantId, BigDecimal priceFloorPercent, boolean taxSplitEnabled, String gstOpinionDecisionId) {
+        jdbc.update("INSERT INTO package_settings (tenant_id, price_floor_percent, tax_split_enabled, gst_opinion_decision_id) VALUES (?,?,?,?) " +
+                        "ON CONFLICT (tenant_id) DO UPDATE SET price_floor_percent = EXCLUDED.price_floor_percent, " +
+                        "tax_split_enabled = EXCLUDED.tax_split_enabled, gst_opinion_decision_id = EXCLUDED.gst_opinion_decision_id",
+                tenantId, priceFloorPercent, taxSplitEnabled, gstOpinionDecisionId);
     }
 
     // ── sale ──────────────────────────────────────────────────────────────
@@ -152,14 +154,14 @@ class PackageRepository {
 
     void insertInstance(UUID id, UUID tenantId, UUID packageId, UUID patientId, UUID invoiceId, String packageName,
                          BigDecimal soldPrice, BigDecimal soldTax, String validityStarts, int validityDays,
-                         LocalDate validityStart, LocalDate validityEnd, int graceDays, UUID soldBy) {
+                         LocalDate validityStart, LocalDate validityEnd, int graceDays, UUID soldBy, boolean taxInclusive) {
         jdbc.update(
                 "INSERT INTO package_instances (id, tenant_id, package_id, patient_id, invoice_id, package_name, " +
                         "sold_price, sold_tax, validity_starts, validity_days, validity_start, validity_end, " +
-                        "grace_days, sold_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "grace_days, sold_by, tax_inclusive) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 id, tenantId, packageId, patientId, invoiceId, packageName, soldPrice, soldTax, validityStarts,
                 validityDays, validityStart == null ? null : Date.valueOf(validityStart),
-                validityEnd == null ? null : Date.valueOf(validityEnd), graceDays, soldBy);
+                validityEnd == null ? null : Date.valueOf(validityEnd), graceDays, soldBy, taxInclusive);
     }
 
     /** Fixes the validity window on first redemption, for instances sold with validity_starts = 'first_session'. */
@@ -169,11 +171,14 @@ class PackageRepository {
     }
 
     void insertInstanceItem(UUID id, UUID tenantId, UUID instanceId, String itemType, String name, int quantityTotal,
-                             BigDecimal unitListPrice, BigDecimal allocatedPrice, BigDecimal taxRatePercent) {
+                             BigDecimal unitListPrice, BigDecimal allocatedPrice, BigDecimal taxRatePercent,
+                             UUID invoiceLineId, Long allocatedMinor, Long taxMinor, String taxCategory) {
         jdbc.update(
                 "INSERT INTO package_instance_items (id, tenant_id, instance_id, item_type, name, quantity_total, " +
-                        "unit_list_price, allocated_price, tax_rate_percent) VALUES (?,?,?,?,?,?,?,?,?)",
-                id, tenantId, instanceId, itemType, name, quantityTotal, unitListPrice, allocatedPrice, taxRatePercent);
+                        "unit_list_price, allocated_price, tax_rate_percent, invoice_line_id, allocated_minor, tax_minor, tax_category) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, instanceId, itemType, name, quantityTotal, unitListPrice, allocatedPrice, taxRatePercent,
+                invoiceLineId, allocatedMinor, taxMinor, taxCategory);
     }
 
     void insertEvent(UUID tenantId, UUID instanceId, String eventType, String note, Integer delta, UUID actorId) {
@@ -200,7 +205,7 @@ class PackageRepository {
     private static final String INSTANCE_SELECT =
             "SELECT i.id, i.package_id, i.patient_id, p.name AS patient_name, i.invoice_id, inv.invoice_number, " +
                     "i.package_name, i.sold_price, i.sold_tax, i.validity_starts, i.validity_days, " +
-                    "i.validity_start, i.validity_end, i.grace_days, i.status, i.last_alert_tier " +
+                    "i.validity_start, i.validity_end, i.grace_days, i.status, i.last_alert_tier, i.tax_inclusive " +
                     "FROM package_instances i JOIN patients p ON p.id = i.patient_id " +
                     "JOIN invoices inv ON inv.id = i.invoice_id ";
 
@@ -214,20 +219,20 @@ class PackageRepository {
                 rs.getString("validity_starts"), rs.getInt("validity_days"),
                 start == null ? null : start.toLocalDate(), end == null ? null : end.toLocalDate(),
                 rs.getInt("grace_days"), rs.getString("status"),
-                rs.getObject("last_alert_tier") == null ? null : rs.getInt("last_alert_tier"));
+                rs.getObject("last_alert_tier") == null ? null : rs.getInt("last_alert_tier"), rs.getBoolean("tax_inclusive"));
     }
 
     List<InstanceItemRow> listInstanceItems(UUID tenantId, UUID instanceId) {
         return jdbc.query(
                 "SELECT id, item_type, name, quantity_total, quantity_consumed, unit_list_price, allocated_price, " +
-                        "tax_rate_percent FROM package_instance_items WHERE tenant_id = ? AND instance_id = ?",
+                        "tax_rate_percent, invoice_line_id, allocated_minor, tax_minor, tax_category FROM package_instance_items WHERE tenant_id = ? AND instance_id = ?",
                 this::mapInstanceItem, tenantId, instanceId);
     }
 
     Optional<InstanceItemRow> findInstanceItem(UUID tenantId, UUID id) {
         return jdbc.query(
                 "SELECT id, item_type, name, quantity_total, quantity_consumed, unit_list_price, allocated_price, " +
-                        "tax_rate_percent FROM package_instance_items WHERE tenant_id = ? AND id = ?",
+                        "tax_rate_percent, invoice_line_id, allocated_minor, tax_minor, tax_category FROM package_instance_items WHERE tenant_id = ? AND id = ?",
                 this::mapInstanceItem, tenantId, id).stream().findFirst();
     }
 
@@ -235,7 +240,8 @@ class PackageRepository {
         return new InstanceItemRow(UUID.fromString(rs.getString("id")), rs.getString("item_type"),
                 rs.getString("name"), rs.getInt("quantity_total"), rs.getInt("quantity_consumed"),
                 rs.getBigDecimal("unit_list_price"), rs.getBigDecimal("allocated_price"),
-                rs.getBigDecimal("tax_rate_percent"));
+                rs.getBigDecimal("tax_rate_percent"), rs.getObject("invoice_line_id", UUID.class),
+                (Long) rs.getObject("allocated_minor"), (Long) rs.getObject("tax_minor"), rs.getString("tax_category"));
     }
 
     Optional<UUID> findInstanceIdForItem(UUID tenantId, UUID instanceItemId) {

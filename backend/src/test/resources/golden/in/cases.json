@@ -3796,6 +3796,134 @@
     "reviewer": null,
     "signedOn": null
    }
+  },
+  {
+   "id": "IN-047",
+   "title": "FIN-025 WE-01 Acne Clear: 6 acne sessions 2,000 + 2 peels 1,500 + 1 cream 800 (15,800 list) sold at 12,999, split pro rata; sessions exempt, peels 18%, cream 18% (cream rate needs CA check)",
+   "kind": "invoice",
+   "package": {
+    "bundleMinor": 1299900,
+    "taxInclusive": false,
+    "listValueMinor": [
+     1200000,
+     300000,
+     80000
+    ]
+   },
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "pkg-acne-session",
+      "quantity": 6,
+      "grossMinor": 987266,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "pkg-peel",
+      "quantity": 2,
+      "grossMinor": 246816,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "pkg-cream",
+      "quantity": 1,
+      "grossMinor": 65818,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "pkg-acne-session",
+      "discountMinor": 0,
+      "taxableMinor": 987266,
+      "taxes": []
+     },
+     {
+      "key": "pkg-peel",
+      "discountMinor": 0,
+      "taxableMinor": 246816,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 246816,
+        "amountMinor": 22213
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 246816,
+        "amountMinor": 22213
+       }
+      ]
+     },
+     {
+      "key": "pkg-cream",
+      "discountMinor": 0,
+      "taxableMinor": 65818,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 65818,
+        "amountMinor": 5924
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 65818,
+        "amountMinor": 5924
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1299900,
+    "discountMinor": 0,
+    "taxMinor": 56274,
+    "roundOffMinor": 26,
+    "totalMinor": 1356200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 312634,
+      "taxMinor": 28137
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 312634,
+      "taxMinor": 28137
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
   }
  ]
 }

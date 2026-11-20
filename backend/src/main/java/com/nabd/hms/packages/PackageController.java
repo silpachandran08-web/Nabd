@@ -87,8 +87,16 @@ public class PackageController {
 
     @PatchMapping("/settings")
     @PreAuthorize("hasAuthority('packages:edit')")
-    public PackageSettingsResponse updateSettings(@CurrentTenant UUID tenantId, @Valid @RequestBody PackageSettingsWriteRequest req) {
-        return catalogueService.updateSettings(tenantId, req);
+    public PackageSettingsResponse updateSettings(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
+                                                  @Valid @RequestBody PackageSettingsWriteRequest req) {
+        return catalogueService.updateSettings(tenantId, staffId, req);
+    }
+
+    /** FIN-025: the price-list heads a package component can be linked to (its tax class comes from the head). */
+    @GetMapping("/charge-heads")
+    @PreAuthorize("hasAuthority('packages:view')")
+    public List<com.nabd.hms.packages.dto.ChargeHeadResponse> chargeHeads(@CurrentTenant UUID tenantId) {
+        return catalogueService.chargeHeads(tenantId);
     }
 
     @PostMapping("/sell")

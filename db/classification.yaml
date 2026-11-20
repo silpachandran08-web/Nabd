@@ -1314,6 +1314,10 @@ schemas:
       unit_list_price: financial
       allocated_price: financial
       tax_rate_percent: financial
+      invoice_line_id: operational
+      allocated_minor: financial
+      tax_minor: financial
+      tax_category: financial
     package_instances:
       id: operational
       tenant_id: operational
@@ -1323,6 +1327,7 @@ schemas:
       package_name: phi  # uncertain: package sold to a patient reveals the treatment
       sold_price: financial
       sold_tax: financial
+      tax_inclusive: financial
       validity_starts: operational
       validity_days: operational
       validity_start: operational
@@ -1347,6 +1352,7 @@ schemas:
       quantity: operational
       unit_list_price: financial
       tax_rate_percent: financial
+      charge_catalogue_id: operational
       display_order: operational
     package_redemptions:
       id: operational
@@ -1383,6 +1389,8 @@ schemas:
     package_settings:
       tenant_id: operational
       price_floor_percent: financial
+      tax_split_enabled: operational
+      gst_opinion_decision_id: operational
       updated_at: operational
     packages:
       id: operational
