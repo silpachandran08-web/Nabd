@@ -86,7 +86,7 @@ function periodRange(p: Period, custom: { from: string; to: string }): { from: s
   return custom;
 }
 
-export default function ReportsPage() {
+export default function ClassicReports() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
