@@ -27,7 +27,7 @@ public enum DomainEventType {
     ORGANIZATION_CONFIG_CHANGED("organization.config.changed.v1", "core/organization"),
     TENANT_REGION_PINNED("organization.tenant.region_pinned.v1", "core/organization"),
     /** ADM-020: every tenant lifecycle move (TenantLifecycleService). Consumers: comms-gateway, control-plane/subscriptions. */
-    TENANT_STATUS_CHANGED("organization.tenant.status_changed.v1", "core/organization"),,
+    TENANT_STATUS_CHANGED("organization.tenant.status_changed.v1", "core/organization"),
     ORGANIZATION_BRANCH_CREATED("organization.branch.created.v1", "core/organization"),
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
