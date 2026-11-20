@@ -8,6 +8,16 @@
 # Initial owners were drafted from the current writers (module with most write statements, domain owner on ties) and
 # need confirmation at the architecture review. Read allow-lists start empty on purpose: today's cross-module reads are
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
+# PLT-036: every table has exactly one WRITING module (one exception by column: `owns_columns`, an UPDATE that sets only the listed
+# columns and updated_at belongs to that module; today only pharmacy's charge_catalogue.stock_qty). A write on another module's table (or a table with no owner or two owners)
+# fails the architecture gate in every mode for every module; a new cross-module read fails unless it is in `reads` (see
+# ci/architecture-gate.json `sql_ownership_all_modules`). Other modules change a table through its owner's API or a port the owner
+# implements: tenants -> common.TenantSettingsPort (platform); charge_catalogue -> organization.api.ChargeHeadWriter and
+# pharmacy.api.ItemCatalogueWriter (billing); staff, roles, login_attempts -> auth.api.OwnerAccess and common.ProvisioningSeeds.Iam
+# (iam); owners, departments -> common.ProvisioningSeeds (owner, organization); procedure_orders -> nursing.api.ProcedureBilling.
+# Known cross-cutting writers the scan cannot see (SQL assembled at run time, accepted as maintenance tools, not module logic):
+# common.CryptoReencryptJob (re-encrypts the encrypted columns listed in its code) and patient.SyntheticPatientPurger (deletes demo
+# patients and every row that references them, table names from pg_constraint).
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
@@ -17,7 +27,7 @@ modules:
     owns: [chronic_conditions, clinical_documents, clinical_notes, clinical_photos, dental_chair_notes, dental_chart_entries, dental_chart_events, dental_images, dental_preset_overrides, dental_settings, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, photo_consents, prescription_items, prescription_rx_tokens, prescription_signer_backfill, prescriptions, rx_coding_suggestions, rx_validity_rules, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
   common:
-    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts, tenant_data_keys]
+    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, tenant_data_keys]
     reads: [tenants]  # PLT-045: TenantKeyService lists tenants and reads their region and status; the same read ClinicClock, TenantContext and CryptoReencryptJob already do
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
@@ -55,6 +65,9 @@ modules:
     owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_notification_preferences, patient_proxies, patient_registry_summary, patients, phone_reverifications, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
     reads: [appointments, clinical_documents, queue_entries, tenants]  # IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
+    # PLT-036 / PHL-003 AC1: the cached stock balance of an item is the one column of another module's table that pharmacy writes
+    # (UPDATE ... SET stock_qty only; StockWriteOwnershipTest keeps every other package out). Rows are created and changed by billing.
+    owns_columns: {charge_catalogue: [stock_qty]}
     owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_alerts, stock_batches, stock_discrepancies, stock_take_counts, stock_takes, stock_write_off_lines, stock_write_offs, supplier_return_lines, supplier_returns]
     reads: [charge_catalogue, prescription_rx_tokens, tenants]  # CLN-023: revoked Rx refused at scan and checkout; items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
   platform:
@@ -78,5 +91,6 @@ modules:
     owns: [specialty_profiles, staff_specialty_profiles]
     reads: []
   shared:
-    owns: [file_blocked_alerts, file_objects, idempotency_keys, projector_applied_events, shedlock]
+    # PLT-036: the PHI read log is written only by shared.phiread (recorder, seal job, volume alerts); it was listed under common
+    owns: [file_blocked_alerts, file_objects, idempotency_keys, phi_read_batches, phi_read_log, phi_read_volume_alerts, projector_applied_events, shedlock]
     reads: [staff, roles]  # PLT-029: file_blocked_alerts fans out to the owner staff (built-in role); no owner API exists yet

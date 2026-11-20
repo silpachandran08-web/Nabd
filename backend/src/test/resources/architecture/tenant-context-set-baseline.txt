@@ -166,7 +166,6 @@ com.nabd.hms.packages.PackageInstanceService.rejectRefund
 com.nabd.hms.packages.PackageInstanceService.requestRefund
 com.nabd.hms.packages.PackageInstanceService.sell
 com.nabd.hms.packages.PackageInstanceService.sendReminder
-com.nabd.hms.patient.LastVisitRepairJob.run
 com.nabd.hms.patient.PatientService.get
 com.nabd.hms.patient.PatientService.getVisibleMany
 com.nabd.hms.patient.PatientService.guardianReviewsDue
@@ -206,6 +205,7 @@ com.nabd.hms.queue.AppointmentService.get
 com.nabd.hms.queue.AppointmentService.list
 com.nabd.hms.queue.AppointmentService.reschedule
 com.nabd.hms.queue.FollowUpListService.list
+com.nabd.hms.queue.LastVisitRepairJob.run
 com.nabd.hms.queue.QueueService.acknowledgePriority
 com.nabd.hms.queue.QueueService.checkIn
 com.nabd.hms.queue.QueueService.list

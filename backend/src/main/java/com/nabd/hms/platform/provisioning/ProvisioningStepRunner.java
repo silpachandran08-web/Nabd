@@ -52,13 +52,22 @@ class ProvisioningStepRunner {
     private final com.nabd.hms.organization.api.RegionRules regions;
     private final com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys;
     private final com.nabd.hms.common.ConfigBundle configBundle;
+    // PLT-036: owners, roles, staff and departments are written by their owning modules
+    private final com.nabd.hms.common.ProvisioningSeeds.Owners ownerSeeds;
+    private final com.nabd.hms.common.ProvisioningSeeds.Iam iamSeeds;
+    private final com.nabd.hms.common.ProvisioningSeeds.Departments departmentSeeds;
 
     ProvisioningStepRunner(com.nabd.hms.common.ConfigBundle configBundle, com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys, ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
                             OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
-                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates) {
+                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates,
+                            com.nabd.hms.common.ProvisioningSeeds.Owners ownerSeeds, com.nabd.hms.common.ProvisioningSeeds.Iam iamSeeds,
+                            com.nabd.hms.common.ProvisioningSeeds.Departments departmentSeeds) {
+        this.ownerSeeds = ownerSeeds;
+        this.iamSeeds = iamSeeds;
+        this.departmentSeeds = departmentSeeds;
         this.tenantKeys = tenantKeys;
         this.configBundle = configBundle;
         this.catalogueTemplates = catalogueTemplates;
@@ -173,8 +182,8 @@ class ProvisioningStepRunner {
             return;
         }
         tenantContext.set(tenantId);
-        repo.deleteBuiltInRole(tenantId);
-        repo.deleteDepartments(tenantId);
+        iamSeeds.deleteSeededRoles(tenantId);
+        departmentSeeds.deleteAll(tenantId); // before undoCreateTenant deletes the tenant row (FK)
     }
 
     private void undoInviteOwner(Job job) {
@@ -183,7 +192,7 @@ class ProvisioningStepRunner {
             return;
         }
         tenantContext.set(tenantId);
-        repo.deleteStaffByTenant(tenantId);
+        iamSeeds.deleteStaff(tenantId);
     }
 
     /** Reverse FK order of createTenant: tenant (child of brand) before brand (child of owner) before owner. */
@@ -198,7 +207,7 @@ class ProvisioningStepRunner {
             repo.deleteBrand(job.createdBrandId());
         }
         if (job.ownerNewlyCreated() && job.createdOwnerId() != null) {
-            repo.deleteOwner(job.createdOwnerId());
+            ownerSeeds.delete(job.createdOwnerId());
         }
         log.info("provisioning job {} rolled back create_tenant (tenant {}, owner-newly-created={}, brand-newly-created={})",
                 job.id(), job.createdTenantId(), job.ownerNewlyCreated(), job.brandNewlyCreated());
@@ -207,7 +216,7 @@ class ProvisioningStepRunner {
     private void createTenant(Job job) {
         Optional<UUID> existingOwner = repo.findOwnerByEmail(job.ownerEmail());
         boolean ownerIsNew = existingOwner.isEmpty();
-        UUID ownerId = existingOwner.orElseGet(() -> repo.insertOwner(job.ownerName(), job.ownerEmail()));
+        UUID ownerId = existingOwner.orElseGet(() -> ownerSeeds.create(job.ownerName(), job.ownerEmail()));
 
         // NB-002's region lock is irreversible and owner-wide: an owner's first clinic sets the
         // region, every clinic after that must match. A brand-new owner has no prior region to
@@ -246,9 +255,9 @@ class ProvisioningStepRunner {
             return; // retry after a later step failed — already seeded (all presets in this one transaction), nothing to redo
         }
         for (RolePresets.Preset p : RolePresets.ALL) {
-            repo.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
+            iamSeeds.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
         }
-        repo.seedDefaultDepartment(tenantId);
+        departmentSeeds.seedDefault(tenantId);
     }
 
     /** NB-353: reuses StaffService's existing invite/accept machinery instead of inventing a second
