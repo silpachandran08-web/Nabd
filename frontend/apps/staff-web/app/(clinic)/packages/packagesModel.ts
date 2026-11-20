@@ -5,19 +5,33 @@ import { ApiError } from "../../lib/api";
 import type { Full } from "../../lib/gen";
 import type {
   ExpiringSoonResponse, InstanceEventResponse, InstanceItemResponse, InstanceResponse, InvoiceResponse, LiabilityResponse, LineItemResponse,
-  PackageItemResponse, PackageResponse, RefundResponse, StaffRosterEntry,
+  PackageItemResponse, PackageResponse, RefundPreviewResponse, RefundResponse, StaffRosterEntry,
 } from "@nabd/api-client/generated";
 
 // GET/POST/PATCH /v1/packages/** (PackageController) — the generated types, with the fields the server always sends marked present.
-export type PackageT = Omit<Full<PackageResponse, "speciality" | "description" | "refundNote" | "doctorLeaveWarning">, "items"> & { items: Full<PackageItemResponse>[] };
-export type InstanceT = Omit<Full<InstanceResponse, "validityStart" | "validityEnd" | "events">, "items" | "events"> & {
-  items: Full<InstanceItemResponse>[]; events: Full<InstanceEventResponse, "note" | "delta" | "deliveryStatus">[] | null;
+// shortcut: the FIN-025 fields are typed here (added fields only) because the OpenAPI writer could not run when this was built
+// (Docker was down on the build machine); once api/openapi/core.yaml and the client are regenerated, drop these for the generated types.
+type SplitFields = { allocatedMinor: number; taxMinor: number; taxCategory: string };
+export type PackageT = Omit<Full<PackageResponse, "speciality" | "description" | "refundNote" | "doctorLeaveWarning">, "items"> & {
+  items: (Full<PackageItemResponse> & { chargeCatalogueId: string | null })[];
 };
+export type InstanceT = Omit<Full<InstanceResponse, "validityStart" | "validityEnd" | "events">, "items" | "events"> & {
+  items: (Full<InstanceItemResponse> & SplitFields)[]; events: Full<InstanceEventResponse, "note" | "delta" | "deliveryStatus">[] | null;
+};
+/** GET /v1/packages/charge-heads: the price-list heads a component can be linked to. */
+export type ChargeHeadT = { id: string; code: string; name: string; category: string };
+/** GET /v1/packages/instances/{id}/refund-preview: the per-component refund, in minor units. */
+export type RefundPreviewT = Full<RefundPreviewResponse> & {
+  lines: { component: string; usedQty: number; usedValueMinor: number; refundTaxableMinor: number; refundTaxMinor: number }[];
+  refundMinor: number; owedMinor: number;
+};
+/** GET/PATCH /v1/packages/settings: the tax-split switch and its release gate (the fields FIN-025 adds to PackageSettingsResponse). */
+export type SplitSettings = { taxSplitEnabled: boolean; gstOpinionDecisionId: string | null; gstOpinionRequired: boolean };
 export type RefundT = Full<RefundResponse, "creditNoteNumber" | "recomputedAmount">;
 export type ExpiringT = Full<ExpiringSoonResponse, "lastReminderStatus">;
 export type LiabilityT = Full<LiabilityResponse>;
 export type StaffOption = Full<StaffRosterEntry>;
-export type ItemDraft = { itemType: string; name: string; quantity: string; unitListPrice: string; taxRatePercent: string };
+export type ItemDraft = { itemType: string; name: string; quantity: string; unitListPrice: string; taxRatePercent: string; chargeCatalogueId: string };
 export type Tab = "packages" | "active" | "sales" | "sessions" | "expiring" | "refunds" | "liability" | "settings";
 // Invoice issued by POST /packages/sell, read back from GET /billing/invoices/{id} (billing:view) so the
 // final step shows the server's own net / tax / total and per-line tax, never a client-side estimate.
@@ -45,7 +59,8 @@ export const SELL_STEPS = ["Patient", "Package", "Eligibility", "Review", "Payme
 // effective status computed by date (PackageInstanceService.effectiveStatus), so active, grace and expired copies
 // are all still stored as 'active' and all block a new sale; only completed or refunded copies do not.
 export const BLOCKING_STATUSES = ["active", "grace", "expired"];
-export const EMPTY_ITEM: ItemDraft = { itemType: "service_session", name: "", quantity: "1", unitListPrice: "0", taxRatePercent: "0" };
+export const EMPTY_ITEM: ItemDraft = { itemType: "service_session", name: "", quantity: "1", unitListPrice: "0", taxRatePercent: "0", chargeCatalogueId: "" };
+
 
 export function money(n: number): string {
   return formatNumber(n, { min: 2, max: 2 });
