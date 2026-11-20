@@ -129,7 +129,7 @@ public class OffboardingService {
         if (open != null) { // asked twice: the same request, nothing new recorded
             return open;
         }
-        if (!jdbc.queryForList("SELECT 1 FROM offboarding_requests WHERE step_up_id = ?", stepUpId).isEmpty()) {
+        if (!jdbc.queryForList("SELECT 1 FROM offboarding_requests WHERE tenant_id = ? AND step_up_id = ?", tenant, stepUpId).isEmpty()) {
             throw stepUpUsed();
         }
         UUID export = downloadedExport(tenant, exportId);
@@ -170,7 +170,7 @@ public class OffboardingService {
             return new Cancelled("cancelled");
         }
         int n = jdbc.update("UPDATE offboarding_requests SET status = 'cancelled', cancelled_at = now(), cancel_step_up_id = ?, notify_email = NULL "
-                + "WHERE id = ? AND status = 'cooling_off' AND cooling_off_ends_at > now()", stepUpId, id);
+                + "WHERE tenant_id = ? AND id = ? AND status = 'cooling_off' AND cooling_off_ends_at > now()", stepUpId, tenant, id);
         if (n == 0) {
             throw new ApiException(HttpStatus.CONFLICT, "past-cooling-off", "Too late to cancel",
                     "The 7-day cooling-off period has ended. The deletion can no longer be cancelled.", Map.of("code", "PAST_COOLING_OFF"));
@@ -213,11 +213,11 @@ public class OffboardingService {
         if ("cooling_off".equals(r.get("status"))) {
             String status = jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, tenant);
             if (!"offboarding".equals(status) && !"offboarded".equals(status)) { // an operator took the clinic out of offboarding: the request no longer stands
-                jdbc.update("UPDATE offboarding_requests SET status = 'cancelled', cancelled_at = now(), notify_email = NULL WHERE id = ?", id);
+                jdbc.update("UPDATE offboarding_requests SET status = 'cancelled', cancelled_at = now(), notify_email = NULL WHERE tenant_id = ? AND id = ?", tenant, id);
                 audit.recordPlatform("system", null, WORKER, "System", null, "offboarding.cancelled", "tenant", tenant, null, Map.of("requestId", id.toString(), "tenantStatus", status));
                 return null;
             }
-            jdbc.update("UPDATE offboarding_requests SET status = 'erasing' WHERE id = ?", id);
+            jdbc.update("UPDATE offboarding_requests SET status = 'erasing' WHERE tenant_id = ? AND id = ?", tenant, id);
             if ("offboarding".equals(status)) {
                 lifecycle.transitionBy("offboarded", null, "ADM-016: cooling-off ended, erasure started");
             }
@@ -263,7 +263,7 @@ public class OffboardingService {
         String email = (String) r.get("notify_email");
         if (r.get("certificate_id") != null) {
             UUID existing = (UUID) r.get("certificate_id");
-            return new Issued(existing, jdbc.queryForObject("SELECT doc_sha256 FROM master.deletion_certificates WHERE id = ?", String.class, existing), email);
+            return new Issued(existing, jdbc.queryForObject("SELECT doc_sha256 FROM master.deletion_certificates WHERE tenant_id = ? AND id = ?", String.class, tenant, existing), email);
         }
         if (r.get("erased_at") == null) {
             throw new IllegalStateException("the clinic is not erased yet");
@@ -311,7 +311,7 @@ public class OffboardingService {
         jdbc.update("INSERT INTO master.deletion_certificates (id, tenant_id, brand_id, request_id, requested_at, erased_at, backup_purge_at, region, row_counts, signed_doc, signature, kid, doc_sha256) "
                         + "VALUES (?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?)", id, tenant, t.get("brand_id"), requestId, Timestamp.from(requested), Timestamp.from(erased), Timestamp.from(purge),
                 t.get("region_code"), json.writeValueAsString(counts), s.canonical(), s.signature(), s.kid(), s.sha256());
-        jdbc.update("UPDATE offboarding_requests SET status = 'done', certificate_id = ? WHERE id = ?", id, requestId);
+        jdbc.update("UPDATE offboarding_requests SET status = 'done', certificate_id = ? WHERE tenant_id = ? AND id = ?", id, tenant, requestId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("requestId", requestId);
         data.put("certificateId", id);
@@ -325,7 +325,7 @@ public class OffboardingService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     void notified(UUID requestId) {
-        jdbc.update("UPDATE offboarding_requests SET notify_email = NULL WHERE id = ?", requestId);
+        jdbc.update("UPDATE offboarding_requests SET notify_email = NULL WHERE tenant_id = ? AND id = ?", tenantContext.current(), requestId);
     }
 
     String certificateUrl(Issued c) {
