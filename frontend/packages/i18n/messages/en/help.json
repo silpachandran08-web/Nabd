@@ -147,5 +147,124 @@
       "en": "English",
       "hi": "Hindi"
     }
+  },
+  "training": {
+    "title": "Data safety training",
+    "intro": "About 6 minutes: six short parts, then five questions. You need {pass} out of 100 to pass.",
+    "loading": "Loading your training status",
+    "error": "Could not load your training status.",
+    "retry": "Try again",
+    "status": {
+      "due": "You have not completed this training yet.",
+      "dueBy": "You have not completed this training yet. Complete it by {due}.",
+      "current": "Completed on {date}. Your yearly refresher is due by {due}.",
+      "overdue": "Your training is overdue. Complete it now."
+    },
+    "start": "Start the training",
+    "retake": "Take the training again",
+    "part": "Part {n} of {total}",
+    "back": "Back",
+    "next": "Next",
+    "toQuiz": "Go to the questions",
+    "submit": "Submit my answers",
+    "close": "Close the training",
+    "sections": {
+      "why": {
+        "title": "Why this matters",
+        "p1": "Patient information is anything that links a person to their health: names with a diagnosis, reports, prescriptions, bills and photos.",
+        "p2": "Patients trust the clinic to keep it private. The law also requires it, and a leak can harm the patient and the clinic.",
+        "p3": "Software blocks many mistakes, but not all. What you do every day keeps patient information safe."
+      },
+      "phishing": {
+        "title": "Fake messages and calls",
+        "p1": "Nabd never asks for your PIN or a one-time code by phone, WhatsApp, SMS or email. Anyone who asks is not Nabd.",
+        "p2": "Do not open links or files you did not expect, even when the message looks urgent or seems to come from the owner.",
+        "p3": "Sign in only on the address your clinic gave you. If a page looks different from usual, stop and ask.",
+        "p4": "If you clicked a link or shared a code by mistake, tell the clinic owner at once."
+      },
+      "handling": {
+        "title": "Handling patient information",
+        "p1": "Open only the records you need for the work in front of you.",
+        "p2": "Do not take photos or screenshots of patient records, and do not copy them to your own phone, email or a USB drive.",
+        "p3": "Speak quietly about patients at the desk. Do not read out a diagnosis or a phone number where others can hear.",
+        "p4": "Print only when needed. Collect prints at once and shred them when they are no longer needed."
+      },
+      "whatsapp": {
+        "title": "WhatsApp and messages",
+        "p1": "Never forward a report, prescription or patient photo from your personal WhatsApp.",
+        "p2": "Send documents to patients only through the clinic's Nabd messages and secure links.",
+        "p3": "Do not post patient names or details in staff or family groups.",
+        "p4": "Check the phone number before you send. If something went to the wrong person, report it straight away."
+      },
+      "devices": {
+        "title": "Your account and devices",
+        "p1": "Your account is yours alone. Never share your PIN or one-time code, and never let a colleague work under your sign-in.",
+        "p2": "Lock the screen or sign out every time you leave the desk, even for a minute.",
+        "p3": "Sign out fully on a shared computer at the end of your shift.",
+        "p4": "If a phone or computer you use for work is lost or stolen, tell the clinic owner the same day."
+      },
+      "incident": {
+        "title": "If something goes wrong",
+        "p1": "Mistakes happen. Reporting quickly limits the harm; hiding a mistake makes it worse.",
+        "p2": "Tell the clinic owner right away. The owner can contact Nabd support from the app.",
+        "p3": "Do not delete messages or records to cover a mistake. They are needed to put things right."
+      }
+    },
+    "quiz": {
+      "title": "Five questions",
+      "unanswered": "Answer every question before you submit.",
+      "q1": {
+        "q": "A patient's relative asks you to send the lab report to them from your personal WhatsApp. What do you do?",
+        "a": "Send it from my personal WhatsApp, because they asked.",
+        "b": "Send it only through the clinic's Nabd messages or secure link.",
+        "c": "Post it in the staff group so that someone else can send it."
+      },
+      "q2": {
+        "q": "A caller says they are from Nabd support and need your PIN or one-time code to fix your account. What do you do?",
+        "a": "Give the code, because support needs it.",
+        "b": "Refuse and tell the clinic owner. Nabd never asks for a PIN or code.",
+        "c": "Give only the one-time code, not the PIN."
+      },
+      "q3": {
+        "q": "You need to leave the front desk for five minutes. What do you do with your screen?",
+        "a": "Leave it open. I will be back soon.",
+        "b": "Turn the monitor away from the patients.",
+        "c": "Lock the screen or sign out."
+      },
+      "q4": {
+        "q": "A colleague forgot their PIN and asks to use your sign-in for the afternoon. What do you do?",
+        "a": "Share my PIN this one time.",
+        "b": "Say no, and ask the owner to reset their access.",
+        "c": "Sign in for them and leave the computer with them."
+      },
+      "q5": {
+        "q": "You sent a prescription to the wrong phone number by mistake. What do you do?",
+        "a": "Delete the message and say nothing.",
+        "b": "Tell the clinic owner right away.",
+        "c": "Wait and see whether anyone complains."
+      }
+    },
+    "result": {
+      "passed": "Passed with {score} out of 100. This is saved on your account.",
+      "failed": "You scored {score} out of 100. You need {pass} to pass. Read the parts again and retake the questions.",
+      "saveFailed": "Your answers could not be saved. Check your connection and submit again."
+    },
+    "roster": {
+      "title": "Data safety training",
+      "hint": "Every active account must complete this before the clinic goes live, and again every year. Each person opens Help (F1) and takes it on their own account.",
+      "summary": "{current} of {total} completed",
+      "loading": "Loading the training list",
+      "error": "Could not load the training list.",
+      "empty": "No staff accounts yet.",
+      "name": "Staff",
+      "role": "Role",
+      "status": "Training",
+      "invited": "invite pending",
+      "state": {
+        "current": "Completed {date}; refresher due {due}",
+        "due": "Not completed",
+        "overdue": "Overdue (last completed {date})"
+      }
+    }
   }
 }
