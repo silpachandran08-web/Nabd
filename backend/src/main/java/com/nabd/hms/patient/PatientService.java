@@ -239,10 +239,15 @@ public class PatientService {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         boolean synthetic = Boolean.TRUE.equals(req.synthetic());
-        if (!synthetic) {
+        boolean paper = PAPER_IMPORT.equals(req.source()); // ADM-014: a paper card is always a real patient
+        if (!synthetic || paper) {
             dataGate.requireRealData(); // ADM-002: DPA_REQUIRED before anything is read or written; demo (synthetic) patients pass
         }
-        validateGuardian(tenantId, req);
+        LocalDate dob = paper ? paperDob(tenantId, req) : req.dob();
+        if (dob == null) {
+            throw invalidField("dob", "must not be null");
+        }
+        validateGuardian(tenantId, dob, req.guardianId());
         if (req.guardianId() != null) {
             requireGuardianConsent(req.guardianConsent());
         }
@@ -250,7 +255,7 @@ public class PatientService {
         String phone = PhoneNumbers.require(req.phone(), repo.region(tenantId), "phone"); // ACC-028: valid for the clinic country, stored E.164
         List<MatchCandidateRow> candidates = Boolean.TRUE.equals(req.confirmedNotDuplicate())
                 ? List.of() // reviewed and confirmed distinct; the registry's Duplicate review flag still surfaces it
-                : repo.findDuplicateCandidates(tenantId, phone, req.name(), req.dob(), 5);
+                : repo.findDuplicateCandidates(tenantId, phone, req.name(), dob, 5);
         if (!candidates.isEmpty()) {
             // count only — candidate ids/names/phones are PHI, don't belong in an operational log
             log.info("patient registration blocked by {}: {} duplicate candidate(s) (tenant {})",
@@ -262,13 +267,52 @@ public class PatientService {
 
         UUID id = UUID.randomUUID();
         byte[] nationalIdEnc = encryptOrNull(tenantId, id, req.nationalId());
-        repo.insert(id, tenantId, req.name(), phone, req.dob(), req.gender(),
+        repo.insert(id, tenantId, req.name(), phone, dob, req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc, synthetic);
+        if (paper) {
+            boolean hasNote = req.note() != null && !req.note().isBlank();
+            repo.markPaperImport(tenantId, id, hasNote ? req.note().strip() : null);
+            audit(tenantId, callerStaffId, "patient.paper_imported", id, null, Map.of("source", PAPER_IMPORT, "hasNote", hasNote)); // no card content
+        }
         if (req.guardianId() != null) {
             grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId(), req.guardianConsent().channel());
         }
         log.info("patient {} registered by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    private static final String PAPER_IMPORT = "paper_import";
+
+    /**
+     * ADM-014: a paper card carries a year of birth, not a date.
+     * shortcut: the year is stored as 1 January of that year with dob_year_only = true; upgrade when dob can hold a partial date.
+     * A card whose year could still mean under 18 is refused: a minor needs the full date and a guardian (NB-080).
+     */
+    private LocalDate paperDob(UUID tenantId, PatientWriteRequest req) {
+        if (req.dob() != null) {
+            throw invalidField("dob", "must be empty for a paper record; send yearOfBirth");
+        }
+        int thisYear = clock.today(tenantId).getYear();
+        Integer year = req.yearOfBirth();
+        if (year == null || year < 1900 || year > thisYear) {
+            throw invalidField("yearOfBirth", "must be a year from 1900 to " + thisYear);
+        }
+        if (thisYear - year <= 18) {
+            throw invalidField("yearOfBirth", "may be under 18: register with the full date of birth and a guardian");
+        }
+        return LocalDate.of(year, 1, 1);
+    }
+
+    private static ApiException invalidField(String field, String message) {
+        return new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", field + ": " + message,
+                Map.of("errors", List.of(Map.of("field", field, "message", message))));
+    }
+
+    /** ADM-014: lets a screen that only registers patients (patients:create, no setup:view) know real patients are still blocked. */
+    @Transactional // not readOnly: the gate opens itself once the DPA is signed and a plan exists (DataGate.isLive)
+    public String dataGateState(UUID tenantId, UUID callerStaffId) {
+        requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        return dataGate.isLive() ? "live" : "demo_only";
     }
 
     @Transactional
@@ -346,7 +390,10 @@ public class PatientService {
             changes.put("phone", PhoneNumbers.require(req.phone(), repo.region(tenantId), "phone"));
             changes.put("phone_invalid", false); // ACC-028: a corrected number leaves the data-quality list
         }
-        if (req.has("dob")) changes.put("dob", java.sql.Date.valueOf(req.dob()));
+        if (req.has("dob")) {
+            changes.put("dob", java.sql.Date.valueOf(req.dob()));
+            changes.put("dob_year_only", false); // ADM-014: a typed full date replaces the paper card's year
+        }
         if (req.has("gender")) changes.put("gender", req.gender());
         if (req.has("guardianId")) changes.put("guardian_id", req.guardianId());
         if (!Objects.equals(before.guardianId(), guardianId)) {
@@ -588,9 +635,6 @@ public class PatientService {
         return Period.between(dob, today).getYears() < 18;
     }
 
-    private void validateGuardian(UUID tenantId, PatientWriteRequest req) {
-        validateGuardian(tenantId, req.dob(), req.guardianId());
-    }
 
     private void validateGuardian(UUID tenantId, LocalDate dob, UUID guardianId) {
         if (isMinor(dob, clock.today(tenantId)) && guardianId == null) {
@@ -631,6 +675,7 @@ public class PatientService {
                 row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob(), clock.today(row.tenantId())),
                 row.guardianId(), guardianName, guardianConsentGrantedAt,
                 row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null),
-                repo.findLastVisit(tenantId, row.id()).orElse(null));
+                repo.findLastVisit(tenantId, row.id()).orElse(null),
+                row.dobYearOnly() ? Boolean.TRUE : null, row.paperNote());
     }
 }

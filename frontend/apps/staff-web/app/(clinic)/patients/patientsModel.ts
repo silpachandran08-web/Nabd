@@ -9,7 +9,7 @@ import { decodeAccessToken } from "../../lib/session";
 
 // FEF-031: types, constants and pure helpers of the patient registry and drawer (moved unchanged from the old page).
 export type PatientDetail = PatientSummary & Full<Pick<PatientDetailResponse, "isMinor" | "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit">,
-  "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit">;
+  "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit"> & Pick<PatientDetailResponse, "dobYearOnly" | "paperNote">; // ADM-014
 // GET /clinical/patients/{id}/allergies/status. "not_assessed" (nobody asked) is NOT "none_documented".
 export type AllergyStatus = Full<AllergyStatusResponse, "documentedByName" | "documentedAt"> & { state: "recorded" | "none_documented" | "not_assessed" };
 export type Allergy = Full<Pick<AllergyResponse, "id" | "substance" | "severity" | "active">> & Pick<AllergyResponse, "category" | "recordedByName" | "recordedAt" | "deactivatedReason" | "deactivatedAt" | "deactivatedByName"> & { reaction: string | null };

@@ -57,11 +57,16 @@ test("an empty body and a non-JSON body are refused", async () => {
 test("POST /patients: valid registration passes; each missing required field and a bad date are refused", async () => {
   assert.ok((await send("POST", "/v1/patients", PATIENT)).status < 300);
   mock.assertNoSpecViolations();
-  for (const k of ["name", "dob", "gender", "phone"]) {
+  // ADM-014: dob left the spec's required list (a paper card sends yearOfBirth); Core still refuses a desk registration without it.
+  const { dob: _dob, ...noDob } = PATIENT;
+  assert.ok((await send("POST", "/v1/patients", { ...noDob, yearOfBirth: 1975, source: "paper_import" })).status < 300, "paper card");
+  mock.assertNoSpecViolations();
+  for (const k of ["name", "gender", "phone"]) {
     const { [k]: _drop, ...body } = PATIENT;
     assert.equal((await send("POST", "/v1/patients", body)).status, 400, `missing ${k}`);
   }
   assert.equal((await send("POST", "/v1/patients", { ...PATIENT, dob: "01/04/1990" })).status, 400, "dob format date");
+  assert.equal((await send("POST", "/v1/patients", { ...PATIENT, source: "whatsapp" })).status, 400, "source is desk or paper_import");
   assert.equal((await send("POST", "/v1/patients", { ...PATIENT, guardianId: "nope" })).status, 400, "guardianId uuid");
   assert.equal(mock.violations.length, 6);
   assert.throws(() => mock.assertNoSpecViolations(), /PatientController_register/);

@@ -25,5 +25,7 @@ public record PatientDetailResponse(UUID id, String mrn, String name, String pho
                                      List<String> chronicConditions, int activePackages,
                                      Double outstandingBalance, Instant lastVisitAt, boolean isMinor,
                                      UUID guardianId, String guardianName, Instant guardianConsentGrantedAt,
-                                     Instant guardianReviewKeptAt, LocalDate lastVisit) {
+                                     Instant guardianReviewKeptAt, LocalDate lastVisit,
+                                     // ADM-014: true while dob is only 1 January of the year on a paper card; paperNote is that card's free text
+                                     Boolean dobYearOnly, String paperNote) {
 }

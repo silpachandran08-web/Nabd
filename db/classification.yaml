@@ -1497,6 +1497,8 @@ schemas:
       preferred_language: operational
       legacy_record_no: pii
       is_synthetic: operational
+      dob_year_only: operational
+      paper_note: phi  # ADM-014: free text from the paper card (last visit, doctor)
       id: operational
       tenant_id: operational
       mrn: pii
