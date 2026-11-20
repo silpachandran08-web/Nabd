@@ -10,6 +10,7 @@ import { ErrorState, Skeleton, EmptyState } from "../../../components/ui/StateVi
 import RoleDenied from "../../../components/platform/RoleDenied";
 import { TenantStatusPill } from "../../../components/platform/statusPills";
 import StatusPill from "../../../components/ui/StatusPill";
+import { canViewLifecycle } from "./lifecycle";
 
 // Matches GET /v1/platform/tenants (api/openapi.yaml has no Platform paths yet — see PlatformAuthController).
 type TenantSummary = {
@@ -48,7 +49,9 @@ export default function FleetPage() {
   const [forbidden, setForbidden] = useState(false);
   const [summary, setSummary] = useState<FleetSummary | null>(null);
   const [canRequestSupportAccess, setCanRequestSupportAccess] = useState(false);
-  const canSwitchFeatures = useOperatorAccess().isSuper; // PLT-059: tenant_detail:edit (super_admin)
+  const access = useOperatorAccess();
+  const canSwitchFeatures = access.isSuper; // PLT-059: tenant_detail:edit (super_admin)
+  const canOpenDetail = canViewLifecycle(access.profile?.permissions); // ADM-020: lifecycle and history need tenant_detail:view
   const [activeSupportSessions, setActiveSupportSessions] = useState<number | null>(null);
 
   const fetchPage = useCallback(async (cursor: string | null, append: boolean) => {
@@ -166,7 +169,9 @@ export default function FleetPage() {
                   {rows.map((t) => (
                     <tr key={t.id}>
                       <td>
-                        <span className={styles.tenantName}>{t.name}</span>
+                        {canOpenDetail
+                          ? <Link className={styles.tenantName} href={`/platform/fleet/${t.id}`}>{t.name}</Link>
+                          : <span className={styles.tenantName}>{t.name}</span>}
                         <span className={styles.tenantSlug}>{t.slug}</span>
                       </td>
                       <td>{t.region}</td>

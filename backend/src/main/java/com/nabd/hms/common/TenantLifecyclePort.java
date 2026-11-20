@@ -8,7 +8,7 @@ import java.util.UUID;
  */
 public interface TenantLifecyclePort {
 
-    /** staffId = the clinic staff member who caused it, or null for the system. 400 invalid-lifecycle-transition when the move is not allowed. */
+    /** staffId = the clinic staff member who caused it, or null for the system. 409 INVALID_TRANSITION when the move is not allowed (ADM-020; a blank reason is 400). */
     void transitionBy(String toStatus, UUID staffId, String reason);
 
     /** Go live: stamps setup_completed_at (kept if already set) and go_live_by on the bound tenant. */

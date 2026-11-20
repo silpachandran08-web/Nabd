@@ -8,6 +8,9 @@ public record LifecycleEventResponse(
         String toStatus,
         UUID changedBy,
         String reason,
-        Instant changedAt
+        Instant changedAt,
+        // ADM-020 (additive): operator | staff | system, and the operator's name when an operator did it
+        String actorType,
+        String operatorName
 ) {
 }

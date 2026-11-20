@@ -367,6 +367,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         // inbound.received and message.status_changed (COM-001, WhatsAppInboxApiTest)
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove("organization.tenant.region_pinned.v1");
+        expected.remove("organization.tenant.status_changed.v1"); // ADM-020: operator-plane lifecycle move, Adm020LifecycleApiTest
         expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type());
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         expected.remove("comms.inbound.received.v1");

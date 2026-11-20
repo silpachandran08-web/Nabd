@@ -3,6 +3,8 @@ export type Entitlements = {
   modules: { code: string; enabled: boolean }[];
   killedFeatures: string[];
   seatLimit: number | null;
+  /** ADM-020: the clinic's lifecycle state (suspended = read-only, overdue = the owner's payment banner). Absent on an older server. */
+  tenantStatus?: string | null;
 };
 
 // Nav item -> the plan modules that make it useful (any one is enough). Items not listed are never gated by plan.

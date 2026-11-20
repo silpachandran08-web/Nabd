@@ -115,7 +115,7 @@ public class TokenService {
     }
 
     public boolean tenantInactive(UUID tenantId) {
-        return staffDir.findTenantById(tenantId).map(t -> com.nabd.hms.common.SessionRevocation.INACTIVE_TENANT_STATUSES.contains(t.status()))
+        return staffDir.findTenantById(tenantId).map(t -> com.nabd.hms.common.SessionRevocation.CLOSED_TENANT_STATUS.equals(t.status()))
                 .orElse(true);
     }
 

@@ -8,6 +8,6 @@ final class TenantLifecycleModels {
     private TenantLifecycleModels() {
     }
 
-    record LifecycleEvent(String fromStatus, String toStatus, UUID changedBy, String reason, Instant changedAt) {
+    record LifecycleEvent(String fromStatus, String toStatus, UUID changedBy, String reason, Instant changedAt, String actorType, String operatorName) {
     }
 }

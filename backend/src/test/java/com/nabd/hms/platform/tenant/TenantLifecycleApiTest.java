@@ -39,7 +39,7 @@ class TenantLifecycleApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/platform/tenants/" + tenant.id() + "/lifecycle/transitions",
                 HttpMethod.POST, authedJsonBody(token, Map.of("toStatus", "provisioning", "reason", "nonsense")), Map.class);
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CONFLICT); // ADM-020: 409 INVALID_TRANSITION
         String status = jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, tenant.id());
         assertThat(status).isEqualTo("active");
     }
@@ -57,7 +57,7 @@ class TenantLifecycleApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resurrect = exchange("/v1/platform/tenants/" + tenant.id() + "/lifecycle/transitions", HttpMethod.POST,
                 authedJsonBody(token, Map.of("toStatus", "active", "reason", "changed our minds")), Map.class);
-        assertThat(resurrect.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resurrect.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

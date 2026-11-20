@@ -102,14 +102,13 @@ class S12QaPlt007SessionsEndTest extends ApiTestBase {
         assertThat((System.nanoTime() - t0) / 1_000_000_000L).isLessThan(60);
         assertThat(liveSessions(clinic.id())).isZero();
 
+        // ADM-020: suspended is read-only, not closed. The ended sessions stay dead, a fresh sign-in or select works again
+        // and every write is 423 TENANT_SUSPENDED (Adm020LifecycleApiTest).
         ResponseEntity<Map> sel = select(owner, clinic);
-        assertThat(sel.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(String.valueOf(sel.getBody().get("type"))).endsWith("TENANT_INACTIVE");
-        assertThat(sel.getBody()).doesNotContainKey("accessToken");
+        assertThat(sel.getStatusCode()).isEqualTo(HttpStatus.OK);
         // tenant isolation: the owner's other clinic still works
         assertThat(select(owner, sister).getStatusCode()).isEqualTo(HttpStatus.OK);
-        // and no new sign-in into the suspended clinic
-        assertThat(rawLogin(rec).getStatusCode().is2xxSuccessful()).isFalse();
+        assertThat(rawLogin(rec).getStatusCode().is2xxSuccessful()).isTrue();
     }
 
     @Test
@@ -139,10 +138,16 @@ class S12QaPlt007SessionsEndTest extends ApiTestBase {
     }
 
     @Test
-    void ac2_abuseClinicSuspendedOutsideTheLifecycleEndpointStillRefusesRefresh() {
+    void ac2_abuseClinicSuspendedOutsideTheLifecycleEndpointIsStillReadOnly() {
         SeededTenant clinic = seedTenant();
         Map<String, Object> pair = login(seedStaff(clinic, receptionistRole(clinic.id()), "qa2-rec3@a.com", "+919310000003", false));
         su.update("UPDATE tenants SET status = 'suspended' WHERE id = ?", clinic.id()); // e.g. a billing job, no revoke ran
+        // ADM-020: the status alone makes the clinic read-only, whichever door set it; a live session cannot write
+        ResponseEntity<Map> w = exchange("/v1/queue/check-in", HttpMethod.POST,
+                authedJsonBodyWithHeader((String) pair.get("accessToken"), "Idempotency-Key", UUID.randomUUID().toString(), Map.of()), Map.class);
+        assertThat(w.getStatusCode()).isEqualTo(HttpStatus.LOCKED);
+        assertThat(String.valueOf(w.getBody().get("type"))).endsWith("TENANT_SUSPENDED");
+        su.update("UPDATE tenants SET status = 'offboarded' WHERE id = ?", clinic.id()); // closed: refresh is refused without any revoke
         ResponseEntity<Map> r = refresh((String) pair.get("refreshToken"));
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(String.valueOf(r.getBody().get("type"))).endsWith("TENANT_INACTIVE");
