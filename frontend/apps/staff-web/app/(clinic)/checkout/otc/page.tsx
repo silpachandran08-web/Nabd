@@ -13,6 +13,7 @@ import BillingStatePill from "../../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../../components/ui/StockPill";
 import StatusPill from "../../../components/ui/StatusPill";
 import RxLinkPicker from "../../../components/checkout/RxLinkPicker";
+import PaperRxDialog, { type PaperRxLink } from "../../../components/checkout/PaperRxDialog";
 import { rxErrorMessage, unlinkedRx } from "../../../components/checkout/rxLink";
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
 import { usePriceReasons } from "../../../components/checkout/priceReasons";
@@ -52,6 +53,7 @@ function OtcCheckoutInner() {
   const canPay = can("billing:edit"); // POST /billing/invoices/{id}/payments requires billing:edit
   const canDiscount = can("billing.discount"); // REC-043: input absent, and discount not sent, without it
   const canReturn = can("billing:edit"); // PHL-011: POST /pharmacy/returns and GET /pharmacy/returns/bill need billing:edit
+  const canPaperRx = can("pharmacy:dispense"); // PHL-020: every /pharmacy/paper-prescriptions call needs it; absent otherwise
   const [returning, setReturning] = useState(false);
 
   const [context, setContext] = useState<OtcContext | null>(null);
@@ -60,7 +62,7 @@ function OtcCheckoutInner() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
 
-  const [items, setItems] = useState<LineItem[]>([]);
+  const [items, setItems] = useState<(LineItem & { paperRxLineId?: string })[]>([]);
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
   const [discountReason, setDiscountReason] = useState(""); // FIN-018: every discount carries a coded reason
@@ -69,6 +71,8 @@ function OtcCheckoutInner() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [linking, setLinking] = useState<string | null>(null); // PHL-001: chargeCode whose prescription picker is open
   const [links, setLinks] = useState<Record<string, RxLine>>({}); // chargeCode -> the signed line it is billed against
+  const [paperFor, setPaperFor] = useState<{ code: string; itemId: string } | null>(null); // PHL-020: the line whose "Paper Rx" dialog is open
+  const [paperLinks, setPaperLinks] = useState<Record<string, PaperRxLink>>({}); // chargeCode -> the recorded paper prescription
 
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState("");
@@ -114,12 +118,26 @@ function OtcCheckoutInner() {
       }
       return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice: charge.baseAmount, taxRatePercent: charge.taxRatePercent }];
     });
-    if (charge.isRx && !links[charge.code]) setLinking(charge.code); // PHL-001: adding an Rx item opens the picker
+    if (charge.isRx && !links[charge.code] && !paperLinks[charge.code]) setLinking(charge.code); // PHL-001: adding an Rx item opens the picker
   }
 
   function link(code: string, line: RxLine) {
     setLinks((prev) => ({ ...prev, [code]: line }));
     setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, prescriptionItemId: line.prescriptionItemId } : i)));
+    setLinking(null);
+  }
+
+  function openPaper(code: string) {
+    const itemId = context?.charges.find((c) => c.code === code)?.id;
+    if (!itemId) return;
+    setLinking(null);
+    setPaperFor({ code, itemId });
+  }
+
+  function linkPaper(code: string, paper: PaperRxLink) {
+    setPaperLinks((prev) => ({ ...prev, [code]: paper }));
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, paperRxLineId: paper.paperRxLineId } : i)));
+    setPaperFor(null);
     setLinking(null);
   }
 
@@ -129,7 +147,9 @@ function OtcCheckoutInner() {
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.chargeCode !== code));
       setLinks((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== code)));
+      setPaperLinks((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== code)));
       if (linking === code) setLinking(null);
+      if (paperFor?.code === code) setPaperFor(null);
       return;
     }
     setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, quantity: qty } : i)));
@@ -157,7 +177,8 @@ function OtcCheckoutInner() {
     try {
       const body = {
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent,
-          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
+          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}),
+          ...(i.paperRxLineId ? { paperRxLineId: i.paperRxLineId } : {}) })),
         ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
         ...(approval?.billStatus === "approved" ? { discountApprovalId: approval.approvalId } : {}),
       };
@@ -334,11 +355,25 @@ function OtcCheckoutInner() {
                             {tr("rxLinked", { drug: links[i.chargeCode].drugName, patient: links[i.chargeCode].patientName, left: links[i.chargeCode].remainingQty })}
                           </div>
                         )}
-                        {waitingForRx.includes(i.chargeCode) && linking !== i.chargeCode && (
+                        {paperLinks[i.chargeCode] && (
+                          <div className={styles.muted} data-testid={`paper-rx-linked-${i.chargeCode}`}>
+                            {tr("paperRxLinked", { doctor: paperLinks[i.chargeCode].prescriberName, qty: paperLinks[i.chargeCode].qty })}
+                          </div>
+                        )}
+                        {waitingForRx.includes(i.chargeCode) && linking !== i.chargeCode && paperFor?.code !== i.chargeCode && (
                           <button type="button" className={styles.rxLinkBtn} onClick={() => setLinking(i.chargeCode)}>{tr("linkRx")}</button>
+                        )}
+                        {/* PHL-020: the paper / photo prescription path; absent without pharmacy:dispense */}
+                        {canPaperRx && waitingForRx.includes(i.chargeCode) && paperFor?.code !== i.chargeCode && (
+                          <button type="button" className={styles.rxLinkBtn} data-testid={`paper-rx-${i.chargeCode}`}
+                            onClick={() => openPaper(i.chargeCode)}>{tr("paperRx")}</button>
                         )}
                         {linking === i.chargeCode && (
                           <RxLinkPicker itemName={i.chargeName} onPick={(l) => link(i.chargeCode, l)} onCancel={() => setLinking(null)} />
+                        )}
+                        {paperFor?.code === i.chargeCode && (
+                          <PaperRxDialog item={{ id: paperFor.itemId, name: i.chargeName }} quantity={i.quantity}
+                            onLinked={(p) => linkPaper(i.chargeCode, p)} onCancel={() => setPaperFor(null)} />
                         )}
                       </td>
                       <td>
