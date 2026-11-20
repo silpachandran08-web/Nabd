@@ -1988,6 +1988,22 @@ schemas:
       packages_sold: operational
       last_event_id: operational
       updated_at: operational
+      bookings: operational
+      flow_n: operational
+      wait_p50_s: operational
+      door_to_doctor_p50_s: operational
+      consult_n: operational
+      consult_p50_s: operational
+      booking_response_n: operational
+      booking_response_p50_s: operational
+      eta_n: operational
+      eta_within_range_pct: operational
+      sessions: operational
+      punctual_sessions_pct: operational
+      checkin_to_vitals_p50_s: operational
+      checkout_p50_s: operational
+      wait_by_hour: operational
+      flow_refreshed_at: operational
     doctor_daily_metrics:
       tenant_id: operational
       doctor_id: operational
@@ -1995,6 +2011,7 @@ schemas:
       visits: operational
       completed: operational
       median_consult_s: operational
+      first_call_delay_s: operational
       no_shows: operational
       billed: financial
       collected: financial

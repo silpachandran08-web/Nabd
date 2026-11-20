@@ -11,6 +11,7 @@ import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.reports.dto.BillingLeakageResponse;
 import com.nabd.hms.reports.dto.DailyMoneyResponse;
 import com.nabd.hms.reports.dto.DoctorPunctualityResponse;
+import com.nabd.hms.reports.dto.FlowOverviewResponse;
 import com.nabd.hms.reports.dto.NoShowRiskResponse;
 import com.nabd.hms.reports.dto.RetentionResponse;
 import com.nabd.hms.reports.dto.SourceBreakdownResponse;
@@ -34,15 +35,25 @@ import java.util.UUID;
 public class ReportsController {
 
     private final ReportsService service;
+    private final FlowOverviewService flowOverview;
 
-    ReportsController(ReportsService service) {
+    ReportsController(ReportsService service, FlowOverviewService flowOverview) {
         this.service = service;
+        this.flowOverview = flowOverview;
     }
 
     @GetMapping("/overview")
     @PreAuthorize("hasAuthority('reports:view')")
     public OverviewResponse overview(@CurrentTenant UUID tenantId, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return service.overview(tenantId, from, to);
+    }
+
+    /** ADM-041: the owner's time KPIs for today, 7 or 30 days, from the daily rollups only. facility, when sent, must be the session's facility. */
+    @GetMapping("/overview/flow")
+    @PreAuthorize("hasAuthority('reports:view')")
+    public FlowOverviewResponse flowOverview(@CurrentTenant UUID tenantId, @RequestParam(defaultValue = "today") String range,
+                                             @RequestParam(required = false) UUID facility) {
+        return flowOverview.overview(tenantId, range, facility);
     }
 
     @GetMapping("/daily-money")
