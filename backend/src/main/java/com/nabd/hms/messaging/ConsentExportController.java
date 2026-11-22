@@ -60,16 +60,22 @@ class ConsentExportController {
         }
         final UUID fromPatient = afterPatient;
         final String fromPurpose = afterPurpose;
+        // The versions are read in ONE pass over the clinic's consent events. A sub-select per consent row scanned the whole
+        // outbox (no index on aggregate_id) once per patient: 500 scans a page, past the 5 s statement timeout on a busy outbox.
+        // shortcut: still one outbox scan per page; a partial index on aggregate_id for consent.changed.v1 when that is too slow
         List<Item> rows = tenantScope.run(tenantId, () -> jdbc.query("""
-                SELECT * FROM (
+                WITH ev AS MATERIALIZED (
+                  SELECT o.aggregate_id, o.payload->>'consentType' AS consent_type, max(o.id) AS version
+                  FROM outbox_events o WHERE o.ce_type = 'consent.changed.v1' GROUP BY 1, 2
+                )
+                SELECT l.patient_id, l.consent_type, l.granted, l.at, COALESCE(ev.version, 0) AS version FROM (
                   SELECT DISTINCT ON (c.patient_id, c.consent_type) c.patient_id, c.consent_type, c.withdrawn_at IS NULL AS granted,
-                         COALESCE(c.withdrawn_at, c.granted_at) AS at,
-                         COALESCE((SELECT max(o.id) FROM outbox_events o WHERE o.aggregate_id = c.patient_id
-                                     AND o.ce_type = 'consent.changed.v1' AND o.payload->>'consentType' = c.consent_type), 0) AS version
+                         COALESCE(c.withdrawn_at, c.granted_at) AS at
                   FROM consents c
                   WHERE c.consent_type IN ('messaging', 'marketing')
                   ORDER BY c.patient_id, c.consent_type, c.created_at DESC, c.id DESC
                 ) l
+                LEFT JOIN ev ON ev.aggregate_id = l.patient_id AND ev.consent_type = l.consent_type
                 WHERE (?::timestamptz IS NULL OR l.at >= ?::timestamptz) AND (l.patient_id, l.consent_type) > (?::uuid, ?)
                 ORDER BY l.patient_id, l.consent_type LIMIT ?
                 """, (rs, i) -> new Item(rs.getObject(1, UUID.class), rs.getString(2), rs.getBoolean(3),
