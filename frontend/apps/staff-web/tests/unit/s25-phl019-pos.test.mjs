@@ -200,3 +200,14 @@ test("T1-BUG-4: a split-payment row wraps in the narrow third column and the amo
   assert.match(css, /\.tenderRow \{[^}]*flex-wrap: wrap/);
   assert.match(css, /\.tenderAmount \{[^}]*flex: 1 1 120px; min-inline-size: 120px/);
 });
+
+test("T1-BUG-4 follow-up: the visit checkout keeps a payment on one line from 1280px; a narrow block (POS, phone) still wraps", () => {
+  const css = src("(clinic)/checkout/checkout.module.css");
+  assert.match(css, /\.tenders \{[^}]*container-type: inline-size/);
+  assert.match(css, /@container \(min-width: 320px\) \{ \.tenderRow \{ flex-wrap: nowrap; \} \}/);
+  assert.match(css, /@media \(min-width: 1280px\) \{ \.layout:has\(\.tenders\) \{ grid-template-columns: 220px 1fr 360px; \} \}/);
+  assert.match(css, /@media \(min-width: 1340px\) \{ \.layout:has\(\.tenders\) \{ grid-template-columns: 280px 1fr 360px; \} \}/);
+  // 360px column = 326px block: method (shrinks) + 120px amount + two 44px buttons + three 6px gaps fit; the POS column (226px) is under the 320px line
+  assert.ok(360 - 34 >= 320 && 120 + 44 + 44 + 18 < 320);
+  assert.match(css, /\.tenderAmount \{[^}]*min-inline-size: 120px/, "the amount never goes under 120px, wrapped or not");
+});

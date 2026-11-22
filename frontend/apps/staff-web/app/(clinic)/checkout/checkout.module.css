@@ -328,7 +328,7 @@
 }
 
 /* REC-044: split tender rows and the sticky Collect bar. */
-.tenders { margin-block-start: var(--nb-space-16); display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.tenders { margin-block-start: var(--nb-space-16); display: flex; flex-direction: column; gap: var(--nb-space-8); container-type: inline-size; }
 .tenderRow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } /* wraps in a narrow column: the amount keeps 120px */
 .tenderSelect, .tenderAmount, .tenderFill, .tenderRemove {
   min-block-size: 44px;
@@ -344,6 +344,12 @@
 .tenderFill, .tenderRemove { min-inline-size: 44px; padding-inline: var(--nb-space-8); cursor: pointer; }
 .tenderFill:disabled, .tenderRemove:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
 .tenders .backBtn { min-block-size: 44px; }
+/* One line per payment (method, amount, Rest, remove) wherever the block is wide enough for a 120px amount; narrower (POS, phone) it wraps. */
+@container (min-width: 320px) { .tenderRow { flex-wrap: nowrap; } }
+/* Visit checkout: from 1280px the payment column is 360px so the rows above fit on one line. The 60px come from the charge list
+   until 1340px, where all three fit; the bill column is never narrower than before. */
+@media (min-width: 1280px) { .layout:has(.tenders) { grid-template-columns: 220px 1fr 360px; } }
+@media (min-width: 1340px) { .layout:has(.tenders) { grid-template-columns: 280px 1fr 360px; } }
 .collectBar {
   position: sticky; inset-block-end: var(--nb-mnav-h, 0px); z-index: var(--z-sticky); /* clears the phone bottom nav (as consult's actionBar) */
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--nb-space-12);
