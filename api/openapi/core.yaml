@@ -33381,6 +33381,7 @@ components:
           type: string
           maxLength: 64
           minLength: 0
+          pattern: "\\s*|\\s*(DEC|T)-[A-Za-z0-9-]{1,60}\\s*"
         priceFloorPercent:
           type: number
           exclusiveMaximum: false
