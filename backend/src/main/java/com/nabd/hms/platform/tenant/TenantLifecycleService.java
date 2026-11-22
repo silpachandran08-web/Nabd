@@ -17,9 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,6 +73,7 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
     private final ActorDirectory actors;
     private final NotificationPort notifications;
     private final CacheKeyPolicy keys;
+    private final TransactionTemplate readTx;
 
     private static final long STATUS_TTL_NANOS = 5_000_000_000L; // the DPA data gate's bound: every instance follows within 5 s, no cross-instance push
 
@@ -81,8 +84,10 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
 
     TenantLifecycleService(TenantLifecycleRepository repo, PlatformAudit audit, SessionRevocation.TenantRevoker sessions,
                            com.nabd.hms.common.TenantContext tenantContext, TenantScope tenantScope, EventPublisher events,
-                           ActorDirectory actors, NotificationPort notifications, CacheKeyPolicy keys) {
+                           ActorDirectory actors, NotificationPort notifications, CacheKeyPolicy keys, PlatformTransactionManager txManager) {
         this.keys = keys;
+        this.readTx = new TransactionTemplate(txManager);
+        this.readTx.setReadOnly(true);
         this.tenantContext = tenantContext;
         this.tenantScope = tenantScope;
         this.events = events;
@@ -183,9 +188,9 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
 
     /**
      * ADM-020 / OPS-020: the status for the suspended write block, which asks on every staff write (check-in included), so it
-     * comes from this instance's cache: a warm write sends no statement and opens no transaction. A move through this service
-     * drops the entry at commit; another instance, or a status set by another door (a billing job's UPDATE), is followed
-     * within 5 s. An unknown tenant is never cached.
+     * comes from this instance's cache: a warm write sends no statement and opens no transaction (a miss, once per clinic every
+     * 5 s, reads it in one). A move through this service drops the entry at commit; another instance, or a status set by another
+     * door (a billing job's UPDATE), is followed within 5 s. An unknown tenant is never cached.
      */
     public java.util.Optional<String> cachedStatusOf(UUID tenantId) {
         String key = statusKey(tenantId);
@@ -194,7 +199,7 @@ public class TenantLifecycleService implements com.nabd.hms.common.TenantLifecyc
         if (c != null && now - c.loadedAt() < STATUS_TTL_NANOS) {
             return java.util.Optional.of(c.status());
         }
-        java.util.Optional<String> status = repo.findTenantStatus(tenantId); // tenants carries no RLS: one statement, no tenant bind
+        java.util.Optional<String> status = readTx.execute(tx -> repo.findTenantStatus(tenantId));
         // shortcut: a load racing a move can put the old status back until the TTL; a version check if 5 s ever matters
         status.ifPresent(s -> statusCache.put(key, new CachedStatus(s, now)));
         return status;
