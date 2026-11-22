@@ -95,6 +95,7 @@ export default function PackagesPage() {
   }
 
   async function saveSettings() {
+    if (!settings) return; // never PATCH defaults over settings that did not load (the tab shows Retry instead of Save)
     fe.clear(); // a successful save removes the previous 422
     // the server refuses the split for a GST clinic without the decision id (422 gst-opinion-required) and says so
     const body = { priceFloorPercent: Number(floorInput) || 0, taxSplitEnabled: splitOn, gstOpinionDecisionId: decisionId.trim() };
@@ -176,7 +177,7 @@ export default function PackagesPage() {
           )}
           {tab === "liability" && canApprove && liability && <LiabilityTab liability={liability} />}
           {tab === "settings" && canEdit && (
-            <SettingsTab fe={fe} floorInput={floorInput} setFloorEdit={setFloorEdit} onSave={saveSettings}
+            <SettingsTab fe={fe} floorInput={floorInput} setFloorEdit={setFloorEdit} onSave={saveSettings} onRetry={() => void loadAll()}
               split={settings ? { on: splitOn, setOn: setSplitEdit, decisionId, setDecisionId: setDecisionEdit, opinionRequired: settings.gstOpinionRequired } : null} />
           )}
         </>
