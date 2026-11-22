@@ -22,12 +22,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class S25QaAdm020WriteBlockApiTest extends ApiTestBase {
 
     private static final AtomicInteger SEQ = new AtomicInteger(25_000);
+    private final java.util.Map<UUID, UUID> ownerRole = new java.util.HashMap<>(); // roles are unique by name per clinic: one full-access role per clinic
 
     private record Probe(HttpMethod method, String path, Object body) {
     }
 
     private String ownerToken(SeededTenant t) {
-        return loginAndGetAccessToken(seedStaff(t, seedFullAccessRole(t.id()), "qa25w" + SEQ.incrementAndGet() + "@a.com", "+9197" + (50000000 + SEQ.incrementAndGet() * 11), false));
+        return loginAndGetAccessToken(seedStaff(t, ownerRole.computeIfAbsent(t.id(), this::seedFullAccessRole), "qa25w" + SEQ.incrementAndGet() + "@a.com", "+9197" + (50000000 + SEQ.incrementAndGet() * 11), false));
     }
 
     @Test
@@ -36,6 +37,8 @@ class S25QaAdm020WriteBlockApiTest extends ApiTestBase {
         SeededTenant other = seedTenant();
         String owner = ownerToken(clinic);
         String otherOwner = ownerToken(other);
+        // pharmacy routes are in the plan only once the pharmacy is in-house; otherwise they answer 403 MODULE_NOT_IN_PLAN before the suspension is looked at
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(owner, Map.of("mode", "in_house", "reason", "QA setup")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         String op = platformLoginAndGetAccessToken(seedOperator("qa25w-" + UUID.randomUUID() + "@nabd.health", "super_admin", false));
 
         // a staff token cannot move a tenant, its own included
@@ -71,7 +74,7 @@ class S25QaAdm020WriteBlockApiTest extends ApiTestBase {
                 new Probe(HttpMethod.POST, "/v1/owner/branches", Map.of()),
                 new Probe(HttpMethod.PATCH, "/v1/pharmacy/settings", Map.of("mode", "hybrid", "reason", "x")),
                 new Probe(HttpMethod.POST, "/v1/roles", Map.of("name", "R", "grants", List.of())),
-                new Probe(HttpMethod.DELETE, "/v1/staff/" + anyId, null));
+                new Probe(HttpMethod.DELETE, "/v1/departments/" + anyId, null));
         List<String> notLocked = new ArrayList<>();
         for (Probe p : writes) {
             ResponseEntity<Map> r = exchange(p.path(), p.method(), p.body() == null ? authed(suspendedOwner) : authedJsonBody(suspendedOwner, p.body()), Map.class);
@@ -93,6 +96,6 @@ class S25QaAdm020WriteBlockApiTest extends ApiTestBase {
     }
 
     private SeededStaff seedStaffForLogin(SeededTenant t) {
-        return seedStaff(t, seedFullAccessRole(t.id()), "qa25w" + SEQ.incrementAndGet() + "@a.com", "+9197" + (50000000 + SEQ.incrementAndGet() * 11), false);
+        return seedStaff(t, ownerRole.computeIfAbsent(t.id(), this::seedFullAccessRole), "qa25w" + SEQ.incrementAndGet() + "@a.com", "+9197" + (50000000 + SEQ.incrementAndGet() * 11), false);
     }
 }
