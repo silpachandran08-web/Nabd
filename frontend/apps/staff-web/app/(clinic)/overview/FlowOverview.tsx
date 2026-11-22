@@ -46,13 +46,16 @@ export default function FlowOverviewSection() {
   const renderTile = (code: string, t: FlowTile | undefined) => {
     if (!data || !t) return <div key={code} className={styles.tileSkel} aria-hidden="true" />;
     const missed = targetMissed(t);
-    return (
-      <Link key={code} href={reportHref(code, data)} className={styles.tileLink} data-testid={`flow-tile-${code}`} data-code={code}>
-        <StatTile label={TILE_LABELS[code] ?? code} value={valueText(t, money)} delta={deltaOf(t, range)}
-          trend={t.trend} trendLabel={trendText(t, range)}
-          hint={[targetText(t), missed === true ? "Over target" : undefined, TILE_HINTS[code]].filter(Boolean).join(" · ")} />
-      </Link>
+    const href = reportHref(code, data);
+    const body = (
+      <StatTile label={TILE_LABELS[code] ?? code} value={valueText(t, money)} delta={deltaOf(t, range)}
+        trend={t.trend} trendLabel={trendText(t, range)}
+        hint={[targetText(t), missed === true ? "Over target" : undefined, TILE_HINTS[code]].filter(Boolean).join(" · ")} />
     );
+    // no report in the library behind this tile: show it, no dead link
+    return href
+      ? <Link key={code} href={href} className={styles.tileLink} data-testid={`flow-tile-${code}`} data-code={code}>{body}</Link>
+      : <div key={code} className={styles.tileLink} data-testid={`flow-tile-${code}`} data-code={code}>{body}</div>;
   };
 
   return (
@@ -96,7 +99,7 @@ export default function FlowOverviewSection() {
           <p className={styles.meta}>On time = first patient called within 5 minutes of the session start.</p>
           {data && data.punctuality.length === 0 ? <p className={styles.empty}>No measured sessions in this range.</p> : null}
           {data && data.punctuality.length > 0 && (
-            <Link href={reportHref("punctuality", data)} className={styles.tileLink} data-testid="flow-punctuality">
+            <Link href={reportHref("punctuality", data) ?? "/reports"} className={styles.tileLink} data-testid="flow-punctuality">
               <ul className={styles.list}>
                 {data.punctuality.map((p) => (
                   <li key={p.doctorId} className={styles.listRow}><bdi>{p.doctorName ?? "Doctor"}</bdi><span>{p.onTimePct}% of {p.sessions} {p.sessions === 1 ? "session" : "sessions"}</span></li>

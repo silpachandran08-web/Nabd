@@ -270,6 +270,8 @@
     "more": "One more {name}",
     "batch": "Batch {batch}",
     "linkRx": "Link prescription",
+    "paperRx": "Paper Rx",
+    "paperRxLinked": "Paper Rx: {doctor} · {qty} on the prescription",
     "rxLinked": "Rx: {drug} · {patient} · {left} left",
     "rxWait": "Link a prescription to every prescription-only item before taking payment.",
     "payment": "Payment",

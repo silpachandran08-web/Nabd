@@ -270,6 +270,8 @@
     "more": "{name} एक और जोड़ें",
     "batch": "बैच {batch}",
     "linkRx": "पर्चा जोड़ें",
+    "paperRx": "काग़ज़ी पर्चा",
+    "paperRxLinked": "काग़ज़ी पर्चा: {doctor} · पर्चे पर {qty}",
     "rxLinked": "Rx: {drug} · {patient} · {left} बाकी",
     "rxWait": "भुगतान लेने से पहले हर केवल-पर्चे वाले आइटम से पर्चा जोड़ें।",
     "payment": "भुगतान",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { formatMoney } from "@nabd/i18n/format";
@@ -16,6 +16,7 @@ import { EmptyState, ErrorState, Skeleton } from "../../../components/ui/StateVi
 import StatusPill from "../../../components/ui/StatusPill";
 import { stockErrorMessage } from "../../../components/ui/StockPill";
 import RxLinkPicker from "../../../components/checkout/RxLinkPicker";
+import PaperRxDialog, { type PaperRxLink } from "../../../components/checkout/PaperRxDialog";
 import TenderRows from "../../../components/checkout/TenderRows";
 import { rxErrorMessage } from "../../../components/checkout/rxLink";
 import type { Tender } from "../../../components/checkout/tender";
@@ -36,17 +37,14 @@ import styles from "./pos.module.css";
 type Note = { text: string; bad: boolean };
 type ForCart<T> = { key: string; value: T };
 
-export type PaperRxSlot = (line: CartLine, attach: (paperRxId: string) => void) => ReactNode;
-
-/** @param paperRx PHL-020: renders the paper / WhatsApp-photo prescription capture inside an Rx-only cart line; `attach`
- *  stores the record id on the line, which is then sent as `paperRxId`. Not passed until that story is wired in. */
-export default function PosScreen({ paperRx }: { paperRx?: PaperRxSlot }) {
+export default function PosScreen() {
   const t = useTranslations("checkout.pos");
   const methodLabel = usePaymentMethodLabel();
   const region = getIdentity()?.tenantRegion;
   const canView = can("billing:view"); // the quote (server total) and the receipt
   // payments sent with the sale need billing:edit and the server total; without either the bill is created unpaid
   const canPay = can("billing:edit") && canView;
+  const canPaperRx = can("pharmacy:dispense"); // PHL-020: every /pharmacy/paper-prescriptions call needs it; absent otherwise
 
   const [index, setIndex] = useState<PosIndex | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,6 +59,7 @@ export default function PosScreen({ paperRx }: { paperRx?: PaperRxSlot }) {
   const [pickError, setPickError] = useState<ForCart<string> | null>(null);
   const [batches, setBatches] = useState<Record<string, StockBatch[]>>({});
   const [linking, setLinking] = useState<string | null>(null);
+  const [paperFor, setPaperFor] = useState<string | null>(null); // the line whose "Paper Rx" dialog is open
   const [paying, setPaying] = useState(false);
   const [tenders, setTenders] = useState<Tender[] | null>(null); // null = untouched: cash for the full amount
   const [busy, setBusy] = useState(false);
@@ -150,6 +149,7 @@ export default function PosScreen({ paperRx }: { paperRx?: PaperRxSlot }) {
     setSaleError(null);
     if (qty <= 0) {
       if (linking === code) setLinking(null);
+      if (paperFor === code) setPaperFor(null);
       if (sel === code) setSel(cart.find((l) => l.item.code !== code)?.item.code ?? null);
     }
   }
@@ -158,6 +158,11 @@ export default function PosScreen({ paperRx }: { paperRx?: PaperRxSlot }) {
   function link(code: string, line: RxLine) {
     patchLine(code, { prescriptionItemId: line.prescriptionItemId, rxLabel: t("rxLinked", { drug: line.drugName, patient: line.patientName, left: line.remainingQty }) });
     setLinking(null);
+    searchRef.current?.focus();
+  }
+  function linkPaper(code: string, paper: PaperRxLink) {
+    patchLine(code, { paperRxLineId: paper.paperRxLineId, paperLabel: t("paperRxLinked", { doctor: paper.prescriberName, qty: paper.qty }) });
+    setPaperFor(null);
     searchRef.current?.focus();
   }
 
@@ -192,6 +197,7 @@ export default function PosScreen({ paperRx }: { paperRx?: PaperRxSlot }) {
       setPaying(false);
       setTenders(null);
       setLinking(null);
+      setPaperFor(null);
       setSel(null);
       setNote(null);
       setBatches({});
@@ -349,10 +355,12 @@ export default function PosScreen({ paperRx }: { paperRx?: PaperRxSlot }) {
                         <bdi>{l.item.name}</bdi> {l.item.isRx && <StatusPill tone="danger" icon="alert" label={classBadge(l.item.scheduleClass)} />}
                         {linePicks(l).map((b) => <div key={b} className={co.muted} data-testid={`pos-batch-${code}`}>{t("batch", { batch: b })}</div>)}
                         {l.rxLabel && <div className={co.muted}>{l.rxLabel}</div>}
-                        {needsRx(l) && linking !== code && <button type="button" className={co.rxLinkBtn} onClick={() => setLinking(code)}>{t("linkRx")}</button>}
+                        {l.paperLabel && <div className={co.muted} data-testid={`paper-rx-linked-${code}`}>{l.paperLabel}</div>}
+                        {needsRx(l) && linking !== code && <button type="button" className={co.rxLinkBtn} onClick={() => { setPaperFor(null); setLinking(code); }}>{t("linkRx")}</button>}
+                        {/* PHL-020: the paper / photo prescription path; absent without pharmacy:dispense */}
+                        {canPaperRx && needsRx(l) && paperFor !== code && <button type="button" className={co.rxLinkBtn} data-testid={`paper-rx-${code}`} onClick={() => { setLinking(null); setPaperFor(code); }}>{t("paperRx")}</button>}
                         {linking === code && <RxLinkPicker itemName={l.item.name} onPick={(line) => link(code, line)} onCancel={() => setLinking(null)} />}
-                        {/* PHL-020 slot: the paper / WhatsApp-photo prescription capture for this Rx-only line */}
-                        {l.item.isRx && !l.prescriptionItemId && paperRx?.(l, (paperRxId) => patchLine(code, { paperRxId }))}
+                        {paperFor === code && <PaperRxDialog item={{ id: l.item.id, name: l.item.name }} quantity={l.qty} onLinked={(p) => linkPaper(code, p)} onCancel={() => setPaperFor(null)} />}
                       </td>
                       <td>
                         <span className={co.qtyStepper}>

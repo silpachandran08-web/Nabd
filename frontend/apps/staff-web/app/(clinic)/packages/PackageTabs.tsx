@@ -4,6 +4,7 @@
 // unchanged from the old single page. State that must survive a tab switch (filter, decision, notices) stays in the page.
 import styles from "./packages.module.css";
 import type { FormErrors } from "../../lib/formErrors";
+import { ErrorState } from "../../components/ui/StateViews";
 import { fromMinor } from "../../components/checkout/discountApproval";
 import { STATUS_PILL, money, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundPreviewT, type RefundT } from "./packagesModel";
 import { refundLineMinor } from "./packageSplit";
@@ -219,10 +220,12 @@ export function RefundLines({ lines }: { lines: RefundPreviewT["lines"] }) {
 }
 
 /** FIN-025: split = the per-component tax switch; a GST clinic must record the GST opinion's decision id before it can be on. */
-export function SettingsTab({ fe, floorInput, setFloorEdit, onSave, split }: {
-  fe: FormErrors; floorInput: string; setFloorEdit: (v: string) => void; onSave: () => void;
+export function SettingsTab({ fe, floorInput, setFloorEdit, onSave, onRetry, split }: {
+  fe: FormErrors; floorInput: string; setFloorEdit: (v: string) => void; onSave: () => void; onRetry: () => void;
+  /** null = the settings did not load: no form and no Save, so defaults are never written over settings the page never read */
   split: { on: boolean; setOn: (v: boolean) => void; decisionId: string; setDecisionId: (v: string) => void; opinionRequired: boolean } | null;
 }) {
+  if (!split) return <div className={styles.card}><ErrorState message="Couldn't load the package settings. Try again." onRetry={onRetry} /></div>;
   return (
     <div className={styles.card}>
       <h2 className={styles.cardTitle}>Pricing rules</h2>

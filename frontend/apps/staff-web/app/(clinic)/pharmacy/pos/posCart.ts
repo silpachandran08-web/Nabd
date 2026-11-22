@@ -8,8 +8,8 @@ export type CartLine = {
   item: PosItem; qty: number;
   /** PHL-001: the signed in-system prescription line an Rx-only item is sold against. */
   prescriptionItemId?: string; rxLabel?: string;
-  /** PHL-020 slot: the paper / WhatsApp-photo prescription record. Nothing in this story sets it. */
-  paperRxId?: string;
+  /** PHL-020: the paper / WhatsApp-photo prescription line (core's LineItemRequest.paperRxLineId), with the text shown under the item. */
+  paperRxLineId?: string; paperLabel?: string;
 };
 
 /** One more of the item (a new line, or +1). Never above the stock on hand; `added` is false when nothing changed. */
@@ -26,7 +26,7 @@ export function setQty(cart: CartLine[], code: string, qty: number): CartLine[] 
 }
 
 /** An Rx-only line that has no prescription yet: the sale cannot be sent (the server would answer 422 rx-required). */
-export const needsRx = (l: CartLine): boolean => l.item.isRx && !l.prescriptionItemId && !l.paperRxId;
+export const needsRx = (l: CartLine): boolean => l.item.isRx && !l.prescriptionItemId && !l.paperRxLineId;
 
 /** The tender rows settle the bill exactly: every amount valid and their sum equal to the total. */
 export const tenderSettles = (rows: Tender[], totalMinor: number): boolean =>
@@ -38,7 +38,7 @@ export function saleBody(cart: CartLine[], tenders?: Tender[]) {
     lineItems: cart.map((l) => ({
       chargeCode: l.item.code, quantity: l.qty,
       ...(l.prescriptionItemId ? { prescriptionItemId: l.prescriptionItemId } : {}),
-      ...(l.paperRxId ? { paperRxId: l.paperRxId } : {}),
+      ...(l.paperRxLineId ? { paperRxLineId: l.paperRxLineId } : {}),
     })),
     ...(tenders ? { payments: filled(tenders).map((t) => ({ method: t.method, amount: (toMinor(t.amount) ?? 0) / 100 })) } : {}),
   };

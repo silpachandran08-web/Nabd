@@ -92,7 +92,7 @@ test("every message key the dialog can show exists in en and hi, with the same p
   assert.deepEqual(Object.keys(hi.paperRx).sort(), Object.keys(en.paperRx).sort());
   const slots = (s) => (s.match(/\{[a-z]+\}/g) ?? []).sort();
   for (const k of Object.keys(en.paperRx)) assert.deepEqual(slots(hi.paperRx[k]), slots(en.paperRx[k]), k);
-  for (const k of ["paperRx", "paperRxLinked"]) assert.deepEqual(slots(hi.otc[k]), slots(en.otc[k]), k);
+  for (const ns of ["otc", "pos"]) for (const k of ["paperRx", "paperRxLinked"]) { assert.ok(en[ns][k] && hi[ns][k], `${ns}.${k}`); assert.deepEqual(slots(hi[ns][k]), slots(en[ns][k]), `${ns}.${k}`); }
 });
 
 test("AC5 / wiring: the Paper Rx control is absent without pharmacy:dispense and the sale sends paperRxLineId", () => {

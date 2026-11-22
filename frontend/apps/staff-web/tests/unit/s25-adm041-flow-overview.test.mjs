@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const m = await import("../../app/(clinic)/overview/flowOverviewModel.ts");
+const { REPORT_CATALOG } = await import("../../app/(clinic)/reports/libraryModel.ts");
 
 const tile = (o) => ({ code: "wait", value: 12, unit: "min", delta: -4, target: 15, lowerIsBetter: true, n: 40, trend: [20, 18, 12], ...o });
 
@@ -37,16 +38,30 @@ test("target: over target for lower-is-better, under for higher-is-better, none 
   assert.equal(m.targetMissed(tile({ target: null })), null);
   assert.equal(m.targetText(tile()), "Target under 15 min");
 });
-test("AC3: every tile links to its report on the same facility and dates", () => {
+test("AC3: a tile with a report links to it on the same branch and dates; a tile without one has no link (T1-BUG-2)", () => {
   const o = { from: "2026-11-14", to: "2026-11-20", facilityId: "f-1" };
-  for (const code of [...m.TIME_TILES, ...m.BUSINESS_TILES, "punctuality"]) {
-    const url = new URL("https://x" + m.reportHref(code, o));
+  const all = [...m.TIME_TILES, ...m.BUSINESS_TILES, "punctuality"];
+  for (const code of all) {
+    const href = m.reportHref(code, o);
+    if (!(code in m.REPORT_KEYS)) { assert.equal(href, null, code); continue; }
+    const url = new URL("https://x" + href);
     assert.equal(url.pathname, "/reports");
     assert.equal(url.searchParams.get("report"), m.REPORT_KEYS[code]);
     assert.equal(url.searchParams.get("from"), o.from);
     assert.equal(url.searchParams.get("to"), o.to);
-    assert.equal(url.searchParams.get("facility"), "f-1");
+    assert.equal(url.searchParams.get("branch"), "f-1"); // the library reads `branch`, not `facility`
+    assert.equal(url.searchParams.get("facility"), null);
   }
+  assert.deepEqual(all.filter((c) => !(c in m.REPORT_KEYS)), ["wait", "door_to_doctor", "consult", "eta_accuracy", "booking_response"]);
+});
+test("T1-BUG-2: every tile report key exists in the reports library catalogue", () => {
+  const keys = new Set(REPORT_CATALOG.map((r) => r.key));
+  for (const [code, key] of Object.entries(m.REPORT_KEYS)) assert.ok(keys.has(key), `${code} -> ${key}`);
+});
+test("T1-BUG-2: an unknown report key shows 'doesn't exist', not the first report", () => {
+  const src = readFileSync(new URL("../../app/(clinic)/reports/ReportsLibrary.tsx", import.meta.url), "utf8");
+  assert.match(src, /const missing = wanted !== null && catalog\.length > 0 && !catalog\.some/);
+  assert.match(src, /if \(missing\) return[^\n]*notFound/);
 });
 test("chart inputs: hour labels, ETA gaps stay gaps, unmeasured stages are left out", () => {
   assert.deepEqual(m.waitByHourSeries([{ hour: 9, minutes: 8.5 }, { hour: 10, minutes: 12 }]), { categories: ["09:00", "10:00"], values: [8.5, 12] });

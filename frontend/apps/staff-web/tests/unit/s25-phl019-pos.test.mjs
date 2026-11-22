@@ -94,16 +94,21 @@ test("cart: adding never goes above the stock on hand, an out-of-stock item is n
   assert.deepEqual(two.map((l) => l.item.code), ["PHM-A", "PHM-B"], "a second item is a second line");
 });
 
-test("Rx-only items stay gated (PHL-001): the line waits until a prescription is linked; the PHL-020 paper-Rx id is the other way through", () => {
+test("Rx-only items stay gated (PHL-001): the line waits until a prescription is linked; the PHL-020 paper-Rx line id is the other way through", () => {
   const rx = { item: item({ isRx: true, scheduleClass: "IN_H" }), qty: 1 };
   assert.equal(needsRx(rx), true);
   assert.equal(needsRx({ item: item(), qty: 1 }), false);
   assert.equal(needsRx({ ...rx, prescriptionItemId: "p1" }), false);
-  assert.equal(needsRx({ ...rx, paperRxId: "paper-1" }), false);
+  assert.equal(needsRx({ ...rx, paperRxLineId: "paper-1" }), false);
   assert.deepEqual(saleBody([{ ...rx, prescriptionItemId: "p1" }]).lineItems, [{ chargeCode: "PHM-A", quantity: 1, prescriptionItemId: "p1" }]);
-  assert.deepEqual(saleBody([{ ...rx, paperRxId: "paper-1" }]).lineItems, [{ chargeCode: "PHM-A", quantity: 1, paperRxId: "paper-1" }]);
+  assert.deepEqual(saleBody([{ ...rx, paperRxLineId: "paper-1" }]).lineItems, [{ chargeCode: "PHM-A", quantity: 1, paperRxLineId: "paper-1" }]);
   const screen = src("(clinic)/pharmacy/pos/PosScreen.tsx");
-  assert.match(screen, /paperRx\?\.\(l, \(paperRxId\) => patchLine\(code, \{ paperRxId \}\)\)/, "the PHL-020 slot is in the cart line");
+  // T1-BUG-3: the same dialog as /checkout/otc is mounted on an Rx-only line, next to "Link prescription", only with pharmacy:dispense
+  assert.match(screen, /import PaperRxDialog/);
+  assert.match(screen, /canPaperRx && needsRx\(l\) && paperFor !== code/);
+  assert.match(screen, /<PaperRxDialog item=\{\{ id: l\.item\.id/);
+  assert.match(screen, /paperRxLineId: paper\.paperRxLineId/);
+  assert.doesNotMatch(screen + src("(clinic)/pharmacy/pos/posCart.ts"), /paperRxId\b/, "core only knows paperRxLineId");
   assert.match(screen, /cart\.length > 0 && !waitingRx && \(\s*<button ref=\{payRef\}/, "no pay button while an Rx line waits");
 });
 
@@ -188,4 +193,10 @@ test("i18n: every key the POS screen asks for exists in English and Hindi", () =
   }
   assert.ok(n > 50, `${n} keys checked`);
   assert.deepEqual(Object.keys(hi).sort(), Object.keys(en).sort());
+});
+
+test("T1-BUG-4: a split-payment row wraps in the narrow third column and the amount box keeps at least 120 px", () => {
+  const css = src("(clinic)/checkout/checkout.module.css");
+  assert.match(css, /\.tenderRow \{[^}]*flex-wrap: wrap/);
+  assert.match(css, /\.tenderAmount \{[^}]*flex: 1 1 120px; min-inline-size: 120px/);
 });

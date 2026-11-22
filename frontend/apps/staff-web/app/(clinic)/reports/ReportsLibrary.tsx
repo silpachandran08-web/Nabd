@@ -47,7 +47,9 @@ export default function ReportsLibrary() {
   const [exp, setExp] = useState<Export>({ state: "idle" });
 
   const catalog = visibleReports((p) => can(p as Parameters<typeof can>[0]));
-  const def = catalog.find((r) => r.key === params.get("report")) ?? catalog[0];
+  const wanted = params.get("report");
+  const missing = wanted !== null && catalog.length > 0 && !catalog.some((r) => r.key === wanted); // a stale or invented link must not open another report
+  const def = missing ? undefined : catalog.find((r) => r.key === wanted) ?? catalog[0];
   const dflt = useMemo(() => presetRange("d30", new Date()), []);
   const from = params.get("from") ?? dflt.from;
   const to = params.get("to") ?? dflt.to;
@@ -71,6 +73,7 @@ export default function ReportsLibrary() {
     staleTime: 30_000,
   });
 
+  if (missing) return <main className={s.page}><EmptyState title={t("notFound")} hint={t("notFoundHint")} action={<Link href="/reports" className={s.link}>{t("notFoundAction")}</Link>} /></main>;
   if (!def) return <main className={s.page}><EmptyState title={t("noAccess")} /></main>;
 
   const first = q.data?.pages[0];
