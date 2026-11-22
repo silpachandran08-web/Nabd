@@ -23,7 +23,7 @@ const TEMPLATE = "Name,Mobile,Date of Birth,Sex,Old Record No,Allergies\r\n";
 const FAIL_TEXT: Record<string, string> = {
   FILE_UNREADABLE: "The file could not be read. Save it again as .xlsx or .csv.",
   NO_ROWS: "The file has a header but no rows.",
-  UNKNOWN_LAYOUT: "The headings are not the standard export of that software. Choose Other software and match the columns yourself.",
+  UNKNOWN_LAYOUT: "The headings are not the standard export of that software. Choose \"Other software (CSV or Excel)\" and match the columns yourself.",
   TOO_MANY_FILES: "The zip has too many files. Upload the one list you want to import.",
   TOO_MANY_ROWS: "The file has too many rows (limit 100,000). Split it and import in parts.",
   FILE_TOO_LARGE: "The file is too large.",

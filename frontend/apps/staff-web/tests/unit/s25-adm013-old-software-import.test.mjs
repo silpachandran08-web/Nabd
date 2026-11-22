@@ -91,3 +91,13 @@ test("T1-BUG-10: an imported visit's date is the clinic's day, also in a browser
   assert.match(timeline, /const tz = useClinicTimeZone\(\)/);
   assert.doesNotMatch(timeline, /toLocale(Date)?String/);
 });
+
+test("T1-BUG-13: the unknown-layout sentence names the picker option as the picker labels it, on the server and on the page", async () => {
+  const { SOURCES } = await import("../../app/components/setup/importModel.ts");
+  const other = SOURCES.find((x) => x.key === "csv").label;
+  const java = readFileSync(new URL("../../../../../backend/src/main/java/com/nabd/hms/organization/dataimport/ImportPipeline.java", import.meta.url), "utf8");
+  const sentence = java.match(/"UNKNOWN_LAYOUT", "([^"]+)"/)[1];
+  assert.ok(sentence.includes(`'${other}'`), sentence);
+  assert.ok(panel.includes(`UNKNOWN_LAYOUT: "The headings are not the standard export of that software. Choose \\"${other}\\" and`), "the page's own text for the same code");
+  assert.doesNotMatch(java + panel, /Other \(CSV\)/);
+});

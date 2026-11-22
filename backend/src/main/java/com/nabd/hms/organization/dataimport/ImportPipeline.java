@@ -120,7 +120,7 @@ public class ImportPipeline {
                 throw unprocessable("FILE_UNREADABLE", "The file could not be read.");
             }
             if (table == null) {
-                throw unprocessable("UNKNOWN_LAYOUT", "The headings are not the standard export of that software for this kind of list. Choose 'Other (CSV)' to match the columns yourself.");
+                throw unprocessable("UNKNOWN_LAYOUT", "The headings are not the standard export of that software for this kind of list. Choose 'Other software (CSV or Excel)' to match the columns yourself.");
             }
         }
         UUID id = repo.insertJob(type, source, up.fileName(), up.id(), staffId);
