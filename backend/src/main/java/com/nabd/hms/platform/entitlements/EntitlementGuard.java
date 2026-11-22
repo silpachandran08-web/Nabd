@@ -42,12 +42,20 @@ class EntitlementGuard implements WebMvcConfigurer, HandlerInterceptor {
      */
     static final List<String> PHARMACY_EDITION_BLOCKED = List.of("/v1/appointments", "/v1/booking-requests", "/v1/booking-policy",
             "/v1/clinical", "/v1/queue", "/v1/schedule", "/v1/waitlist", "/v1/nursing", "/v1/specialty", "/v1/packages", "/v1/doctors",
-            "/v1/recall-orders", "/v1/front-desk", "/v1/display", "/v1/display-devices", "/v1/facility");
-    private static final String PHARMACY_EDITION_ALLOWED = "/v1/clinical/drug";
+            "/v1/recall-orders", "/v1/front-desk", "/v1/display", "/v1/display-devices", "/v1/facility",
+            "/v1/queue-settings", "/v1/clinic", "/v1/abha");
+    /**
+     * Structural net for the prefix list: every controller of these scheduling/clinical modules is blocked whatever its path (reports and
+     * staff sub-resources live under other prefixes), so a new endpoint cannot slip through. Shared with billing: the reason-code picker.
+     */
+    private static final List<String> PHARMACY_EDITION_BLOCKED_PACKAGES = List.of("com.nabd.hms.queue", "com.nabd.hms.nursing",
+            "com.nabd.hms.specialty", "com.nabd.hms.packages");
+    private static final List<String> PHARMACY_EDITION_ALLOWED = List.of("/v1/clinical/drug", "/v1/reason-codes");
 
-    static boolean blockedForPharmacy(String path) {
-        if (path.startsWith(PHARMACY_EDITION_ALLOWED)) return false;
-        return PHARMACY_EDITION_BLOCKED.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/"));
+    static boolean blockedForPharmacy(String path, Class<?> controller) {
+        if (PHARMACY_EDITION_ALLOWED.stream().anyMatch(path::startsWith)) return false;
+        return PHARMACY_EDITION_BLOCKED.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/"))
+                || PHARMACY_EDITION_BLOCKED_PACKAGES.stream().anyMatch(controller.getPackageName()::startsWith);
     }
 
     @Override
@@ -55,7 +63,7 @@ class EntitlementGuard implements WebMvcConfigurer, HandlerInterceptor {
         if (!(handler instanceof HandlerMethod hm)) return true;
         if (SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken t
                 && t.getToken().getClaimAsString("tenantId") != null
-                && blockedForPharmacy(request.getRequestURI())
+                && blockedForPharmacy(request.getRequestURI(), hm.getBeanType())
                 && "pharmacy".equals(entitlements.facilityType(UUID.fromString(t.getToken().getClaimAsString("tenantId"))))) {
             throw new ApiException(HttpStatus.FORBIDDEN, "module-not-entitled", "MODULE_NOT_ENTITLED",
                     "This is a pharmacy account: clinical and scheduling modules are not part of it.");

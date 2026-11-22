@@ -97,7 +97,7 @@ class Phl032PharmacyEditionApiTest extends ApiTestBase {
     @Test
     void everyClinicalAndSchedulingAreaIs403ModuleNotEntitledForAPharmacyButTheClinicStillWorks() {
         Shop shop = pharmacyShop();
-        for (String path : List.of("/v1/appointments", "/v1/queue/eta", "/v1/schedule", "/v1/clinical/encounters", "/v1/nursing", "/v1/packages",
+        for (String path : List.of("/v1/appointments", "/v1/queue/eta", "/v1/schedule/day", "/v1/clinical/encounters", "/v1/nursing/administration-orders/today", "/v1/packages",
                 "/v1/waitlist", "/v1/booking-requests")) {
             ResponseEntity<Map> r = exchange(path, HttpMethod.GET, authed(shop.token()), Map.class);
             assertThat(r.getStatusCode()).as(path).isEqualTo(HttpStatus.FORBIDDEN);
@@ -130,7 +130,7 @@ class Phl032PharmacyEditionApiTest extends ApiTestBase {
 
         Map<String, Object> sale = Map.of("lineItems", List.of(Map.of("chargeCode", item.get("code"), "quantity", 1)));
         ResponseEntity<Map> refused = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(shop.token(), sale), Map.class);
-        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(String.valueOf(refused.getBody())).contains("DRUG_LICENCE_MISSING");
         assertThat(su().queryForObject("SELECT count(*) FROM invoices WHERE tenant_id = ?", Integer.class, shop.t())).isZero();
         assertThat(su().queryForObject("SELECT count(*) FROM invoice_series WHERE tenant_id = ? AND next_number > 1", Integer.class, shop.t())).as("no number consumed").isZero();
@@ -138,7 +138,7 @@ class Phl032PharmacyEditionApiTest extends ApiTestBase {
         // one of the two India licences is still a blocker
         assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(shop.token(), Map.of("licenceNumbers", Map.of("IN_20B", "SYN-20B"))), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(shop.token(), sale), Map.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(shop.token(), sale), Map.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
 
         assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(shop.token(), Map.of("licenceNumbers", Map.of("IN_20B", "SYN-20B", "IN_21B", "SYN-21B"))), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
