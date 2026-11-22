@@ -81,7 +81,7 @@ class S25QaPhl009RaceApiTest extends ApiTestBase {
         long ok = List.of(r1, r2).stream().filter(r -> r.getStatusCode().is2xxSuccessful()).count();
         assertThat(ok).as("return %s %s / write-off %s %s", r1.getStatusCode(), r1.getBody(), r2.getStatusCode(), r2.getBody()).isEqualTo(1);
         assertThat(su().queryForObject("SELECT qty_on_hand FROM stock_batches WHERE id = ?", Integer.class, batch)).isEqualTo(0);
-        Integer out = su().queryForObject("SELECT coalesce(sum(abs(qty)),0) FROM pharmacy_stock_movements WHERE batch_id = ? AND kind IN ('return_out','write_off')", Integer.class, batch);
+        Integer out = su().queryForObject("SELECT coalesce(sum(abs(delta)),0) FROM pharmacy_stock_movements WHERE batch_id = ? AND kind IN ('return_out','write_off')", Integer.class, batch);
         assertThat(out).as("units that left the batch through return_out + write_off").isEqualTo(10);
     }
 
