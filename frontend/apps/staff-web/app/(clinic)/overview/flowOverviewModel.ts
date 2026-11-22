@@ -29,16 +29,17 @@ export const TILE_HINTS: Record<string, string> = {
   no_show_rate: "Booked, never arrived", visits: "Checked-in visits", revenue: "Billed, before tax",
 };
 
-// Report keys the tiles open (ADM-047 library, GET /v1/reports/{reportId}); the route is /reports?report=<key>&from&to&facility.
+// Report keys the tiles open (ADM-047 library, GET /v1/reports/{reportId}); the route is /reports?report=<key>&from&to&branch.
+// A tile with no report in the library (wait, door to doctor, consult, ETA accuracy, booking response) is absent here and renders without a link.
 export const REPORT_KEYS: Record<string, string> = {
-  wait: "visit-times", door_to_doctor: "visit-times", consult: "visit-times", eta_accuracy: "eta-accuracy", booking_response: "booking-response",
-  no_show_rate: "no-show-risk", visits: "sources", revenue: "daily-money", punctuality: "doctor-punctuality",
+  no_show_rate: "no-show-watch", visits: "patient-sources", revenue: "takings", punctuality: "doctor-on-time",
 };
 
-/** The report behind a tile, on the same facility and dates the tile was computed for. */
-export function reportHref(code: string, o: Pick<FlowOverview, "from" | "to" | "facilityId">): string {
-  const q = new URLSearchParams({ report: REPORT_KEYS[code] ?? code, from: o.from, to: o.to, facility: o.facilityId });
-  return `/reports?${q.toString()}`;
+/** The report behind a tile on the same branch and dates the tile was computed for, or null when the library has none. */
+export function reportHref(code: string, o: Pick<FlowOverview, "from" | "to" | "facilityId">): string | null {
+  const report = REPORT_KEYS[code];
+  if (!report) return null;
+  return `/reports?${new URLSearchParams({ report, from: o.from, to: o.to, branch: o.facilityId })}`;
 }
 
 const COMPARED: Record<FlowRange, string> = { today: "the same day last week", d7: "the previous 7 days", d30: "the previous 30 days" };
