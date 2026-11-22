@@ -11,11 +11,12 @@ ALTER TABLE tenants VALIDATE CONSTRAINT tenants_facility_type_check;
 ALTER TABLE master.provisioning_jobs ADD COLUMN edition text NOT NULL DEFAULT 'clinic'
   CHECK (edition IN ('clinic', 'pharmacy', 'lab'));
 
--- 3. Pharmacy preset roles (Pharmacist-in-charge, Pharmacist, Counter staff) join the six clinic presets.
+-- 3. Pharmacy preset roles (Pharmacist-in-charge, Pharmacist, Counter staff) join the six clinic presets and the Lab technician
+--    preset V3540 (PHL-041) added; this re-creates the same CHECK, so it must list all ten codes.
 ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_preset_code_check;
 ALTER TABLE roles ADD CONSTRAINT roles_preset_code_check
   CHECK (preset_code IN ('owner','owner_doctor','doctor','nurse','receptionist','frontdesk_vitals',
-                         'pharmacist_in_charge','pharmacist','counter_staff')) NOT VALID;
+                         'lab_technician','pharmacist_in_charge','pharmacist','counter_staff')) NOT VALID;
 ALTER TABLE roles VALIDATE CONSTRAINT roles_preset_code_check;
 
 -- 4. The receipt-printer test of the setup wizard (when the owner last printed the test page).
