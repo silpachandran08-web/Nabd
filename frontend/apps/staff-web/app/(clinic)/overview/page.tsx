@@ -17,7 +17,7 @@ import FlowOverviewSection from "./FlowOverview";
 import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
-import { pharmacyEdition, useEntitlementsStatus } from "../../lib/entitlements";
+import { pharmacyKnown, useEntitlementsStatus } from "../../lib/entitlements";
 
 
 // Matches GET /v1/reports/overview (ReportsController.overview → OverviewResponse).
@@ -98,7 +98,7 @@ function OverviewInner() {
   // PHL-032: a pharmacy-only tenant has no queue or consultations, and the server refuses those reads: the patient-time cards are
   // absent and never requested. Decided only once the entitlements have answered, so nothing is fetched and then taken away.
   const { ent, settled } = useEntitlementsStatus();
-  const clinical = settled && !pharmacyEdition(ent);
+  const clinical = settled && !pharmacyKnown(ent); // a failed answer falls back to the edition last seen on this device (T1-BUG-15)
 
   const load = useCallback(async () => {
     setError(null);

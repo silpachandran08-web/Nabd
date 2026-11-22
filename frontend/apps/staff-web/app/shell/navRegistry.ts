@@ -1,7 +1,7 @@
 // FEF-052/053/054: the ONE nav registry. Role context -> items, each with its grants, plan module, badge source and the squad
 // that owns the screen. Pure (unit-tested): ClinicNav, the Ctrl+K palette and the planned-screen pages all read this.
 import type { IconName } from "../components/ui/Icon";
-import { NAV_MODULES, editionAllows, navAllowed, pharmacyEdition, type Entitlements } from "../lib/entitlementRules.ts";
+import { NAV_MODULES, editionAllows, navAllowed, pharmacyEdition, pharmacyHref, type Entitlements } from "../lib/entitlementRules.ts";
 
 export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing" | "solo";
 export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent" | "stock-alerts";
@@ -198,14 +198,18 @@ export function rolesFor(perms: readonly string[], owner: boolean, solo = false)
   return counter.length ? counter : ["reception"];
 }
 
-export type NavInput = { perms: readonly string[]; owner: boolean; ent: Entitlements | null; override?: string | null; specialty?: string | null; solo?: boolean };
-export function navFor({ perms, owner, ent, override, specialty, solo }: NavInput): { role: RoleContext; roles: RoleContext[]; items: NavItem[] } {
+export type NavInput = { perms: readonly string[]; owner: boolean; ent: Entitlements | null; override?: string | null; specialty?: string | null; solo?: boolean;
+  /** T1-BUG-15: the edition last answered on this device; used only while `ent` is unknown. */
+  pharmacyHint?: boolean };
+export function navFor({ perms, owner, ent, override, specialty, solo, pharmacyHint }: NavInput): { role: RoleContext; roles: RoleContext[]; items: NavItem[] } {
   const roles = rolesFor(perms, owner, solo);
   let role = roles.find((r) => r === override) ?? roles[0];
   let items = NAV[role].filter((i) => itemVisible(i, perms, ent));
   // A trimmed Owner role (or a counter role) that can open none of its items falls back to the generic staff list.
   if (items.length === 0 && (role === "owner" || COUNTER_ROLES.includes(role))) { role = "reception"; items = NAV.reception.filter((i) => itemVisible(i, perms, ent)); }
-  if (pharmacyEdition(ent) && role === "owner") items = [...PHARMACIST, PHARMACY_SETUP].filter((i) => itemVisible(i, perms, ent) && !items.some((x) => x.href === i.href)).concat(items); // PHL-032: the owner of a pharmacy runs the counter too
+  // T1-BUG-15: entitlements still unknown but this device last saw a pharmacy edition: the same areas as the answer would give
+  if (!ent && pharmacyHint) items = items.filter((i) => pharmacyHref(i.href));
+  if ((ent ? pharmacyEdition(ent) : pharmacyHint) && role === "owner") items = [...PHARMACIST, PHARMACY_SETUP].filter((i) => itemVisible(i, perms, ent) && !items.some((x) => x.href === i.href)).concat(items); // PHL-032: the owner of a pharmacy runs the counter too
   if (specialty) items = items.map((i) => (i.id === "specialty" || i.id === "solo-specialty" ? { ...i, label: `${titleCase(specialty)} workspace`, short: titleCase(specialty), icon: SPECIALTY_ICON[specialty] ?? i.icon } : i));
   return { role, roles, items };
 }

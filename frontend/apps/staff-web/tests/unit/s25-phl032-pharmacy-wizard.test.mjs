@@ -71,11 +71,27 @@ test("T1-BUG-12: a pharmacy edition's overview neither renders nor requests the 
   assert.equal(pharmacyEdition({ modules: [], killedFeatures: [], seatLimit: null, edition: "pharmacy" }), true);
   assert.equal(pharmacyEdition({ modules: [], killedFeatures: [], seatLimit: null }), false);
   const page = src("(clinic)/overview/page.tsx");
-  assert.match(page, /const clinical = settled && !pharmacyEdition\(ent\);/, "decided after the entitlements answer: no request before it");
+  assert.match(page, /const clinical = settled && !pharmacyKnown\(ent\);/, "decided after the entitlements answer: no request before it");
   // every mount of a card that reads queue / consult data is behind `clinical` (the tiles fetch on mount)
   for (const card of ["EtaAccuracyTile", "FlowOverviewSection"]) {
     const mounts = page.match(new RegExp(`[^\\n]*<${card} />`, "g")) ?? [];
     assert.equal(mounts.length, 1, card);
     assert.match(mounts[0], /\{clinical && /, card);
   }
+});
+
+test("T1-BUG-15: while the entitlements are unknown, the edition last seen on this device keeps the pharmacy owner's menu; an answer always wins", () => {
+  const hrefs = (input) => navFor({ perms: owner, owner: true, ...input }).items.map((i) => i.href);
+  assert.ok(!hrefs({ ent: null }).includes("/pharmacy/pos"), "nothing remembered: the owner items only, as before");
+  const hinted = hrefs({ ent: null, pharmacyHint: true });
+  assert.ok(hinted.includes("/pharmacy") && hinted.includes("/pharmacy/pos") && hinted.includes("/setup/pharmacy-wizard"));
+  for (const h of hinted) assert.ok(editionAllows(h, ent("pharmacy")), `${h} must be a pharmacy area`);
+  assert.ok(hrefs({ ent: null }).includes("/schedule") && !hinted.includes("/schedule"), "no clinic item flashes for a known pharmacy");
+  const answered = hrefs({ ent: ent("pharmacy") }); // planned screens need the plan's answer, so they come with it
+  assert.deepEqual(hinted, answered.filter((h) => !["/pharmacy/purchase", "/pharmacy/registers"].includes(h)), "the answered menu, minus planned screens");
+  assert.ok(!hrefs({ ent: ent("clinic"), pharmacyHint: true }).includes("/setup/pharmacy-wizard"), "a clinic answer beats a stale hint");
+  const hook = src("lib/entitlements.ts");
+  assert.match(hook, /if \(ent\) return pharmacyEdition\(ent\);/);
+  assert.match(hook, /remember\(tenant, e\);/, "written only from a well-formed answer, for the clinic that asked");
+  assert.match(src("shell/useShellNav.ts"), /pharmacy: pharmacyKnown\(null\)/, "read in the effect, so server and first client render agree");
 });

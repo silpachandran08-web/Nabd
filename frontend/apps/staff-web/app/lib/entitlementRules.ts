@@ -12,11 +12,11 @@ export type Entitlements = {
 /** PHL-032: a pharmacy-only tenant sees only these areas (and their sub-routes); the server answers 403 on every clinical or scheduling endpoint. */
 export const PHARMACY_EDITION_HREFS = ["/pharmacy", "/checkout/otc", "/billing", "/reports", "/overview", "/setup", "/staff", "/plan", "/compliance", "/account", "/patients"];
 export const pharmacyEdition = (ent: Entitlements | null): boolean => ent?.edition === "pharmacy";
-export function editionAllows(href: string, ent: Entitlements | null): boolean {
-  if (!pharmacyEdition(ent)) return true;
+export function pharmacyHref(href: string): boolean {
   const path = href.split("?")[0];
   return PHARMACY_EDITION_HREFS.some((h) => path === h || path.startsWith(`${h}/`));
 }
+export const editionAllows = (href: string, ent: Entitlements | null): boolean => !pharmacyEdition(ent) || pharmacyHref(href);
 
 // Nav item -> the plan modules that make it useful (any one is enough). Items not listed are never gated by plan.
 export const NAV_MODULES: Record<string, string[]> = {
