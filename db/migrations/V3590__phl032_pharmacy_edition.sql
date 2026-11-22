@@ -37,3 +37,12 @@ WITH p AS (
 )
 INSERT INTO master.plan_entitlements (plan_id, plan_version, module_code)
 SELECT plan_id, version, m FROM v, unnest(ARRAY['pharmacy_inhouse', 'billing']) AS m;
+
+-- 6. Undoing seed_masters of a pharmacy job deletes the pharmacy-plan subscription (the row references the tenant that the saga then
+--    removes). nabd_app has no DELETE on the master schema (V210), so every provisioning rollback died with "permission denied".
+--    DELETE on this one table only; the rollback is the sole caller and filters by the job's own tenant id.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nabd_app') THEN
+    GRANT DELETE ON master.subscriptions TO nabd_app;
+  END IF;
+END $$;

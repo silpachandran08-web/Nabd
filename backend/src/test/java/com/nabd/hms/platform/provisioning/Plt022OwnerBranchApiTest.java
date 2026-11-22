@@ -180,7 +180,7 @@ class Plt022OwnerBranchApiTest extends ApiTestBase {
         assertThat(item).containsEntry("name", "Branch BLR-2").containsEntry("branchCode", "BLR-2").containsEntry("status", "trialing")
                 .containsEntry("region", "IN").containsEntry("timezone", "Asia/Kolkata");
         assertThat((List<?>) listed.get("jobs")).isEmpty();
-        assertThat(jdbc.queryForMap("SELECT region_code, brand_id, branch_address, slug FROM tenants WHERE id = ?", branch))
+        assertThat(jdbc.queryForMap("SELECT region_code, brand_id, branch_address, slug::text AS slug FROM tenants WHERE id = ?", branch))
                 .containsEntry("region_code", "IN").containsEntry("brand_id", o.brand().id()).containsEntry("branch_address", "12 Synthetic Road")
                 .containsEntry("slug", o.clinic().slug() + "-blr-2");
 
