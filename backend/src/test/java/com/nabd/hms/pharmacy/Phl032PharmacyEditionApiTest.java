@@ -108,6 +108,7 @@ class Phl032PharmacyEditionApiTest extends ApiTestBase {
         // pharmacy, billing, the drug master and the entitlement answer stay open
         assertThat(exchange("/v1/pharmacy/items", HttpMethod.GET, authed(shop.token()), List.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(exchange("/v1/clinical/drugs", HttpMethod.GET, authed(shop.token()), Object.class).getStatusCode()).isNotEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange("/v1/reason-codes?kind=discount", HttpMethod.GET, authed(shop.token()), Object.class).getStatusCode()).isNotEqualTo(HttpStatus.FORBIDDEN); // billing's picker, a queue-package controller
         assertThat(exchange("/v1/me/entitlements", HttpMethod.GET, authed(shop.token()), Map.class).getBody().get("edition")).isEqualTo("pharmacy");
 
         // the same call for an ordinary clinic is not refused for its edition

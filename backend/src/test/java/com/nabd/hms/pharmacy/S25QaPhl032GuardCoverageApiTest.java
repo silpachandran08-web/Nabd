@@ -33,12 +33,14 @@ class S25QaPhl032GuardCoverageApiTest extends ApiTestBase {
         List<Probe> probes = List.of(
                 new Probe(HttpMethod.GET, "/v1/appointments", null),
                 new Probe(HttpMethod.GET, "/v1/queue", null),
-                new Probe(HttpMethod.GET, "/v1/schedule/doctors", null),
-                new Probe(HttpMethod.GET, "/v1/nursing/procedures", null),
-                new Probe(HttpMethod.GET, "/v1/doctors", null),
+                new Probe(HttpMethod.GET, "/v1/schedule/day", null),
+                new Probe(HttpMethod.GET, "/v1/nursing/administration-orders/today", null),
+                new Probe(HttpMethod.GET, "/v1/doctors/" + java.util.UUID.randomUUID() + "/working-hours", null),
                 new Probe(HttpMethod.PUT, "/v1/queue-settings/facility", Map.of()),
                 new Probe(HttpMethod.PUT, "/v1/clinic/settings/day-start", Map.of("minute", 0)),
-                new Probe(HttpMethod.GET, "/v1/abha/status", null));
+                new Probe(HttpMethod.GET, "/v1/abha/status", null),
+                new Probe(HttpMethod.GET, "/v1/reports/eta-accuracy", null), // a queue controller under /v1/reports: caught by package, not prefix
+                new Probe(HttpMethod.GET, "/v1/reports/booking-reasons", null));
         List<String> slipped = new ArrayList<>();
         for (Probe p : probes) {
             ResponseEntity<Map> r = exchange(p.path(), p.method(), p.body() == null ? authed(token) : authedJsonBody(token, p.body()), Map.class);
