@@ -32,6 +32,7 @@ import static com.nabd.hms.platform.provisioning.ProvisioningRepository.OwnerLin
  * confirmation bound to the branch code, used once.
  */
 @Service
+@Transactional(readOnly = true) // the private helpers (requireOwner, slug) read through the repository; start() and retry() override it
 public class OwnerBranchService {
 
     /** copy_config sits before provision_whatsapp so the copied template languages win over the regional defaults. */

@@ -34,7 +34,8 @@ public class ClinicClock {
 
     private static final Logger log = LoggerFactory.getLogger(ClinicClock.class);
 
-    private static final ZoneId UTC = ZoneId.of("UTC"); // id "UTC", not "Z" — it is passed to SQL AT TIME ZONE
+    /** Id "UTC", not "Z" (it is passed to SQL AT TIME ZONE). Public for the few dates that belong to no clinic: operator-console and training records. */
+    public static final ZoneId UTC = ZoneId.of("UTC");
 
     private final JdbcTemplate jdbc;
     private final Clock clock;

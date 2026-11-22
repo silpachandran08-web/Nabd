@@ -3,7 +3,6 @@ package com.nabd.hms.common;
 import org.springframework.http.HttpStatus;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +36,7 @@ public final class TrainingRules {
 
     /** A pass is current for one year; the refresher is due on this instant. */
     public static Instant refresherDue(Instant completedAt) {
-        return completedAt.atZone(ZoneOffset.UTC).plusYears(1).toInstant();
+        return completedAt.atZone(ClinicClock.UTC).plusYears(1).toInstant();
     }
 
     /** The same rule in SQL for a completed_at column aliased c: a current pass at the bound instant. */

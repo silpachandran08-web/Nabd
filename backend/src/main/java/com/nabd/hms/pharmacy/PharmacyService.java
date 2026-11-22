@@ -236,6 +236,7 @@ public class PharmacyService {
         return toResponse(repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // always called from the item create/update transaction
     private void setGtin(UUID tenantId, UUID id, String gtin) {
         try {
             repo.setGtin(tenantId, id, gtin);
