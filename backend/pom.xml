@@ -24,6 +24,8 @@
          Run them with: mvn test -Dknown.defect.tags= -->
     <known.defect.tags>known-defect-ACC-002 | known-defect-ACC-003 | known-defect-ACC-004 | known-defect-FIN-003 | known-defect-OPS-004 | known-defect-OPS-007 | known-defect-OPS-034 | known-defect-PLT-044 | known-defect-PLT-038 | known-defect-IDC-001 | known-defect-CLN-004 | known-defect-CLN-005 | known-defect-OPS-012 | known-defect-OPS-042 | known-defect-OPS-020 | known-defect-PLT-009 | known-defect-OPS-045</known.defect.tags>
     <pit.history>${project.build.directory}/pit-history.bin</pit.history>
+    <!-- empty default so @{argLine} below resolves; jacoco:prepare-agent (ci.yml) appends its agent here -->
+    <argLine></argLine>
   </properties>
 
   <dependencies>
@@ -209,6 +211,9 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <excludedGroups>${known.defect.tags}</excludedGroups>
+          <!-- Decision 153: tests date their fixtures with LocalDate.now() and CURRENT_DATE (pgjdbc gives the DB session the JVM zone)
+               while seeded tenants and ClockConfig are UTC. On a +03 machine the two disagreed from 00:00 to 03:00. -->
+          <argLine>@{argLine} -Duser.timezone=UTC</argLine>
         </configuration>
       </plugin>
     </plugins>

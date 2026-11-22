@@ -19,8 +19,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Keeps the clinic calendar defined in one place (ClinicClock). The runtime tests only catch a stray server-local date
- * between 00:00 and the UTC offset (e.g. 00:00–03:00 on a +03 machine); this catches it any time. */
+/** Keeps the clinic calendar defined in one place (ClinicClock). The runtime tests run in UTC (pom.xml, surefire argLine), so a
+ * stray server-local date equals a UTC tenant's date there and only this static check catches it. */
 class ClinicClockUsageTest {
 
     // JVM zone: LocalDate/LocalTime.now() with no zone. Hard-coded UTC: ZoneOffset.UTC, AT TIME ZONE 'UTC'.
@@ -93,6 +93,12 @@ class ClinicClockUsageTest {
                 .hasMessageContaining("LocalDate.now()").hasMessageContaining("LocalDateTime.now()")
                 .hasMessageContaining("ZonedDateTime.now()").hasMessageContaining("LocalDate.now(java.time.ZoneId)");
         NO_SYSTEM_CLOCK_NOW.check(new ClassFileImporter().importClasses(GoodNowSample.class));
+    }
+
+    /** Decision 153: fixtures use LocalDate.now() and CURRENT_DATE; in any other JVM zone they are a day off the UTC tenants for some hours a day. */
+    @Test
+    void testJvmRunsInUtc() {
+        assertThat(java.util.TimeZone.getDefault().getID()).as("run tests through Maven, or add -Duser.timezone=UTC to the IDE run configuration").isEqualTo("UTC");
     }
 
     @Test
