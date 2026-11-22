@@ -131,16 +131,17 @@ class Adm020LifecycleApiTest extends ApiTestBase {
         assertThat(inTenantTx(clinic.id(), () -> jdbc.queryForObject("SELECT count(*) FROM roles WHERE name LIKE 'Role %'", Integer.class))).isZero();
 
         // the session itself keeps working, and so does the export (owner + step-up, ADM-015) and a read that happens to be a POST
-        assertThat(http.postForEntity(url("/v1/auth/refresh"), jsonBody(Map.of("refreshToken", deskPair.get("refreshToken"))), Map.class).getStatusCode())
-                .isEqualTo(HttpStatus.OK);
+        ResponseEntity<Map> refreshed = http.postForEntity(url("/v1/auth/refresh"), jsonBody(Map.of("refreshToken", deskPair.get("refreshToken"))), Map.class);
+        assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        deskAccess = (String) refreshed.getBody().get("accessToken"); // a refresh rotates the session: the previous access token is revoked with it
         ResponseEntity<Map> export = exchange("/v1/setup/export-jobs", HttpMethod.POST,
                 authedJsonBodyWithHeader(ownerAccess, "X-Step-Up-Token", stepUp(ownerAccess, "data-export"), Map.of("scope", "full_tenant", "format", "csv")), Map.class);
         assertThat(export.getStatusCode()).as("export: %s", export.getBody()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(exchange("/v1/files/" + UUID.randomUUID() + "/download-url", HttpMethod.POST, authed(ownerAccess), Map.class).getStatusCode())
                 .isNotEqualTo(HttpStatus.LOCKED);
         // and the clinic can still ask Nabd why
-        assertThat(exchange("/v1/support/tickets", HttpMethod.POST, authedJsonBody(deskAccess, Map.of("subject", "Why are we suspended?", "description", "Please call the owner.")), Map.class)
-                .getStatusCode().is2xxSuccessful()).isTrue();
+        ResponseEntity<Map> ticket = exchange("/v1/support/tickets", HttpMethod.POST, authedJsonBody(deskAccess, Map.of("subject", "Why are we suspended?", "description", "Please call the owner.")), Map.class);
+        assertThat(ticket.getStatusCode().is2xxSuccessful()).as("ticket: %s %s", ticket.getStatusCode(), ticket.getBody()).isTrue();
 
         // the owner (not the desk) is told once, and the event carries from, to and the reason
         assertThat(inTenantTx(clinic.id(), () -> jdbc.queryForObject(
