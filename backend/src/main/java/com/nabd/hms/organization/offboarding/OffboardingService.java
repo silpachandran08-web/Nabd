@@ -272,7 +272,7 @@ public class OffboardingService {
             throw new IllegalStateException("the clinic's data key is not destroyed yet");
         }
         int keys = jdbc.queryForObject("SELECT count(*) FROM tenant_data_keys WHERE tenant_id = ?", Integer.class, tenant);
-        Map<String, Object> t = jdbc.queryForMap("SELECT name, slug, brand_id, region_code FROM tenants WHERE id = ?", tenant);
+        Map<String, Object> t = jdbc.queryForMap("SELECT name::text AS name, slug::text AS slug, brand_id, region_code::text AS region_code FROM tenants WHERE id = ?", tenant);
         Instant requested = ((Timestamp) r.get("requested_at")).toInstant().truncatedTo(ChronoUnit.SECONDS);
         Instant erased = ((Timestamp) r.get("erased_at")).toInstant().truncatedTo(ChronoUnit.SECONDS);
         Instant purge = erased.plus(BACKUP_PURGE);
