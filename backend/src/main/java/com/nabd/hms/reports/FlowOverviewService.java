@@ -79,7 +79,7 @@ public class FlowOverviewService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-range", "Invalid range", "range must be today, d7 or d30.");
         }
         if (facility != null && !facility.equals(tenantId)) {
-            throw ApiException.notFound(); // a session works in one facility; another one is not readable from here
+            throw ApiException.notFound(); // a session works in one facility and cannot read another one
         }
         LocalDate to = clock.today(tenantId);
         LocalDate from = to.minusDays(days - 1);

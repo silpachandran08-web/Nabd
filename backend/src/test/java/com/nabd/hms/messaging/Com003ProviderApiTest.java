@@ -26,6 +26,8 @@ class Com003ProviderApiTest extends SlowProviderTestBase {
     @Autowired
     private TemplateReconciler reconciler;
     @Autowired
+    private WhatsAppTemplateRepository templateRepo;
+    @Autowired
     private OutboxDispatcher dispatcher;
 
     @BeforeEach
@@ -104,15 +106,18 @@ class Com003ProviderApiTest extends SlowProviderTestBase {
         assertThat(submit(token, "five_hundred").getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
+    // The stranded row is written directly and settled with a 0-minute threshold, so nothing else alive in the suite JVM can free it
+    // first: an open breaker frees a row at submit, and another Spring context's scheduled reconciler (mock client: never found)
+    // deletes any row older than 10 minutes. The submit that strands a row on a 500 is covered by the test above.
     @Test
     void metaOutageDuringReconcileKeepsTheRowForTheNextRun() {
         SeededTenant t = seedTenant();
+        inTenantTx(t.id(), () -> templateRepo.insertSubmitting(t.id(), "still_down", "c003_" + UUID.randomUUID().toString().substring(0, 8) + "_still_down",
+                "en", "UTILITY", "Clinic", "Your visit is at {{1}} today.", 1, List.of("10:00")));
         STUB.status.set(500);
-        submit(ownerToken(t), "still_down");
-        makeStale(t.id());
 
-        assertThat(reconciler.reconcile(10)).isZero();
-        assertThat(templateRows(t.id())).hasSize(1);
+        assertThat(reconciler.reconcile(0)).isZero();
+        assertThat(templateRows(t.id())).singleElement().satisfies(row -> assertThat(row).containsEntry("status", "submitting"));
     }
 
     // AC3: 50% failures (never 5 in a row) open the breaker; sends are deferred by the outbox, not attempted

@@ -129,6 +129,33 @@ class Adm041FlowOverviewApiTest extends ApiTestBase {
         assertThat(tile(body, "no_show_rate").get("value")).isNull();
     }
 
+    /** A consult that has not ended has no consult time yet: the rollups keep NULL and the tile has no value ("No data"), never 0. */
+    @Test
+    void aConsultThatHasNotEndedIsNoDataNotZero() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "a41-" + UUID.randomUUID() + "@a.com", "+9198" + (10000000 + (int) (Math.random() * 89999999)), false);
+        String token = loginAndGetAccessToken(owner);
+        String patient = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Flow Pat", "phone", "+9199" + (10000000 + (int) (Math.random() * 89999999)), "dob", "1971-01-01", "gender", "male")), Map.class).getBody().get("id");
+        String entry = (String) exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of("patientId", patient, "doctorId", owner.id().toString())), Map.class).getBody().get("id");
+        for (String s : List.of("waiting", "vitals_pending", "vitals_done", "in_consult")) {
+            exchange("/v1/queue/" + entry + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", s)), Map.class);
+        }
+        LocalDate today = clock.today(tenant.id());
+        inTenantTx(tenant.id(), () -> projector.recomputeFlow(tenant.id(), today));
+        Map<String, Object> row = inTenantTx(tenant.id(), () -> jdbc.queryForMap("SELECT t.flow_n, t.consult_n, t.consult_p50_s, t.checkout_p50_s, d.median_consult_s "
+                + "FROM tenant_daily_metrics t JOIN doctor_daily_metrics d ON d.tenant_id = t.tenant_id AND d.day = t.day WHERE t.tenant_id = ? AND t.day = ?",
+                tenant.id(), java.sql.Date.valueOf(today)));
+        assertThat(row.get("flow_n")).isEqualTo(1); // the patient did reach the doctor
+        assertThat(row.get("consult_n")).isEqualTo(0);
+        assertThat(row.get("consult_p50_s")).isNull();
+        assertThat(row.get("checkout_p50_s")).isNull();
+        assertThat(row.get("median_consult_s")).isNull();
+        Map<String, Object> body = exchange("/v1/reports/overview/flow?range=today", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(tile(body, "consult").get("value")).isNull();
+        assertThat(tile(body, "door_to_doctor").get("value")).isNotNull();
+    }
+
     @Test
     void rangeFacilityAndPermissionAreEnforcedOnTheServer() {
         Day f = visitWithStages();
