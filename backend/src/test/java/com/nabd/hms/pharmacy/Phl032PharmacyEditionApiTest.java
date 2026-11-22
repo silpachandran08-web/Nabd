@@ -97,7 +97,7 @@ class Phl032PharmacyEditionApiTest extends ApiTestBase {
     @Test
     void everyClinicalAndSchedulingAreaIs403ModuleNotEntitledForAPharmacyButTheClinicStillWorks() {
         Shop shop = pharmacyShop();
-        for (String path : List.of("/v1/appointments", "/v1/queue/eta", "/v1/schedule/day", "/v1/clinical/encounters", "/v1/nursing", "/v1/packages",
+        for (String path : List.of("/v1/appointments", "/v1/queue/eta", "/v1/schedule/day", "/v1/clinical/encounters", "/v1/nursing/procedure-orders/today", "/v1/packages",
                 "/v1/waitlist", "/v1/booking-requests")) {
             ResponseEntity<Map> r = exchange(path, HttpMethod.GET, authed(shop.token()), Map.class);
             assertThat(r.getStatusCode()).as(path).isEqualTo(HttpStatus.FORBIDDEN);
