@@ -329,7 +329,7 @@
 
 /* REC-044: split tender rows and the sticky Collect bar. */
 .tenders { margin-block-start: var(--nb-space-16); display: flex; flex-direction: column; gap: var(--nb-space-8); }
-.tenderRow { display: flex; gap: 6px; align-items: center; }
+.tenderRow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } /* wraps in a narrow column: the amount keeps 120px */
 .tenderSelect, .tenderAmount, .tenderFill, .tenderRemove {
   min-block-size: 44px;
   border: 1px solid var(--nb-border-default);
@@ -340,7 +340,7 @@
   font-size: 13px;
 }
 .tenderSelect { flex: 0 1 110px; min-inline-size: 0; padding-inline: var(--nb-space-8); }
-.tenderAmount { flex: 1 1 0; min-inline-size: 0; padding-inline: var(--nb-space-8); text-align: end; }
+.tenderAmount { flex: 1 1 120px; min-inline-size: 120px; padding-inline: var(--nb-space-8); text-align: end; }
 .tenderFill, .tenderRemove { min-inline-size: 44px; padding-inline: var(--nb-space-8); cursor: pointer; }
 .tenderFill:disabled, .tenderRemove:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
 .tenders .backBtn { min-block-size: 44px; }

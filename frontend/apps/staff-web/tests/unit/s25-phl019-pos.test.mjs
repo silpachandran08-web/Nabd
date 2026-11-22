@@ -194,3 +194,9 @@ test("i18n: every key the POS screen asks for exists in English and Hindi", () =
   assert.ok(n > 50, `${n} keys checked`);
   assert.deepEqual(Object.keys(hi).sort(), Object.keys(en).sort());
 });
+
+test("T1-BUG-4: a split-payment row wraps in the narrow third column and the amount box keeps at least 120 px", () => {
+  const css = src("(clinic)/checkout/checkout.module.css");
+  assert.match(css, /\.tenderRow \{[^}]*flex-wrap: wrap/);
+  assert.match(css, /\.tenderAmount \{[^}]*flex: 1 1 120px; min-inline-size: 120px/);
+});
