@@ -77,12 +77,13 @@ class Ops010RollupsApiTest extends ApiTestBase {
         Map live = exchange("/v1/reports/daily-money", HttpMethod.GET, authed(f.token()), Map.class).getBody();
         assertThat(new BigDecimal(live.get("collectedToday").toString())).isEqualByComparingTo((BigDecimal) row.get("collected"));
         assertThat(new BigDecimal(live.get("billedToday").toString())).isEqualByComparingTo((BigDecimal) row.get("billed"));
-        // doctor rollup: median consult time stays null until T-105
+        // doctor rollup: ADM-041 measures the median consult time from the stage events (it was null before, T-105); this visit left
+        // the consult room the moment it entered, so the measured time is about 0 s (no ended consult = NULL: Adm041FlowOverviewApiTest)
         Map<String, Object> doc = inTenantTx(f.tenant().id(), () -> jdbc.queryForMap("SELECT visits, collected, median_consult_s FROM doctor_daily_metrics WHERE tenant_id = ? AND doctor_id = ? AND day = ?",
                 f.tenant().id(), f.owner().id(), java.sql.Date.valueOf(f.today())));
         assertThat((BigDecimal) doc.get("collected")).isEqualByComparingTo("500");
         assertThat(doc.get("visits")).isEqualTo(1);
-        assertThat(doc.get("median_consult_s")).isNull();
+        assertThat((Integer) doc.get("median_consult_s")).isBetween(0, 30);
     }
 
     @Test
