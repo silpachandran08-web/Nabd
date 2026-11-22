@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.compliance;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.organization.api.RegionRules;
 import com.nabd.hms.platform.PlatformAudit;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,7 +19,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -90,7 +90,7 @@ public class RegulatoryWatchService {
         if (!SOURCES.contains(req.source()) || !IMPACT_LEVELS.contains(req.impactLevel()) || !markets().contains(req.market())) {
             throw invalid("UNKNOWN_WATCH_VALUE", "Source, market or impact level is not one of the listed values.");
         }
-        if (req.noticedOn().isAfter(LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(1))) { // a day of slack for the recorder's time zone
+        if (req.noticedOn().isAfter(LocalDate.ofInstant(now, ClinicClock.UTC).plusDays(1))) { // a day of slack for the recorder's time zone
             throw invalid("NOTICED_IN_FUTURE", "The day the change was noticed cannot be in the future.");
         }
         UUID id = UUID.randomUUID();
@@ -125,7 +125,7 @@ public class RegulatoryWatchService {
         if (!rows.isEmpty()) {
             md.append("| Noticed | Recorded | Working days | Source | Market | Impact | Change | What it means for Nabd | Linked |\n|---|---|---|---|---|---|---|---|---|\n");
             for (Entry e : rows) {
-                md.append("| ").append(e.noticedOn()).append(" | ").append(LocalDate.ofInstant(e.recordedAt(), ZoneOffset.UTC)).append(" | ")
+                md.append("| ").append(e.noticedOn()).append(" | ").append(LocalDate.ofInstant(e.recordedAt(), ClinicClock.UTC)).append(" | ")
                         .append(e.workingDays()).append(e.withinSla() ? "" : " (late)").append(" | ").append(e.source()).append(" | ").append(e.market()).append(" | ")
                         .append(e.impactLevel()).append(" | ").append(cell(e.title())).append(" | ").append(cell(e.impact())).append(" | ").append(e.linkedRef()).append(" |\n");
             }
@@ -167,7 +167,7 @@ public class RegulatoryWatchService {
                 (rs, i) -> {
                     LocalDate noticed = rs.getObject("noticed_on", LocalDate.class);
                     Instant recorded = rs.getTimestamp("recorded_at").toInstant();
-                    int days = workingDays(noticed, LocalDate.ofInstant(recorded, ZoneOffset.UTC));
+                    int days = workingDays(noticed, LocalDate.ofInstant(recorded, ClinicClock.UTC));
                     return new Entry(rs.getObject("id", UUID.class), rs.getString("source"), rs.getString("market"), rs.getString("title"), rs.getString("impact_level"),
                             rs.getString("impact"), rs.getString("linked_ref"), noticed, recorded, rs.getString("recorded_by"), days, days <= SLA_WORKING_DAYS);
                 }, args);

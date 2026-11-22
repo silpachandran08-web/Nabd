@@ -44,6 +44,7 @@ import java.util.function.Function;
  * shortcut: the replica (T-208) and the nabd_reports 60 s timeout are not wired, every read uses the app's own pool; upgrade when the replica exists.
  */
 @Service
+@Transactional(readOnly = true) // every helper below reads through a repository inside run(); export() overrides it
 public class ReportLibraryService {
 
     static final int PAGE = 50;

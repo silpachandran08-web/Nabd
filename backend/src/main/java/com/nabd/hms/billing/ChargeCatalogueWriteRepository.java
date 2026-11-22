@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -48,6 +49,23 @@ class ChargeCatalogueWriteRepository implements ChargeHeadWriter, ItemCatalogueW
                 h.emergencyAmount(), h.taxCode(), h.taxRatePercent(), h.doctorOverride(), h.active(),
                 Date.valueOf(h.effectiveFrom()), h.effectiveTo() == null ? null : Date.valueOf(h.effectiveTo()),
                 h.displayOrder(), tenantId, id);
+    }
+
+    @Override
+    public int copyHeads(UUID tenantId, List<String> rowsJson) {
+        int n = 0;
+        for (String row : rowsJson) {
+            n += jdbc.update("INSERT INTO charge_catalogue SELECT r.* FROM (SELECT ?::jsonb AS j, ?::uuid AS tenant) src, "
+                    + "jsonb_populate_record(NULL::charge_catalogue, src.j || jsonb_build_object('id', gen_random_uuid(), 'tenant_id', src.tenant, "
+                    + "'created_at', now(), 'updated_at', now(), "
+                    + "'stock_qty', CASE WHEN src.j->>'stock_qty' IS NOT NULL THEN 0 END)) r ON CONFLICT DO NOTHING", row, tenantId);
+        }
+        return n;
+    }
+
+    @Override
+    public void deleteHeads(UUID tenantId) {
+        jdbc.update("DELETE FROM charge_catalogue WHERE tenant_id = ?", tenantId);
     }
 
     // ── pharmacy items (pharmacy) ──

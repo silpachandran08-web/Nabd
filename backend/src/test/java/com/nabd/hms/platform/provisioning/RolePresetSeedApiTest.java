@@ -72,6 +72,14 @@ class RolePresetSeedApiTest extends ApiTestBase {
         assertThat(count).isEqualTo(7);
     }
 
+    /** T1-BUG-1: V3540 (lab_technician) and V3590 (pharmacy presets) both re-create roles_preset_code_check: the last one must list every preset. */
+    @Test
+    void presetCodeCheckAllowsEveryClinicAndPharmacyPreset() {
+        String def = jdbc.queryForObject("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'roles_preset_code_check'", String.class);
+        java.util.stream.Stream.concat(RolePresets.ALL.stream(), RolePresets.PHARMACY.stream())
+                .forEach(p -> assertThat(def).as(p.code()).contains("'" + p.code() + "'"));
+    }
+
     /** Golden file (matrix + extension rows), then MF-52 on the Owner and Owner-doctor = Owner OR Doctor plus clinical:approve. */
     private Map<String, Map<String, boolean[]>> expectedFromGolden() throws Exception {
         Map<String, Map<String, boolean[]>> out = new HashMap<>();

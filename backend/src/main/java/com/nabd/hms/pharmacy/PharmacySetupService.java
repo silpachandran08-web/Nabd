@@ -27,8 +27,10 @@ class PharmacySetupService implements InvoicingGate {
     static final String PIC_REGISTRATION_KEY = "PIC_REG_NO";
     /** India: retail sale licence (Form 20B) and (Form 21B). NEEDS REGULATORY CHECK (which forms a standalone chemist must hold). */
     private static final List<String> INDIA_KEYS = List.of("IN_20B", "IN_21B");
-    /** KSA SFDA establishment licence; the same key is asked in AE and QA until a regulatory expert names those regulators' licences. */
+    /** Saudi SFDA establishment licence; the same key is asked in AE and QA until a regulatory expert names those regulators' licences. */
     private static final List<String> GULF_KEYS = List.of("SFDA_ESTABLISHMENT");
+    /** shortcut: a code-keyed table (not a regions column), every other region asks the Gulf key; move it onto the regions table when a second regulator is named (OPS-061). */
+    private static final Map<String, List<String>> KEYS_BY_REGION = Map.of("IN", INDIA_KEYS);
 
     private final PharmacyRepository repo;
     private final JdbcTemplate jdbc;
@@ -54,7 +56,7 @@ class PharmacySetupService implements InvoicingGate {
     }
 
     static List<String> requiredKeys(String region) {
-        return "IN".equals(region) ? INDIA_KEYS : GULF_KEYS;
+        return KEYS_BY_REGION.getOrDefault(region, GULF_KEYS);
     }
 
     private static boolean filled(Map<String, String> m, String key) {
@@ -64,7 +66,6 @@ class PharmacySetupService implements InvoicingGate {
 
     @Transactional(readOnly = true)
     public PharmacySetupResponse status(UUID tenantId) {
-        tenantContext.set(tenantId);
         Facility f = facility(tenantId);
         var settings = repo.findSettings(tenantId);
         Map<String, String> licences = settings.map(s -> PharmacyService.licences(s.licenceJson())).orElse(Map.of());
@@ -82,7 +83,6 @@ class PharmacySetupService implements InvoicingGate {
     /** Records that the owner printed the test page on the receipt printer; the page itself is printed by the browser. */
     @Transactional
     public Instant recordPrinterTest(UUID tenantId, UUID staffId, String ip) {
-        tenantContext.set(tenantId);
         var cur = repo.findSettings(tenantId);
         if (cur.isEmpty()) repo.saveSettings(tenantId, "external", false, null, "{}", null, null); // a clinic that never opened the settings
         Instant now = jdbc.queryForObject("UPDATE pharmacy_settings SET printer_tested_at = now() WHERE tenant_id = ? RETURNING printer_tested_at",
@@ -93,6 +93,7 @@ class PharmacySetupService implements InvoicingGate {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void requireReady() {
         UUID tenantId = tenantContext.current();
         Facility f = facility(tenantId);

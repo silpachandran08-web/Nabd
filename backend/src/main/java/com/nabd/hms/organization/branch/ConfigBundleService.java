@@ -3,6 +3,8 @@ package com.nabd.hms.organization.branch;
 import com.nabd.hms.common.CatalogueTemplates;
 import com.nabd.hms.common.TenantScope;
 import com.nabd.hms.common.ConfigBundle;
+import com.nabd.hms.common.ProvisioningSeeds;
+import com.nabd.hms.organization.api.ChargeHeadWriter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -39,8 +41,7 @@ class ConfigBundleService implements ConfigBundle {
                     + "FROM department_workflow_selection t JOIN departments d ON d.id = t.department_id "
                     + "JOIN workflow_definitions w ON w.id = t.workflow_definition_id WHERE t.tenant_id = ? AND w.tenant_id IS NULL", BY_DEPARTMENT),
             // stock stays with the source clinic: a stock-tracked item starts at 0 in the branch
-            new Table("charges", "charge_catalogue", "SELECT to_jsonb(t)::text FROM charge_catalogue t WHERE t.tenant_id = ?",
-                    "|| jsonb_build_object('stock_qty', CASE WHEN src.j->>'stock_qty' IS NOT NULL THEN 0 END)"),
+            new Table("charges", "charge_catalogue", "SELECT to_jsonb(t)::text FROM charge_catalogue t WHERE t.tenant_id = ?", ""),
             new Table("policies", "clinic_policies", "SELECT to_jsonb(t)::text FROM clinic_policies t WHERE t.tenant_id = ?", ""),
             new Table("roles", "roles", "SELECT to_jsonb(t)::text FROM roles t WHERE t.tenant_id = ? AND NOT t.built_in", ""),
             new Table("hours", "clinic_holidays", "SELECT to_jsonb(t)::text FROM clinic_holidays t WHERE t.tenant_id = ?", ""),
@@ -50,12 +51,17 @@ class ConfigBundleService implements ConfigBundle {
     private final JdbcTemplate jdbc;
     private final TenantScope tenantScope;
     private final CatalogueTemplates templates;
+    private final ProvisioningSeeds.Iam iam; // PLT-036: roles has one writer (iam)
+    private final ChargeHeadWriter charges; // PLT-036: charge_catalogue has one writer (billing)
     private final TransactionTemplate ownTx;
 
-    ConfigBundleService(JdbcTemplate jdbc, TenantScope tenantScope, CatalogueTemplates templates, PlatformTransactionManager txManager) {
+    ConfigBundleService(JdbcTemplate jdbc, TenantScope tenantScope, CatalogueTemplates templates, ProvisioningSeeds.Iam iam,
+                        ChargeHeadWriter charges, PlatformTransactionManager txManager) {
         this.jdbc = jdbc;
         this.tenantScope = tenantScope;
         this.templates = templates;
+        this.iam = iam;
+        this.charges = charges;
         this.ownTx = new TransactionTemplate(txManager);
         this.ownTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -100,18 +106,16 @@ class ConfigBundleService implements ConfigBundle {
             jdbc.update("DELETE FROM departments WHERE tenant_id = ?", target);
         }
         if (bundle.sections().contains("roles")) {
-            jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND NOT built_in", target); // seeded presets; the built-in Owner stays
+            iam.deleteCopiedRoles(target); // seeded presets; the built-in Owner stays
         }
         for (Table t : TABLES) {
             List<String> rows = bundle.rows().get(t.name());
             if (rows == null) continue;
-            String sql = "INSERT INTO " + t.name() + " SELECT r.* FROM (SELECT ?::jsonb AS j, ?::uuid AS tenant) src, "
-                    + "jsonb_populate_record(NULL::" + t.name() + ", src.j || jsonb_build_object('id', gen_random_uuid(), 'tenant_id', src.tenant, "
-                    + "'created_at', now(), 'updated_at', now()) " + t.extra() + ") r ON CONFLICT DO NOTHING";
-            int n = 0;
-            for (String row : rows) {
-                n += jdbc.update(sql, row, target);
-            }
+            int n = switch (t.name()) {
+                case "roles" -> iam.copyRoles(target, rows);
+                case "charge_catalogue" -> charges.copyHeads(target, rows);
+                default -> copy(t, rows, target);
+            };
             counts.put(t.name(), n);
         }
         if (!bundle.templateLanguages().isEmpty()) {
@@ -122,13 +126,29 @@ class ConfigBundleService implements ConfigBundle {
         return counts;
     }
 
+    /** The tables organization owns: the row JSON becomes a row of the target clinic under a fresh id. */
+    private int copy(Table t, List<String> rows, UUID target) {
+        String sql = "INSERT INTO " + t.name() + " SELECT r.* FROM (SELECT ?::jsonb AS j, ?::uuid AS tenant) src, "
+                + "jsonb_populate_record(NULL::" + t.name() + ", src.j || jsonb_build_object('id', gen_random_uuid(), 'tenant_id', src.tenant, "
+                + "'created_at', now(), 'updated_at', now()) " + t.extra() + ") r ON CONFLICT DO NOTHING";
+        int n = 0;
+        for (String row : rows) {
+            n += jdbc.update(sql, row, target);
+        }
+        return n;
+    }
+
     @Override
     public void remove(UUID targetTenantId) {
         tenantScope.run(targetTenantId, () -> {
             for (int i = TABLES.size() - 1; i >= 0; i--) {
                 String table = TABLES.get(i).name();
                 // roles: the built-in Owner belongs to seed_masters' undo; departments: its undo deletes whatever is left
-                jdbc.update("DELETE FROM " + table + " WHERE tenant_id = ?" + ("roles".equals(table) ? " AND NOT built_in" : ""), targetTenantId);
+                switch (table) {
+                    case "roles" -> iam.deleteCopiedRoles(targetTenantId);
+                    case "charge_catalogue" -> charges.deleteHeads(targetTenantId);
+                    default -> jdbc.update("DELETE FROM " + table + " WHERE tenant_id = ?", targetTenantId);
+                }
             }
             jdbc.update("DELETE FROM config_bundle_imports WHERE tenant_id = ?", targetTenantId);
         });

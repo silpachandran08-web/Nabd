@@ -2,6 +2,7 @@ package com.nabd.hms.organization.api;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -21,4 +22,10 @@ public interface ChargeHeadWriter {
     UUID insertHead(UUID tenantId, ChargeHead head, String taxCategory, String sacHsn);
 
     void updateHead(UUID tenantId, UUID id, ChargeHead head);
+
+    /** PLT-022: a branch's copied charge heads (ConfigBundle rows, JSON per row), insert-if-absent under a fresh id; a stock-tracked item starts at 0. Returns rows written. */
+    int copyHeads(UUID tenantId, List<String> rowsJson);
+
+    /** Undo of {@link #copyHeads} for a branch that is being rolled back. */
+    void deleteHeads(UUID tenantId);
 }

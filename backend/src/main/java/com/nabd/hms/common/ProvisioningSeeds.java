@@ -1,5 +1,6 @@
 package com.nabd.hms.common;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -21,6 +22,12 @@ public interface ProvisioningSeeds {
     interface Iam {
         /** PLT-016: one preset role (only the Owner preset is built in). */
         void insertPresetRole(UUID tenantId, String name, boolean builtIn, String grantsJson, String presetCode, int presetVersion);
+
+        /** PLT-022: a branch's copied roles (ConfigBundle rows, JSON per row), insert-if-absent under a fresh id. Returns rows written. */
+        int copyRoles(UUID tenantId, List<String> rowsJson);
+
+        /** PLT-022: replaces the seeded presets before {@link #copyRoles} and undoes it; the built-in Owner stays. */
+        void deleteCopiedRoles(UUID tenantId);
 
         /** Saga rollback of seed_masters: the built-in and preset roles. */
         void deleteSeededRoles(UUID tenantId);

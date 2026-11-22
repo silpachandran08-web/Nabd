@@ -11,11 +11,12 @@ ALTER TABLE tenants VALIDATE CONSTRAINT tenants_facility_type_check;
 ALTER TABLE master.provisioning_jobs ADD COLUMN edition text NOT NULL DEFAULT 'clinic'
   CHECK (edition IN ('clinic', 'pharmacy', 'lab'));
 
--- 3. Pharmacy preset roles (Pharmacist-in-charge, Pharmacist, Counter staff) join the six clinic presets.
+-- 3. Pharmacy preset roles (Pharmacist-in-charge, Pharmacist, Counter staff) join the six clinic presets and the Lab technician
+--    preset V3540 (PHL-041) added; this re-creates the same CHECK, so it must list all ten codes.
 ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_preset_code_check;
 ALTER TABLE roles ADD CONSTRAINT roles_preset_code_check
   CHECK (preset_code IN ('owner','owner_doctor','doctor','nurse','receptionist','frontdesk_vitals',
-                         'pharmacist_in_charge','pharmacist','counter_staff')) NOT VALID;
+                         'lab_technician','pharmacist_in_charge','pharmacist','counter_staff')) NOT VALID;
 ALTER TABLE roles VALIDATE CONSTRAINT roles_preset_code_check;
 
 -- 4. The receipt-printer test of the setup wizard (when the owner last printed the test page).
@@ -36,3 +37,12 @@ WITH p AS (
 )
 INSERT INTO master.plan_entitlements (plan_id, plan_version, module_code)
 SELECT plan_id, version, m FROM v, unnest(ARRAY['pharmacy_inhouse', 'billing']) AS m;
+
+-- 6. Undoing seed_masters of a pharmacy job deletes the pharmacy-plan subscription (the row references the tenant that the saga then
+--    removes). nabd_app has no DELETE on the master schema (V210), so every provisioning rollback died with "permission denied".
+--    DELETE on this one table only; the rollback is the sole caller and filters by the job's own tenant id.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nabd_app') THEN
+    GRANT DELETE ON master.subscriptions TO nabd_app;
+  END IF;
+END $$;
