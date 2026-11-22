@@ -15,6 +15,7 @@ import { useStepUp } from "./useStepUp";
 import { useRoleBuilder, useRowActions } from "./useStaffActions";
 import { useInviteForm } from "./useInviteForm";
 import { InvitesTab, PeopleCard, PeopleExtras, RolesTab, TeamSummary, type StaffTab } from "./StaffTables";
+import TrainingRoster from "./TrainingRoster";
 import { CloneRoleDialog, InviteDialog, RoleBuilderModal, StepUpDialog } from "./StaffDialogs";
 
 export default function StaffAccessPage() {
@@ -90,6 +91,8 @@ export default function StaffAccessPage() {
       {!loading && !forbidden && tab === "roles" && <RolesTab d={d} selectedRole={selectedRole} setSelectedRoleId={setSelectedRoleId} g={g} rows={rows} rb={rb} />}
 
       {!loading && !forbidden && tab === "people" && <PeopleExtras d={d} canEditRoles={g.canEditRoles} rows={rows} />}
+
+      {!loading && !forbidden && tab === "people" && <TrainingRoster />}
 
       {regEdit && g.canEditRoles && (
         <RegistrationNoDialog staffId={regEdit.id} staffName={regEdit.name} current={regEdit.professionalRegistrationNo ?? null}

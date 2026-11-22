@@ -14,11 +14,26 @@ final class ProvisioningModels {
                String ownerEmail, String ownerName, String ownerMobile, String brandName, String status, String path,
                UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId,
                boolean ownerNewlyCreated, boolean brandNewlyCreated,
-               Instant approvedAt, UUID approvedBy) {
+               Instant approvedAt, UUID approvedBy, Branch branch, String edition) {
+
+        /** PLT-022: started by an owner to add a branch; requestedBy (an operator) is null for these. */
+        boolean isBranch() {
+            return branch != null;
+        }
+
+        /** PHL-032: a pharmacy-only tenant. An add-branch job is never one; the default edition is a clinic. */
+        boolean pharmacy() {
+            return branch == null && "pharmacy".equals(edition);
+        }
 
         boolean isGatedAndUnapproved() {
             return "enterprise".equals(path) && approvedAt == null;
         }
+    }
+
+    /** PLT-022: what an owner asked for. The region is not here on purpose: it is always the source clinic's. */
+    record Branch(UUID sourceTenantId, UUID requestedByStaff, UUID plannedTenantId, String code, String address, String timezone,
+                  List<String> copySections) {
     }
 
     record JobStep(UUID id, UUID jobId, String stepName, int stepOrder, String status,

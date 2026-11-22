@@ -26,7 +26,10 @@ class ScheduleRepository {
     private final JdbcTemplate jdbc;
     private final ClinicClock clock;
 
-    ScheduleRepository(JdbcTemplate jdbc, ClinicClock clock) {
+    private final com.nabd.hms.common.TenantSettingsPort tenantSettings; // PLT-036: tenants is written by platform only
+
+    ScheduleRepository(JdbcTemplate jdbc, ClinicClock clock, com.nabd.hms.common.TenantSettingsPort tenantSettings) {
+        this.tenantSettings = tenantSettings;
         this.jdbc = jdbc;
         this.clock = clock;
     }
@@ -104,7 +107,7 @@ class ScheduleRepository {
     }
 
     void setDayStart(UUID tenantId, int minute) {
-        jdbc.update("UPDATE tenants SET day_start_minute = ?, updated_at = now() WHERE id = ?", minute, tenantId);
+        tenantSettings.setDayStart(tenantId, minute);
     }
 
     UUID insertWorkingHours(UUID tenantId, UUID doctorId, int dayOfWeek, LocalTime start,

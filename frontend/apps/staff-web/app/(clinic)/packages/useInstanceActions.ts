@@ -7,7 +7,7 @@ import { api, ApiError } from "../../lib/api";
 import type { FormErrors } from "../../lib/formErrors";
 import type { Full } from "../../lib/gen";
 import type { RefundPreviewResponse } from "@nabd/api-client/generated";
-import { why, type InstanceT, type RefundT, type Tab } from "./packagesModel";
+import { why, type InstanceT, type RefundPreviewT, type RefundT, type Tab } from "./packagesModel";
 
 export type Deciding = { refund: RefundT; current: number; owed: number; changed: boolean };
 
@@ -16,7 +16,7 @@ export function useInstanceActions({ fe, loadAll, setTab }: { fe: FormErrors; lo
   const [selectedInstance, setSelectedInstance] = useState<InstanceT | null>(null);
   const [extendDate, setExtendDate] = useState("");
   const [extendReason, setExtendReason] = useState("");
-  const [refundPreview, setRefundPreview] = useState<Full<RefundPreviewResponse, never> | null>(null);
+  const [refundPreview, setRefundPreview] = useState<RefundPreviewT | null>(null);
   const [refundReason, setRefundReason] = useState("");
   // FIN-004: the approver sees request-time vs current amount and confirms the current one (expectedAmount).
   const [deciding, setDeciding] = useState<Deciding | null>(null);
@@ -76,7 +76,7 @@ export function useInstanceActions({ fe, loadAll, setTab }: { fe: FormErrors; lo
   }
 
   async function loadRefundPreview(instanceId: string) {
-    try { setRefundPreview(await api.get<Full<RefundPreviewResponse>>(`/packages/instances/${instanceId}/refund-preview`)); } catch { /* the button stays; press it again */ }
+    try { setRefundPreview(await api.get<RefundPreviewT>(`/packages/instances/${instanceId}/refund-preview`)); } catch { /* the button stays; press it again */ }
   }
   async function submitRefundRequest(instanceId: string) {
     if (!refundReason.trim()) {

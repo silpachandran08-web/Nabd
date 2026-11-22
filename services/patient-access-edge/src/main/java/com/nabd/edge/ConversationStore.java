@@ -68,9 +68,9 @@ public class ConversationStore {
                 s.setRollbackOnly();
                 return Commit.CONFLICT;
             }
-            if (o.next() != c.state()) { // ACC-045 funnel: state names and time only, in the same transaction as the move
-                j.update("insert into funnel_steps (tenant_id, conversation_id, from_state, to_state) values (?, ?, ?, ?)",
-                        c.tenantId(), c.id(), c.state().name(), o.next().name());
+            if (o.next() != c.state()) { // ACC-045 funnel: state names, language code and time only, in the same transaction as the move
+                j.update("insert into funnel_steps (tenant_id, conversation_id, from_state, to_state, lang) values (?, ?, ?, ?, ?)",
+                        c.tenantId(), c.id(), c.state().name(), o.next().name(), o.context().get("lang")); // FEF-041: a language code, not PHI
             }
             return Commit.OK;
         });

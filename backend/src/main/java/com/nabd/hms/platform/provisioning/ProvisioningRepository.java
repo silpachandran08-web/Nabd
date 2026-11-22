@@ -29,7 +29,8 @@ class ProvisioningRepository {
     private static final String JOB_COLUMNS =
             "id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, owner_mobile, brand_name, " +
                     "status, path, created_tenant_id, created_owner_id, created_brand_id, " +
-                    "owner_newly_created, brand_newly_created, approved_at, approved_by ";
+                    "owner_newly_created, brand_newly_created, approved_at, approved_by, " +
+                    "source_tenant_id, requested_by_staff, planned_tenant_id, branch_code, branch_address, timezone, copy_sections, edition ";
 
     void insertJob(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
                    String ownerEmail, String ownerName, String ownerMobile, String brandName, String path) {
@@ -37,6 +38,104 @@ class ProvisioningRepository {
                         "(id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, owner_mobile, brand_name, path) " +
                         "VALUES (?,?,?,?,?,?,?,?,?,?)",
                 id, requestedBy, tenantSlug, tenantName, region, ownerEmail, ownerName, ownerMobile, brandName, path);
+    }
+
+    /** PLT-022: an owner's add-branch job. @return false when the step-up confirmation was already used (unique step_up_id). */
+    boolean insertBranchJob(UUID id, ProvisioningModels.Branch b, String tenantSlug, String tenantName, String region,
+                            String ownerEmail, String ownerName, String brandName, UUID stepUpId) {
+        return jdbc.update("INSERT INTO master.provisioning_jobs " +
+                        "(id, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name, path, source_tenant_id, requested_by_staff, " +
+                        "planned_tenant_id, branch_code, branch_address, timezone, copy_sections, step_up_id) " +
+                        "VALUES (?,?,?,?,?,?,?,'self_serve',?,?,?,?,?,?,?,?) ON CONFLICT (step_up_id) DO NOTHING",
+                id, tenantSlug, tenantName, region, ownerEmail, ownerName, brandName, b.sourceTenantId(), b.requestedByStaff(),
+                b.plannedTenantId(), b.code(), b.address(), b.timezone(), b.copySections().toArray(new String[0]), stepUpId) == 1;
+    }
+
+    /** PLT-022: the caller as the owner of the clinic they are signed in to: built-in Owner role AND the owner account of the
+     * clinic's brand (linked staff row, or the provisioned row under the owner's own email). Empty for everyone else. */
+    Optional<OwnerLink> ownerLink(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT o.id, o.name, o.email, b.id, b.name, t.region_code, t.slug, s.name " +
+                        "FROM staff s JOIN roles r ON r.id = s.role_id AND r.tenant_id = s.tenant_id AND r.built_in " +
+                        "JOIN tenants t ON t.id = s.tenant_id JOIN brands b ON b.id = t.brand_id JOIN owners o ON o.id = b.owner_id " +
+                        "WHERE s.id = ? AND s.tenant_id = ? AND s.status = 'active' AND (s.owner_id = o.id OR (s.owner_id IS NULL AND s.email = o.email))",
+                (rs, i) -> new OwnerLink(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getObject(4, UUID.class),
+                        rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8)), staffId, tenantId).stream().findFirst();
+    }
+
+    record OwnerLink(UUID ownerId, String ownerName, String ownerEmail, UUID brandId, String brandName, String region, String slug, String staffName) {
+    }
+
+    record BranchRow(UUID tenantId, String name, String branchCode, String status, String region, String timezone) {
+    }
+
+    /** Every clinic under any brand of this owner, oldest first. */
+    List<BranchRow> branchesOf(UUID ownerId) {
+        return jdbc.query("SELECT t.id, t.name, t.branch_code, t.status, t.region_code, t.timezone FROM tenants t JOIN brands b ON b.id = t.brand_id " +
+                        "WHERE b.owner_id = ? ORDER BY t.created_at, t.id",
+                (rs, i) -> new BranchRow(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6)),
+                ownerId);
+    }
+
+    /** Serialises add-branch requests of one brand, so the plan limit and the branch code are checked without a race. */
+    void lockBrand(UUID brandId) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 22))", rs -> { }, brandId.toString());
+    }
+
+    /** Clinics of the brand plus add-branch jobs that have not made their clinic yet (they hold a place too). */
+    long branchesInUse(UUID brandId, String ownerEmail, String brandName) {
+        Long n = jdbc.queryForObject("SELECT (SELECT count(*) FROM tenants WHERE brand_id = ?) + " + PENDING_BRANCH_JOBS, Long.class,
+                brandId, ownerEmail, brandName);
+        return n == null ? 0 : n;
+    }
+
+    private static final String PENDING_BRANCH_JOBS = "(SELECT count(*) FROM master.provisioning_jobs WHERE source_tenant_id IS NOT NULL " +
+            "AND created_tenant_id IS NULL AND status IN ('queued','running','failed') AND owner_email = ?::citext AND brand_name = ?)";
+
+    boolean branchCodeTaken(UUID brandId, String ownerEmail, String brandName, String code) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM tenants WHERE brand_id = ? AND lower(branch_code) = lower(?)) " +
+                        "OR EXISTS (SELECT 1 FROM master.provisioning_jobs WHERE source_tenant_id IS NOT NULL AND status IN ('queued','running','failed') " +
+                        "AND owner_email = ?::citext AND brand_name = ? AND lower(branch_code) = lower(?))",
+                Boolean.class, brandId, code, ownerEmail, brandName, code));
+    }
+
+    boolean slugTaken(String slug) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM tenants WHERE slug = ?::citext) " +
+                "OR EXISTS (SELECT 1 FROM master.provisioning_jobs WHERE tenant_slug = ?::citext AND status IN ('queued','running','failed'))",
+                Boolean.class, slug, slug));
+    }
+
+    /** The region of a clinic this owner owns; empty when it is not theirs (or does not exist). */
+    Optional<String> regionOfOwnedClinic(UUID ownerId, UUID tenantId) {
+        return jdbc.query("SELECT t.region_code FROM tenants t JOIN brands b ON b.id = t.brand_id WHERE t.id = ? AND b.owner_id = ?",
+                (rs, i) -> rs.getString(1), tenantId, ownerId).stream().findFirst();
+    }
+
+    /** This owner's add-branch jobs that are not finished, newest first. */
+    List<Job> openBranchJobs(String ownerEmail) {
+        return jdbc.query("SELECT " + JOB_COLUMNS + "FROM master.provisioning_jobs WHERE source_tenant_id IS NOT NULL AND status <> 'done' " +
+                "AND owner_email = ?::citext ORDER BY created_at DESC", jobMapper(), ownerEmail);
+    }
+
+    /** PHL-032: the edition the job provisions (a new job is a clinic until this says otherwise). */
+    void setJobEdition(UUID jobId, String edition) {
+        jdbc.update("UPDATE master.provisioning_jobs SET edition = ? WHERE id = ?", edition, jobId);
+    }
+
+    /** PHL-032: a pharmacy edition's tenant is facility_type 'pharmacy' (the column defaults to 'clinic'). */
+    void setFacilityType(UUID tenantId, String facilityType) {
+        jdbc.update("UPDATE tenants SET facility_type = ? WHERE id = ?", facilityType, tenantId);
+    }
+
+    /** PHL-032: the pharmacy plan by code (inactive, so never in the catalogue); sold as a live subscription, no trial. */
+    void subscribeToPlan(UUID tenantId, String planCode, String currency) {
+        jdbc.update("INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date, plan_version, status) " +
+                        "SELECT ?, p.id, 0, ?, current_date + 30, p.version, 'active' FROM master.plans p WHERE p.code = ? " +
+                        "ON CONFLICT (tenant_id) DO NOTHING",
+                tenantId, currency, planCode);
+    }
+
+    void deleteSubscription(UUID tenantId) {
+        jdbc.update("DELETE FROM master.subscriptions WHERE tenant_id = ?", tenantId);
     }
 
     /** Only meaningful for an enterprise-path job — self-serve jobs have nothing to gate. */
@@ -179,12 +278,6 @@ class ProvisioningRepository {
                 .stream().findFirst();
     }
 
-    UUID insertOwner(String name, String email) {
-        UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO owners (id, name, email, status) VALUES (?,?,?,'active')", id, name, email);
-        return id;
-    }
-
     /** Any one existing region tells us the owner's region lock (NB-002) — an owner never spans regions. */
     Optional<String> findAnyRegionForOwner(UUID ownerId) {
         return jdbc.query("SELECT t.region_code AS region FROM tenants t JOIN brands b ON t.brand_id = b.id WHERE b.owner_id = ? LIMIT 1",
@@ -213,27 +306,22 @@ class ProvisioningRepository {
         return id;
     }
 
-    /** Mirrors ApiTestBase's seedFullAccessRole shape — full grants on every module an Owner's shadow staff row needs. */
-    /** PLT-016: one preset role from RolePresets (only the Owner preset is built_in). */
-    void insertPresetRole(UUID tenantId, String name, boolean builtIn, String grantsJson, String presetCode, int presetVersion) {
-        jdbc.update("INSERT INTO roles (id, tenant_id, name, built_in, grants, preset_code, preset_version) VALUES (?,?,?,?,?::jsonb,?,?)",
-                UUID.randomUUID(), tenantId, name, builtIn, grantsJson, presetCode, presetVersion);
+    /** PLT-022: a branch gets the id the owner was told, its own timezone, code and address, and the source clinic's region
+     * (pinned: never taken from the request), locale, facility type, billing mode, specialties and day start. */
+    UUID insertBranchTenant(ProvisioningModels.Branch b, String slug, String name, UUID brandId) {
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, brand_id, timezone, branch_code, branch_label, branch_address, " +
+                        "default_locale, facility_type, billing_mode, specialties, day_start_minute) " +
+                        "SELECT ?,?,?,s.region_code,'provisioning',?,?,?,?,?, s.default_locale, s.facility_type, s.billing_mode, s.specialties, s.day_start_minute " +
+                        "FROM tenants s WHERE s.id = ?",
+                b.plannedTenantId(), slug, name, brandId, b.timezone(), b.code(), name, b.address(), b.sourceTenantId());
+        return b.plannedTenantId();
     }
 
+    /** Mirrors ApiTestBase's seedFullAccessRole shape — full grants on every module an Owner's shadow staff row needs. */
     boolean hasBuiltInRole(UUID tenantId) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM roles WHERE tenant_id = ? AND built_in = true", Integer.class, tenantId);
         return count != null && count > 0;
-    }
-
-    /** Same backfill V37's migration gave every already-provisioned tenant — a brand-new tenant
-     * needs this too, so check-in never breaks for a doctor nobody has assigned a department to yet.
-     * No department_workflow_selection row is seeded here — DepartmentService.resolveStatusSequence()
-     * already falls back to vitals+consultation (the platform's clinic_walkin default) when a
-     * department hasn't picked a template yet. */
-    void seedDefaultDepartment(UUID tenantId) {
-        jdbc.update("INSERT INTO departments (tenant_id, name, is_default) VALUES (?,'General',true)",
-                tenantId);
     }
 
     /** The Owner role seed_masters just created — verify_invite_owner needs its id to invite the owner as staff. */
@@ -252,21 +340,8 @@ class ProvisioningRepository {
     }
 
     // ---- rollback (NB-259) — reverse of the creates above, same FK-ordering constraints ----
-
-    void deleteBuiltInRole(UUID tenantId) {
-        jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND (built_in = true OR preset_code IS NOT NULL)", tenantId);
-    }
-
-    /** Reverses seedDefaultDepartment — departments.tenant_id references tenants(id), so this must
-     * run before undoCreateTenant's deleteTenant or that DELETE hits a FK violation. */
-    void deleteDepartments(UUID tenantId) {
-        jdbc.update("DELETE FROM departments WHERE tenant_id = ?", tenantId);
-    }
-
-    /** NB-353's undo of verify_invite_owner — a fatal later-step failure must leave no login behind either. */
-    void deleteStaffByTenant(UUID tenantId) {
-        jdbc.update("DELETE FROM staff WHERE tenant_id = ?", tenantId);
-    }
+    // PLT-036: owners, roles, staff and departments are created and rolled back through common.ProvisioningSeeds
+    // (their owning modules); this repository writes platform's own tables only.
 
     void deleteTenant(UUID tenantId) {
         jdbc.update("DELETE FROM tenants WHERE id = ?", tenantId);
@@ -276,16 +351,12 @@ class ProvisioningRepository {
         jdbc.update("DELETE FROM brands WHERE id = ?", brandId);
     }
 
-    void deleteOwner(UUID ownerId) {
-        jdbc.update("DELETE FROM owners WHERE id = ?", ownerId);
-    }
-
     private RowMapper<Job> jobMapper() {
         return (rs, i) -> {
             Timestamp approvedAt = rs.getTimestamp("approved_at");
             return new Job(
                     UUID.fromString(rs.getString("id")),
-                    UUID.fromString(rs.getString("requested_by")),
+                    uuidOrNull(rs.getString("requested_by")),
                     rs.getString("tenant_slug"),
                     rs.getString("tenant_name"),
                     rs.getString("region"),
@@ -301,7 +372,12 @@ class ProvisioningRepository {
                     rs.getBoolean("owner_newly_created"),
                     rs.getBoolean("brand_newly_created"),
                     approvedAt == null ? null : approvedAt.toInstant(),
-                    uuidOrNull(rs.getString("approved_by")));
+                    uuidOrNull(rs.getString("approved_by")),
+                    rs.getString("source_tenant_id") == null ? null : new ProvisioningModels.Branch(
+                            uuidOrNull(rs.getString("source_tenant_id")), uuidOrNull(rs.getString("requested_by_staff")),
+                            uuidOrNull(rs.getString("planned_tenant_id")), rs.getString("branch_code"), rs.getString("branch_address"),
+                            rs.getString("timezone"), List.of((String[]) rs.getArray("copy_sections").getArray())),
+                    rs.getString("edition"));
         };
     }
 

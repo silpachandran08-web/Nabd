@@ -1,4 +1,4 @@
-package com.nabd.hms.patient;
+package com.nabd.hms.queue;
 
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
@@ -21,6 +21,7 @@ import java.util.UUID;
  * migration time. Restores updated_at = created_at for rows whose updated_at is exactly one of the given stamps.
  * Touches no other column. Batches of 10k, each in its own transaction with nabd.skip_updated_at (V225) so the
  * trigger does not re-stamp. One audit row per tenant run. Re-runnable: finished rows no longer match.
+ * PLT-036: lives in the queue module, the only writer of queue_entries (it was in patient).
  * Enable with app.maintenance.last-visit-repair.stamps=<ISO instant>[,...] (the migration times, from flyway_schema_history).
  */
 @Component
@@ -35,7 +36,7 @@ public class LastVisitRepairJob implements ApplicationRunner {
     private final AuditService audit;
     private final List<Instant> stamps;
 
-    LastVisitRepairJob(JdbcTemplate jdbc, TransactionTemplate tx, TenantContext tenantContext, AuditService audit,
+    public LastVisitRepairJob(JdbcTemplate jdbc, TransactionTemplate tx, TenantContext tenantContext, AuditService audit,
                        @org.springframework.beans.factory.annotation.Value("${app.maintenance.last-visit-repair.stamps}") String stamps) {
         this.jdbc = jdbc;
         this.tx = tx;

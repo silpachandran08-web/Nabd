@@ -59,6 +59,17 @@ export default function PlatformHomePage() {
           </ul>
         )}
       </div>
+
+      {/* PLT-054: every operator, whatever the role: first week after joining, then yearly */}
+      <div className={styles.card}>
+        <ul className={styles.navList}>
+          <li>
+            <Link className={styles.navLink} href="/platform/training">
+              <Icon name="shield" size={16} /> Data safety training
+            </Link>
+          </li>
+        </ul>
+      </div>
     </main>
   );
 }

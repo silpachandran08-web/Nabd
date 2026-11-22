@@ -14,5 +14,6 @@
   "urgent-500": "#ff7a45", "urgent-tint": "rgba(255, 122, 69, 0.14)",
   "text-primary": "#ffffff", "text-secondary": "#a6b0b8", "text-tertiary": "#8b97a0", "text-disabled": "#657078",
   "focus-ring": "#2ed3e0",
+  "chart-1": "#27a2b1", "chart-2": "#8c611a", "chart-3": "#ad6ffa", "chart-4": "#00b502", "chart-5": "#dc2d72", "chart-6": "#0a64cf",
   "shadow-md": "0 12px 32px rgba(0, 0, 0, 0.55)"
 }

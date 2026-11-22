@@ -20,6 +20,8 @@ public record ProvisioningJobResponse(
         /** Reveal-once, top-level Owner account invite (NB-354/NB-350) — lets the same owner log into
          * every clinic they own from one place. Null if this owner already activated their account
          * (e.g. this is their second clinic). Accept at /owner/accept-invite/{token}. */
-        String ownerAccountInviteToken
+        String ownerAccountInviteToken,
+        /** PHL-032: clinic or pharmacy. */
+        String edition
 ) {
 }

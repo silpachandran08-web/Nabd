@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import styles from "./audit.module.css";
 import Dialog from "../../../components/ui/Dialog";
 import Icon from "../../../components/ui/Icon";
@@ -214,6 +215,8 @@ export default function AuditLogPage() {
           <p className={styles.subtitle}>Immutable, append-only and cross-tenant — every platform action. Every search is itself audited; 50 entries per page.</p>
         </div>
         {!loading && !error && !forbidden && <span className={styles.count}>{rows.length} loaded</span>}
+        {/* PLT-054: the DPO's regulatory-watch log and the team's training state (same audit_compliance:view gate) */}
+        {!forbidden && <Link className={styles.secondaryBtn} href="/platform/audit/compliance">Regulatory watch &amp; training</Link>}
       </div>
 
       {!forbidden && (

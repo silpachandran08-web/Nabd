@@ -5,7 +5,7 @@ import { useState } from "react";
 import styles from "./packages.module.css";
 import { api, ApiError } from "../../lib/api";
 import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
-import { EMPTY_ITEM, money, type ItemDraft, type PackageT, type StaffOption } from "./packagesModel";
+import { EMPTY_ITEM, money, type ChargeHeadT, type ItemDraft, type PackageT, type StaffOption } from "./packagesModel";
 
 type Draft = {
   name: string; type: string; speciality: string; description: string; price: string; taxInclusive: boolean; validityDays: string;
@@ -18,11 +18,11 @@ const EMPTY_DRAFT: Draft = {
 const draftOf = (p: PackageT): Draft => ({
   name: p.name, type: p.packageType, speciality: p.speciality ?? "", description: p.description ?? "", price: String(p.price), taxInclusive: p.taxInclusive,
   validityDays: String(p.validityDays), validityStarts: p.validityStarts, graceDays: String(p.graceDays), refundNote: p.refundNote ?? "", doctorIds: p.eligibleDoctorIds,
-  items: p.items.map((i) => ({ itemType: i.itemType, name: i.name, quantity: String(i.quantity), unitListPrice: String(i.unitListPrice), taxRatePercent: String(i.taxRatePercent) })),
+  items: p.items.map((i) => ({ itemType: i.itemType, name: i.name, quantity: String(i.quantity), unitListPrice: String(i.unitListPrice), taxRatePercent: String(i.taxRatePercent), chargeCatalogueId: i.chargeCatalogueId ?? "" })),
 });
 
-export default function PackageForm({ editing, staff, onCancel, onSaved }: {
-  editing: PackageT | null; staff: StaffOption[]; onCancel: () => void; onSaved: () => Promise<unknown>;
+export default function PackageForm({ editing, staff, heads, onCancel, onSaved }: {
+  editing: PackageT | null; staff: StaffOption[]; heads: ChargeHeadT[]; onCancel: () => void; onSaved: () => Promise<unknown>;
 }) {
   const [d, setD] = useState<Draft>(() => (editing ? draftOf(editing) : { ...EMPTY_DRAFT, items: [{ ...EMPTY_ITEM }] }));
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((prev) => ({ ...prev, [k]: v }));
@@ -50,7 +50,7 @@ export default function PackageForm({ editing, staff, onCancel, onSaved }: {
         price: Number(d.price) || 0, taxInclusive: d.taxInclusive, validityDays: Number(d.validityDays) || 1,
         validityStarts: d.validityStarts, graceDays: Number(d.graceDays) || 0, refundNote: d.refundNote || null,
         eligibleDoctorIds: d.doctorIds,
-        items: items.map((i) => ({ itemType: i.itemType, name: i.name, quantity: Number(i.quantity) || 1, unitListPrice: Number(i.unitListPrice) || 0, taxRatePercent: Number(i.taxRatePercent) || 0 })),
+        items: items.map((i) => ({ itemType: i.itemType, name: i.name, quantity: Number(i.quantity) || 1, unitListPrice: Number(i.unitListPrice) || 0, taxRatePercent: Number(i.taxRatePercent) || 0, chargeCatalogueId: i.chargeCatalogueId || null })),
       };
       await (editing ? api.patch(`/packages/${editing.id}`, body) : api.post("/packages", body));
       await onSaved();
@@ -121,6 +121,16 @@ export default function PackageForm({ editing, staff, onCancel, onSaved }: {
             </div>
             <button type="button" className={styles.btnSmall} onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}>Remove</button>
           </div>
+          {/* FIN-025: the linked price-list item decides the component's tax class; a picker, never a raw id. Absent when the clinic has no price list. */}
+          {heads.length > 0 && (
+            <div className={`${styles.field} ${styles.fieldFlush}`}>
+              <label className={styles.label} htmlFor={`pkf-head-${idx}`}>Price-list item (decides the tax)</label>
+              <select id={`pkf-head-${idx}`} className={styles.select} value={item.chargeCatalogueId} onChange={(e) => setItem(idx, { chargeCatalogueId: e.target.value })}>
+                <option value="">Not linked: the typed tax % applies</option>
+                {heads.map((h) => <option key={h.id} value={h.id}>{h.name} · {h.code}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       ))}
       <button type="button" className={styles.btn} onClick={() => setItems((prev) => [...prev, { ...EMPTY_ITEM }])}>+ Add an item</button>

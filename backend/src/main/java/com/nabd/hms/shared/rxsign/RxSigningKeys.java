@@ -39,20 +39,26 @@ public class RxSigningKeys {
 
     private final List<ECKey> keys;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public RxSigningKeys(Environment env) {
-        this.keys = List.copyOf(load(env));
+        this(env, "app.rx", MISSING);
     }
 
-    private static List<ECKey> load(Environment env) {
-        String file = env.getProperty("app.rx.keys-file", "");
-        String json = env.getProperty("app.rx.keys-json", "");
+    /** ADM-016: the same loader for another ES256 key set ({@code prefix}.keys-file / .keys-json); not a bean, its user holds it. */
+    public RxSigningKeys(Environment env, String prefix, String missing) {
+        this.keys = List.copyOf(load(env, prefix, missing));
+    }
+
+    private static List<ECKey> load(Environment env, String prefix, String missing) {
+        String file = env.getProperty(prefix + ".keys-file", "");
+        String json = env.getProperty(prefix + ".keys-json", "");
         try {
             if (!file.isBlank()) json = Files.readString(Path.of(file), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("RX_KEYS_FILE is set but unreadable: " + file);
+            throw new IllegalStateException(prefix + ".keys-file is set but unreadable: " + file);
         }
         if (json.isBlank()) {
-            if (env.acceptsProfiles(Profiles.of("prod"))) throw new IllegalStateException(MISSING);
+            if (env.acceptsProfiles(Profiles.of("prod"))) throw new IllegalStateException(missing);
             return List.of(ephemeral());
         }
         List<ECKey> out = new ArrayList<>();

@@ -84,6 +84,10 @@ public class CheckoutController {
     @PreAuthorize("hasAuthority('billing:create')")
     public InvoiceResponse otcCheckout(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req,
                                         jakarta.servlet.http.HttpServletRequest http) {
+        // PHL-019: taking money needs the same grant as POST /invoices/{id}/payments
+        if (req.payments() != null && !req.payments().isEmpty() && !has(jwt, "billing:edit")) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "payment-not-permitted", "Payment not permitted", "Your role cannot record payments.");
+        }
         return service.otcCheckout(tenantId, staffId, canDiscount(jwt), RequestMeta.clientIp(http), req);
     }
 
@@ -120,7 +124,11 @@ public class CheckoutController {
 
     /** REC-043 / FIN-003: the billing.discount grant gates every price-bearing change; CheckoutService enforces it per field. */
     private boolean canDiscount(Jwt jwt) {
+        return has(jwt, "billing.discount");
+    }
+
+    private static boolean has(Jwt jwt, String permission) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
-        return permissions != null && permissions.contains("billing.discount");
+        return permissions != null && permissions.contains(permission);
     }
 }

@@ -47,6 +47,15 @@ class OwnerPlanRepository {
                 tenantId).stream().findFirst();
     }
 
+    /** COM-015: the allowance of the plan version the subscription is pinned to; empty = none configured. */
+    java.util.OptionalLong whatsappMessageAllowance(UUID tenantId) {
+        return jdbc.query("""
+                SELECT pv.whatsapp_message_allowance FROM master.subscriptions s
+                JOIN master.plan_versions pv ON pv.plan_id = s.plan_id AND pv.version = s.plan_version
+                WHERE s.tenant_id = ? AND pv.whatsapp_message_allowance IS NOT NULL""",
+                (rs, i) -> rs.getLong(1), tenantId).stream().mapToLong(Long::longValue).findFirst();
+    }
+
     /** Active plans sold in the clinic's market and currency, current version, cheapest first. */
     List<Plan> offered(String region, String currency) {
         return jdbc.query("""

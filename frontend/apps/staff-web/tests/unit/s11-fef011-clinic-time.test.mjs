@@ -137,3 +137,16 @@ test("AC3: eslint fails toLocale*String / Intl.DateTimeFormat in migrated files,
   const [mod] = await eslint.lintText('export const c = new Intl.DateTimeFormat("en-GB");', { filePath: "app/lib/clinicTime.ts" });
   assert.equal(mod.messages.filter((m) => m.ruleId === "no-restricted-syntax").length, 0);
 });
+
+test("T1-BUG-14: before the configured zone arrives, dates use the region's zone, not UTC", async () => {
+  let answer;
+  const pending = loadClinicTimeZone(() => new Promise((r) => { answer = r; }), "IN", "t-bug14");
+  assert.equal(getClinicTimeZone(), null, "still not loaded: screens that wait for the zone keep waiting");
+  assert.equal(formatClinicDate("2019-03-04T18:30:00Z"), "05 Mar 2019", "midnight in Kolkata, not the UTC day before");
+  assert.equal(clinicToday(), toClinicDateTime(Date.now(), "Asia/Kolkata").date);
+  answer({ ok: true, status: 200, json: async () => ({ timezone: "Asia/Dubai" }) });
+  assert.equal(await pending, "Asia/Dubai");
+  assert.equal(formatClinicDate("2019-03-04T18:30:00Z"), "04 Mar 2019", "the configured zone wins once known (22:30 in Dubai)");
+  resetClinicTimeZone();
+  assert.equal(formatClinicDate("2019-03-04T18:30:00Z"), "04 Mar 2019", "no region known: UTC, as before");
+});

@@ -1648,6 +1648,116 @@
     "reviewer": null,
     "signedOn": null
    }
+  },
+  {
+   "id": "PHL-SA-025",
+   "title": "FIN-025 WE-02 tax-inclusive bundle: 4 laser sessions 800 + 1 consultation 300 + 1 serum 250 (3,750 list) sold at 2,999.00 incl. VAT; VAT 15% backed out per line, consultation exempt, total equals the bundle price (constructed figures: the FRD's WE-02 sheet was not in the repo)",
+   "kind": "invoice",
+   "package": {
+    "bundleMinor": 299900,
+    "taxInclusive": true,
+    "listValueMinor": [
+     320000,
+     30000,
+     25000
+    ]
+   },
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "pkg-laser-session",
+      "quantity": 4,
+      "grossMinor": 255915,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     },
+     {
+      "key": "pkg-consultation",
+      "quantity": 1,
+      "grossMinor": 23992,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     },
+     {
+      "key": "pkg-serum",
+      "quantity": 1,
+      "grossMinor": 19993,
+      "category": "TAXABLE",
+      "ratePercent": "15",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "pkg-laser-session",
+      "discountMinor": 0,
+      "taxableMinor": 222535,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 222535,
+        "amountMinor": 33380
+       }
+      ]
+     },
+     {
+      "key": "pkg-consultation",
+      "discountMinor": 0,
+      "taxableMinor": 23992,
+      "taxes": []
+     },
+     {
+      "key": "pkg-serum",
+      "discountMinor": 0,
+      "taxableMinor": 17385,
+      "taxes": [
+       {
+        "type": "VAT",
+        "ratePercent": "15.00",
+        "taxableMinor": 17385,
+        "amountMinor": 2608
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 263912,
+    "discountMinor": 0,
+    "taxMinor": 35988,
+    "roundOffMinor": 0,
+    "totalMinor": 299900
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "VAT",
+      "ratePercent": "15.00",
+      "taxableMinor": 239920,
+      "taxMinor": 35988
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "PHL-SA-1",
+    "reviewer": null,
+    "signedOn": null
+   }
   }
  ]
 }

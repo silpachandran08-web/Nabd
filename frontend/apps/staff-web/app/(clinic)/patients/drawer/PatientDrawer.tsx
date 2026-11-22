@@ -27,6 +27,7 @@ export default function PatientDrawer({ patientId, row, perms, onClose, onRegist
   const canDental = perms.dentalView;
   const canDerm = perms.dermView;
   const tPhotos = useTranslations("shell.dermPhotos");
+  const tPaper = useTranslations("shell.paperEntry");
   const drawerError = detailQ.isError ? (detailQ.error instanceof ApiError ? "Couldn't load this patient." : "Couldn't reach the server. Check your connection and try again.") : null;
   return (
     <Dialog title={drawerPatient?.name ?? "Patient"} size="drawer" onClose={onClose}>
@@ -37,7 +38,7 @@ export default function PatientDrawer({ patientId, row, perms, onClose, onRegist
       ) : (
         <>
           <div className={styles.drawerHeader}>
-            <span className={styles.drawerMeta}>{drawerPatient.mrn} · {age(drawerPatient.dob)} · {drawerPatient.gender}</span>
+            <span className={styles.drawerMeta}>{drawerPatient.mrn} · {age(drawerPatient.dob)}{drawerPatient.dobYearOnly ? ` (${tPaper("yearOnly")})` : ""} · {drawerPatient.gender}</span>
             {visit.action}
           </div>
           {visit.below}

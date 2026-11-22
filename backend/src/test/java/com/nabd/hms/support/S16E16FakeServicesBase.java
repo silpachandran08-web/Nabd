@@ -34,6 +34,8 @@ public abstract class S16E16FakeServicesBase extends ApiTestBase {
     public static final Map<String, String> VAULT = new ConcurrentHashMap<>();
     /** The clinic the fake fleet answer names (set by the COM-022 test). */
     public static volatile UUID fleetTenant = UUID.randomUUID();
+    /** COM-015: the fake gateway's answer to GET /internal/v1/usage (set by the COM-015 test). */
+    public static volatile String usageReply = "{\"month\":\"2026-11\",\"channels\":[],\"whatsappCount\":0}";
 
     private static final HttpServer RAZORPAY = server(ex -> {
         String good = "Basic " + Base64.getEncoder().encodeToString((KEY_ID + ":" + KEY_SECRET).getBytes(StandardCharsets.UTF_8));
@@ -56,6 +58,7 @@ public abstract class S16E16FakeServicesBase extends ApiTestBase {
                     + "\"templates\":[{\"id\":\"" + UUID.randomUUID() + "\",\"name\":\"reminder\",\"language\":\"en\",\"category\":\"UTILITY\",\"status\":\"approved\"}],\"unknownField\":1}");
         }
         if (path.endsWith("/quality")) return new Reply(200, "{\"quality\":\"Medium\"}");
+        if (path.endsWith("/internal/v1/usage")) return new Reply(200, usageReply);
         return new Reply(200, "{\"items\":[{\"senderAccountId\":\"" + UUID.randomUUID() + "\",\"tenantId\":\"" + fleetTenant + "\",\"kind\":\"TENANT\",\"region\":\"in\",\"status\":\"active\","
                 + "\"rating\":\"YELLOW\",\"tier\":\"TIER_250\",\"throttleMode\":\"bulk_paused\",\"deliveredRate7d\":0.8,\"sends7d\":10}],\"nextCursor\":null}");
     });

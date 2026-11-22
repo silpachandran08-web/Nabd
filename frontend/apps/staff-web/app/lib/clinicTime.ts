@@ -11,6 +11,7 @@ export const REGION_DEFAULT_TZ: Record<string, string> = {
 };
 
 let zone: string | null = null;
+let regionZone: string | null = null; // T1-BUG-14: the region's zone, used for the moment before the configured zone arrives
 let nowMs: () => number = () => Date.now();
 const listeners = new Set<() => void>();
 let ready: Promise<string> | null = null;
@@ -39,6 +40,7 @@ export function setClinicNow(fn?: () => number): void {
 /** Test reset: forget the loaded zone and the one-time warning. */
 export function resetClinicTimeZone(): void {
   zone = null;
+  regionZone = null;
   ready = null;
   readyFor = null;
   warned = false;
@@ -68,7 +70,7 @@ function formatter(tz: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeF
   return f;
 }
 
-const tzOr = (tz?: string | null) => tz ?? zone ?? "UTC";
+const tzOr = (tz?: string | null) => tz ?? zone ?? regionZone ?? "UTC";
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A calendar date ("2026-03-10") is not an instant: it is shown as-is, never shifted by any zone. */
@@ -126,6 +128,7 @@ async function configuredZone(fetcher: Fetcher): Promise<unknown> {
 export function loadClinicTimeZone(fetcher: Fetcher, region: string | null | undefined, tenantKey = ""): Promise<string> {
   if (ready && readyFor === tenantKey) return ready;
   readyFor = tenantKey;
+  regionZone = REGION_DEFAULT_TZ[region ?? ""] ?? null;
   ready = configuredZone(fetcher).then((configured) => {
     const { tz, fallback } = resolveClinicTimeZone(configured ?? null, region);
     // Warn only when Core really answered with a null/unusable tenants.timezone; a failed request is not a config problem.

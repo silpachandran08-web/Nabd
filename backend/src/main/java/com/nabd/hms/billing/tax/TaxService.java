@@ -28,9 +28,14 @@ public class TaxService {
     public static final String INVOICE = "invoice";
     public static final String BILL_OF_SUPPLY = "bill_of_supply";
 
-    /** A line to tax. For a line already on the invoice pass {@code existing}=true: its stored class and rate are used, never re-resolved. */
+    /** A line to tax. For a line already on the invoice pass {@code existing}=true: its stored class and rate are used, never re-resolved.
+     * FIN-025: {@code forceInclusive} (a package component) makes the bundle's price basis win over the head's own; null = the head decides. */
     public record InLine(String key, long grossMinor, UUID catalogueId, BigDecimal rate, boolean existing, String storedCategory,
-                         boolean storedInclusive, boolean storedInterState, String storedSacHsn) {
+                         boolean storedInclusive, boolean storedInterState, String storedSacHsn, Boolean forceInclusive) {
+        public InLine(String key, long grossMinor, UUID catalogueId, BigDecimal rate, boolean existing, String storedCategory,
+                      boolean storedInclusive, boolean storedInterState, String storedSacHsn) {
+            this(key, grossMinor, catalogueId, rate, existing, storedCategory, storedInclusive, storedInterState, storedSacHsn, null);
+        }
     }
 
     public record LineMeta(BigDecimal rate, String category, UUID ruleId, boolean inclusive, boolean interState, String sacHsn) {
@@ -79,6 +84,9 @@ public class TaxService {
         for (InLine l : lines) {
             LineMeta m = l.existing() ? stored(l)
                     : PharmacyTaxLines.apply(resolve(l, heads.get(l.catalogueId()), region.code(), today, clinicGstin, buyer), pharmacyInputs.get(l.catalogueId()));
+            if (!l.existing() && l.forceInclusive() != null) {
+                m = new LineMeta(m.rate(), m.category(), m.ruleId(), l.forceInclusive(), m.interState(), m.sacHsn());
+            }
             if (BILL_OF_SUPPLY.equals(docType) && !l.existing()) { // no tax is charged, so the line must not show a rate
                 m = new LineMeta(BigDecimal.ZERO, m.category(), null, false, false, m.sacHsn());
             }

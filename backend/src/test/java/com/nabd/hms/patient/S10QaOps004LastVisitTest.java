@@ -2,6 +2,7 @@ package com.nabd.hms.patient;
 
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.patient.registry.RegistryReconciler;
+import com.nabd.hms.queue.LastVisitRepairJob;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

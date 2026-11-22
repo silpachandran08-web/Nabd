@@ -149,7 +149,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: architecture-report, path: "architecture-report.json\narch.md\ntenant-params.json" }
       - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
-        name: architecture gate (mode from ci/architecture-gate.json; report only until its dates are set)
+        name: architecture gate (ci/architecture-gate.json; PLT-036 single-writer and new SQL-ownership findings always fail, the rest by its dates)
         run: python3 scripts/ci/arch.py gate backend/target/architecture-violations.json
 
   stage3-integration:

@@ -10,8 +10,14 @@ import java.util.UUID;
  */
 public final class SessionRevocation {
 
-    /** Tenant statuses that end every session and refuse refresh / workspace select (same set login refuses). */
+    /** Tenant statuses whose start ends every live session (TenantLifecycleService revokes on entering one). */
     public static final Set<String> INACTIVE_TENANT_STATUSES = Set.of("suspended", "offboarded");
+
+    /**
+     * ADM-020: the one status that signs in nobody and refuses refresh / workspace select. A suspended clinic is read-only
+     * instead (platform's SuspendedTenantWriteBlock answers 423 on writes), so its staff sign in again after the revoke.
+     */
+    public static final String CLOSED_TENANT_STATUS = "offboarded";
 
     private SessionRevocation() {
     }

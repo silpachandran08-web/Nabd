@@ -62,9 +62,12 @@ public class ImportPipeline {
     private final ActorDirectory actors;
     private final ObjectMapper json;
     private final ObjectProvider<ImportWorker> worker;
+    private final ImportRows rows;
+    static final List<String> STAGED = List.of("patients", "visit_history", "drugs", "stock");
 
     ImportPipeline(ImportRepository repo, TenantContext tenant, FieldCipher cipher, DataGatePort gate, PatientDirectory patients,
-                   ClinicClock clock, AuditService audit, ActorDirectory actors, ObjectMapper json, ObjectProvider<ImportWorker> worker) {
+                   ClinicClock clock, AuditService audit, ActorDirectory actors, ObjectMapper json, ObjectProvider<ImportWorker> worker, ImportRows rows) {
+        this.rows = rows;
         this.repo = repo;
         this.tenant = tenant;
         this.cipher = cipher;
@@ -86,7 +89,7 @@ public class ImportPipeline {
         if (data == null || data.length == 0) throw unprocessable("EMPTY_FILE", "The file is empty.");
         if (data.length > MAX_BYTES) throw new ApiException(HttpStatus.CONTENT_TOO_LARGE, "FILE_TOO_LARGE", "File too large", "Files up to 25 MB are accepted.");
         String format = ImportFileReader.sniff(data, declaredFormat);
-        if (format == null) throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_FILE", "Unsupported file", "Upload an .xlsx or .csv file.");
+        if (format == null) throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_FILE", "Unsupported file", "Upload an .xlsx or .csv file, or the export .zip of your old software.");
         String name = cleanName(fileName);
         UUID id = UUID.randomUUID();
         repo.insertUpload(id, name, format, data.length, cipher.encrypt(data, uploadAad(id)), staffId);
@@ -96,14 +99,32 @@ public class ImportPipeline {
     @Transactional
     public ImportJobResponse create(UUID staffId, ImportJobRequest req) {
         gate.requireRealData();
-        if (!"patients".equals(req.importType())) throw unprocessable("UNSUPPORTED_IMPORT_TYPE", "Only patient imports use the staged pipeline.");
+        String type = req.importType();
+        String source = req.source() == null ? SourcePresets.GENERIC : req.source();
+        if (!STAGED.contains(type)) throw unprocessable("UNSUPPORTED_IMPORT_TYPE", "Patients, past visits, the drug list and opening stock use the staged pipeline.");
+        if (("drugs".equals(type) || "stock".equals(type)) && !rows.pharmacyItems()) {
+            throw unprocessable("PHARMACY_NOT_ENABLED", "Set the clinic pharmacy to Hybrid or In-house before importing a drug list or stock.");
+        }
         ImportRepository.Upload up = repo.findUpload(req.uploadId()).orElseThrow(() -> ApiException.notFound());
         if (req.sourceFormat() != null && !req.sourceFormat().equals(up.format())) {
             throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_FILE", "Unsupported file", "The file is not in the declared format.");
         }
         if (repo.uploadUsed(up.id())) throw new ApiException(HttpStatus.CONFLICT, "UPLOAD_USED", "Upload already used", "This upload already has an import job.");
-        UUID id = repo.insertJob(up.fileName(), up.id(), staffId);
-        auditAs(staffId, "import.created", id, Map.of("importType", "patients"));
+        // ADM-013: a named old system must be its standard export; say so now (422) instead of a failed job later. The upload stays for another try.
+        // shortcut: this reads the file once here and again in the worker; keep the chosen table in a staging column if 25 MB uploads make that slow.
+        if (!SourcePresets.GENERIC.equals(source)) {
+            ImportFileReader.Table table;
+            try {
+                table = table(up, type, source);
+            } catch (IOException | RuntimeException e) {
+                throw unprocessable("FILE_UNREADABLE", "The file could not be read.");
+            }
+            if (table == null) {
+                throw unprocessable("UNKNOWN_LAYOUT", "The headings are not the standard export of that software for this kind of list. Choose 'Other software (CSV or Excel)' to match the columns yourself.");
+            }
+        }
+        UUID id = repo.insertJob(type, source, up.fileName(), up.id(), staffId);
+        auditAs(staffId, "import.created", id, Map.of("importType", type, "source", source));
         kickAfterCommit(id);
         return view(repo.findJob(id, false).orElseThrow());
     }
@@ -123,11 +144,11 @@ public class ImportPipeline {
         List<String> headers = headers(job);
         Map<String, String> byTarget = new LinkedHashMap<>();
         for (ImportColumn c : req.columns()) {
-            if (!ImportMapper.TARGETS.contains(c.target())) throw unprocessable("UNKNOWN_TARGET", "Unknown field to map to.");
+            if (!ImportMapper.targets(job.importType()).contains(c.target())) throw unprocessable("UNKNOWN_TARGET", "Unknown field to map to.");
             if (!headers.contains(c.source())) throw unprocessable("UNKNOWN_COLUMN", "A mapped column is not in the file.");
             if (byTarget.put(c.target(), c.source()) != null) throw unprocessable("DUPLICATE_TARGET", "A field is mapped twice.");
         }
-        List<String> missing = ImportMapper.REQUIRED.stream().filter(t -> !byTarget.containsKey(t)).toList();
+        List<String> missing = ImportMapper.missing(job.importType(), byTarget.keySet());
         if (!missing.isEmpty()) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "REQUIRED_FIELD_UNMAPPED", "Required field not mapped", "Map a column to: " + String.join(", ", missing));
         String mapping = mappingJson(headers, byTarget, fmt);
         repo.saveMapping(id, mapping);
@@ -141,6 +162,9 @@ public class ImportPipeline {
         if (!"dry_run".equals(job.status())) throw new ApiException(HttpStatus.CONFLICT, "DIFF_STALE", "The diff is stale", "The import is " + job.status() + "; run the dry run again.");
         if (Boolean.TRUE.equals(diff.get("needsMapping"))) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "REQUIRED_FIELD_UNMAPPED", "Required field not mapped", "Map every required column before committing.");
         List<ImportDecision> decisions = req == null || req.duplicateDecisions() == null ? List.of() : req.duplicateDecisions();
+        if (!decisions.isEmpty() && !"patients".equals(job.importType())) {
+            throw unprocessable("DECISIONS_NOT_SUPPORTED", "Only a patient import takes merge or create decisions; other duplicates are skipped.");
+        }
         for (ImportDecision d : decisions) {
             if (repo.setDecision(id, d.row(), d.action()) == 0) {
                 throw new ApiException(HttpStatus.CONFLICT, "DIFF_STALE", "The diff is stale", "A decision names a row that is not a possible duplicate in this diff.");
@@ -154,6 +178,7 @@ public class ImportPipeline {
     @Transactional
     public ImportDuplicatePage duplicates(UUID id, int afterRow, int limit) {
         Job job = repo.findJob(id, false).orElseThrow(() -> ApiException.notFound());
+        if (!"patients".equals(job.importType())) return new ImportDuplicatePage(List.of(), null); // ADM-013: no per-row review, duplicates are skipped
         Map<String, Integer> idx = columnIndex(job);
         String region = clock.region(tenant.current());
         List<ImportDuplicateRow> out = new ArrayList<>();
@@ -192,14 +217,17 @@ public class ImportPipeline {
         if (!"validating".equals(job.status())) return;
         ImportRepository.Upload up = repo.findUpload(job.uploadId()).orElse(null);
         if (up == null) { repo.setStatus(id, "failed", "UPLOAD_MISSING"); return; }
-        List<String[]> lines;
+        String source = job.source() == null ? SourcePresets.GENERIC : job.source();
+        ImportFileReader.Table table;
         try {
-            lines = ImportFileReader.read(cipher.decrypt(up.contentEnc(), uploadAad(up.id())), up.format());
+            table = table(up, job.importType(), source);
         } catch (IOException | RuntimeException e) {
             repo.setStatus(id, "failed", e instanceof IllegalArgumentException ? e.getMessage() : "FILE_UNREADABLE"); // codes like TOO_MANY_ROWS, never file content
             repo.deleteUpload(up.id());
             return;
         }
+        if (table == null) { repo.setStatus(id, "failed", "UNKNOWN_LAYOUT"); repo.deleteUpload(up.id()); return; }
+        List<String[]> lines = table.rows();
         if (lines.size() < 2) { repo.setStatus(id, "failed", "NO_ROWS"); repo.deleteUpload(up.id()); return; }
         List<String> headers = java.util.Arrays.asList(lines.get(0));
         List<Object[]> batch = new ArrayList<>();
@@ -209,7 +237,8 @@ public class ImportPipeline {
         }
         if (!batch.isEmpty()) repo.insertRows(id, batch);
         repo.deleteUpload(up.id());
-        repo.saveMapping(id, mappingJson(headers, ImportMapper.suggest(lines.get(0)), ImportMapper.DEFAULT_DATE_FORMAT));
+        Map<String, String> byTarget = SourcePresets.GENERIC.equals(source) ? ImportMapper.suggest(job.importType(), lines.get(0)) : SourcePresets.match(source, job.importType(), lines.get(0));
+        repo.saveMapping(id, mappingJson(headers, byTarget, ImportMapper.DEFAULT_DATE_FORMAT));
         repo.saveDryRun(id, repo.findJob(id, false).orElseThrow().mapping(), "{}", lines.size() - 1);
         dryRun(repo.findJob(id, false).orElseThrow());
     }
@@ -221,7 +250,7 @@ public class ImportPipeline {
         int total = job.rowsTotal() == null ? 0 : job.rowsTotal();
         List<Map<String, String>> sample = new ArrayList<>();
         Map<String, Object> diff = new LinkedHashMap<>();
-        if (!idx.keySet().containsAll(ImportMapper.REQUIRED)) { // auto-mapping missed a required column: the owner maps it by hand
+        if (!ImportMapper.missing(job.importType(), idx.keySet()).isEmpty()) { // auto-mapping missed a required column: the owner maps it by hand
             diff.putAll(Map.of("ready", 0, "duplicates", 0, "errors", 0, "total", total, "needsMapping", true));
             repo.saveDryRun(job.id(), job.mapping(), toJson(diff), total);
             return new ImportMappingResponse(diff, sample);
@@ -231,10 +260,23 @@ public class ImportPipeline {
         String fmt = dateFormat(job);
         Map<String, Integer> seen = new HashMap<>(); // phone|dob -> first row in the file
         int ready = 0, dup = 0, err = 0, after = 0;
+        ImportRows.Pass pass = "patients".equals(job.importType()) ? null : this.rows.pass(job.importType(), idx, fmt);
         while (true) {
             List<ImportRepository.Row> rows = repo.rowsAfter(job.id(), after, BATCH);
             if (rows.isEmpty()) break;
             after = rows.get(rows.size() - 1).rowNo();
+            if (pass != null) { // ADM-013: visits, drugs, stock
+                List<Object[]> labelled = new ArrayList<>();
+                for (ImportRepository.Row r : rows) {
+                    String[] cells = decode(job.id(), r);
+                    ImportRows.Verdict v = this.rows.check(pass, cells);
+                    labelled.add(new Object[]{v.outcome(), v.errorCode(), r.rowNo()});
+                    if ("ready".equals(v.outcome())) ready++; else if ("duplicate".equals(v.outcome())) dup++; else err++;
+                    if (sample.size() < 3) sample.add(sampleOf(job.importType(), cells, idx));
+                }
+                repo.setOutcomes(job.id(), labelled);
+                continue;
+            }
             Map<Integer, Result> results = new LinkedHashMap<>();
             java.util.Set<String> phones = new java.util.HashSet<>();
             for (ImportRepository.Row r : rows) {
@@ -242,7 +284,7 @@ public class ImportPipeline {
                 Result res = ImportMapper.normalize(cells, idx, fmt, region, today);
                 results.put(r.rowNo(), res);
                 if (res.rec() != null) phones.add(res.rec().phone());
-                if (sample.size() < 3) sample.add(sampleOf(cells, idx));
+                if (sample.size() < 3) sample.add(sampleOf(job.importType(), cells, idx));
             }
             java.util.Set<String> existing = patients.existingPhoneDobKeys(phones);
             List<Object[]> outcomes = new ArrayList<>();
@@ -303,9 +345,18 @@ public class ImportPipeline {
         return FieldCipher.Aad.of(tenant.current(), "data_import_uploads", "content_enc", id);
     }
 
-    private Map<String, String> sampleOf(String[] cells, Map<String, Integer> idx) {
+    /** The upload's table for this import: the only one of a csv / xlsx, or the zip entry that carries most of the source's layout; null = no such table. */
+    private ImportFileReader.Table table(ImportRepository.Upload up, String type, String source) throws IOException {
+        return ImportFileReader.bestTable(cipher.decrypt(up.contentEnc(), uploadAad(up.id())), up.format(), h -> {
+            if (SourcePresets.GENERIC.equals(source)) return 1;
+            Map<String, String> m = SourcePresets.match(source, type, h);
+            return m == null ? 0 : m.size();
+        });
+    }
+
+    private Map<String, String> sampleOf(String type, String[] cells, Map<String, Integer> idx) {
         Map<String, String> s = new LinkedHashMap<>();
-        for (String t : ImportMapper.TARGETS) if (idx.containsKey(t)) s.put(t, ImportMapper.cell(cells, idx, t));
+        for (String t : ImportMapper.targets(type)) if (idx.containsKey(t)) s.put(t, ImportMapper.cell(cells, idx, t));
         return s;
     }
 
@@ -355,7 +406,7 @@ public class ImportPipeline {
 
     private static String cleanName(String n) {
         String base = n == null ? "" : n.replace('\\', '/').substring(n.replace('\\', '/').lastIndexOf('/') + 1).replaceAll("\\p{Cntrl}", "").trim();
-        return base.isEmpty() ? "patients-import" : base.substring(0, Math.min(base.length(), 120));
+        return base.isEmpty() ? "import" : base.substring(0, Math.min(base.length(), 120));
     }
 
     private static ApiException unprocessable(String code, String detail) {

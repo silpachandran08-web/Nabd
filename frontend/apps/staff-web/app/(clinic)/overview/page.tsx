@@ -13,9 +13,11 @@ import { api, ApiError, reasonText } from "../../lib/api";
 import { DpaReacceptBanner } from "../../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
 import EtaAccuracyTile from "./EtaAccuracyTile";
+import FlowOverviewSection from "./FlowOverview";
 import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
+import { pharmacyKnown, useEntitlementsStatus } from "../../lib/entitlements";
 
 
 // Matches GET /v1/reports/overview (ReportsController.overview → OverviewResponse).
@@ -93,6 +95,10 @@ function OverviewInner() {
   const [now, setNow] = useState(0);
   const [dailySummary, setDailySummary] = useState(false);
   const [canDailySummary, setCanDailySummary] = useState(false);
+  // PHL-032: a pharmacy-only tenant has no queue or consultations, and the server refuses those reads: the patient-time cards are
+  // absent and never requested. Decided only once the entitlements have answered, so nothing is fetched and then taken away.
+  const { ent, settled } = useEntitlementsStatus();
+  const clinical = settled && !pharmacyKnown(ent); // a failed answer falls back to the edition last seen on this device (T1-BUG-15)
 
   const load = useCallback(async () => {
     setError(null);
@@ -202,6 +208,8 @@ function OverviewInner() {
         </section>
       )}
 
+      {clinical && <FlowOverviewSection />}
+
       <div className={styles.kpis}>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Visits today</div>
@@ -227,7 +235,7 @@ function OverviewInner() {
 
       <div className={styles.columns}>
         <div className={styles.column}>
-          {can("reports:view") && <EtaAccuracyTile />}
+          {clinical && can("reports:view") && <EtaAccuracyTile />}
           <section className={styles.card} aria-label="Payment split">
             <div className={styles.cardLabel}>Payment split</div>
             {splitTotal === 0 ? (

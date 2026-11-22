@@ -29,9 +29,11 @@ class CheckoutRepository {
     private final com.nabd.hms.pharmacy.api.StockCommands stock;
     private final com.nabd.hms.pharmacy.api.RxDispensing dispensing;
     private final com.nabd.hms.queue.api.VisitQueries visits; // PLT-035: visit facts come from the visit module, never queue_entries SQL
+    private final com.nabd.hms.nursing.api.ProcedureBilling procedures; // PLT-036: procedure_orders is written by nursing only
 
     CheckoutRepository(JdbcTemplate jdbc, com.nabd.hms.pharmacy.api.StockCommands stock, com.nabd.hms.pharmacy.api.RxDispensing dispensing,
-                       com.nabd.hms.queue.api.VisitQueries visits) {
+                       com.nabd.hms.queue.api.VisitQueries visits, com.nabd.hms.nursing.api.ProcedureBilling procedures) {
+        this.procedures = procedures;
         this.dispensing = dispensing;
         this.visits = visits;
         this.jdbc = jdbc;
@@ -89,8 +91,7 @@ class CheckoutRepository {
     }
 
     void markProceduresBilled(UUID tenantId, UUID queueEntryId) {
-        jdbc.update("UPDATE procedure_orders SET billed = true WHERE tenant_id = ? AND queue_entry_id = ? " +
-                "AND status = 'completed' AND billed = false", tenantId, queueEntryId);
+        procedures.markVisitBilled(tenantId, queueEntryId);
     }
 
     /** PLT-035: through queue.api.VisitQueries (billing SQL never touches queue_entries). */
@@ -165,12 +166,12 @@ class CheckoutRepository {
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
-                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class, batch_id) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id, schedule_class, batch_id, paper_rx_line_id) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
                     item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId(),
-                    issued == null ? null : issued.scheduleClass(), issued == null ? null : issued.batchId());
+                    issued == null ? null : issued.scheduleClass(), issued == null ? null : issued.batchId(), item.paperRxLineId());
         }
         dispensing.record(invoiceId, staffId, dispensed); // PHL-018: dispenses row + stock discrepancies
     }
@@ -319,10 +320,11 @@ class CheckoutRepository {
                 (rs, i) -> UUID.fromString(rs.getString("invoice_id")), tenantId, key).stream().findFirst();
     }
 
+    /** recorded_at is the wall clock, not the transaction start: the payments of one split sale (one transaction) list in the order they were taken. */
     UUID insertPayment(UUID tenantId, UUID invoiceId, String method, BigDecimal amount, UUID recordedBy,
                        String reference, String idempotencyKey, String receiptNumber) {
-        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key, receipt_number) " +
-                "VALUES (?,?,?,?,?,?,?,?) RETURNING id", UUID.class,
+        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key, receipt_number, recorded_at) " +
+                "VALUES (?,?,?,?,?,?,?,?, clock_timestamp()) RETURNING id", UUID.class,
                 tenantId, invoiceId, method, amount, recordedBy, reference, idempotencyKey, receiptNumber);
     }
 

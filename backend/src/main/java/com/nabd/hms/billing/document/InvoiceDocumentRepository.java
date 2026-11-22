@@ -24,6 +24,12 @@ class InvoiceDocumentRepository {
         }, tenantId).stream().findFirst().orElseThrow();
     }
 
+    /** PHL-019: {region code, VAT number or null} of the clinic, for the header of a market without GST. */
+    String[] vatIdentity(UUID tenantId) {
+        return jdbc.queryForObject("SELECT trim(region_code), CASE WHEN tax_id_type = 'VAT' THEN tax_id END FROM tenants WHERE id = ?",
+                (rs, i) -> new String[]{rs.getString(1), rs.getString(2)}, tenantId);
+    }
+
     List<String> sacHsn(UUID tenantId, UUID invoiceId) {
         return jdbc.query("SELECT sac_hsn FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order",
                 (rs, i) -> rs.getString(1), tenantId, invoiceId);

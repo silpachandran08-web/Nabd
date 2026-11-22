@@ -3,12 +3,16 @@
   arch.py scan                     SQL scans only, one line per violation with file:line
   arch.py summary JAVA_JSON [OUT]  markdown report (counts by module) for the PR comment; OUT = full JSON report
   arch.py gate    JAVA_JSON        exit 1 when the current mode blocks (see ci/architecture-gate.json)
-  arch.py freeze  JAVA_JSON        rewrite ci/architecture-baseline.json from the current violations
+  arch.py freeze  JAVA_JSON [CHECK] rewrite ci/architecture-baseline.json from the current violations (CHECK: only that check's keys)
 JAVA_JSON is backend/target/architecture-violations.json written by ArchitectureRulesTest (Modulith + ArchUnit).
 PLT-035: ci/architecture-gate.json `sql_ownership_blocking` {module: [owner modules]} makes those sql-ownership findings fail in
 every mode, baseline or not (the queue-billing-packages SQL cycle stays broken).
+PLT-036: `sql_ownership_all_modules` covers every module: `writes_blocking` fails any write on a table the module does not own and
+any table with no owner or two owners, in every mode, baseline or not (single writer); `new_blocking` fails any sql-ownership
+finding that is not in the baseline (a new cross-module read), also in report mode.
 SQL scans: tenant-predicate (SQL on a tenant_id/RLS table without a tenant_id predicate) and sql-ownership
-(writes only own tables, reads only own + allow-listed tables, docs/architecture/table-ownership.yaml; PLT-033: every
+(writes only own tables, reads only own + allow-listed tables, docs/architecture/table-ownership.yaml; PLT-036 `owns_columns`:
+an UPDATE that sets only the listed columns of another module's table counts as the module's own write; PLT-033: every
 table in public/identity/consent has exactly one owner, a module may span several packages via `packages:`).
 shortcut: regex over Java string literals, not a SQL parser; SQL built across methods or via StringBuilder is not
 followed. Upgrade to a JSqlParser-based scan in the ArchUnit test if false positives/negatives start to matter.
@@ -129,6 +133,26 @@ def ownership(root="."):
     return owner, reads, owners, pkg
 
 
+def column_grants(root="."):
+    """PLT-036 `owns_columns`: {module: {table: columns}}, the columns of another module's table that the module itself updates."""
+    import yaml
+    mods = (yaml.safe_load(open(f"{root}/{OWNERSHIP}")) or {}).get("modules") or {}
+    return {mod: {norm(t): {c.lower() for c in cols} for t, cols in ((spec or {}).get("owns_columns") or {}).items()} for mod, spec in mods.items()}
+
+
+def sets_only(sql, table, cols):
+    """True when sql is one UPDATE of `table` whose SET list assigns only `cols` (and updated_at)."""
+    m = re.match(r"\s*update\s+([\w.\"]+)(?:\s+(?:as\s+)?(?!set\b)\w+)?\s+set\s+(.*?)(?:\s+(?:from|where|returning)\b|$)", sql, I)
+    if not m or norm(m.group(1)) != table: return False
+    parts, depth, cur = [], 0, ""
+    for ch in m.group(2):  # split the SET list on top-level commas
+        depth += ch == "("; depth -= ch == ")"
+        if ch == "," and depth == 0: parts.append(cur); cur = ""
+        else: cur += ch
+    names = {p.split("=")[0].strip().split(".")[-1].strip('"').lower() for p in parts + [cur]}
+    return names <= set(cols) | {"updated_at"}
+
+
 MAPPED_SCHEMAS = ("public", "identity", "consent")  # PLT-033: every table here needs exactly one owner
 
 
@@ -147,6 +171,7 @@ def map_gaps(tables, owners):
 def scan(root="."):
     tables, tenant = schema(root)
     owner, reads, owners, pkg = ownership(root)
+    grants = column_grants(root)
     out = map_gaps(tables, owners)
     for f in sorted(glob.glob(f"{root}/{SRC}/**/*.java", recursive=True)):
         rel = os.path.relpath(f, root)
@@ -158,7 +183,7 @@ def scan(root="."):
             if tt and not has_tenant_predicate(sql):
                 out.append(v("tenant-predicate", mod, rel, line, "no tenant_id predicate on " + ",".join(tt)))
             for t in sorted(w):
-                if owner.get(t) != mod:
+                if owner.get(t) != mod and not sets_only(sql, t, grants.get(mod, {}).get(t, ())):
                     out.append(v("sql-ownership", mod, rel, line, f"writes {t} " + (f"owned by {owner[t]}" if t in owner else "(not in table-ownership.yaml)")))
             for t in sorted(r):
                 if owner.get(t) != mod and t not in reads.get(mod, set()):
@@ -204,7 +229,18 @@ def blocked(vs, rules):
     return [x for x in vs if x["rule"] == "sql-ownership" and owner(x) in rules.get(x["module"], ())]
 
 
-def evaluate(vs, base, m, rules=None):
+def single_writer(root="."):
+    """PLT-036: the all-module sql-ownership switches {writes_blocking, new_blocking} from the gate file."""
+    return {k: v for k, v in (json.load(open(f"{root}/{GATE}")).get("sql_ownership_all_modules") or {}).items() if not k.startswith("_")}
+
+
+def foreign_writes(vs):
+    """PLT-036: sql-ownership findings that break 'one writing module per table': a write on a table the module does not own
+    (or that has no owner) and an ownership-map gap (no owner, two owners). Cross-module reads are not in here."""
+    return [x for x in vs if x["rule"] == "sql-ownership" and not x["detail"].startswith("reads ")]
+
+
+def evaluate(vs, base, m, rules=None, own=None):
     cur = collections.Counter(key(x) for x in vs)
     seen, new = collections.Counter(), []
     for x in vs:  # the n-th occurrence of a key beyond its baseline count is new
@@ -221,6 +257,16 @@ def evaluate(vs, base, m, rules=None):
     if hard:
         fails.append(f"{len(hard)} blocking sql-ownership violation(s) (sql_ownership_blocking, PLT-035): "
                      + "; ".join(f"{where(x)} {x['detail']}" for x in hard[:20]))
+    own = own or {}
+    w = foreign_writes(vs) if own.get("writes_blocking") else []
+    if w:
+        fails.append(f"{len(w)} single-writer violation(s) (sql_ownership_all_modules.writes_blocking, PLT-036: go through the owning "
+                     "module's API or fix docs/architecture/table-ownership.yaml): " + "; ".join(f"{where(x)} {x['detail']}" for x in w[:20]))
+    new_own = [x for x in new if x["rule"] == "sql-ownership"]
+    if own.get("new_blocking") and m == "report" and new_own:  # modes new/all already fail on these
+        fails.append(f"{len(new_own)} new sql-ownership violation(s) not in {BASELINE} (sql_ownership_all_modules.new_blocking, PLT-036: "
+                     "use the owner's API, or add the table to the module's reads allow-list once the read is accepted): "
+                     + "; ".join(f"{where(x)} {x['detail']}" for x in new_own[:20]))
     return new, fixed, fails
 
 
@@ -228,8 +274,8 @@ def where(x): return f"{x['file']}:{x['line']}" if x.get("file") else x["module"
 LABEL = {"report": "report only (S2-S4), never fails", "new": "new violations fail (S5-S7)", "all": "any violation fails (Phase 1 exit, S8)"}
 
 
-def summary(vs, base, m, rules=None):
-    new, fixed, fails = evaluate(vs, base, m, rules)
+def summary(vs, base, m, rules=None, own=None):
+    new, fixed, fails = evaluate(vs, base, m, rules, own)
     by = collections.defaultdict(collections.Counter)
     for x in vs: by[x["module"]][check_of(x)] += 1
     o = ["<!-- architecture-report -->", f"### Architecture checks (stage 2): mode {m}, {LABEL[m]}", "",
@@ -255,18 +301,22 @@ def main(a):
         return
     vs = collect(a[1])
     if a[0] == "summary":
-        md, _ = summary(vs, load_baseline(), mode(), blocking())
+        md, _ = summary(vs, load_baseline(), mode(), blocking(), single_writer())
         print(md)
         if len(a) > 2: json.dump({"date": today().isoformat(), "mode": mode(), "violations": vs}, open(a[2], "w"), indent=1)
     elif a[0] == "gate":
-        _, _, fails = evaluate(vs, load_baseline(), mode(), blocking())
+        _, _, fails = evaluate(vs, load_baseline(), mode(), blocking(), single_writer())
         print("\n".join(fails) or "architecture gate: pass"); sys.exit(1 if fails else 0)
     elif a[0] == "freeze":
+        keys = collections.Counter(key(x) for x in vs)
+        if len(a) > 2:  # PLT-036: one check only; the other checks' keys stay exactly as they are
+            keys = collections.Counter({k: n for k, n in keys.items() if k.split("|")[0] == a[2]}) \
+                + collections.Counter({k: n for k, n in load_baseline().items() if k.split("|")[0] != a[2]})
         json.dump({"_note": "OPS-033 frozen baseline of existing architecture violations. Shrinks only; must be empty at Phase 1 exit (S8). "
                    "Keys: check|rule|module|file|detail (line numbers stripped); value = occurrences.",
-                   "frozen": today().isoformat(), "violations": dict(sorted(collections.Counter(key(x) for x in vs).items()))},
+                   "frozen": today().isoformat(), "violations": dict(sorted(keys.items()))},
                   open(BASELINE, "w"), indent=1)
-        print(f"baseline: {len(vs)} violation(s)")
+        print(f"baseline: {sum(keys.values())} violation(s)")
     else: sys.exit(__doc__)
 
 

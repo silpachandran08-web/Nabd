@@ -21,19 +21,24 @@ import java.util.UUID;
  * immutable: a late event for it changes nothing and counts in reporting_late_event_total; a reopened day recomputes again.
  * shortcut: no scheduling.appointment.no_show.v1 exists, no_shows comes from the recompute; no invoice-created event
  * exists, so billed for a past day catches up on the next event of that day (today's figure is always read live).
+ * ADM-041: the same day row carries the time KPIs (FlowRollupRepository). A stage change (visit.queue_entry.changed.v1, the
+ * event the spec calls visit.stage_changed.v1) recomputes only those; FlowRefreshJob refreshes yesterday before 06:00 local.
  */
 @Component
 public class RollupProjector implements EventConsumer {
 
-    static final Set<String> TYPES = Set.of("visit.completed.v1", "visit.queue_entry.created.v1", "billing.payment.recorded.v1", "billing.invoice.paid.v1");
+    static final String STAGE_CHANGED = "visit.queue_entry.changed.v1";
+    static final Set<String> TYPES = Set.of("visit.completed.v1", "visit.queue_entry.created.v1", "billing.payment.recorded.v1", "billing.invoice.paid.v1", STAGE_CHANGED);
 
     private final ReportsRepository repo;
+    private final FlowRollupRepository flow;
     private final ClinicClock clock;
     private final RegionRules regions;
     private final MeterRegistry meters;
 
-    RollupProjector(ReportsRepository repo, ClinicClock clock, RegionRules regions, MeterRegistry meters) {
+    RollupProjector(ReportsRepository repo, FlowRollupRepository flow, ClinicClock clock, RegionRules regions, MeterRegistry meters) {
         this.repo = repo;
+        this.flow = flow;
         this.clock = clock;
         this.regions = regions;
         this.meters = meters;
@@ -72,7 +77,11 @@ public class RollupProjector implements EventConsumer {
             meters.counter("reporting.late.event").increment();
             return;
         }
-        recompute(e.tenantId(), day.get(), e.id());
+        if (STAGE_CHANGED.equals(e.type())) {
+            recomputeFlow(e.tenantId(), day.get()); // a stage change moves no money and no visit count
+        } else {
+            recompute(e.tenantId(), day.get(), e.id());
+        }
     }
 
     private static Optional<UUID> paymentId(tools.jackson.databind.JsonNode data) {
@@ -101,5 +110,23 @@ public class RollupProjector implements EventConsumer {
         ZoneId zone = clock.zone(tenantId);
         String currency = regions.region(java.util.Optional.ofNullable(clock.region(tenantId)).orElse("IN")).currency();
         repo.recomputeTenantDay(tenantId, day, ClinicClock.startOf(day, zone), ClinicClock.startOf(day.plusDays(1), zone), clock.now(), currency, eventId);
+        recomputeFlow(tenantId, day);
+    }
+
+    /** ADM-041: the time KPIs of one clinic day (waits, door to doctor, consult, booking response, ETA accuracy, punctuality). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recomputeFlow(UUID tenantId, LocalDate day) {
+        ZoneId zone = clock.zone(tenantId);
+        flow.recomputeDay(tenantId, day, ClinicClock.startOf(day, zone), ClinicClock.startOf(day.plusDays(1), zone), clock.now(), zone);
+    }
+
+    /** ADM-041 morning refresh of a past day: time KPIs always, money only while the day is open (a closed day keeps its closed figures). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void refresh(UUID tenantId, LocalDate day) {
+        if (repo.dayClosed(tenantId, day)) {
+            recomputeFlow(tenantId, day);
+        } else {
+            recompute(tenantId, day, "refresh");
+        }
     }
 }

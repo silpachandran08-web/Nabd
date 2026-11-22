@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -17,15 +18,24 @@ import java.util.UUID;
 public class OwnerMessagingController {
 
     private final SenderDirectory senders;
+    private final MessageUsageService usage;
 
-    OwnerMessagingController(SenderDirectory senders) {
+    OwnerMessagingController(SenderDirectory senders, MessageUsageService usage) {
         this.senders = senders;
+        this.usage = usage;
     }
 
     @GetMapping("/owner/messaging/health")
     @PreAuthorize("hasAuthority('setup:view')")
     public SenderDirectory.Health health(@AuthenticationPrincipal Jwt jwt) {
         return senders.health(UUID.fromString(jwt.getClaimAsString("tenantId")));
+    }
+
+    /** COM-015: message counts and cost of one calendar month (default: the clinic's current month) against the plan allowance. */
+    @GetMapping("/owner/messaging/usage")
+    @PreAuthorize("hasAuthority('setup:view')")
+    public MessageUsageService.Usage usage(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) String month) {
+        return usage.usage(UUID.fromString(jwt.getClaimAsString("tenantId")), month);
     }
 
     @GetMapping("/messaging/quality")

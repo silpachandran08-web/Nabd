@@ -2,6 +2,11 @@
   "_note": "OPS-033 stage 2 architecture gate. null = report only (S2-S4). Set new_code_blocking_from (YYYY-MM-DD) to the first day of S5: new violations fail, existing ones stay in ci/architecture-baseline.json. Set all_blocking_from to the Phase 1 exit (S8): baseline must be empty and any violation fails; then make stage2-unit's architecture step a plain required check.",
   "new_code_blocking_from": null,
   "all_blocking_from": null,
+  "sql_ownership_all_modules": {
+    "_note": "PLT-036, every module. writes_blocking: a write on a table the module does not own, or a table with no owner or two owners in docs/architecture/table-ownership.yaml, fails the gate in EVERY mode and the baseline does not excuse it (one writing module per table). new_blocking: an sql-ownership finding that is not in ci/architecture-baseline.json (a new cross-module read) fails too, also in report mode; go through the owner's API, or add the table to the module's reads allow-list once the read is accepted. The existing cross-module reads stay in the baseline as debt. Modulith, ArchUnit and tenant-predicate still follow new_code_blocking_from / all_blocking_from.",
+    "writes_blocking": true,
+    "new_blocking": true
+  },
   "sql_ownership_blocking": {
     "_note": "PLT-035: sql-ownership findings of module M on a table owned by one of these modules fail the gate in EVERY mode (report included); the baseline does not excuse them. Breaks the queue-billing-packages SQL cycle: visit/queue never touches invoices, payments or package tables, billing never touches queue tables. Other modules go through queue.api / billing.api.",
     "queue": [

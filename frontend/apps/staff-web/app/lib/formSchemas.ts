@@ -13,7 +13,7 @@ export const registerSchema = (country: string | undefined, today: string) =>
   PatientWriteRequestSchema.pick({ name: true, phone: true, dob: true, gender: true }).superRefine((v, ctx) => {
     need(ctx, v, ["name", "phone", "dob", "gender"]);
     if (!blank(v.phone) && !normalizePhone(v.phone, country)) ctx.addIssue({ code: "custom", message: "phoneInvalid", path: ["phone"] });
-    if (!blank(v.dob) && v.dob > today) ctx.addIssue({ code: "custom", message: "dobFuture", path: ["dob"] });
+    if (v.dob && v.dob > today) ctx.addIssue({ code: "custom", message: "dobFuture", path: ["dob"] });
   });
 
 /** Check-in of a known patient: the doctor to see. */

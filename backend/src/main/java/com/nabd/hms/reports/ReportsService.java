@@ -194,7 +194,7 @@ public class ReportsService {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
-        UUID scopedToStaffId = "own_patients_only".equals(caller.scope()) ? callerStaffId : null;
+        UUID scopedToStaffId = ownRowOnly(caller) ? callerStaffId : null;
         Instant since = r.from().atStartOfDay(zone).toInstant();
         Instant until = r.to().plusDays(1).atStartOfDay(zone).toInstant();
         return repo.staffCollection(tenantId, r.from(), r.to(), since, until, scopedToStaffId).stream()
@@ -207,10 +207,15 @@ public class ReportsService {
     public StaffPerformanceReport staffPerformanceReport(UUID tenantId, UUID callerStaffId, Range r) {
         tenantContext.set(tenantId);
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
-        String scopeNote = "own_patients_only".equals(caller.scope())
+        String scopeNote = ownRowOnly(caller)
                 ? "You can see only your own row."
                 : "You can see every staff member's row (full access).";
         return new StaffPerformanceReport(scopeNote, staffPerformance(tenantId, callerStaffId, r));
+    }
+
+    /** ADM-047: every row only for a caller who manages staff and is not scoped to their own patients (a receptionist with reports:view sees their own). */
+    private static boolean ownRowOnly(CallerInfo caller) {
+        return !ReportLibraryService.teamView(caller.scope(), ReportLibraryService.has("staff:view"));
     }
 
     @Transactional(readOnly = true)

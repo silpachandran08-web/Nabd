@@ -89,7 +89,7 @@ test("permission missing: the item is absent, also from Ctrl+K", () => {
   assert.ok(!ids(nav(BILLING.filter((p) => p !== "packages:view"), ALL)).includes("billing-packages"));
   assert.ok(!ids(nav(PHARMACIST.filter((p) => p !== "billing:create"), ALL)).includes("ph-pos"), "no counter sale without billing:create");
   assert.deepEqual(jumpTargets({ perms: PHARMACIST.filter((p) => !p.startsWith("billing:")), owner: false, ent: ALL }, "otc"), []);
-  assert.deepEqual(jumpTargets({ perms: PHARMACIST, owner: false, ent: ALL }, "otc").map((i) => i.href), ["/checkout/otc"]);
+  assert.deepEqual(jumpTargets({ perms: PHARMACIST, owner: false, ent: ALL }, "otc").map((i) => i.href), ["/pharmacy/pos"]);
   assert.deepEqual(rolesFor(["pharmacy:view"], false), ["reception"], "no lab or pharmacy grant: no counter shell");
 });
 
@@ -149,7 +149,8 @@ test("route skeletons: every planned counter item has its thin page on the Plann
       const page = new URL(`../../app/(clinic)${i.href.split("?")[0]}/page.tsx`, import.meta.url);
       if (i.planned) {
         assert.ok(existsSync(page), i.href);
-        assert.match(readFileSync(page, "utf8"), new RegExp(`<PlannedScreen id="${i.id}" />`), i.href);
+        // bare skeleton, or (PHL-041: a built screen behind a still-`planned` item) the same gate wrapping its screen as children
+        assert.match(readFileSync(page, "utf8"), new RegExp(`<PlannedScreen id="${i.id}"( />|>)`), i.href);
       }
     }
   }

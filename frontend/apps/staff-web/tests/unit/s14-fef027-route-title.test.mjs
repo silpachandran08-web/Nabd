@@ -24,8 +24,9 @@ function walk(dir, out = []) {
   }
   return out;
 }
-test("only ui/Dialog (and the idle-lock screen, the card picker) declares role=dialog", () => {
-  const allowed = ["components/ui/Dialog.tsx", "IdleLockGuard.tsx", "components/checkout/RxLinkPicker.tsx"];
+test("only ui/Dialog (and the idle-lock screen, the card pickers) declares role=dialog", () => {
+  // the two Rx pickers are inline panels in the checkout line (PHL-001 link picker, PHL-020 paper Rx), not modal dialogs
+  const allowed = ["components/ui/Dialog.tsx", "IdleLockGuard.tsx", "components/checkout/RxLinkPicker.tsx", "components/checkout/PaperRxDialog.tsx"];
   const bad = walk(new URL("../../app", import.meta.url).pathname).filter((f) => /role="dialog"/.test(readFileSync(f, "utf8")) && !allowed.some((a) => f.endsWith(a)));
   assert.deepEqual(bad, []);
 });

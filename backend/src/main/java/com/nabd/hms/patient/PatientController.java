@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -123,6 +124,13 @@ public class PatientController {
             throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "status must be due or overdue.");
         }
         return service.guardianReviewsDue(tenantId, staffId, status);
+    }
+
+    /** ADM-014: "live" or "demo_only" (DPA not signed or no plan: only demo patients can be created). No patient data. */
+    @GetMapping("/data-gate")
+    @PreAuthorize("hasAuthority('patients:create')")
+    public Map<String, String> dataGate(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId) {
+        return Map.of("dataGate", service.dataGateState(tenantId, staffId));
     }
 
     @com.nabd.hms.shared.Idempotent

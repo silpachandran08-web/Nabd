@@ -4,6 +4,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CHART_SLOTS, validateChartPalette } from "./chart-palette.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (f) => JSON.parse(readFileSync(join(here, "src/source", f), "utf8"));
@@ -72,7 +73,11 @@ for (const [name, t] of [["dark", dark], ["light", light]]) {
   }
 }
 const failures = rows.filter((r) => !r.pass);
-const report = JSON.stringify({ generated: "packages/tokens/build.mjs", pass: failures.length === 0, failures: failures.length, pairs: rows }, null, 2) + "\n";
+// FEF-026: the categorical chart palette is gated on the surface charts are drawn on (surface-1): all pairs, both themes.
+const chartPalette = Object.fromEntries([["dark", dark], ["light", light]].map(([name, t]) =>
+  [name, validateChartPalette(Array.from({ length: CHART_SLOTS }, (_, i) => t[`chart-${i + 1}`]), t["surface-1"])]));
+const chartFailures = Object.entries(chartPalette).flatMap(([name, r]) => r.failures.map((f) => `${name} ${f}`));
+const report = JSON.stringify({ generated: "packages/tokens/build.mjs", pass: failures.length === 0, failures: failures.length, pairs: rows, chartPalette }, null, 2) + "\n";
 
 const out = process.argv.includes("--check") ? null : join(here, "dist");
 const files = { "tokens.css": css, "custom-media.css": media, "theme.ts": ts, "contrast-report.json": report };
@@ -83,5 +88,6 @@ else {
   if (drift) process.exit(1);
 }
 for (const f of failures) console.error(`contrast FAIL ${f.theme} ${f.fg} on ${f.bg}${f.base ? ` over ${f.base}` : ""}: ${f.ratio} < ${f.min}`);
-if (failures.length) process.exit(1);
-console.log(`tokens: ${rows.length} contrast pairs ok`);
+for (const f of chartFailures) console.error(`chart palette FAIL ${f}`);
+if (failures.length || chartFailures.length) process.exit(1);
+console.log(`tokens: ${rows.length} contrast pairs ok, chart palette ok (${CHART_SLOTS} slots, all pairs, both themes)`);

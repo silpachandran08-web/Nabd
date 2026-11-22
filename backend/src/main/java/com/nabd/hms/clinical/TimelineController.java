@@ -29,10 +29,11 @@ public class TimelineController {
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterPage get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
-                              @RequestParam(required = false) Integer limit, @RequestParam(required = false) String cursor) {
+                              @RequestParam(required = false) Integer limit, @RequestParam(required = false) String cursor,
+                              @RequestParam(required = false) String include) {
         int pageLimit = com.nabd.hms.common.PageRequest.limit(limit); // a bad limit is a 400 before the patient gate
         ReadScope scope = scopes.resolve(jwt);
         scopes.requirePatient(scope, patientId);
-        return FieldGrantMasker.timeline(scope, service.get(scope.tenantId(), patientId, pageLimit, cursor));
+        return FieldGrantMasker.timeline(scope, service.get(scope.tenantId(), patientId, pageLimit, cursor, "imported".equals(include)));
     }
 }

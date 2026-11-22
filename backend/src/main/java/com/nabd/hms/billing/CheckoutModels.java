@@ -42,11 +42,11 @@ final class CheckoutModels {
     record LineItemInput(String chargeCode, String chargeName, String category, int quantity,
                           BigDecimal unitPrice, BigDecimal taxRatePercent, UUID catalogueId, BigDecimal listUnitPrice,
                           String tier, String overrideReasonCode, String overrideNote, UUID overriddenBy,
-                          boolean isRx, UUID prescriptionItemId, String shortfallReason) {
+                          boolean isRx, UUID prescriptionItemId, String shortfallReason, UUID paperRxLineId) {
         /** FIN-008: the tax engine decides the rate (head class, effective-dated rule); the line then stores that rate. */
         LineItemInput withTaxRate(BigDecimal rate) {
             return new LineItemInput(chargeCode, chargeName, category, quantity, unitPrice, rate, catalogueId, listUnitPrice, tier,
-                    overrideReasonCode, overrideNote, overriddenBy, isRx, prescriptionItemId, shortfallReason);
+                    overrideReasonCode, overrideNote, overriddenBy, isRx, prescriptionItemId, shortfallReason, paperRxLineId);
         }
     }
 

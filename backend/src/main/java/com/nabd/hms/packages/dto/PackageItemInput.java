@@ -7,13 +7,16 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record PackageItemInput(
         @Pattern(regexp = "service_session|procedure|consultation|take_home_product") String itemType,
         @NotBlank String name,
         @Positive int quantity,
         @NotNull @DecimalMin(value = "0") BigDecimal unitListPrice,
-        @DecimalMin(value = "0") BigDecimal taxRatePercent
+        @DecimalMin(value = "0") BigDecimal taxRatePercent,
+        /* FIN-025: the price-list head whose tax class this component takes; without one taxRatePercent stands. Optional. */
+        UUID chargeCatalogueId
 ) {
     public BigDecimal taxRatePercentOrZero() {
         return taxRatePercent == null ? BigDecimal.ZERO : taxRatePercent;

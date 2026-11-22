@@ -7,19 +7,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
- * PLT-016: the six preset role bundles every new clinic starts with, versioned in code.
+ * PLT-016: the preset role bundles every new clinic starts with (the six of the RBAC matrix, plus PHL-041 Lab technician), versioned in code.
  * Flags read like the RBAC Matrix sheet, in its column order: view, create, edit, delete/void, approve,
  * refund/discount, export. Y and P (plan-dependent: gated by plan/pharmacy mode, not the role) grant; N and - do not.
  * The ten matrix modules are transcribed verbatim (golden file: src/test/resources/rbac-matrix-golden.csv),
  * except MF-52: the Owner preset has no clinical:approve, only Owner-doctor (Owner plus Doctor plus clinical:approve) does.
- * nursing, specialty_dental and departments are not in the matrix; their rows are marked "extension" in the golden file.
+ * nursing, specialty_dental, departments and lab (PHL-041) are not in the matrix; their rows are marked "extension" in the golden file.
+ * lab flags map to the named lab permissions in GrantsFlattener (create = order, edit = collect + result, approve = validate + release,
+ * delete = catalogue + qc).
  * Bump VERSION whenever a definition changes; reset-to-preset then moves a role to the new definition.
  */
 public final class RolePresets {
 
-    public static final int VERSION = 1;
+    public static final int VERSION = 2; // 2: PHL-041 lab module on every preset, Lab technician preset
 
     public record Preset(String code, String name, boolean builtIn, List<ModuleGrant> grants) {
     }
@@ -28,42 +31,73 @@ public final class RolePresets {
             g("patients", "YYYYY-Y"), g("queue", "YYYYY-Y"), g("clinical", "YNNYN-Y", true),
             g("billing", "YYYYYYY"), g("packages", "YYYYYYY"), g("pharmacy", "PPPPPPP"), g("reports", "Y---Y-Y"),
             g("staff", "YYYYY-Y"), g("setup", "Y-Y---Y"), g("compliance", "Y--YY-Y"),
-            g("nursing", "YYYYYYY"), g("specialty_dental", "YYYYYYY"), g("departments", "YYYYYYY")));
+            g("nursing", "YYYYYYY"), g("specialty_dental", "YYYYYYY"), g("departments", "YYYYYYY"), g("lab", "YYYYYYY")));
 
     private static final Preset DOCTOR = new Preset("doctor", "Doctor", false, List.of(
             g("patients", "YYY-N--"), g("queue", "Y-Y----"), g("clinical", "YYYYN--"),
             g("billing", "Y------"), g("packages", "YYY----"), g("pharmacy", "PPN----"), g("reports", "Y---N--"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "YY-----"), g("specialty_dental", "YYY----"), g("departments", "Y------")));
+            g("nursing", "YY-----"), g("specialty_dental", "YYY----"), g("departments", "Y------"), g("lab", "YY-----")));
 
     private static final Preset NURSE = new Preset("nurse", "Nurse", false, List.of(
             g("patients", "YNY-N--"), g("queue", "Y-Y----"), g("clinical", "YYY-N--"),
             g("billing", "N------"), g("packages", "Y-Y----"), g("pharmacy", "PNN----"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "YYY----"), g("specialty_dental", "Y------"), g("departments", "Y------")));
+            g("nursing", "YYY----"), g("specialty_dental", "Y------"), g("departments", "Y------"), g("lab", "N------")));
 
     private static final Preset RECEPTIONIST = new Preset("receptionist", "Receptionist", false, List.of(
             g("patients", "YYY-N--"), g("queue", "YYY----"), g("clinical", "N------"),
             g("billing", "YYYNYN-"), g("packages", "YYN----"), g("pharmacy", "PPN----"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------")));
+            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "N------")));
 
     private static final Preset FRONTDESK_VITALS = new Preset("frontdesk_vitals", "Front-desk + Vitals", false, List.of(
             g("patients", "YYY-N--"), g("queue", "YYY----"), g("clinical", "YYN-N--"),
             g("billing", "YYYNYN-"), g("packages", "YYN----"), g("pharmacy", "PPN----"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------")));
+            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "N------")));
 
     /** MF-52: an owner who is also a clinician — Owner and Doctor combined, plus clinical:approve. */
     private static final Preset OWNER_DOCTOR = new Preset("owner_doctor", "Owner-doctor", false, ownerDoctorGrants());
 
-    public static final List<Preset> ALL = List.of(OWNER, OWNER_DOCTOR, DOCTOR, NURSE, RECEPTIONIST, FRONTDESK_VITALS);
+    /** PHL-041: collects samples and enters results (lab view + edit); no validation or release (lab approve), no catalogue. */
+    private static final Preset LAB_TECHNICIAN = new Preset("lab_technician", "Lab technician", false, List.of(
+            g("patients", "Y------"), g("queue", "N------"), g("clinical", "N------"),
+            g("billing", "N------"), g("packages", "N------"), g("pharmacy", "N------"), g("reports", "N------"),
+            g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
+            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "Y-Y----")));
+
+    public static final List<Preset> ALL = List.of(OWNER, OWNER_DOCTOR, DOCTOR, NURSE, RECEPTIONIST, FRONTDESK_VITALS, LAB_TECHNICIAN);
+
+    /** PHL-032: the roles a pharmacy-only tenant starts with (the Owner plus three pharmacy roles); no clinical or scheduling module is granted.
+     * Kept out of ALL: ALL is the clinic bundle the RBAC golden file and matrix tests are written against. */
+    private static final Preset PHARMACIST_IN_CHARGE = new Preset("pharmacist_in_charge", "Pharmacist-in-charge", false, pharmacyGrants(
+            "YYY----", "YYYNYYY", "YYYYYYY", "Y---N-Y", "Y------", "Y-Y----", "Y------"));
+    private static final Preset PHARMACIST = new Preset("pharmacist", "Pharmacist", false, pharmacyGrants(
+            "YYY----", "YYYN-N-", "YYYN---", "Y------", "N------", "N------", "N------"));
+    private static final Preset COUNTER_STAFF = new Preset("counter_staff", "Counter staff", false, pharmacyGrants(
+            "YYY----", "YYY----", "YYY----", "N------", "N------", "N------", "N------"));
+
+    public static final List<Preset> PHARMACY = List.of(OWNER, PHARMACIST_IN_CHARGE, PHARMACIST, COUNTER_STAFF);
 
     private RolePresets() {
     }
 
+    /** The presets a new tenant of this edition is seeded with. */
+    public static List<Preset> forEdition(String edition) {
+        return "pharmacy".equals(edition) ? PHARMACY : ALL;
+    }
+
     public static Optional<Preset> byCode(String code) {
-        return ALL.stream().filter(p -> p.code().equals(code)).findFirst();
+        return Stream.concat(ALL.stream(), PHARMACY.stream()).filter(p -> p.code().equals(code)).findFirst();
+    }
+
+    /** Flags per module in the order patients, billing, pharmacy, reports, staff, setup, compliance; every other module is none. */
+    private static List<ModuleGrant> pharmacyGrants(String patients, String billing, String pharmacy, String reports, String staff,
+                                                   String setup, String compliance) {
+        return List.of(g("patients", patients), g("queue", "N------"), g("clinical", "N------"), g("billing", billing),
+                g("packages", "N------"), g("pharmacy", pharmacy), g("reports", reports), g("staff", staff), g("setup", setup),
+                g("compliance", compliance), g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"));
     }
 
     private static List<ModuleGrant> ownerDoctorGrants() {

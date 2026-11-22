@@ -39,7 +39,10 @@ class ProvisioningStepRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ProvisioningStepRunner.class);
 
+    private static final String PHARMACY_PLAN = "pharmacy_basic";
+
     private final ProvisioningRepository repo;
+    private final com.nabd.hms.pharmacy.api.PharmacyEdition pharmacyEdition;
     private final TenantContext tenantContext;
     private final WabaProvisioningGateway wabaGateway;
     private final CatalogueTemplates catalogueTemplates;
@@ -51,14 +54,27 @@ class ProvisioningStepRunner {
     private final com.nabd.hms.common.EventPublisher events;
     private final com.nabd.hms.organization.api.RegionRules regions;
     private final com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys;
+    private final com.nabd.hms.common.ConfigBundle configBundle;
+    // PLT-036: owners, roles, staff and departments are written by their owning modules
+    private final com.nabd.hms.common.ProvisioningSeeds.Owners ownerSeeds;
+    private final com.nabd.hms.common.ProvisioningSeeds.Iam iamSeeds;
+    private final com.nabd.hms.common.ProvisioningSeeds.Departments departmentSeeds;
 
-    ProvisioningStepRunner(com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys, ProvisioningRepository repo, TenantContext tenantContext,
+    ProvisioningStepRunner(com.nabd.hms.common.ConfigBundle configBundle, com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys, ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
                             OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
-                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates) {
+                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates,
+                            com.nabd.hms.common.ProvisioningSeeds.Owners ownerSeeds, com.nabd.hms.common.ProvisioningSeeds.Iam iamSeeds,
+                            com.nabd.hms.common.ProvisioningSeeds.Departments departmentSeeds,
+                            com.nabd.hms.pharmacy.api.PharmacyEdition pharmacyEdition) {
+        this.ownerSeeds = ownerSeeds;
+        this.iamSeeds = iamSeeds;
+        this.departmentSeeds = departmentSeeds;
+        this.pharmacyEdition = pharmacyEdition;
         this.tenantKeys = tenantKeys;
+        this.configBundle = configBundle;
         this.catalogueTemplates = catalogueTemplates;
         this.events = events;
         this.regions = regions;
@@ -75,18 +91,38 @@ class ProvisioningStepRunner {
     /** Returns both reveal-once invite tokens when this step is verify_invite_owner (StepResult.NONE otherwise, never persisted). */
     @Transactional
     StepResult run(Job job, String stepName) {
+        return run(job, stepName, null);
+    }
+
+    /** PLT-022: what copy_config of an add-branch job will write; null for every other step. Not transactional on purpose:
+     * the export opens its own transaction bound to the source clinic, so it must run before {@link #run} binds the new one. */
+    com.nabd.hms.common.ConfigBundle.Bundle bundleFor(Job job, String stepName) {
+        return job.isBranch() && "copy_config".equals(stepName)
+                ? configBundle.export(job.branch().sourceTenantId(), job.branch().copySections()) : null;
+    }
+
+    /** PLT-022: bundle is the source clinic's configuration for copy_config (read by the caller before this transaction), else null. */
+    @Transactional
+    StepResult run(Job job, String stepName, com.nabd.hms.common.ConfigBundle.Bundle bundle) {
         // PLT-058: the effect and its idempotency key commit together, so a retry after a crash never redoes the effect.
         if (repo.effectCommitted(job.id(), stepName)) {
             log.info("provisioning job {} step {} effect already committed; marking done without re-running", job.id(), stepName); // log-phi-ok: workflow step name
             return StepResult.NONE;
         }
-        StepResult result = execute(job, stepName);
+        StepResult result = execute(job, stepName, bundle);
         repo.recordEffect(job.id(), stepName);
         return result;
     }
 
-    private StepResult execute(Job job, String stepName) {
+    private StepResult execute(Job job, String stepName, com.nabd.hms.common.ConfigBundle.Bundle bundle) {
         return switch (stepName) {
+            case "copy_config" -> {
+                if (job.createdTenantId() == null || bundle == null) {
+                    throw new IllegalStateException("copy_config needs the new clinic and the source clinic's configuration");
+                }
+                configBundle.apply(job.createdTenantId(), bundle); // binds this transaction to the new clinic
+                yield StepResult.NONE;
+            }
             case "create_tenant" -> {
                 createTenant(job);
                 yield StepResult.NONE;
@@ -119,6 +155,11 @@ class ProvisioningStepRunner {
     @Transactional
     void undo(Job job, String stepName) {
         switch (stepName) {
+            case "copy_config" -> {
+                if (job.createdTenantId() != null) {
+                    configBundle.remove(job.createdTenantId());
+                }
+            }
             case "seed_masters" -> undoSeedMasters(job);
             case "create_tenant" -> undoCreateTenant(job);
             case "verify_invite_owner" -> undoInviteOwner(job);
@@ -146,8 +187,9 @@ class ProvisioningStepRunner {
             return;
         }
         tenantContext.set(tenantId);
-        repo.deleteBuiltInRole(tenantId);
-        repo.deleteDepartments(tenantId);
+        repo.deleteSubscription(tenantId); // PHL-032: the pharmacy plan subscription (no-op for a clinic); before the tenant row (FK)
+        iamSeeds.deleteSeededRoles(tenantId);
+        departmentSeeds.deleteAll(tenantId); // before undoCreateTenant deletes the tenant row (FK)
     }
 
     private void undoInviteOwner(Job job) {
@@ -156,7 +198,7 @@ class ProvisioningStepRunner {
             return;
         }
         tenantContext.set(tenantId);
-        repo.deleteStaffByTenant(tenantId);
+        iamSeeds.deleteStaff(tenantId);
     }
 
     /** Reverse FK order of createTenant: tenant (child of brand) before brand (child of owner) before owner. */
@@ -171,7 +213,7 @@ class ProvisioningStepRunner {
             repo.deleteBrand(job.createdBrandId());
         }
         if (job.ownerNewlyCreated() && job.createdOwnerId() != null) {
-            repo.deleteOwner(job.createdOwnerId());
+            ownerSeeds.delete(job.createdOwnerId());
         }
         log.info("provisioning job {} rolled back create_tenant (tenant {}, owner-newly-created={}, brand-newly-created={})",
                 job.id(), job.createdTenantId(), job.ownerNewlyCreated(), job.brandNewlyCreated());
@@ -180,7 +222,7 @@ class ProvisioningStepRunner {
     private void createTenant(Job job) {
         Optional<UUID> existingOwner = repo.findOwnerByEmail(job.ownerEmail());
         boolean ownerIsNew = existingOwner.isEmpty();
-        UUID ownerId = existingOwner.orElseGet(() -> repo.insertOwner(job.ownerName(), job.ownerEmail()));
+        UUID ownerId = existingOwner.orElseGet(() -> ownerSeeds.create(job.ownerName(), job.ownerEmail()));
 
         // NB-002's region lock is irreversible and owner-wide: an owner's first clinic sets the
         // region, every clinic after that must match. A brand-new owner has no prior region to
@@ -198,14 +240,16 @@ class ProvisioningStepRunner {
         boolean brandIsNew = existingBrand.isEmpty();
         UUID brandId = existingBrand.orElseGet(() -> repo.insertBrand(ownerId, job.brandName()));
 
-        UUID tenantId = repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
+        UUID tenantId = job.isBranch() ? repo.insertBranchTenant(job.branch(), job.tenantSlug(), job.tenantName(), brandId)
+                : repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
+        if (job.pharmacy()) repo.setFacilityType(tenantId, job.edition()); // PHL-032 (pharmacy() is never true for an add-branch job)
         repo.setJobCreatedRefs(job.id(), tenantId, ownerId, brandId);
         repo.setJobCreationFlags(job.id(), ownerIsNew, brandIsNew);
         tenantKeys.provision(tenantId, job.region()); // PLT-045: the tenant's DEK exists before any patient row can be written
         log.info("provisioning job {} created tenant {} (owner {}, brand {})", job.id(), tenantId, ownerId, brandId);
     }
 
-    /** PLT-016: seeds the six preset role bundles from the iam preset catalogue (RolePresets). */
+    /** PLT-016: seeds the preset role bundles from the iam preset catalogue (RolePresets). */
     private void seedMasters(Job job) {
         UUID tenantId = job.createdTenantId();
         if (tenantId == null) {
@@ -217,10 +261,14 @@ class ProvisioningStepRunner {
         if (repo.hasBuiltInRole(tenantId)) {
             return; // retry after a later step failed — already seeded (all presets in this one transaction), nothing to redo
         }
-        for (RolePresets.Preset p : RolePresets.ALL) {
-            repo.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
+        for (RolePresets.Preset p : RolePresets.forEdition(job.pharmacy() ? job.edition() : "clinic")) {
+            iamSeeds.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
         }
-        repo.seedDefaultDepartment(tenantId);
+        departmentSeeds.seedDefault(tenantId);
+        if (job.pharmacy()) { // PHL-032: the pharmacy edition keeps stock in-house from day one and sells on the pharmacy plan
+            pharmacyEdition.startInHouse(tenantId);
+            repo.subscribeToPlan(tenantId, PHARMACY_PLAN, regions.region(job.region()).currency());
+        }
     }
 
     /** NB-353: reuses StaffService's existing invite/accept machinery instead of inventing a second
@@ -279,6 +327,10 @@ class ProvisioningStepRunner {
         // OPS-061: the region is now immutable; the control plane records the tenant's cell routing from this
         events.publish(tenantId, com.nabd.hms.common.DomainEventType.TENANT_REGION_PINNED, tenantId,
                 java.util.Map.of("regionCode", job.region(), "cell", regions.region(job.region()).cell()));
+        if (job.isBranch()) { // PLT-022: subscriptions and the template gateway learn about the new branch
+            events.publish(tenantId, com.nabd.hms.common.DomainEventType.ORGANIZATION_BRANCH_CREATED, tenantId, java.util.Map.of(
+                    "ownerId", job.createdOwnerId(), "brandId", job.createdBrandId(), "sourceTenantId", job.branch().sourceTenantId()));
+        }
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {

@@ -89,7 +89,7 @@ public class SessionService {
     @Transactional
     public TokenPairResponse issueTokensForStaff(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
         tenantContext.set(tenantId);
-        if (tokens.tenantInactive(tenantId)) { // PLT-007: workspace select into a suspended/offboarded clinic
+        if (tokens.tenantInactive(tenantId)) { // PLT-007: workspace select into an offboarded clinic (ADM-020: a suspended one is read-only)
             throw AuthErrors.tenantInactive(HttpStatus.FORBIDDEN);
         }
         Staff staff = staffDir.findStaffById(staffId)
@@ -108,7 +108,8 @@ public class SessionService {
         tenantContext.set(session.tenantId());
 
         // PLT-007: checked before reuse detection, since suspension revokes the sessions this would read as reuse
-        if (tokens.tenantInactive(session.tenantId())) {
+        // ADM-020: a suspended clinic signs in again (read-only), but a session its suspension ended stays ended and is not "reuse"
+        if (tokens.tenantInactive(session.tenantId()) || "tenant_suspended".equals(session.revokedReason())) {
             throw AuthErrors.tenantInactive(HttpStatus.UNAUTHORIZED);
         }
         if ("max_age".equals(session.revokedReason())) {

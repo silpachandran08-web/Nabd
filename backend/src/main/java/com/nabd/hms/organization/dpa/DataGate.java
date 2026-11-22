@@ -25,8 +25,10 @@ class DataGate implements DataGatePort {
     private final TenantContext tenantContext;
     private final CacheKeyPolicy keys;
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
+    private final com.nabd.hms.common.TenantSettingsPort tenantSettings; // PLT-036: tenants is written by platform only
 
-    DataGate(JdbcTemplate jdbc, TenantContext tenantContext, CacheKeyPolicy keys) {
+    DataGate(JdbcTemplate jdbc, TenantContext tenantContext, CacheKeyPolicy keys, com.nabd.hms.common.TenantSettingsPort tenantSettings) {
+        this.tenantSettings = tenantSettings;
         this.jdbc = jdbc;
         this.tenantContext = tenantContext;
         this.keys = keys;
@@ -44,7 +46,8 @@ class DataGate implements DataGatePort {
         boolean live = "live".equals(jdbc.queryForObject("SELECT data_gate FROM tenants WHERE id = ?", String.class, tenantId));
         if (!live && eligible(tenantId)) {
             // a plan chosen after the DPA was signed opens the gate here; the DB trigger re-checks both conditions
-            live = jdbc.update("UPDATE tenants SET data_gate = 'live', updated_at = now() WHERE id = ? AND data_gate = 'demo_only'", tenantId) >= 0;
+            tenantSettings.openDataGate(tenantId);
+            live = true;
         }
         cache.put(key, new Entry(live, now));
         return live;

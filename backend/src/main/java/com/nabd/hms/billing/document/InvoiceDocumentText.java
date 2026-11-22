@@ -13,10 +13,11 @@ import java.util.List;
 /** FIN-012: the text of an invoice or receipt for a given column width (90 for A4, 48 for the 80 mm roll). Pure, so the golden test needs no database. */
 final class InvoiceDocumentText {
 
-    /** @param licenceLines PHL-021: drug licence numbers printed under the GSTIN of a pharmacy invoice (empty otherwise) */
-    record Supplier(String legalName, String gstin, String stateCode, ZoneId zone, List<String> licenceLines) {
+    /** @param licenceLines PHL-021: drug licence numbers printed under the GSTIN of a pharmacy invoice (empty otherwise)
+     *  @param taxIdLine PHL-019: the tax identity line of a market without GST ("VAT No: ..."); null = the GSTIN line */
+    record Supplier(String legalName, String gstin, String stateCode, ZoneId zone, List<String> licenceLines, String taxIdLine) {
         Supplier(String legalName, String gstin, String stateCode, ZoneId zone) {
-            this(legalName, gstin, stateCode, zone, List.of());
+            this(legalName, gstin, stateCode, zone, List.of(), null);
         }
     }
 
@@ -29,7 +30,8 @@ final class InvoiceDocumentText {
         return build(inv, s, kind, receiptNo, cols, sacHsn, List.of());
     }
 
-    /** @param lineNotes per line (display order), a short note printed under the line, or null (PHL-021: the zero-rating reason) */
+    /** @param lineNotes per line (display order), short notes printed under the line, one per newline, or null (PHL-021: the zero-rating
+     *  reason; PHL-019: batch and expiry) */
     static List<String> build(InvoiceResponse inv, Supplier s, String kind, String receiptNo, int cols, List<String> sacHsn, List<String> lineNotes) {
         boolean thermal = cols <= 48;
         boolean receipt = "receipt".equals(kind);
@@ -37,7 +39,7 @@ final class InvoiceDocumentText {
         List<String> out = new ArrayList<>();
         String title = receipt ? "PAYMENT RECEIPT" : inv.documentTitle() == null ? "Invoice" : inv.documentTitle();
         out.addAll(center(s.legalName(), cols));
-        out.add(s.gstin() == null ? "GSTIN: not registered" : "GSTIN: " + s.gstin() + "  State code: " + s.stateCode());
+        out.add(s.taxIdLine() != null ? s.taxIdLine() : s.gstin() == null ? "GSTIN: not registered" : "GSTIN: " + s.gstin() + "  State code: " + s.stateCode());
         out.addAll(s.licenceLines());
         out.addAll(center(title.toUpperCase(java.util.Locale.ROOT), cols));
         out.add(rule);
@@ -89,7 +91,18 @@ final class InvoiceDocumentText {
                         l.taxRatePercent().stripTrailingZeros().toPlainString(), money(tax)));
                 if (!parts.isEmpty()) out.add("    " + parts);
             }
-            if (i < lineNotes.size() && lineNotes.get(i) != null) out.add("    " + lineNotes.get(i));
+            if (i < lineNotes.size() && lineNotes.get(i) != null) for (String n : lineNotes.get(i).split("\n")) out.add("    " + n);
+        }
+        // FIN-025 (PR-01): package lines sit at their share of the bundle price; the saving is printed as information, not as a discount
+        BigDecimal separately = BigDecimal.ZERO, bundle = BigDecimal.ZERO;
+        for (LineItemResponse l : inv.lineItems()) {
+            if ("Package".equals(l.category()) && l.listUnitPrice() != null) {
+                separately = separately.add(l.listUnitPrice().multiply(BigDecimal.valueOf(l.quantity())));
+                bundle = bundle.add(l.lineTotal());
+            }
+        }
+        if (separately.compareTo(bundle) > 0) {
+            out.add("Total if bought separately " + money(separately) + " / you save " + money(separately.subtract(bundle)));
         }
     }
 

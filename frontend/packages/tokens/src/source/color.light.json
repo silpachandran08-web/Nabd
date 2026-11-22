@@ -39,5 +39,11 @@
   "text-tertiary": "#616d75",
   "text-disabled": "#98a2a9",
   "focus-ring": "#0a6c76",
+  "chart-1": "#11989f",
+  "chart-2": "#b6780a",
+  "chart-3": "#ad55ec",
+  "chart-4": "#206007",
+  "chart-5": "#b70f6b",
+  "chart-6": "#2551aa",
   "shadow-md": "0 10px 28px rgba(10, 14, 18, 0.14)"
 }

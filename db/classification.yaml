@@ -78,6 +78,33 @@ schemas:
       decision_source_before_no_show: operational
       late_arrival_queue_entry_id: operational
       cancel_reason_code: operational
+    config_bundle_imports:
+      id: operational
+      tenant_id: operational
+      source_tenant_id: operational
+      sections: operational
+      status: operational
+      started_at: operational
+      finished_at: operational
+      error: operational
+    offboarding_requests:
+      id: operational
+      tenant_id: operational
+      requested_by: operational
+      export_id: operational
+      waived: operational
+      reason: pii  # uncertain: the owner's own words; kept after the erasure as part of the request record
+      previous_status: operational
+      step_up_id: operational
+      cancel_step_up_id: operational
+      notify_email: pii
+      status: operational
+      requested_at: operational
+      cooling_off_ends_at: operational
+      cancelled_at: operational
+      erased_at: operational
+      row_counts: operational
+      certificate_id: operational
     reason_code_catalogue:
       kind: operational
       code: operational
@@ -257,6 +284,13 @@ schemas:
       owner_staff_id: operational
       reason: operational
       created_at: operational
+    message_usage_alerts:
+      tenant_id: operational
+      month: operational
+      threshold_pct: operational
+      used: operational
+      allowance: operational
+      created_at: operational
     stock_alerts:
       id: operational
       tenant_id: operational
@@ -271,6 +305,47 @@ schemas:
       acknowledged_at: operational
       created_on: operational
       created_at: operational
+    supplier_returns:
+      id: operational
+      tenant_id: operational
+      supplier_id: operational
+      supplier_name_snapshot: operational
+      debit_note_number: financial
+      status: operational
+      value: financial
+      reason: pii # uncertain: free text typed by staff about a stock return; strictest plausible tier
+      created_by: operational
+      created_at: operational
+    supplier_return_lines:
+      id: operational
+      tenant_id: operational
+      return_id: operational
+      line_order: operational
+      batch_id: operational
+      item_id: operational
+      qty: operational
+      rate: financial
+      value: financial
+    stock_write_offs:
+      id: operational
+      tenant_id: operational
+      method: operational
+      note: pii # uncertain: free text typed by staff about a write-off; strictest plausible tier
+      value: financial
+      witness_staff_id: operational
+      approved_by: operational
+      created_at: operational
+    stock_write_off_lines:
+      id: operational
+      tenant_id: operational
+      write_off_id: operational
+      line_order: operational
+      batch_id: operational
+      item_id: operational
+      qty: operational
+      rate: financial
+      value: financial
+      register_type: operational
     stock_batches:
       id: operational
       tenant_id: operational
@@ -627,6 +702,7 @@ schemas:
       id: operational
       tenant_id: operational
       import_type: operational
+      source: operational
       file_name: operational  # uncertain: uploaded file name / errors may echo row content; verify
       status: operational
       result_url: operational
@@ -1018,6 +1094,7 @@ schemas:
       inter_state: financial
       sac_hsn: financial
       batch_id: operational
+      paper_rx_line_id: operational
     invoice_line_taxes:
       id: operational
       tenant_id: operational
@@ -1165,6 +1242,42 @@ schemas:
       buyer_gstin: financial
       change_seq: operational
       updated_at: operational
+    lab_panel_tests:
+      tenant_id: operational
+      panel_id: operational
+      test_id: operational
+      display_order: operational
+    lab_panels:
+      id: operational
+      tenant_id: operational
+      code: operational
+      name: operational
+      charge_item_id: operational
+      active: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
+    lab_tests:
+      id: operational
+      tenant_id: operational
+      code: operational
+      name: operational
+      loinc: operational
+      sample_type: operational
+      container: operational
+      volume_ml: operational
+      method: operational
+      unit: operational
+      decimals: operational
+      tat_minutes: operational
+      charge_item_id: operational
+      outsourced_partner_id: operational
+      active: operational
+      sensitive: operational
+      auto_release_to_patient: operational
+      created_at: operational
+      updated_at: operational
+      change_seq: operational
     legal_entities:
       id: operational
       owner_id: operational
@@ -1314,6 +1427,10 @@ schemas:
       unit_list_price: financial
       allocated_price: financial
       tax_rate_percent: financial
+      invoice_line_id: operational
+      allocated_minor: financial
+      tax_minor: financial
+      tax_category: financial
     package_instances:
       id: operational
       tenant_id: operational
@@ -1323,6 +1440,7 @@ schemas:
       package_name: phi  # uncertain: package sold to a patient reveals the treatment
       sold_price: financial
       sold_tax: financial
+      tax_inclusive: financial
       validity_starts: operational
       validity_days: operational
       validity_start: operational
@@ -1347,6 +1465,7 @@ schemas:
       quantity: operational
       unit_list_price: financial
       tax_rate_percent: financial
+      charge_catalogue_id: operational
       display_order: operational
     package_redemptions:
       id: operational
@@ -1383,6 +1502,8 @@ schemas:
     package_settings:
       tenant_id: operational
       price_floor_percent: financial
+      tax_split_enabled: operational
+      gst_opinion_decision_id: operational
       updated_at: operational
     packages:
       id: operational
@@ -1401,6 +1522,26 @@ schemas:
       created_by: operational
       created_at: operational
       updated_at: operational
+    paper_prescription_lines:
+      id: operational
+      tenant_id: operational
+      paper_rx_id: operational
+      item_id: operational
+      drug_text: phi
+      qty: phi
+    paper_prescriptions:
+      id: operational
+      tenant_id: operational
+      prescriber_name: pii
+      prescriber_reg_no: pii
+      rx_date: phi
+      customer_name: pii
+      customer_phone: pii
+      document_id: operational
+      duplicate_copy_retained: operational
+      valid_until: operational
+      created_by: operational
+      created_at: operational
     patient_allergies:
       unconfirmed: operational
       id: operational
@@ -1497,6 +1638,8 @@ schemas:
       preferred_language: operational
       legacy_record_no: pii
       is_synthetic: operational
+      dob_year_only: operational
+      paper_note: phi  # ADM-014: free text from the paper card (last visit, doctor)
       id: operational
       tenant_id: operational
       mrn: pii
@@ -1582,6 +1725,7 @@ schemas:
       returnable: operational
       cold_chain: operational
       reorder_level: operational
+      gtin: operational
     pharmacy_schedule_rules:
       market: operational
       schedule_class: operational
@@ -1602,6 +1746,7 @@ schemas:
       drug_licence_numbers: operational
       pharmacist_in_charge_staff_id: operational
       alert_recipient_staff_id: operational
+      printer_tested_at: operational
       expiry_alert_days: operational
       dead_stock_days: operational
       digest_local_time: operational
@@ -1988,6 +2133,22 @@ schemas:
       packages_sold: operational
       last_event_id: operational
       updated_at: operational
+      bookings: operational
+      flow_n: operational
+      wait_p50_s: operational
+      door_to_doctor_p50_s: operational
+      consult_n: operational
+      consult_p50_s: operational
+      booking_response_n: operational
+      booking_response_p50_s: operational
+      eta_n: operational
+      eta_within_range_pct: operational
+      sessions: operational
+      punctual_sessions_pct: operational
+      checkin_to_vitals_p50_s: operational
+      checkout_p50_s: operational
+      wait_by_hour: operational
+      flow_refreshed_at: operational
     doctor_daily_metrics:
       tenant_id: operational
       doctor_id: operational
@@ -1995,6 +2156,7 @@ schemas:
       visits: operational
       completed: operational
       median_consult_s: operational
+      first_call_delay_s: operational
       no_shows: operational
       billed: financial
       collected: financial
@@ -2340,6 +2502,13 @@ schemas:
       tour_key: operational
       completed_at: operational
       competency_passed_at: operational
+    training_completions:
+      id: operational
+      tenant_id: operational
+      staff_id: operational
+      module_id: operational
+      score: operational
+      completed_at: operational
     staff_preferences:
       staff_id: operational
       tenant_id: operational
@@ -2376,6 +2545,9 @@ schemas:
       secure_link_ttl_days: operational
       consent_two_witnesses: operational
       day_start_minute: operational
+      branch_code: operational
+      branch_label: operational
+      branch_address: operational
     vaccine_records:
       id: operational
       tenant_id: operational

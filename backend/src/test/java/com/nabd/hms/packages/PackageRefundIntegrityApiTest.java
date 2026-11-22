@@ -164,7 +164,8 @@ class PackageRefundIntegrityApiTest extends ApiTestBase {
         assertThat(type(noConfirm)).endsWith("amount-changed");
         double current = ((Number) noConfirm.getBody().get("currentAmount")).doubleValue();
         assertThat(((Number) noConfirm.getBody().get("requestedAmount")).doubleValue()).isEqualTo(requested);
-        assertThat(requested - current).isEqualTo(1000.00); // one session at full single-session list price, no fee
+        // FIN-025: one session at the full single-session list price (1,000) plus the 18% tax on that used value stays; no fee
+        assertThat(requested - current).isEqualTo(1180.00);
 
         ResponseEntity<Map> stale = approve(c.checker(), refundId, requested);
         assertThat(stale.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);

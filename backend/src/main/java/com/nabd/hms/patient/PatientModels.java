@@ -10,7 +10,8 @@ final class PatientModels {
     }
 
     record PatientRow(UUID id, UUID tenantId, String mrn, String name, String phone, LocalDate dob,
-                       String gender, UUID guardianId, String address, String status, Instant createdAt) {
+                       String gender, UUID guardianId, String address, String status, Instant createdAt,
+                       boolean dobYearOnly, String paperNote) {
     }
 
     /** matchedFields (REC-038): which of the fields the matcher compares agreed — phone, dob, name, in that order. */

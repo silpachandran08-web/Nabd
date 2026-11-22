@@ -5,6 +5,7 @@ import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.iam.api.ActorDirectory;
+import com.nabd.hms.organization.api.InvoicingGate;
 import com.nabd.hms.organization.api.SeriesAllocator;
 import com.nabd.hms.organization.series.dto.InvoiceSeriesConfigRequest;
 import com.nabd.hms.organization.series.dto.InvoiceSeriesListResponse;
@@ -31,7 +32,7 @@ public class InvoiceSeriesService implements SeriesAllocator {
     static final int GST_MAX_LENGTH = 16;
     private static final String REGION_IN = "IN";
     private static final Map<Kind, String> DEFAULT_PATTERN = Map.of(
-            Kind.INVOICE, "INV-{FY}-", Kind.CREDIT_NOTE, "CN-{FY}-", Kind.RECEIPT, "RCT-{FY}-");
+            Kind.INVOICE, "INV-{FY}-", Kind.CREDIT_NOTE, "CN-{FY}-", Kind.RECEIPT, "RCT-{FY}-", Kind.DEBIT_NOTE, "DN-{FY}-");
     private static final String COLS = "id, kind, prefix, fiscal_year, next_number, tax_registration_id, prefix_pattern, fy_start_month, pad";
 
     private final JdbcTemplate jdbc;
@@ -40,9 +41,11 @@ public class InvoiceSeriesService implements SeriesAllocator {
     private final AuditService audit;
     private final ActorDirectory actors;
     private final TransactionTemplate tx;
+    private final InvoicingGate gate;
 
     InvoiceSeriesService(JdbcTemplate jdbc, ClinicClock clock, TenantContext tenantContext, AuditService audit,
-                         ActorDirectory actors, PlatformTransactionManager txManager) {
+                         ActorDirectory actors, PlatformTransactionManager txManager, InvoicingGate gate) {
+        this.gate = gate;
         this.jdbc = jdbc;
         this.clock = clock;
         this.tenantContext = tenantContext;
@@ -72,6 +75,7 @@ public class InvoiceSeriesService implements SeriesAllocator {
 
     /** The clinic day is a parameter so the financial-year boundary can be tested without a mutable clock. */
     Allocation allocate(Kind kind, LocalDate today) {
+        if (kind == Kind.INVOICE) gate.requireReady(); // PHL-032: before a number is taken, so a refusal consumes none
         UUID tenantId = tenantContext.current();
         String sql = "UPDATE invoice_series SET next_number = next_number + 1 WHERE tenant_id = ? AND kind = ? AND fiscal_year = ? " +
                 "RETURNING id, next_number - 1 AS n, prefix, pad";
@@ -115,7 +119,7 @@ public class InvoiceSeriesService implements SeriesAllocator {
     public InvoiceSeriesResponse configure(UUID staffId, String ip, String kindPath, InvoiceSeriesConfigRequest req) {
         Kind kind = java.util.Arrays.stream(Kind.values()).filter(k -> k.column().equals(kindPath)).findFirst()
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "unknown-series-kind", "Unknown series",
-                        "The series kind must be invoice, credit_note or receipt."));
+                        "The series kind must be invoice, credit_note, receipt or debit_note."));
         String pattern = req.prefixPattern().trim();
         if (!pattern.contains("{FY}") || pattern.chars().anyMatch(Character::isWhitespace)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "invalid-prefix-pattern", "Invalid prefix pattern",

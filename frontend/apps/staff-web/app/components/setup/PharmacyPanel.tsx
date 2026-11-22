@@ -25,7 +25,7 @@ import type { DispensingQueueEntryResponse, DispensingQueueItem, PharmacyItemRes
 export type PharmacyMode = "external" | "hybrid" | "in_house";
 type PharmacySettings = Omit<Full<PharmacySettingsResponse>, "mode"> & { mode: PharmacyMode };
 // PHL-002/004 fields (also in the generated type once regenerated): class, register badge, generic name, dispensed-here flag.
-type PharmacyItem = Omit<Full<PharmacyItemResponse, "hsnCode">, "reorderLevel"> & { scheduleClass: string; register?: string | null; genericName?: string | null; inHouse: boolean; reorderLevel?: number | null };
+type PharmacyItem = Omit<Full<PharmacyItemResponse, "hsnCode">, "reorderLevel" | "gtin"> & { scheduleClass: string; register?: string | null; genericName?: string | null; inHouse: boolean; reorderLevel?: number | null; gtin?: string | null };
 type DispensingQueueEntry = Omit<Full<DispensingQueueEntryResponse>, "items" | "token"> & {
   token?: number | null; items: Full<DispensingQueueItem, "stockQty" | "dosage" | "frequency" | "duration" | "instructions">[];
 };
@@ -226,6 +226,7 @@ export default function PharmacyPanel() {
     name: i.name, isRx: i.isRx, hsnCode: i.hsnCode || null, price: i.price, taxRatePercent: i.taxRatePercent,
     scheduleClass: i.scheduleClass, genericName: i.genericName || null, inHouse: i.inHouse,
     priceInclusiveOfTax: i.priceInclusiveOfTax ?? null, zeroRated: !!i.zeroRated, mrp: i.mrp ?? null, reorderLevel: i.reorderLevel ?? null,
+    gtin: i.gtin ?? "", // PHL-019: "" clears the barcode
   });
 
   const openAdjust = (item: PharmacyItem, direction: 1 | -1) => {
@@ -532,6 +533,12 @@ export default function PharmacyPanel() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-generic">Generic name</label>
               <input id="pe-generic" className={styles.input} maxLength={200} value={editing.genericName ?? ""} onChange={(e) => setEditing({ ...editing, genericName: e.target.value })} />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pe-gtin">Barcode (GTIN)</label>
+              <input id="pe-gtin" className={styles.input} inputMode="numeric" maxLength={14} pattern="[0-9]{8,14}" autoComplete="off" value={editing.gtin ?? ""} {...efe.attrs("gtin")}
+                onChange={(e) => { efe.clearField("gtin"); setEditing({ ...editing, gtin: e.target.value.replace(/\D/g, "") }); }} />
+              <p className={ph.sub}>8 to 14 digits from the pack. Scanning it at the counter adds this item to the sale.</p>
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-reorder">Reorder level</label>

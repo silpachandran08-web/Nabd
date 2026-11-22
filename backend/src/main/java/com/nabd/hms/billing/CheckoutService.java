@@ -254,7 +254,22 @@ public class CheckoutService {
     public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, boolean canDiscount, String ip, CheckoutRequest req) {
         tenantContext.set(tenantId);
         requireOtcAvailable(tenantId);
-        return standaloneInvoice(tenantId, staffId, null, req, "OTC", canDiscount, false, ip);
+        InvoiceResponse inv = standaloneInvoice(tenantId, staffId, null, req, "OTC", canDiscount, false, ip);
+        // PHL-019: the counter takes the money with the sale (split tender = several rows); all of it or the sale rolls back
+        List<PaymentRequest> payments = req.payments() == null ? List.of() : req.payments();
+        if (!payments.isEmpty()) {
+            BigDecimal tendered = payments.stream().map(PaymentRequest::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (tendered.compareTo(inv.total()) != 0) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "payment-mismatch", "Payments do not match the total",
+                        "The payments add up to " + tendered.toPlainString() + " but the bill is " + inv.total().toPlainString() + ".",
+                        java.util.Map.of("total", inv.total()));
+            }
+            for (PaymentRequest p : payments) inv = recordPayment(tenantId, inv.id(), staffId, p, null);
+        }
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.PHARMACY_OTC_SALE_COMPLETED, inv.id(), java.util.Map.of(
+                "invoiceId", inv.id(), "lineCount", inv.lineItems().size(),
+                "totalMinor", Money.of(inv.total(), inv.currency()).amountMinor(), "currency", inv.currency()));
+        return inv;
     }
 
     /** E14 Treatment Packages: a package sale is also a standalone invoice — no queue entry, but
@@ -262,6 +277,51 @@ public class CheckoutService {
     @Transactional
     public InvoiceResponse sellPackageInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req) {
         return standaloneInvoice(tenantId, staffId, patientId, req, "package", true, true, null);
+    }
+
+    /**
+     * FIN-025: the package sale invoiced from its components: one line per component at its allocated share (quantity 1, so the line
+     * total is exact to the minor unit), the tax class from the component's price-list head through the tax engine, and with a
+     * tax-inclusive bundle the tax back-calculated out of each line. list_unit_price carries what the component costs bought
+     * separately (the printed "you save"). The line is not linked to the head, so a stocked take-home item is not dispensed here.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public com.nabd.hms.billing.api.PackageInvoicing.Issued sellPackageComponents(UUID tenantId, UUID staffId, UUID patientId, boolean taxInclusive,
+                                                                                 List<com.nabd.hms.billing.api.PackageInvoicing.Component> components) {
+        dayClose.requireTodayOpen(tenantId);
+        String currency = currencyFor(tenantId);
+        List<LineItemInput> items = new java.util.ArrayList<>();
+        List<com.nabd.hms.billing.tax.TaxService.InLine> in = new java.util.ArrayList<>();
+        for (var c : components) {
+            items.add(new LineItemInput(c.code(), c.quantity() > 1 ? c.name() + " x " + c.quantity() : c.name(), "Package", 1,
+                    money(c.allocatedMinor(), currency), c.fallbackRatePercent(), null, money(c.listValueMinor(), currency), "custom",
+                    null, null, null, false, null, null, null));
+            in.add(new com.nabd.hms.billing.tax.TaxService.InLine("new" + in.size(), c.allocatedMinor(), c.chargeCatalogueId(),
+                    c.fallbackRatePercent(), false, null, false, false, null, taxInclusive));
+        }
+        var computed = tax.compute(null, in, 0, null);
+        var r = computed.result();
+        for (int i = 0; i < items.size(); i++) items.set(i, items.get(i).withTaxRate(computed.meta().get(i).rate()));
+        var number = series.allocate(SeriesAllocator.Kind.INVOICE);
+        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId, null, money(r.subtotalMinor(), currency), BigDecimal.ZERO,
+                money(r.taxMinor(), currency), money(r.roundOffMinor(), currency), money(r.totalMinor(), currency), staffId, number);
+        repo.insertLineItems(tenantId, invoiceId, items, staffId);
+        tax.persist(invoiceId, computed);
+        List<LineItemRow> stored = repo.findLineItems(tenantId, invoiceId);
+        List<com.nabd.hms.billing.api.PackageInvoicing.Line> lines = new java.util.ArrayList<>();
+        for (int i = 0; i < stored.size(); i++) {
+            lines.add(new com.nabd.hms.billing.api.PackageInvoicing.Line(stored.get(i).id(), r.lines().get(i).taxableMinor(),
+                    r.lines().get(i).taxMinor(), computed.meta().get(i).category()));
+        }
+        log.info("package invoice {} created by {} (tenant {}, total {})", invoiceId, staffId, tenantId, money(r.totalMinor(), currency));
+        return new com.nabd.hms.billing.api.PackageInvoicing.Issued(invoiceId, number.formatted(), r.taxMinor(), r.totalMinor(), lines);
+    }
+
+    /** FIN-025: the active price-list heads a package component can be linked to. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public List<com.nabd.hms.billing.api.PackageInvoicing.ChargeHead> packageChargeHeads(UUID tenantId) {
+        return repo.listActiveCharges(tenantId).stream()
+                .map(c -> new com.nabd.hms.billing.api.PackageInvoicing.ChargeHead(c.id(), c.code(), c.name(), c.category())).toList();
     }
 
     private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind,
@@ -279,7 +339,8 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "free-text-not-allowed", "Only price-list items at the counter",
                     "Counter sales can only bill items from the price list. Add the item to the price list first.");
         }
-        // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
+        // PHL-001: a counter sale of an Rx line needs a signed in-system prescription (the invoice then carries that patient)
+        // or, PHL-020, a recorded outside prescription line.
         UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
         Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
         UUID approvalId = trusted ? null : gate(tenantId, null, t, List.of(), BigDecimal.ZERO, req);
@@ -298,7 +359,7 @@ public class CheckoutService {
 
     private static List<com.nabd.hms.pharmacy.RxGate.Line> rxLines(List<LineItemInput> items) {
         return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.Line(i.chargeCode(), i.catalogueId(), i.isRx(), i.quantity(),
-                i.prescriptionItemId())).toList();
+                i.prescriptionItemId(), i.paperRxLineId())).toList();
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,

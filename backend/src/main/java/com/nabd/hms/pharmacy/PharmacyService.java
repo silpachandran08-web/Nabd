@@ -88,7 +88,7 @@ public class PharmacyService {
                 .orElse(new PharmacySettingsResponse("external", null, Map.of(), null, null));
     }
 
-    private static Map<String, String> licences(String json) {
+    static Map<String, String> licences(String json) {
         try {
             return json == null ? Map.of() : JSON.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() { });
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
@@ -199,6 +199,7 @@ public class PharmacyService {
         repo.upsertProfile(tenantId, id, cls, req.genericName(), req.packSize(), req.unit(), req.inHouse());
         taxInputs.setInputs(tenantId, id, req.priceInclusiveOfTax(), req.zeroRated(), req.mrp());
         repo.setReturnFlags(tenantId, id, req.coldChain(), req.returnable(), req.reorderLevel());
+        setGtin(tenantId, id, req.gtin());
         if (drugId != null) {
             repo.setDrug(tenantId, id, drugId);
         }
@@ -223,6 +224,7 @@ public class PharmacyService {
         repo.upsertProfile(tenantId, id, cls, req.genericName(), req.packSize(), req.unit(), req.inHouse());
         taxInputs.setInputs(tenantId, id, req.priceInclusiveOfTax(), req.zeroRated(), req.mrp());
         repo.setReturnFlags(tenantId, id, req.coldChain(), req.returnable(), req.reorderLevel());
+        setGtin(tenantId, id, req.gtin());
         if (drugId != null && !drugId.equals(before.drugId())) {
             repo.setDrug(tenantId, id, drugId);
         }
@@ -232,6 +234,21 @@ public class PharmacyService {
         }
         catalogueChanged(tenantId, id, "updated");
         return toResponse(repo.findItem(tenantId, id).orElseThrow(() -> ApiException.notFound(NOT_FOUND)));
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // always called from the item create/update transaction
+    private void setGtin(UUID tenantId, UUID id, String gtin) {
+        try {
+            repo.setGtin(tenantId, id, gtin);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            throw new ApiException(HttpStatus.CONFLICT, "gtin-in-use", "Barcode already used", "Another item already has this barcode.");
+        }
+    }
+
+    /** PHL-019: the counter's client-side search index. */
+    @Transactional
+    public List<com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry> itemIndex(UUID tenantId) {
+        return repo.itemIndex(tenantId);
     }
 
     /** The drug master id to link, checked like PUT drug-link (exists, not retired); null when the request sends none. */
@@ -352,7 +369,7 @@ public class PharmacyService {
     private PharmacyItemResponse toResponse(PharmacyItemRow r) {
         return new PharmacyItemResponse(r.id().toString(), r.code(), r.name(), r.isRx(), r.hsnCode(), r.price(),
                 r.taxRatePercent(), r.stockQty(), r.active(), r.drugId(), r.scheduleClass(), r.registerType(), r.genericName(),
-                r.packSize(), r.unit(), r.inHouse(), r.priceInclusiveOfTax(), r.zeroRated(), r.mrp(), r.coldChain(), r.returnable(), r.reorderLevel());
+                r.packSize(), r.unit(), r.inHouse(), r.priceInclusiveOfTax(), r.zeroRated(), r.mrp(), r.coldChain(), r.returnable(), r.reorderLevel(), r.gtin());
     }
 
     /** CLN-019: owner maps an in-house item to a drug master id. is_rx is only SUGGESTED (scheduled product => prescription-only);

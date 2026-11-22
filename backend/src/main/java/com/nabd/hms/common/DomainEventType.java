@@ -26,6 +26,9 @@ public enum DomainEventType {
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
     ORGANIZATION_CONFIG_CHANGED("organization.config.changed.v1", "core/organization"),
     TENANT_REGION_PINNED("organization.tenant.region_pinned.v1", "core/organization"),
+    /** ADM-020: every tenant lifecycle move (TenantLifecycleService). Consumers: comms-gateway, control-plane/subscriptions. */
+    TENANT_STATUS_CHANGED("organization.tenant.status_changed.v1", "core/organization"),
+    ORGANIZATION_BRANCH_CREATED("organization.branch.created.v1", "core/organization"),
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),
@@ -67,7 +70,19 @@ public enum DomainEventType {
     PACKAGE_SOLD("billing.package.sold.v1", "core/billing"),
     /** PHL-008: the clinic's daily stock-alert digest was handed to its one named recipient. Ids and counts only. */
     PHARMACY_STOCK_ALERTS_DIGEST_READY("pharmacy.stock.alerts_digest_ready.v1", "core/pharmacy"),
-    SPECIALTY_PHOTO_ADDED("specialty.photo.added.v1", "core/specialty");
+    SPECIALTY_PHOTO_ADDED("specialty.photo.added.v1", "core/specialty"),
+    /** PHL-019: a counter (OTC) sale was invoiced and its stock issued. Ids, a count and the total only. */
+    PHARMACY_OTC_SALE_COMPLETED("pharmacy.otc_sale.completed.v1", "core/pharmacy"),
+    /** PHL-009: a batch was taken off sale (by hand, by the nightly expiry pass or by a return into an expired batch). Ids and a reason code only. */
+    PHARMACY_BATCH_QUARANTINED("pharmacy.batch.quarantined.v1", "core/pharmacy"),
+    /** COM-015: produced by services/comms-gateway once per clinic and closed day: message counts and cost by channel and category. No PHI. */
+    USAGE_REPORTED("comms.usage.reported.v1", "core/messaging"),
+    /** ADM-016: a leaving clinic's rows were erased and its deletion certificate issued. Ids, the erase time and totals only. */
+    ORGANIZATION_OFFBOARDING_ERASED("organization.offboarding.erased.v1", "core/organization"),
+    /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
+    REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
+    /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
+    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab");
 
     private final String type;
     private final String source;

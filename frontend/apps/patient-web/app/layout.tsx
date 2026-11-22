@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 import { dirOf } from "@nabd/i18n";
+import catalogue from "@nabd/i18n/catalogue/patient-catalogue.json";
 import "./globals.css";
 import { scriptFontClasses } from "./fonts";
 import { currentLocale } from "./lib/messages";
@@ -14,7 +15,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await currentLocale();
   const theme = (await headers()).get("x-nabd-theme") === "dark" ? "dark" : "light";
   return (
-    <html lang={locale} dir={dirOf(locale)} data-theme={theme} className={scriptFontClasses}>
+    <html lang={locale} dir={dirOf(locale)} data-theme={theme} data-catalogue={catalogue.version} className={scriptFontClasses}>
       <body>{children}</body>
     </html>
   );

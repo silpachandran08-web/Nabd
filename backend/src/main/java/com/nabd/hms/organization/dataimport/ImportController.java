@@ -43,10 +43,10 @@ public class ImportController {
         this.pipeline = pipeline;
     }
 
-    /** The raw file is the request body (application/octet-stream), the name and format are query parameters. */
+    /** The raw file is the request body (application/octet-stream), the name and format are query parameters. ADM-013: zip = an old system's export (a set of csv / xlsx files). */
     @PostMapping("/import-uploads")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<ImportUploadResponse> upload(@RequestParam String fileName, @RequestParam @Pattern(regexp = "xlsx|csv") String format,
+    public ResponseEntity<ImportUploadResponse> upload(@RequestParam String fileName, @RequestParam @Pattern(regexp = "xlsx|csv|zip") String format,
                                                        @RequestBody byte[] body, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.status(HttpStatus.CREATED).body(pipeline.upload(fileName, format, body, UUID.fromString(jwt.getSubject())));
     }

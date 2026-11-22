@@ -48,6 +48,19 @@ class PharmacyTaxInputsRepository {
                 priceInclusive, zeroRated, mrp, itemId, tenantId, tenantId, itemId);
     }
 
+    record SoldBatch(UUID itemId, String batchNo, java.time.LocalDate expiry, int qty) {
+    }
+
+    /** PHL-019: the batches an invoice's dispense movements came from, earliest expiry first; batches without an expiry (no batch details) are left out. */
+    java.util.List<SoldBatch> soldBatches(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT m.item_id, b.batch_no, b.expiry_date, -sum(m.delta) AS qty FROM pharmacy_stock_movements m " +
+                        "JOIN stock_batches b ON b.tenant_id = m.tenant_id AND b.id = m.batch_id " +
+                        "WHERE m.tenant_id = ? AND m.invoice_id = ? AND m.kind = 'dispense' AND b.expiry_date IS NOT NULL " +
+                        "GROUP BY m.item_id, b.batch_no, b.expiry_date ORDER BY b.expiry_date, b.batch_no",
+                (rs, i) -> new SoldBatch(rs.getObject("item_id", UUID.class), rs.getString("batch_no"),
+                        rs.getObject("expiry_date", java.time.LocalDate.class), rs.getInt("qty")), tenantId, invoiceId);
+    }
+
     Optional<String> licenceJson(UUID tenantId) {
         return jdbc.query("SELECT drug_licence_numbers::text FROM pharmacy_settings WHERE tenant_id = ?",
                 (rs, i) -> rs.getString(1), tenantId).stream().findFirst();

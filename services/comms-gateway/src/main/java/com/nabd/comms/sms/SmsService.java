@@ -6,6 +6,7 @@ import com.nabd.comms.inbox.FieldCrypto;
 import com.nabd.comms.inbox.InboxException;
 import com.nabd.comms.provider.Provider;
 import com.nabd.comms.send.StatusApplier;
+import com.nabd.comms.usage.UsageService;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import com.nabd.comms.i18n.PatientCatalogue;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -162,10 +164,10 @@ public class SmsService {
             Timestamp now = Timestamp.from(clock.instant());
             jdbc.update("""
                     INSERT INTO outbound_messages (id, tenant_id, request_id, channel, patient_ref, to_address_enc, to_hash, template_id, template_name,
-                      language, status, error_code, fallback_of, created_at, updated_at)
-                    VALUES (?,?,?, 'sms', ?,?,?,?,?, ?,?,?,?,?,?)""",
+                      language, status, error_code, fallback_of, created_at, updated_at, catalogue_version)
+                    VALUES (?,?,?, 'sms', ?,?,?,?,?, ?,?,?,?,?,?,?)""",
                     id, tenant, r.requestId(), r.patientRef(), crypto.encrypt(r.to()), crypto.hash(r.to()), t.id(), t.key(), t.language(),
-                    status, decision.reason(), fallbackOf, now, now);
+                    status, decision.reason(), fallbackOf, now, now, PatientCatalogue.get().version());
             return new Prepared(new Sent(id, status), t);
         });
     }
@@ -226,6 +228,7 @@ public class SmsService {
                 m.put("id", d.providerMessageId());
                 m.put("status", d.status());
                 m.put("errorCode", d.errorCode());
+                m.put("costMicros", d.costMicros());
                 jdbc.update("INSERT INTO inbound_events (source, dedupe_key, field, body_enc) VALUES (?,?, 'sms_dlr', ?) ON CONFLICT (dedupe_key) DO NOTHING",
                         "sms_" + provider.name(), "sms:" + provider.name() + ":" + d.providerMessageId() + ":" + d.status(),
                         crypto.encrypt(json.writeValueAsString(m)));
@@ -273,6 +276,13 @@ public class SmsService {
                 boolean moved = statuses.apply(providerId, status);
                 if (moved && "failed".equals(status)) {
                     jdbc.update("UPDATE outbound_messages SET error_code = ? WHERE id = ?", err, messageId);
+                }
+                // COM-015: a delivered SMS (or any report that names its cost) is priced once, under its DLT template's category
+                Long cost = d.path("costMicros").isIntegralNumber() ? d.path("costMicros").asLong() : null;
+                if ("delivered".equals(status) || cost != null) {
+                    String category = jdbc.query("SELECT t.category FROM sms_templates t JOIN outbound_messages m ON m.template_id = t.id WHERE m.id = ?",
+                            (rs, i) -> rs.getString(1), messageId).stream().findFirst().orElse("unknown");
+                    UsageService.price(jdbc, clock, region.toLowerCase(), messageId, "sms", category, true, cost);
                 }
                 jdbc.update("UPDATE inbound_events SET tenant_id = ?, status = 'done', attempts = attempts + 1, processed_at = now() WHERE id = ?", tenant, eventId);
                 if (moved) {

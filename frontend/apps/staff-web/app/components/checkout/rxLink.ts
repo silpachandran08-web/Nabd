@@ -1,13 +1,13 @@
 // PHL-001: prescription-only (isRx, the clinic's catalogue flag) lines must carry a signed prescription line id.
 // Pure helpers shared by the counter sale and the visit checkout.
 
-type Coded = { chargeCode: string; prescriptionItemId?: string };
+type Coded = { chargeCode: string; prescriptionItemId?: string; paperRxLineId?: string }; // PHL-020: either link
 type Prescribed = { prescriptionItemId: string; drugName: string; remainingQty: number };
 
 /** Codes of Rx lines still waiting for a prescription link (Pay/Checkout stays off until this is empty). */
 export function unlinkedRx(items: Coded[], charges: { code: string; isRx?: boolean }[]): string[] {
   const rx = new Set(charges.filter((c) => c.isRx).map((c) => c.code));
-  return items.filter((i) => rx.has(i.chargeCode) && !i.prescriptionItemId).map((i) => i.chargeCode);
+  return items.filter((i) => rx.has(i.chargeCode) && !i.prescriptionItemId && !i.paperRxLineId).map((i) => i.chargeCode);
 }
 
 /** Visit checkout pre-link: the visit's signed line for this item, by name, that still has quantity left. */
@@ -25,6 +25,11 @@ const RX_RULES: Record<string, string> = {
   "rx-not-signed": "The linked prescription is still a draft: the doctor must sign it first.",
   "rx-patient-mismatch": "The linked prescription belongs to a different patient.",
   "rx-quantity-exhausted": "The linked prescription line has no quantity left for this amount.",
+  // PHL-020: outside (paper) prescriptions
+  "rx-item-mismatch": "The paper prescription was recorded for a different item.",
+  "rx-copy-required": "This item needs the duplicate copy of the prescription retained and a photo of it.",
+  "document-not-clean": "The prescription photo cannot be used.",
+  "rx-expired": "The prescription has passed its validity date.",
 };
 
 /** Names the rule that refused the bill (the server detail adds the item code), or null for a non-Rx problem. */

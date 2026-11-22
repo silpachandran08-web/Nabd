@@ -14,13 +14,17 @@ public class MeEntitlementsController {
     public record ModuleState(String code, boolean enabled) {
     }
 
-    public record MeEntitlements(List<ModuleState> modules, List<String> killedFeatures, Integer seatLimit) {
+    /** tenantStatus (ADM-020, additive): staff-web shows the read-only banner when suspended and the owner's payment banner when overdue.
+     *  edition (PHL-032): "pharmacy" for a pharmacy-only tenant, whose navigation is pharmacy only; "clinic" for every other facility type. */
+    public record MeEntitlements(List<ModuleState> modules, List<String> killedFeatures, Integer seatLimit, String tenantStatus, String edition) {
     }
 
     private final PlanEntitlements entitlements;
+    private final com.nabd.hms.platform.tenant.TenantLifecycleService lifecycle;
 
-    MeEntitlementsController(PlanEntitlements entitlements) {
+    MeEntitlementsController(PlanEntitlements entitlements, com.nabd.hms.platform.tenant.TenantLifecycleService lifecycle) {
         this.entitlements = entitlements;
+        this.lifecycle = lifecycle;
     }
 
     @GetMapping("/v1/me/entitlements")
@@ -31,6 +35,7 @@ public class MeEntitlementsController {
         List<String> killed = PlanEntitlements.FEATURES.stream().sorted()
                 .filter(f -> entitlements.state(t, f) == PlanEntitlements.State.KILLED).toList();
         int seats = entitlements.seatLimit();
-        return new MeEntitlements(mods, killed, seats == Integer.MAX_VALUE ? null : seats);
+        return new MeEntitlements(mods, killed, seats == Integer.MAX_VALUE ? null : seats, lifecycle.statusOf(t).orElse(null),
+                "pharmacy".equals(entitlements.facilityType(t)) ? "pharmacy" : "clinic");
     }
 }

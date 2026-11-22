@@ -127,6 +127,8 @@ class SmsServiceTest {
 
         var row = su.queryForMap("SELECT channel, status, provider_message_id, template_name, to_address_enc FROM outbound_messages WHERE id = ?", sent.messageId());
         assertThat(row.get("channel")).isEqualTo("sms");
+        assertThat(su.queryForObject("SELECT catalogue_version FROM outbound_messages WHERE id = ?", String.class, sent.messageId()))
+                .as("FEF-041: the catalogue artefact version is recorded per send").isEqualTo(com.nabd.comms.i18n.PatientCatalogue.get().version());
         assertThat(row.get("status")).isEqualTo("sent");
         assertThat((String) row.get("provider_message_id")).startsWith("bsp-");
         assertThat(row.get("template_name")).isEqualTo("otp");
@@ -224,6 +226,31 @@ class SmsServiceTest {
         assertThat(published.get(0).path("type").asString()).isEqualTo("comms.message.status_changed.v1");
         assertThat(published.get(0).path("data").path("channel").asString()).isEqualTo("sms");
         assertThat(published.get(0).path("data").path("status").asString()).isEqualTo("delivered");
+    }
+
+    @Test
+    void com015_aDeliveryReportPricesTheMessageOnceWithTheBspsOwnCostOrThePriceList() {
+        UUID tenant = UUID.randomUUID();
+        var svc = service("in");
+        var withCost = svc.send(tenant, new SmsService.SendRequest(PHONE, otpText("111222"), null, null));
+        var listPrice = svc.send(tenant, new SmsService.SendRequest(PHONE, otpText("333444"), null, null));
+        String id1 = su.queryForObject("SELECT provider_message_id FROM outbound_messages WHERE id = ?", String.class, withCost.messageId());
+        String id2 = su.queryForObject("SELECT provider_message_id FROM outbound_messages WHERE id = ?", String.class, listPrice.messageId());
+
+        var dlrs = svc.provider().parseDlr(("[{\"id\":\"" + id1 + "\",\"status\":\"DELIVRD\",\"cost\":\"0.18\"},{\"id\":\"" + id2 + "\",\"status\":\"DELIVRD\"}]")
+                .getBytes(StandardCharsets.UTF_8));
+        assertThat(dlrs).containsExactly(new SmsProvider.Dlr(id1, "delivered", null, 180000L), new SmsProvider.Dlr(id2, "delivered", null));
+        svc.storeDlrs(dlrs);
+        svc.drainDlrs();
+
+        assertThat(su.queryForMap("SELECT pricing_category, currency, cost_micros, cost_minor, priced_at IS NOT NULL AS priced FROM outbound_messages WHERE id = ?", withCost.messageId()))
+                .containsEntry("pricing_category", "otp").containsEntry("currency", "INR").containsEntry("cost_micros", 180000L).containsEntry("cost_minor", 18L).containsEntry("priced", true);
+        // no cost in the report: the price list row (0 until the BSP rate is set), still counted under its DLT category
+        assertThat(su.queryForMap("SELECT pricing_category, cost_micros FROM outbound_messages WHERE id = ?", listPrice.messageId()))
+                .containsEntry("pricing_category", "otp").containsEntry("cost_micros", 0L);
+        assertThat(BspSmsProvider.costMicros(JSON.readTree("\"-1\""))).isNull();
+        assertThat(BspSmsProvider.costMicros(JSON.readTree("\"abc\""))).isNull();
+        assertThat(BspSmsProvider.costMicros(JSON.readTree("0.125"))).isEqualTo(125000L);
     }
 
     @Test

@@ -29,7 +29,10 @@ class PharmacyRepository {
 
     private final ClinicClock clock;
 
-    PharmacyRepository(JdbcTemplate jdbc, ClinicClock clock) {
+    private final com.nabd.hms.pharmacy.api.ItemCatalogueWriter catalogue; // PLT-036: charge_catalogue rows are written by billing; only stock_qty here
+
+    PharmacyRepository(JdbcTemplate jdbc, ClinicClock clock, com.nabd.hms.pharmacy.api.ItemCatalogueWriter catalogue) {
+        this.catalogue = catalogue;
         this.clock = clock;
         this.jdbc = jdbc;
     }
@@ -72,7 +75,7 @@ class PharmacyRepository {
                     "(SELECT max(r.register_type) FROM pharmacy_schedule_rules r WHERE r.schedule_class = p.schedule_class) AS register_type, " +
                     "p.generic_name, p.pack_size, p.unit, COALESCE(p.in_house, true) AS in_house, " +
                     "p.price_inclusive_of_tax, COALESCE(p.zero_rated, false) AS zero_rated, p.mrp, " +
-                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable, p.reorder_level " +
+                    "COALESCE(p.cold_chain, false) AS cold_chain, COALESCE(p.returnable, true) AS returnable, p.reorder_level, p.gtin " +
                     "FROM charge_catalogue c LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id ";
 
     /** @param scheduleClass optional PHL-002 filter (index on tenant_id, schedule_class) */
@@ -134,6 +137,12 @@ class PharmacyRepository {
                 (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, code).stream().findFirst();
     }
 
+    /** ADM-013: a pharmacy item by name, ignoring case; an active one first. */
+    Optional<UUID> findItemIdByName(UUID tenantId, String name) {
+        return jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL AND lower(name) = lower(?) " +
+                "ORDER BY active DESC, created_at LIMIT 1", (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, name).stream().findFirst();
+    }
+
     Optional<String> scheduleClassOf(UUID tenantId, UUID itemId) {
         return jdbc.query("SELECT schedule_class FROM pharmacy_item_profiles WHERE tenant_id = ? AND item_id = ?",
                 (rs, i) -> rs.getString("schedule_class"), tenantId, itemId).stream().findFirst();
@@ -153,6 +162,24 @@ class PharmacyRepository {
         jdbc.update("UPDATE pharmacy_item_profiles SET cold_chain = COALESCE(?, cold_chain), returnable = COALESCE(?, returnable), " +
                         "reorder_level = COALESCE(?, reorder_level) WHERE tenant_id = ? AND item_id = ?",
                 coldChain, returnable, reorderLevel, tenantId, itemId);
+    }
+
+    /** PHL-019: null leaves the stored barcode, "" clears it. A code another item of the clinic holds is a DuplicateKeyException. */
+    void setGtin(UUID tenantId, UUID itemId, String gtin) {
+        if (gtin != null) {
+            jdbc.update("UPDATE pharmacy_item_profiles SET gtin = NULLIF(?, '') WHERE tenant_id = ? AND item_id = ?", gtin, tenantId, itemId);
+        }
+    }
+
+    /** PHL-019: what the counter can sell: active, stocked, dispensed here. Ordered by name (the client's result order). */
+    List<com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry> itemIndex(UUID tenantId) {
+        return jdbc.query("SELECT c.id, c.code, c.name, p.generic_name, p.gtin, c.base_amount, COALESCE(p.schedule_class, 'OTC') AS schedule_class, " +
+                        "COALESCE(c.is_rx, false) AS is_rx, c.stock_qty FROM charge_catalogue c " +
+                        "LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id " +
+                        "WHERE c.tenant_id = ? AND c.stock_qty IS NOT NULL AND c.active AND COALESCE(p.in_house, true) ORDER BY c.name, c.id",
+                (rs, i) -> new com.nabd.hms.pharmacy.dto.PharmacyItemIndexEntry(rs.getString("id"), rs.getString("code"), rs.getString("name"),
+                        rs.getString("generic_name"), rs.getString("gtin"), rs.getBigDecimal("base_amount"), rs.getString("schedule_class"),
+                        rs.getBoolean("is_rx"), rs.getInt("stock_qty")), tenantId);
     }
 
     List<RuleRow> rulesForMarket(String market) {
@@ -197,8 +224,7 @@ class PharmacyRepository {
 
     /** One statement for the two single-column item flags (a null argument leaves its column as it is). */
     private void patchItem(UUID tenantId, UUID id, Boolean active, String drugId) {
-        jdbc.update("UPDATE charge_catalogue SET active = COALESCE(?, active), drug_id = COALESCE(?, drug_id), updated_at = now() " +
-                "WHERE tenant_id = ? AND id = ?", active, drugId, tenantId, id);
+        catalogue.patchItem(tenantId, id, active, drugId);
     }
 
     List<StockMovementRow> listMovements(UUID tenantId, UUID itemId) {
@@ -214,24 +240,17 @@ class PharmacyRepository {
     }
 
     UUID insertItem(UUID tenantId, String code, PharmacyItemWriteRequest req) {
-        UUID id = UUID.randomUUID();
-        // stock_qty starts at 0: opening stock goes through StockCommands (movement row + audit). is_rx is set by the profile trigger.
-        jdbc.update(
-                "INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, tax_rate_percent, " +
-                        "is_rx, hsn_code, stock_qty, active, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                id, tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
-                req.isRx(), req.hsnCode(), 0, true, java.sql.Date.valueOf(clock.today(tenantId)));
+        // PLT-036: billing creates the row; the balance is pharmacy's own column. stock_qty starts at 0: opening stock goes through
+        // StockCommands (movement row + audit). is_rx is set by the profile trigger.
+        UUID id = catalogue.insertItem(tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
+                req.isRx(), req.hsnCode(), clock.today(tenantId));
+        jdbc.update("UPDATE charge_catalogue SET stock_qty = 0 WHERE tenant_id = ? AND id = ?", tenantId, id);
         return id;
     }
 
     /** Name, price, tax and HSN only. Stock is never written here (V2-004); is_rx follows the schedule class (PHL-002). */
     int updateItem(UUID tenantId, UUID id, PharmacyItemWriteRequest req) {
-        return jdbc.update(
-                "UPDATE charge_catalogue SET name = ?, base_amount = ?, tax_rate_percent = ?, " +
-                        "hsn_code = ?, updated_at = now() " +
-                        "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
-                req.name(), req.price(), req.taxRatePercentOrZero(), req.hsnCode(),
-                tenantId, id);
+        return catalogue.updateItem(tenantId, id, req.name(), req.price(), req.taxRatePercentOrZero(), req.hsnCode());
     }
 
     /** NB-179: signed prescriptions still ahead of checkout, cross-patient — narrow direct query
@@ -273,6 +292,6 @@ class PharmacyRepository {
                 rs.getString("schedule_class"), rs.getString("register_type"), rs.getString("generic_name"),
                 (Integer) rs.getObject("pack_size"), rs.getString("unit"), rs.getBoolean("in_house"),
                 (Boolean) rs.getObject("price_inclusive_of_tax"), rs.getBoolean("zero_rated"), rs.getBigDecimal("mrp"),
-                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"), (Integer) rs.getObject("reorder_level"));
+                rs.getBoolean("cold_chain"), rs.getBoolean("returnable"), (Integer) rs.getObject("reorder_level"), rs.getString("gtin"));
     }
 }

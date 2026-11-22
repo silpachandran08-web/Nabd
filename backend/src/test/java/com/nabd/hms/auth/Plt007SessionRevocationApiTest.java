@@ -81,10 +81,10 @@ class Plt007SessionRevocationApiTest extends ApiTestBase {
         assertThat(get("/v1/queue", (String) otherTenant.get("accessToken")).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(refresh((String) otherTenant.get("refreshToken")).getStatusCode()).isEqualTo(HttpStatus.OK);
 
+        // ADM-020: a suspended clinic is read-only, not closed: the owner can enter it again (writes are 423, Adm020LifecycleApiTest)
         ResponseEntity<Map> select = exchange("/v1/owners/workspaces/select", HttpMethod.POST,
                 authedJsonBody(ownerLoginPendingToken(owner), Map.of("clinicId", clinic.id().toString())), Map.class);
-        assertThat(select.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(String.valueOf(select.getBody().get("type"))).endsWith("TENANT_INACTIVE");
+        assertThat(select.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         assertThat(su.queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.session.revoked.v1' "
                 + "AND payload->>'reasonCode' = 'tenant_suspended' AND payload->>'scope' = 'all_sessions'", Integer.class, clinic.id())).isEqualTo(2); // OPS-015 schema: one per staff member

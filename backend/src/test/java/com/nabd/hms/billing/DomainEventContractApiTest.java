@@ -276,6 +276,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         }
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove(DomainEventType.TENANT_REGION_PINNED.type()); // published by provisioning go-live: Ops061RegionsApiTest
+        expected.remove(DomainEventType.TENANT_STATUS_CHANGED.type()); // ADM-020: operator-plane lifecycle move, Adm020LifecycleApiTest
         expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type()); // COM-004: produced by NotificationService, contract-tested in NotificationContractApiTest
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         // COM-001: produced by the WhatsApp webhook processor, not over this HTTP flow; WhatsAppInboxApiTest covers the producer
@@ -289,6 +290,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.APPOINTMENT_NO_SHOW.type()); // ACC-025: Acc025NoShowApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
         expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
+        expected.remove(DomainEventType.USAGE_REPORTED.type()); // COM-015: produced by services/comms-gateway (Com015UsageTest)
         expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
         expected.remove(DomainEventType.PATIENT_LINK_OPENED.type()); // PLT-041: written by LinkOpenRecorder when the secure-link service reports an open, Plt041LinkOpenApiTest
         expected.remove(DomainEventType.PHARMACY_STOCK_BATCH_CHANGED.type()); // PHL-005: Phl005StockBatchesApiTest
@@ -302,6 +304,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.PATIENT_GUARDIAN_HANDOVER_DUE.type()); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove(DomainEventType.PATIENT_GUARDIAN_HANDOVER_COMPLETED.type()); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove(DomainEventType.ORGANIZATION_EXPORT_READY.type()); // ADM-015: Adm015DataExportApiTest
+        expected.remove(DomainEventType.ORGANIZATION_OFFBOARDING_ERASED.type()); // ADM-016: produced by the erasure worker, Adm016OffboardingApiTest
         expected.remove(DomainEventType.TEMPLATE_STATUS_CHANGED.type()); // COM-013: Com013TemplateLifecycleApiTest
         expected.remove(DomainEventType.APPOINTMENT_CONFIRMED.type()); // COM-043: Com043ReminderApiTest
         expected.remove(DomainEventType.RECALL_CREATED.type()); // COM-052: Com052RecallOrderApiTest
@@ -309,9 +312,14 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.PATIENT_NOTIFICATION_PREFERENCES_CHANGED.type()); // COM-025: Com025NotificationPreferencesApiTest
         expected.remove(DomainEventType.RX_REVOKED.type()); // CLN-023: Cln023RxPdfApiTest
         expected.remove(DomainEventType.PHARMACY_STOCK_ALERTS_DIGEST_READY.type()); // PHL-008: Phl008StockAlertsApiTest
+        expected.remove(DomainEventType.PHARMACY_BATCH_QUARANTINED.type()); // PHL-009: Phl009QuarantineApiTest
         expected.remove(DomainEventType.BREAK_GLASS_REVIEWED.type()); // PLT-013: Plt013BreakGlassReviewApiTest
         expected.remove(DomainEventType.PACKAGE_SOLD.type()); // COM-044: Com044PackageMessagingApiTest
         expected.remove(DomainEventType.SPECIALTY_PHOTO_ADDED.type()); // CLN-047: Cln047DermPhotosApiTest
+        expected.remove(DomainEventType.PHARMACY_OTC_SALE_COMPLETED.type()); // PHL-019: Phl019CounterSaleApiTest
+        expected.remove(DomainEventType.ORGANIZATION_BRANCH_CREATED.type()); // PLT-022: Plt022OwnerBranchApiTest
+        expected.remove(DomainEventType.REPORTING_EXPORT_CREATED.type()); // ADM-047: Adm047ReportsLibraryApiTest
+        expected.remove(DomainEventType.LAB_CATALOGUE_CHANGED.type()); // PHL-041: Phl041LabCatalogueApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

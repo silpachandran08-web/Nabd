@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "note": "FEF-041. clinicalKeys: strings whose wrong translation could mislead a patient about a prescription, a record category or an allergy; 'python3 scripts/ci/patient_catalogue.py check --release' fails while any of them lacks a native-clinician review in hi, kn or te. reviews: one entry per reviewed string {locale, ns, key, reviewerId, reviewedOn (ISO date), textSha (sha256 of the exact text reviewed)}. Entries are added only by the clinician's sign-off, never by the translator; a changed text makes its entry stale. Empty today: every hi/kn/te string is a machine draft. The clinical-key list is a proposal for the clinical owners to confirm.",
+  "clinicalKeys": {
+    "patient": [
+      "rxValid", "rxExpired", "rxDispensed", "rxDispensedNoDate", "rxRevoked", "rxUnknownTitle", "rxUnknownHint",
+      "rxOfflineValid", "rxOfflineHint", "rxOfflineNoKey", "rxLines", "rxPrivacy",
+      "cat_prescriptions", "cat_lab_reports", "cat_imaging", "cat_diagnoses", "cat_allergies", "cat_visit_notes"
+    ],
+    "templates": []
+  },
+  "reviews": []
+}

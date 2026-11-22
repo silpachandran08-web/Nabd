@@ -8,6 +8,16 @@
 # Initial owners were drafted from the current writers (module with most write statements, domain owner on ties) and
 # need confirmation at the architecture review. Read allow-lists start empty on purpose: today's cross-module reads are
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
+# PLT-036: every table has exactly one WRITING module (one exception by column: `owns_columns`, an UPDATE that sets only the listed
+# columns and updated_at belongs to that module; today only pharmacy's charge_catalogue.stock_qty). A write on another module's table (or a table with no owner or two owners)
+# fails the architecture gate in every mode for every module; a new cross-module read fails unless it is in `reads` (see
+# ci/architecture-gate.json `sql_ownership_all_modules`). Other modules change a table through its owner's API or a port the owner
+# implements: tenants -> common.TenantSettingsPort (platform); charge_catalogue -> organization.api.ChargeHeadWriter and
+# pharmacy.api.ItemCatalogueWriter (billing); staff, roles, login_attempts -> auth.api.OwnerAccess and common.ProvisioningSeeds.Iam
+# (iam); owners, departments -> common.ProvisioningSeeds (owner, organization); procedure_orders -> nursing.api.ProcedureBilling.
+# Known cross-cutting writers the scan cannot see (SQL assembled at run time, accepted as maintenance tools, not module logic):
+# common.CryptoReencryptJob (re-encrypts the encrypted columns listed in its code) and patient.SyntheticPatientPurger (deletes demo
+# patients and every row that references them, table names from pg_constraint).
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
@@ -17,7 +27,7 @@ modules:
     owns: [chronic_conditions, clinical_documents, clinical_notes, clinical_photos, dental_chair_notes, dental_chart_entries, dental_chart_events, dental_images, dental_preset_overrides, dental_settings, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, photo_consents, prescription_items, prescription_rx_tokens, prescription_signer_backfill, prescriptions, rx_coding_suggestions, rx_validity_rules, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
   common:
-    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts, tenant_data_keys]
+    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, tenant_data_keys]
     reads: [tenants]  # PLT-045: TenantKeyService lists tenants and reads their region and status; the same read ClinicClock, TenantContext and CryptoReencryptJob already do
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
@@ -32,10 +42,15 @@ modules:
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
     # (remaining direct staff reads elsewhere are baseline debt).
     packages: [iam, auth, staff]
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences, training_completions]
     reads: [patients, phi_read_log, specialty_profiles, staff_specialty_profiles]  # CLN-042: the access token carries the staff member's specialty claim and specialty_<code> permissions; PLT-013: the owner's break-glass review lists what the holder read (phi_read_log by grant) with the patient's name and MRN
+  lab:
+    # PHL-041: the test and panel catalogue. Prices live on charge_catalogue and are read and written through
+    # organization.api.ChargeCatalogue, never by SQL from here.
+    owns: [lab_panel_tests, lab_panels, lab_tests]
+    reads: []
   messaging:
-    owns: [comms_cutover_flags, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
+    owns: [comms_cutover_flags, message_usage_alerts, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands
   nursing:
     owns: [administration_orders, administration_records, consent_templates, procedure_consents, procedure_orders, vaccine_records]
@@ -43,8 +58,8 @@ modules:
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.
-    owns: [attendance_records, booking_policy_versions, charge_doctor_fees, charge_price_changes, price_templates, clinic_holidays, clinic_policies, clinic_quiet_hours, holiday_templates, tenant_messaging_settings, clinic_setup_progress, data_export_jobs, data_export_links, data_import_jobs, data_import_rows, data_import_uploads, department_transfers, department_workflow_selection, departments, dpa_acceptances, invoice_series, licence_registry, regions, service_points, staff_shifts, trial_conversion_jobs, workflow_definitions]
-    reads: [appointments, audit_log, clinical_documents, clinical_notes, consents, file_objects, invoice_line_items, invoice_payments, invoices, patient_proxies, patients, prescription_items, prescriptions, queue_entries, staff, tenants, vitals]  # FIN-006: InvoiceSeriesService checks the tenant's tax_registration_id (needs architecture review); ADM-015: the owner's full export reads every exported table by design (organization.export, read-only, under the clinic's own tenant context) and the owner's email/mobile
+    owns: [attendance_records, booking_policy_versions, charge_doctor_fees, charge_price_changes, clinic_holidays, clinic_policies, clinic_quiet_hours, clinic_setup_progress, config_bundle_imports, data_export_jobs, data_export_links, data_import_jobs, data_import_rows, data_import_uploads, department_transfers, department_workflow_selection, departments, dpa_acceptances, holiday_templates, invoice_series, licence_registry, master.deletion_certificates, offboarding_requests, price_templates, regions, service_points, staff_shifts, tenant_messaging_settings, trial_conversion_jobs, workflow_definitions]
+    reads: [appointments, audit_log, charge_catalogue, clinical_documents, clinical_notes, consents, file_objects, invoice_line_items, invoice_payments, invoices, patient_proxies, patients, prescription_items, prescriptions, queue_entries, staff, tenant_data_keys, tenants, vitals]  # FIN-006: InvoiceSeriesService checks the tenant's tax_registration_id (needs architecture review); ADM-015: the owner's full export reads every exported table by design (organization.export, read-only, under the clinic's own tenant context) and the owner's email/mobile; PHL-041: the lab catalogue shows each test's price and checks which codes the price master has (read-only; rows are written by billing through ChargeHeadWriter)
   owner:
     owns: [legal_entities, owners, tax_registrations]
     reads: []
@@ -55,17 +70,20 @@ modules:
     owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_notification_preferences, patient_proxies, patient_registry_summary, patients, phone_reverifications, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
     reads: [appointments, clinical_documents, queue_entries, tenants]  # IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
-    owns: [dispenses, goods_receipt_lines, goods_receipts, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_alerts, stock_batches, stock_discrepancies, stock_take_counts, stock_takes]
-    reads: [charge_catalogue, prescription_rx_tokens, tenants]  # CLN-023: revoked Rx refused at scan and checkout; items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes
+    # PLT-036 / PHL-003 AC1: the cached stock balance of an item is the one column of another module's table that pharmacy writes
+    # (UPDATE ... SET stock_qty only; StockWriteOwnershipTest keeps every other package out). Rows are created and changed by billing.
+    owns_columns: {charge_catalogue: [stock_qty]}
+    owns: [dispenses, goods_receipt_lines, goods_receipts, paper_prescription_lines, paper_prescriptions, pharmacy_item_profiles, pharmacy_schedule_rules, pharmacy_settings, pharmacy_stock_movements, pharmacy_worklist_entries, rx_verifications, stock_alerts, stock_batches, stock_discrepancies, stock_take_counts, stock_takes, stock_write_off_lines, stock_write_offs, supplier_return_lines, supplier_returns]
+    reads: [charge_catalogue, invoice_line_items, invoices, prescription_rx_tokens, tenants]  # CLN-023: revoked Rx refused at scan and checkout; items are charge_catalogue rows (stock columns are pharmacy-written, PHL-003); PHL-002: the clinic's market picks the valid schedule classes; PHL-020/PHL-019: the units of a paper-Rx line or Rx item already sold are the non-void invoice lines against it (read-only; written by billing)
   platform:
-    owns: [brands, master.activation_steps, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.platform_invoices, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscription_changes, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, master.white_glove_engagements, tenant_lifecycle_events, tenants]
-    reads: []
+    owns: [brands, master.activation_steps, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operator_training_completions, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.platform_invoices, master.provisioning_job_steps, master.provisioning_jobs, master.regulatory_watch_entries, master.sessions, master.subscription_changes, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, master.white_glove_engagements, tenant_lifecycle_events, tenants]
+    reads: [owners, roles, staff]  # PLT-022: provisioning checks its own seed rows (built-in role, owner staff, owner by email) to be re-runnable, and the owner "Add branch" flow resolves the signed-in owner, brand and clinics (read-only; the seeds are written through ProvisioningSeeds)
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
     owns: [daily_summary_settings, doctor_daily_metrics, tenant_daily_metrics]
     # ADM-043: the daily summary's close time (doctor_working_hours, day_closes), average wait (queue_entry_events), unbilled amount
     # (procedure_orders) and the brand's clinics for the combined message (tenants, brands)
-    reads: [appointments, brands, day_closes, doctor_working_hours, invoice_payments, invoices, package_instances, procedure_orders, queue_entries, queue_entry_events, tenants]  # OPS-010: the recompute-from-source of one tenant-day
+    reads: [appointments, brands, day_closes, doctor_delays, doctor_working_hours, eta_accuracy_daily, invoice_line_items, invoice_payments, invoices, package_instance_items, package_instances, patients, procedure_orders, queue_entries, queue_entry_events, staff, tenants]  # OPS-010: the recompute-from-source of one tenant-day; ADM-041: the time KPIs of that day (stage events, working hours, ETA accuracy rollup); ADM-047: the library reads source rows of each report by design (staff and patient names, invoice lines, package items, announced doctor delays), read-only, masked or aggregated per report, every export audited
   queue:
     owns: [appointment_change_offers, appointment_desk_exceptions, appointment_reminders, appointments, booking_request_details, booking_request_offers, booking_routing_settings, checkin_attempts, delay_broadcast_recipients, desk_exceptions, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_checkin_settings, facility_queue_settings, queue_entries, queue_entry_events, reason_code_catalogue, service_time_stats, session_reserved_slots, specialty_service_defaults, tenant_reason_codes, waitlist_entries]
     reads: [tenants]  # ACC-040: the clinic name shown on the WhatsApp booking card (no organization.api accessor yet)
@@ -78,5 +96,6 @@ modules:
     owns: [specialty_profiles, staff_specialty_profiles]
     reads: []
   shared:
-    owns: [file_blocked_alerts, file_objects, idempotency_keys, projector_applied_events, shedlock]
+    # PLT-036: the PHI read log is written only by shared.phiread (recorder, seal job, volume alerts); it was listed under common
+    owns: [file_blocked_alerts, file_objects, idempotency_keys, phi_read_batches, phi_read_log, phi_read_volume_alerts, projector_applied_events, shedlock]
     reads: [staff, roles]  # PLT-029: file_blocked_alerts fans out to the owner staff (built-in role); no owner API exists yet

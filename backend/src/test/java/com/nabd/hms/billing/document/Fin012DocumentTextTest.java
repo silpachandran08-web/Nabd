@@ -65,6 +65,30 @@ class Fin012DocumentTextTest {
         assertThat(rc).contains("PAYMENT RECEIPT", "Receipt No: RCP-000009", "Paid", "590.00").doesNotContain("Digital X-ray");
     }
 
+    // FIN-025 (PR-01): package lines print what the bundle would cost bought separately and the saving, as information only
+    @Test
+    void packageLinesPrintTotalIfBoughtSeparatelyAndYouSaveOnBothLayouts() {
+        var sessions = new LineItemResponse("PKGI-1", "Acne session x 6", "Package", 1, new BigDecimal("9872.66"), BigDecimal.ZERO,
+                new BigDecimal("9872.66"), new BigDecimal("12000.00"), "custom", null, 987266L, List.of(), null);
+        var peels = new LineItemResponse("PKGI-2", "Peel x 2", "Package", 1, new BigDecimal("3126.34"), new BigDecimal("18"),
+                new BigDecimal("3126.34"), new BigDecimal("3800.00"), "custom", null, 312634L,
+                List.of(new LineItemResponse.TaxPart("CGST", new BigDecimal("9"), 28137L), new LineItemResponse.TaxPart("SGST", new BigDecimal("9"), 28137L)), null);
+        var base = invoice("Invoice", null, false);
+        var inv = new InvoiceResponse(base.id(), base.invoiceNumber(), null, base.patientId(), base.patientName(), null, "Dr X", "INR",
+                new BigDecimal("12999.00"), BigDecimal.ZERO, new BigDecimal("562.74"), new BigDecimal("0.26"), new BigDecimal("13562.00"), new BigDecimal("13562.00"),
+                BigDecimal.ZERO, "paid", List.of(sessions, peels), base.payments(), base.createdAt(), "Invoice", null);
+        for (int cols : new int[]{90, 48}) {
+            List<String> t = InvoiceDocumentText.build(inv, SUPPLIER, "invoice", null, cols, List.of());
+            assertThat(String.join(" ", t)).contains("Total if bought separately 15800.00 / you save 2801.00");
+            assertThat(t).allSatisfy(l -> assertThat(l.length()).isLessThanOrEqualTo(cols));
+            // information only: it is not a discount row and does not change the totals
+            assertThat(t).noneMatch(l -> l.startsWith("Discount"));
+            assertThat(t.stream().filter(l -> l.startsWith("TOTAL INR")).findFirst().orElseThrow()).endsWith("13562.00");
+        }
+        // an ordinary invoice prints no such line
+        assertThat(String.join(" ", InvoiceDocumentText.build(base, SUPPLIER, "invoice", null, 90, List.of("999316")))).doesNotContain("bought separately");
+    }
+
     @Test
     void amountInWordsUsesLakhAndCrore() {
         assertThat(Words.indianRupees(new BigDecimal("1234567.50"))).isEqualTo("Rupees Twelve Lakh Thirty Four Thousand Five Hundred Sixty Seven and Fifty Paise Only");

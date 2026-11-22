@@ -128,7 +128,7 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
                 new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt,
                         List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("clinical:view"))));
         try {
-            return timelineController.get(jwt, p, 20, null);
+            return timelineController.get(jwt, p, 20, null, null);
         } finally {
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }
@@ -281,35 +281,46 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
         return timer.count();
     }
 
+    /**
+     * Pool checkouts of one run of {@code work}. The acquire timer counts the whole pool, so anything this Spring context does
+     * on another thread is counted too: the ETA recompute 250 ms after the visit's queue changes, scheduled jobs. That can only
+     * add, so the lowest of five runs is what {@code work} itself costs.
+     */
+    private double checkouts(Runnable work) {
+        double min = Double.MAX_VALUE;
+        for (int i = 0; i < 5; i++) {
+            double c0 = timerCount();
+            work.run();
+            min = Math.min(min, timerCount() - c0);
+        }
+        return min;
+    }
+
     @Test
-    void ac6a_gateCostsExactlyTwoExtraPoolCheckoutsPerRead_andInOneTransactionItCostsNone() {
+    void ac6a_gateCostsExactlyTwoExtraPoolCheckoutsPerRead_andInOneTransactionItCostsNone() throws InterruptedException {
         SeededTenant t = seedTenant();
         SeededStaff doc = staff(t, seedFullAccessRole(t.id()));
         Visit v = visit(loginAndGetAccessToken(doc), doc.id(), "Qapool Rhea");
         UUID p = UUID.fromString(v.patientId());
         Jwt jwt = jwtFor(doc);
+        // let the visit's after-commit work finish: measure once the pool has been idle for 500 ms (give up after 10 s)
+        for (double seen = -1, i = 0; i < 20 && seen != timerCount(); i++) {
+            seen = timerCount();
+            Thread.sleep(500);
+        }
 
-        double c0 = timerCount();
-        timelineService.get(t.id(), p, 20, null);
-        double ungated = timerCount() - c0;
-
-        c0 = timerCount();
-        ReadScope scope = scopes.resolve(jwt);
-        scopes.requirePatient(scope, p);
-        timelineService.get(t.id(), p, 20, null);
-        double gated = timerCount() - c0;
-
-        c0 = timerCount();
-        new TransactionTemplate(txManager).executeWithoutResult(s -> {
+        double ungated = checkouts(() -> timelineService.get(t.id(), p, 20, null));
+        double gated = checkouts(() -> {
+            ReadScope scope = scopes.resolve(jwt);
+            scopes.requirePatient(scope, p);
+            timelineService.get(t.id(), p, 20, null);
+        });
+        double oneTx = checkouts(() -> new TransactionTemplate(txManager).executeWithoutResult(s -> {
             ReadScope sc = scopes.resolve(jwt);
             scopes.requirePatient(sc, p);
             timelineService.get(t.id(), p, 20, null);
-        });
-        double oneTx = timerCount() - c0;
-
-        c0 = timerCount();
-        shippedTimeline(jwt, p);
-        double shipped = timerCount() - c0;
+        }));
+        double shipped = checkouts(() -> shippedTimeline(jwt, p));
         System.out.printf("QA3 IDC-001 pool checkouts per timeline read: ungated=%.0f gated=%.0f gated-in-one-tx=%.0f shipped-controller=%.0f%n", ungated, gated, oneTx, shipped);
         assertThat(shipped).as("the shipped controller runs caller lookup, gate and read in one transaction").isEqualTo(1);
         assertThat(ungated).isEqualTo(1);

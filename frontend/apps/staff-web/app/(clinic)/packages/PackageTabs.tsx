@@ -3,8 +3,11 @@
 // FEF-032: the list tabs of Treatment Packages (catalogue, sessions, expiring, refunds, liability, settings), moved
 // unchanged from the old single page. State that must survive a tab switch (filter, decision, notices) stays in the page.
 import styles from "./packages.module.css";
-import type { FormErrors } from "../../lib/formErrors";
-import { STATUS_PILL, money, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundT } from "./packagesModel";
+import { FieldError, type FormErrors } from "../../lib/formErrors";
+import { ErrorState } from "../../components/ui/StateViews";
+import { fromMinor } from "../../components/checkout/discountApproval";
+import { STATUS_PILL, money, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundPreviewT, type RefundT } from "./packagesModel";
+import { refundLineMinor } from "./packageSplit";
 import type { Deciding } from "./useInstanceActions";
 import { deliveryLabel } from "./eventLabel";
 
@@ -41,6 +44,10 @@ export function CatalogueTab({ packages, filter, setFilter, canEdit, onEdit, onS
               {p.items.map((i) => (
                 <div key={i.id} className={styles.itemLine}><span>{i.name}</span><span>×{i.quantity}</span></div>
               ))}
+              {/* FIN-025: the owner's review list: components not yet linked to a price-list item keep the typed tax % */}
+              {p.items.some((i) => !i.chargeCatalogueId) && (
+                <div className={styles.muted}>{p.items.filter((i) => !i.chargeCatalogueId).length} of {p.items.length} items not linked to the price list (typed tax % applies)</div>
+              )}
               <div className={styles.priceRow}>
                 {p.saveAmount > 0 && <div className={styles.listPrice}>{money(p.listValue)}</div>}
                 <div className={styles.salePrice}>{money(p.price)}</div>
@@ -190,7 +197,35 @@ export function LiabilityTab({ liability }: { liability: LiabilityT }) {
   );
 }
 
-export function SettingsTab({ fe, floorInput, setFloorEdit, onSave }: { fe: FormErrors; floorInput: string; setFloorEdit: (v: string) => void; onSave: () => void }) {
+/** FIN-025: per component, what was used at the full list price and what goes back with the tax reversed on that line. */
+export function RefundLines({ lines }: { lines: RefundPreviewT["lines"] }) {
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead><tr><th scope="col">Item</th><th scope="col">Used</th><th scope="col">Used value</th><th scope="col">Refund</th><th scope="col">Tax reversed</th></tr></thead>
+        <tbody>
+          {lines.map((l, n) => (
+            <tr key={n}>
+              <td>{l.component}</td>
+              <td>{l.usedQty}</td>
+              <td>{money(fromMinor(l.usedValueMinor))}</td>
+              <td>{money(fromMinor(refundLineMinor(l)))}</td>
+              <td>{money(fromMinor(l.refundTaxMinor))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** FIN-025: split = the per-component tax switch; a GST clinic must record the GST opinion's decision id before it can be on. */
+export function SettingsTab({ fe, floorInput, setFloorEdit, onSave, onRetry, split }: {
+  fe: FormErrors; floorInput: string; setFloorEdit: (v: string) => void; onSave: () => void; onRetry: () => void;
+  /** null = the settings did not load: no form and no Save, so defaults are never written over settings the page never read */
+  split: { on: boolean; setOn: (v: boolean) => void; decisionId: string; setDecisionId: (v: string) => void; opinionRequired: boolean } | null;
+}) {
+  if (!split) return <div className={styles.card}><ErrorState message="Couldn't load the package settings. Try again." onRetry={onRetry} /></div>;
   return (
     <div className={styles.card}>
       <h2 className={styles.cardTitle}>Pricing rules</h2>
@@ -198,6 +233,24 @@ export function SettingsTab({ fe, floorInput, setFloorEdit, onSave }: { fe: Form
         <label className={styles.label}>Price floor (% of list value — never silently overridable)</label>
         <input className={`${styles.input} ${styles.floorInput}`} type="number" step="0.1" value={floorInput} {...fe.attrs("priceFloorPercent")} onChange={(e) => { fe.clearField("priceFloorPercent"); setFloorEdit(e.target.value); }} />
       </div>
+      {split && (
+        <>
+          <h2 className={`${styles.cardTitle} ${styles.cardTitleSpaced}`}>Tax on package invoices</h2>
+          <label className={styles.label} htmlFor="pk-split">
+            <input id="pk-split" type="checkbox" checked={split.on} onChange={(e) => split.setOn(e.target.checked)} /> Invoice each component at its share of the package price, with its own tax
+          </label>
+          <p className={styles.muted}>Each component takes the tax class of the price-list item it is linked to. Refunds reverse tax line by line.</p>
+          {split.opinionRequired && (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pk-gst-decision">GST opinion decision id (required before this can be turned on)</label>
+              <input id="pk-gst-decision" className={`${styles.input} ${styles.floorInput}`} maxLength={64} value={split.decisionId} {...fe.attrs("gstOpinionDecisionId")}
+                onChange={(e) => { fe.clearField("gstOpinionDecisionId"); split.setDecisionId(e.target.value); }} />
+              <FieldError fe={fe} name="gstOpinionDecisionId" className={styles.muted} />
+              <p className={styles.muted}>The id of the written GST opinion on bundle splitting in the Decisions sheet, like DEC-2026-014 or T-213.</p>
+            </div>
+          )}
+        </>
+      )}
       <div className={`${styles.actions} ${styles.actionsStart}`}>
         <button className={styles.btnPrimary} onClick={onSave}>Save</button>
       </div>

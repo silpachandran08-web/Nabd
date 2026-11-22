@@ -367,6 +367,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         // inbound.received and message.status_changed (COM-001, WhatsAppInboxApiTest)
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove("organization.tenant.region_pinned.v1");
+        expected.remove("organization.tenant.status_changed.v1"); // ADM-020: operator-plane lifecycle move, Adm020LifecycleApiTest
+        expected.remove("organization.branch.created.v1"); // PLT-022: Plt022OwnerBranchApiTest
         expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type());
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         expected.remove("comms.inbound.received.v1");
@@ -377,6 +379,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("organization.privacy_notice.published.v1"); // IDC-003: Idc003PrivacyNoticeApiTest
         expected.remove("billing.refund.approved.v1"); // FIN-013: Fin013RefundApiTest
         expected.remove("comms.sender.throttled.v1"); // COM-021: produced by services/comms-gateway
+        expected.remove("comms.usage.reported.v1"); // COM-015: produced by services/comms-gateway
         expected.remove("scheduling.booking.routed.v1"); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove("scheduling.appointment.no_show.v1"); // ACC-025: Acc025NoShowApiTest
         expected.remove("shared.attachment.scanned.v1"); // PLT-029: Plt029FilesApiTest
@@ -393,6 +396,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("patient.guardian.handover_due.v1"); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove("patient.guardian.handover_completed.v1"); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove("organization.export.ready.v1"); // ADM-015: Adm015DataExportApiTest
+        expected.remove("organization.offboarding.erased.v1"); // ADM-016: produced by the erasure worker, Adm016OffboardingApiTest
         expected.remove("comms.template.status_changed.v1"); // COM-013: Com013TemplateLifecycleApiTest
         expected.remove("scheduling.appointment.confirmed.v1"); // COM-043: Com043ReminderApiTest
         expected.remove("engagement.recall.created.v1"); // COM-052: Com052RecallOrderApiTest
@@ -403,7 +407,11 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("iam.break_glass.reviewed.v1"); // PLT-013: Plt013BreakGlassReviewApiTest
         expected.remove("billing.package.sold.v1"); // COM-044: Com044PackageMessagingApiTest
         expected.remove("pharmacy.stock.alerts_digest_ready.v1"); // PHL-008: Phl008StockAlertsApiTest
+        expected.remove("pharmacy.batch.quarantined.v1"); // PHL-009: Phl009QuarantineApiTest
         expected.remove("specialty.photo.added.v1"); // CLN-047: Cln047DermPhotosApiTest
+        expected.remove("pharmacy.otc_sale.completed.v1"); // PHL-019: Phl019CounterSaleApiTest
+        expected.remove("reporting.export.created.v1"); // ADM-047: Adm047ReportsLibraryApiTest
+        expected.remove("lab.catalogue.changed.v1"); // PHL-041: Phl041LabCatalogueApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

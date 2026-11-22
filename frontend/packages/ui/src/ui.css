@@ -79,3 +79,71 @@
 .nbu-options { display: flex; flex-direction: column; gap: var(--nb-space-2); }
 .nbu-option { min-block-size: var(--nb-touch-min); padding-inline: var(--nb-space-12); border: 0; border-radius: var(--nb-radius-sm); background: transparent; color: var(--nb-text-primary); font: inherit; font-size: var(--nb-fs-md); text-align: start; cursor: pointer; }
 .nbu-option[aria-selected="true"] { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
+
+/* FEF-026 chart kit. A chart draws on its own surface-1 card: the palette (--nb-chart-1..6) is validated against that surface
+   in both themes (packages/tokens/chart-palette.mjs). Marks carry the series colour; every text wears a text token. */
+.nbu-vh { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.nbu-chart { display: flex; flex-direction: column; gap: var(--nb-space-8); min-inline-size: 0; padding: var(--nb-space-16); border-radius: var(--nb-radius-lg); background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); color: var(--nb-text-primary); }
+.nbu-chart-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--nb-space-8); }
+.nbu-chart-title { font-size: var(--nb-fs-md); font-weight: 600; }
+.nbu-chart-tools { display: flex; gap: var(--nb-space-4); }
+.nbu-chart-tools .nbu-btn { padding-inline: var(--nb-space-8); font-size: var(--nb-fs-sm); }
+.nbu-chart-tools .nbu-btn[aria-pressed="true"] { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
+.nbu-chart-note { display: flex; align-items: center; gap: var(--nb-space-4); margin: 0; font-size: var(--nb-fs-xs); color: var(--nb-text-secondary); }
+.nbu-chart-legend { display: flex; flex-wrap: wrap; gap: var(--nb-space-4) var(--nb-space-16); margin: 0; padding: 0; list-style: none; font-size: var(--nb-fs-xs); color: var(--nb-text-secondary); }
+.nbu-chart-legend li { display: inline-flex; align-items: center; gap: var(--nb-space-4); }
+.nbu-chart-s1 { --nbu-series: var(--nb-chart-1); }
+.nbu-chart-s2 { --nbu-series: var(--nb-chart-2); }
+.nbu-chart-s3 { --nbu-series: var(--nb-chart-3); }
+.nbu-chart-s4 { --nbu-series: var(--nb-chart-4); }
+.nbu-chart-s5 { --nbu-series: var(--nb-chart-5); }
+.nbu-chart-s6 { --nbu-series: var(--nb-chart-6); }
+.nbu-chart-key { flex: none; inline-size: 10px; block-size: 10px; border-radius: 2px; background: var(--nbu-series); print-color-adjust: exact; }
+.nbu-chart[data-kind="line"] .nbu-chart-key, .nbu-chart[data-kind="area"] .nbu-chart-key, .nbu-chart-tip .nbu-chart-key { inline-size: 14px; block-size: 3px; }
+.nbu-chart-plot { position: relative; min-inline-size: 0; }
+/* direction: ltr keeps text-anchor meaning the same in every page direction (an inherited rtl swaps start and end); the mirror below does the RTL layout. */
+.nbu-chart-svg { display: block; inline-size: 100%; block-size: auto; overflow: visible; direction: ltr; font-size: var(--nb-fs-xs); font-variant-numeric: tabular-nums; }
+.nbu-chart-svg:focus-visible, .nbu-chart-tablewrap:focus-visible { outline: 2px solid var(--nb-focus-ring); outline-offset: 2px; border-radius: var(--nb-radius-xs); }
+.nbu-chart-grid { stroke: var(--nb-border-subtle); stroke-width: 1; }
+.nbu-chart-axis { stroke: var(--nb-border-strong); stroke-width: 1; }
+.nbu-chart-cross { stroke: var(--nb-text-tertiary); stroke-width: 1; }
+.nbu-chart-band { fill: var(--nb-surface-3); }
+.nbu-chart-tick { fill: var(--nb-text-secondary); }
+.nbu-chart-value { fill: var(--nb-text-primary); font-weight: 600; }
+.nbu-chart-fill { fill: var(--nbu-series); }
+.nbu-chart-line { fill: none; stroke: var(--nbu-series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.nbu-chart-area { fill: var(--nbu-series); fill-opacity: 0.12; }
+.nbu-chart-dot { fill: var(--nbu-series); stroke: var(--nb-surface-1); stroke-width: 2; }
+.nbu-chart-hit { fill: transparent; }
+.nbu-chart-tip { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: var(--nb-space-2); padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-sm); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: var(--nb-shadow-md); font-size: var(--nb-fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+.nbu-chart-tip-title { color: var(--nb-text-secondary); }
+.nbu-chart-tip-row { display: flex; align-items: center; gap: var(--nb-space-8); color: var(--nb-text-secondary); }
+.nbu-chart-tip-row strong { color: var(--nb-text-primary); }
+/* RTL: a categorical plot mirrors (first category at the inline start) and its text is flipped back in place.
+   A time plot has dir="ltr" and no nbu-chart-flip, so time always runs left to right; legend, title, notes and table are HTML and mirror by themselves. */
+[dir="rtl"] .nbu-chart-flip { transform: scaleX(-1); }
+[dir="rtl"] .nbu-chart-flip text { transform: scaleX(-1); transform-box: fill-box; transform-origin: center; }
+.nbu-chart-tablewrap { max-block-size: 320px; overflow-y: auto; }
+.nbu-chart-table { inline-size: 100%; border-collapse: collapse; font-size: var(--nb-fs-sm); font-variant-numeric: tabular-nums; }
+.nbu-chart-table th, .nbu-chart-table td { padding: var(--nb-space-8) var(--nb-space-12); border-block-end: 1px solid var(--nb-border-subtle); text-align: start; white-space: nowrap; }
+.nbu-chart-table td, .nbu-chart-table thead th + th { text-align: end; }
+.nbu-chart-table thead th { font-weight: 600; color: var(--nb-text-secondary); }
+.nbu-chart-table tbody th { font-weight: 400; }
+@media print { .nbu-chart-tools, .nbu-chart-tip { display: none; } }
+
+.nbu-spark { display: block; flex: none; overflow: visible; }
+.nbu-spark-line { fill: none; stroke: var(--nb-text-tertiary); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.nbu-spark-dot { fill: var(--nb-chart-1); stroke: var(--nb-surface-1); stroke-width: 2; }
+.nbu-meter { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: var(--nb-fs-sm); color: var(--nb-text-secondary); }
+.nbu-meter-head { display: flex; justify-content: space-between; gap: var(--nb-space-8); }
+.nbu-meter-value { color: var(--nb-text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nbu-meter-bar { display: block; }
+.nbu-meter-track { fill: var(--nb-surface-3); }
+.nbu-meter-fill { fill: var(--nb-chart-1); }
+.nbu-meter-ok { fill: var(--nb-ok-500); }
+.nbu-meter-warn { fill: var(--nb-warn-500); }
+.nbu-meter-danger { fill: var(--nb-danger-500); }
+.nbu-stat-row { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-12); }
+.nbu-stat-delta { display: flex; align-items: center; gap: var(--nb-space-4); font-size: var(--nb-fs-sm); color: var(--nb-text-secondary); }
+.nbu-stat-better { color: var(--nb-ok-500); }
+.nbu-stat-worse { color: var(--nb-danger-500); }

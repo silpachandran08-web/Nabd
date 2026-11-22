@@ -27,4 +27,12 @@ public interface PlanAccount {
 
     /** Empty when the clinic has no subscription yet. */
     Optional<Account> account(UUID tenantId);
+
+    /**
+     * COM-015: WhatsApp messages a month the clinic's pinned plan version includes. Empty = no allowance configured (no
+     * subscription, or the plan sells messages at cost only): usage is then shown as cost without a bar and nothing alerts.
+     */
+    default java.util.OptionalLong whatsappMessageAllowance(UUID tenantId) {
+        return java.util.OptionalLong.empty();
+    }
 }

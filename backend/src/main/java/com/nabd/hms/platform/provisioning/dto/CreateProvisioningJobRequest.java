@@ -14,6 +14,8 @@ public record CreateProvisioningJobRequest(
         @NotBlank String ownerName,
         @NotBlank String ownerMobile,
         @NotBlank String brandName,
-        @NotBlank @Pattern(regexp = "^(self_serve|enterprise)$") String path
+        @NotBlank @Pattern(regexp = "^(self_serve|enterprise)$") String path,
+        /** PHL-032: what the tenant is sold as; absent = clinic. A pharmacy edition has pharmacy, billing and reports only. */
+        @Pattern(regexp = "^(clinic|pharmacy)$") String edition
 ) {
 }

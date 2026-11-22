@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:organization.tenant.status_changed.v1",
+  "title": "organization.tenant.status_changed.v1",
+  "description": "A clinic moved between lifecycle states (ADM-020): by an operator, the clinic owner (go live) or the trial clock. reason is the operator's commercial or compliance reason about the clinic, never patient data.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "from",
+    "to",
+    "reason",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "from": {
+      "type": "string",
+      "enum": [
+        "provisioning",
+        "trialing",
+        "active",
+        "overdue",
+        "suspended",
+        "offboarding",
+        "offboarded"
+      ]
+    },
+    "to": {
+      "type": "string",
+      "enum": [
+        "provisioning",
+        "trialing",
+        "active",
+        "overdue",
+        "suspended",
+        "offboarding",
+        "offboarded"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "pattern": "^[\\s\\S]{1,500}$",
+      "description": "Free text entered by the operator, cut to 500 characters here (the history keeps all of it), or a fixed system reason."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "from": "active",
+      "to": "suspended",
+      "reason": "non-payment",
+      "version": 1
+    }
+  ]
+}
