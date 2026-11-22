@@ -72,3 +72,32 @@ test("timeline: asks for imported history and labels it with the date and the ol
   assert.match(timeline, /Imported history · \$\{e\.doctorName/);
   assert.doesNotMatch(timeline, /<button[^>]*imported/i, "read-only: no action on an imported row");
 });
+
+test("T1-BUG-10: an imported visit's date is the clinic's day, also in a browser west of the clinic", async () => {
+  const { formatClinicDate } = await import("../../app/lib/clinicTime.ts");
+  const sent = "2019-03-04T18:30:00Z"; // 5 Mar 2019 00:00 in Asia/Kolkata, as TimelineRepository sends it
+  const was = process.env.TZ;
+  try {
+    for (const browser of ["America/New_York", "UTC", "Asia/Riyadh", "Australia/Sydney"]) {
+      process.env.TZ = browser;
+      assert.equal(formatClinicDate(sent, undefined, "Asia/Kolkata"), "05 Mar 2019", browser);
+    }
+    process.env.TZ = "America/New_York";
+    assert.equal(new Date(sent).getDate(), 4, "the browser's own calendar is a day early: the bug");
+  } finally {
+    if (was === undefined) delete process.env.TZ; else process.env.TZ = was;
+  }
+  assert.match(timeline, /formatClinicDate\(e\.occurredAt, undefined, tz\)/);
+  assert.match(timeline, /const tz = useClinicTimeZone\(\)/);
+  assert.doesNotMatch(timeline, /toLocale(Date)?String/);
+});
+
+test("T1-BUG-13: the unknown-layout sentence names the picker option as the picker labels it, on the server and on the page", async () => {
+  const { SOURCES } = await import("../../app/components/setup/importModel.ts");
+  const other = SOURCES.find((x) => x.key === "csv").label;
+  const java = readFileSync(new URL("../../../../../backend/src/main/java/com/nabd/hms/organization/dataimport/ImportPipeline.java", import.meta.url), "utf8");
+  const sentence = java.match(/"UNKNOWN_LAYOUT", "([^"]+)"/)[1];
+  assert.ok(sentence.includes(`'${other}'`), sentence);
+  assert.ok(panel.includes(`UNKNOWN_LAYOUT: "The headings are not the standard export of that software. Choose \\"${other}\\" and`), "the page's own text for the same code");
+  assert.doesNotMatch(java + panel, /Other \(CSV\)/);
+});

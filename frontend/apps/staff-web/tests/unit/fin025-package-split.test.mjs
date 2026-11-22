@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
-import { refundLineMinor, taxNote } from "../../app/(clinic)/packages/packageSplit.ts";
+import { DECISION_ID_HELP, decisionIdProblem, refundLineMinor, taxNote } from "../../app/(clinic)/packages/packageSplit.ts";
 
 test("an exempt component reads exempt and never taxable, whatever its amount", () => {
   assert.equal(taxNote("EXEMPT", 0), "exempt");
@@ -29,4 +29,17 @@ test("T1-BUG-6: settings that did not load never get a Save, and saveSettings re
   // the early return for `split === null` comes before the form (and its Save button)
   assert.ok(tabs.indexOf("if (!split) return") > 0 && tabs.indexOf("if (!split) return") < tabs.indexOf("onClick={onSave}"));
   assert.match(tabs, /if \(!split\) return[^\n]*ErrorState[^\n]*onRetry/);
+});
+
+test("T1-BUG-11: a wrong GST decision id gets a sentence saying what to type, before and after the server", () => {
+  for (const ok of ["", "   ", "DEC-2026-014", "T-213", "  DEC-2026-014  "]) assert.equal(decisionIdProblem(ok), null, ok);
+  for (const bad of ["see email", "dec-2026-014", "DEC-", "2026-014", "DEC-2026/014", "T-" + "9".repeat(61)]) assert.equal(decisionIdProblem(bad), DECISION_ID_HELP, bad);
+  assert.doesNotMatch(DECISION_ID_HELP, /[\\|*{}]/, "a sentence, not a pattern");
+  // the same shape as the server rule
+  const java = readFileSync(new URL("../../../../../backend/src/main/java/com/nabd/hms/packages/dto/PackageSettingsWriteRequest.java", import.meta.url), "utf8");
+  assert.ok(java.includes('(DEC|T)-[A-Za-z0-9-]{1,60}'), "the server pattern changed: update decisionIdProblem");
+  const page = pk("page.tsx"), tabs = pk("PackageTabs.tsx");
+  assert.match(page, /if \(badId\) \{ fe\.setFields[^\n]*return; \}\n[^\n]*api\.patch/, "refused before the PATCH");
+  assert.match(page, /else fe\.setFields\(\(f\) => \("gstOpinionDecisionId" in f \? \{ \.\.\.f, gstOpinionDecisionId: DECISION_ID_HELP \}/, "the server's 400 reads the same");
+  assert.match(tabs, /<FieldError fe=\{fe\} name="gstOpinionDecisionId"/, "aria-describedby has its element");
 });

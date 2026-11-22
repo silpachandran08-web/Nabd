@@ -65,3 +65,17 @@ test("direct URL: a pharmacy tenant cannot open a clinical counter route", () =>
   const r = counterRouteState("pharmacist", { perms: ["pharmacy:view", "pharmacy:edit", "billing:view", "billing:create"], owner: false, ent: ent("pharmacy") }, "/pharmacy/pos", true);
   assert.equal(r.kind, "open");
 });
+
+test("T1-BUG-12: a pharmacy edition's overview neither renders nor requests the patient-time cards", async () => {
+  const { pharmacyEdition } = await import("../../app/lib/entitlementRules.ts");
+  assert.equal(pharmacyEdition({ modules: [], killedFeatures: [], seatLimit: null, edition: "pharmacy" }), true);
+  assert.equal(pharmacyEdition({ modules: [], killedFeatures: [], seatLimit: null }), false);
+  const page = src("(clinic)/overview/page.tsx");
+  assert.match(page, /const clinical = settled && !pharmacyEdition\(ent\);/, "decided after the entitlements answer: no request before it");
+  // every mount of a card that reads queue / consult data is behind `clinical` (the tiles fetch on mount)
+  for (const card of ["EtaAccuracyTile", "FlowOverviewSection"]) {
+    const mounts = page.match(new RegExp(`[^\\n]*<${card} />`, "g")) ?? [];
+    assert.equal(mounts.length, 1, card);
+    assert.match(mounts[0], /\{clinical && /, card);
+  }
+});

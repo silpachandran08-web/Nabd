@@ -3,7 +3,7 @@
 // FEF-032: the list tabs of Treatment Packages (catalogue, sessions, expiring, refunds, liability, settings), moved
 // unchanged from the old single page. State that must survive a tab switch (filter, decision, notices) stays in the page.
 import styles from "./packages.module.css";
-import type { FormErrors } from "../../lib/formErrors";
+import { FieldError, type FormErrors } from "../../lib/formErrors";
 import { ErrorState } from "../../components/ui/StateViews";
 import { fromMinor } from "../../components/checkout/discountApproval";
 import { STATUS_PILL, money, type ExpiringT, type InstanceT, type LiabilityT, type PackageT, type RefundPreviewT, type RefundT } from "./packagesModel";
@@ -245,7 +245,8 @@ export function SettingsTab({ fe, floorInput, setFloorEdit, onSave, onRetry, spl
               <label className={styles.label} htmlFor="pk-gst-decision">GST opinion decision id (required before this can be turned on)</label>
               <input id="pk-gst-decision" className={`${styles.input} ${styles.floorInput}`} maxLength={64} value={split.decisionId} {...fe.attrs("gstOpinionDecisionId")}
                 onChange={(e) => { fe.clearField("gstOpinionDecisionId"); split.setDecisionId(e.target.value); }} />
-              <p className={styles.muted}>The id of the written GST opinion on bundle splitting in the Decisions sheet.</p>
+              <FieldError fe={fe} name="gstOpinionDecisionId" className={styles.muted} />
+              <p className={styles.muted}>The id of the written GST opinion on bundle splitting in the Decisions sheet, like DEC-2026-014 or T-213.</p>
             </div>
           )}
         </>

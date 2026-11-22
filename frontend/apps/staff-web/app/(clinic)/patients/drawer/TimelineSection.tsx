@@ -4,6 +4,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import styles from "../patients.module.css";
 import { Skeleton } from "../../../components/ui/StateViews";
 import { api } from "../../../lib/api";
+import { formatClinicDate } from "../../../lib/clinicTime";
+import { useClinicTimeZone } from "../../../lib/useClinicTimeZone";
 import { key } from "../../../lib/query";
 import type { TimelinePage } from "./usePatientQueries";
 
@@ -13,6 +15,7 @@ type Entry = TimelinePage["data"][number] & Imported;
 
 // Encounter timeline: own paged query, own loading / error state. A failed "Load more" keeps what is shown; press it again.
 export default function TimelineSection({ patientId }: { patientId: string }) {
+  const tz = useClinicTimeZone(); // an imported visit is midnight on the clinic's clock: the browser's zone would show the day before
   const q = useInfiniteQuery({
     queryKey: key("patient-timeline", { id: patientId }), initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => api.get<TimelinePage>(`/clinical/patients/${patientId}/timeline?limit=10&include=imported${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`),
@@ -34,7 +37,7 @@ export default function TimelineSection({ patientId }: { patientId: string }) {
                         ) : (
                           timeline.map((e) => (
                             <div key={e.queueEntryId ?? e.documentId} className={styles.timelineRow}>
-                              <span className={styles.muted}>{new Date(e.occurredAt).toLocaleDateString()}{e.kind === "imported_history" ? ` · Imported history · ${e.doctorName ?? ""}` : ""}</span>
+                              <span className={styles.muted}>{formatClinicDate(e.occurredAt, undefined, tz)}{e.kind === "imported_history" ? ` · Imported history · ${e.doctorName ?? ""}` : ""}</span>
                               <span>{e.diagnosis || e.assessment || "—"}</span>
                               {e.kind === "imported_history" && e.diagnosis && e.assessment && <span>{e.assessment}</span>}
                               {e.medications && <span className={styles.muted}>{e.medications}</span>}

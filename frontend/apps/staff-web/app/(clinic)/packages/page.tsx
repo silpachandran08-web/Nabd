@@ -24,6 +24,7 @@ import { CatalogueTab, ExpiringTab, LiabilityTab, RefundLines, RefundsTab, Sessi
 
 type SettingsT = Full<PackageSettingsResponse> & SplitSettings;
 import { useInstanceActions } from "./useInstanceActions";
+import { DECISION_ID_HELP, decisionIdProblem } from "./packageSplit";
 
 export default function PackagesPage() {
   const qc = useQueryClient();
@@ -99,7 +100,10 @@ export default function PackagesPage() {
     fe.clear(); // a successful save removes the previous 422
     // the server refuses the split for a GST clinic without the decision id (422 gst-opinion-required) and says so
     const body = { priceFloorPercent: Number(floorInput) || 0, taxSplitEnabled: splitOn, gstOpinionDecisionId: decisionId.trim() };
+    const badId = decisionIdProblem(decisionId);
+    if (badId) { fe.setFields(() => ({ gstOpinionDecisionId: badId })); return; }
     if (await x.act(() => api.patch("/packages/settings", body), "Action failed.")) { setFloorEdit(null); setSplitEdit(null); setDecisionEdit(null); }
+    else fe.setFields((f) => ("gstOpinionDecisionId" in f ? { ...f, gstOpinionDecisionId: DECISION_ID_HELP } : f)); // the server's 400 for this field is a raw pattern
   }
 
   if (loading) return <main className={styles.page}><Skeleton rows={6} label="Loading treatment packages" /></main>;

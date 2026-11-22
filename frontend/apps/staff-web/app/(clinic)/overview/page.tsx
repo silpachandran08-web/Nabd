@@ -17,6 +17,7 @@ import FlowOverviewSection from "./FlowOverview";
 import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
+import { pharmacyEdition, useEntitlementsStatus } from "../../lib/entitlements";
 
 
 // Matches GET /v1/reports/overview (ReportsController.overview → OverviewResponse).
@@ -94,6 +95,10 @@ function OverviewInner() {
   const [now, setNow] = useState(0);
   const [dailySummary, setDailySummary] = useState(false);
   const [canDailySummary, setCanDailySummary] = useState(false);
+  // PHL-032: a pharmacy-only tenant has no queue or consultations, and the server refuses those reads: the patient-time cards are
+  // absent and never requested. Decided only once the entitlements have answered, so nothing is fetched and then taken away.
+  const { ent, settled } = useEntitlementsStatus();
+  const clinical = settled && !pharmacyEdition(ent);
 
   const load = useCallback(async () => {
     setError(null);
@@ -203,7 +208,7 @@ function OverviewInner() {
         </section>
       )}
 
-      <FlowOverviewSection />
+      {clinical && <FlowOverviewSection />}
 
       <div className={styles.kpis}>
         <div className={styles.card}>
@@ -230,7 +235,7 @@ function OverviewInner() {
 
       <div className={styles.columns}>
         <div className={styles.column}>
-          {can("reports:view") && <EtaAccuracyTile />}
+          {clinical && can("reports:view") && <EtaAccuracyTile />}
           <section className={styles.card} aria-label="Payment split">
             <div className={styles.cardLabel}>Payment split</div>
             {splitTotal === 0 ? (
