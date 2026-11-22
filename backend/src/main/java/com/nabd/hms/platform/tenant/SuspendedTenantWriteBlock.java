@@ -20,7 +20,9 @@ import java.util.regex.Pattern;
  * tenantId; operator and owner-account tokens do not) gets 423 TENANT_SUSPENDED on every write. Reads pass, and so do the calls
  * a read-only session still needs: /v1/auth (refresh, sign out, unlock, the step-up an export asks for), starting a data export
  * (ADM-015), a support ticket to Nabd (the clinic must be able to ask why), and the two POSTs that only read (a signed file link,
- * the Rx line search). The status is read per write request, never cached, so suspending and reactivating take effect on the next call.
+ * the Rx line search). The status comes from TenantLifecycleService's per-instance cache (no statement on a warm write: check-in
+ * is the hottest path): suspending or reactivating through the lifecycle takes effect on the next call on that instance and
+ * within 5 s everywhere else.
  */
 @Configuration
 class SuspendedTenantWriteBlock implements WebMvcConfigurer, HandlerInterceptor {
@@ -44,7 +46,7 @@ class SuspendedTenantWriteBlock implements WebMvcConfigurer, HandlerInterceptor 
         if (SAFE.contains(request.getMethod()) || ALLOWED.matcher(request.getRequestURI()).matches()) return true;
         if (SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken t
                 && t.getToken().getClaimAsString("tenantId") != null
-                && lifecycle.getObject().statusOf(UUID.fromString(t.getToken().getClaimAsString("tenantId"))).filter("suspended"::equals).isPresent()) {
+                && lifecycle.getObject().cachedStatusOf(UUID.fromString(t.getToken().getClaimAsString("tenantId"))).filter("suspended"::equals).isPresent()) {
             throw new ApiException(HttpStatus.LOCKED, "TENANT_SUSPENDED", "Clinic suspended",
                     "This clinic is suspended, so nothing can be changed. Records can still be viewed and exported.");
         }
