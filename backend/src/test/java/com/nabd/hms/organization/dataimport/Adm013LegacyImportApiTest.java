@@ -217,9 +217,9 @@ class Adm013LegacyImportApiTest extends ApiTestBase {
         Env e = env();
         String up = upload(e, "list.csv", "csv", csv("Full Name,Phone No,Birth Date,Sex", "Asha Rao,9876512101,01/02/1990,F"));
         ResponseEntity<Map> r = createRaw(e, up, "patients", "clinicea");
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(String.valueOf(r.getBody().get("type"))).contains("UNKNOWN_LAYOUT");
-        assertThat(createRaw(e, up, "stock", "lybrate").getStatusCode()).as("no stock layout for that source").isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(createRaw(e, up, "stock", "lybrate").getStatusCode()).as("no stock layout for that source").isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(createRaw(e, up, "patients", "tally").getStatusCode()).as("unknown source").isEqualTo(HttpStatus.BAD_REQUEST);
         ResponseEntity<Map> ok = createRaw(e, up, "patients", "csv");
         assertThat(ok.getStatusCode()).as("the upload survives a refused layout").isEqualTo(HttpStatus.CREATED);
@@ -235,7 +235,7 @@ class Adm013LegacyImportApiTest extends ApiTestBase {
         Env e = env();
         String upBefore = upload(e, "stock.csv", "csv", csv("Item Name,Batch No,Expiry Date,Quantity,MRP,Purchase Rate,Selling Price", "X,B,01/01/2099,1,1,1,1"));
         ResponseEntity<Map> off = createRaw(e, upBefore, "stock", "clinicea");
-        assertThat(off.getStatusCode()).as("pharmacy is External").isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(off.getStatusCode()).as("pharmacy is External").isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(String.valueOf(off.getBody().get("type"))).contains("PHARMACY_NOT_ENABLED");
 
         pharmacy(e, "in_house");
@@ -284,7 +284,7 @@ class Adm013LegacyImportApiTest extends ApiTestBase {
         assertThat(diff(j)).containsEntry("ready", 2).containsEntry("errors", 1).containsEntry("duplicates", 1);
         assertThat(errorsCsv(e, j)).contains("4,PRICE_ABOVE_MRP");
         assertThat(exchange("/v1/setup/import-jobs/" + j.get("id") + "/commit", HttpMethod.POST,
-                authedJsonBody(e.token(), Map.of("duplicateDecisions", List.of(Map.of("row", 5, "action", "create")))), Map.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                authedJsonBody(e.token(), Map.of("duplicateDecisions", List.of(Map.of("row", 5, "action", "create")))), Map.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(diff(commit(e, j))).containsEntry("created", 2).containsEntry("skipped", 1);
         List<Map<String, Object>> items = exchange("/v1/pharmacy/items", HttpMethod.GET, authed(e.token()), List.class).getBody();
         assertThat(items).extracting(i -> i.get("name") + "|" + i.get("isRx") + "|" + i.get("genericName")).containsExactlyInAnyOrder(

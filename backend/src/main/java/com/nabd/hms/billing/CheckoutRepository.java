@@ -320,10 +320,11 @@ class CheckoutRepository {
                 (rs, i) -> UUID.fromString(rs.getString("invoice_id")), tenantId, key).stream().findFirst();
     }
 
+    /** recorded_at is the wall clock, not the transaction start: the payments of one split sale (one transaction) list in the order they were taken. */
     UUID insertPayment(UUID tenantId, UUID invoiceId, String method, BigDecimal amount, UUID recordedBy,
                        String reference, String idempotencyKey, String receiptNumber) {
-        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key, receipt_number) " +
-                "VALUES (?,?,?,?,?,?,?,?) RETURNING id", UUID.class,
+        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key, receipt_number, recorded_at) " +
+                "VALUES (?,?,?,?,?,?,?,?, clock_timestamp()) RETURNING id", UUID.class,
                 tenantId, invoiceId, method, amount, recordedBy, reference, idempotencyKey, receiptNumber);
     }
 

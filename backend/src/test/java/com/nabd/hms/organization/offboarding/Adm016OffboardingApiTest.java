@@ -145,7 +145,11 @@ class Adm016OffboardingApiTest extends ApiTestBase {
         UUID manager = seedRole(c.t().id(), "Practice Manager", false, new ModuleGrant("setup", true, true, true, true, false, false, true));
         String mt = loginAndGetAccessToken(seedStaff(c.t(), manager, "adm016m-" + SEQ.incrementAndGet() + "@a.com", phone(), false));
         assertThat(request(mt, stepUp(mt, "offboarding"), waiver()).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(exchange("/v1/setup/offboarding", HttpMethod.GET, authed(mt), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        // the status read is deliberately empty (200), not 403, for a non-owner: the RBAC matrix cannot model owner-only reads (OffboardingController.status)
+        ResponseEntity<Map> seen = exchange("/v1/setup/offboarding", HttpMethod.GET, authed(mt), Map.class);
+        assertThat(seen.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(seen.getBody().get("request")).isNull();
+        assertThat(seen.getBody().get("recentExportId")).isNull();
         UUID desk = seedRole(c.t().id(), "Reception", false, new ModuleGrant("patients", true, true, true, false, false, false, false));
         String rt = loginAndGetAccessToken(seedStaff(c.t(), desk, "adm016r-" + SEQ.incrementAndGet() + "@a.com", phone(), false));
         assertThat(request(rt, stepUp(rt, "offboarding"), waiver()).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
