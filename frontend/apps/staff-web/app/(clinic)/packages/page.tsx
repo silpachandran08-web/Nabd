@@ -95,6 +95,7 @@ export default function PackagesPage() {
   }
 
   async function saveSettings() {
+    fe.clear(); // a successful save removes the previous 422
     // the server refuses the split for a GST clinic without the decision id (422 gst-opinion-required) and says so
     const body = { priceFloorPercent: Number(floorInput) || 0, taxSplitEnabled: splitOn, gstOpinionDecisionId: decisionId.trim() };
     if (await x.act(() => api.patch("/packages/settings", body), "Action failed.")) { setFloorEdit(null); setSplitEdit(null); setDecisionEdit(null); }
