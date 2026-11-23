@@ -135,6 +135,7 @@ public abstract class ApiTestBase {
         registry.add("app.whatsapp.inbound.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // COM-001: tests call WhatsAppInboundProcessor.poll() themselves
         registry.add("app.registry.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // OPS-007: tests call drain() themselves
         registry.add("app.registry.reconcile-cron", () -> "-"); // never fires; tests call runAll()
+        registry.add("app.dsr.export-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // PLT-047: tests call DsrExportJob.runFor() themselves
         // default 20/min is realistic for one browser, not for a suite of HTTP calls from one loopback IP
         registry.add("app.auth.rate-limit-per-ip-per-minute", () -> "100000");
     }

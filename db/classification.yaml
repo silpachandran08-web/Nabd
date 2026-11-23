@@ -1971,6 +1971,40 @@ schemas:
       otp_expires_at: operational
       created_by: operational
       created_at: operational
+    dsr_market_periods:
+      region_code: operational
+      access_days: operational
+      correction_days: operational
+      erasure_days: operational
+    dsr_requests:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      requester_type: operational
+      requester_patient_id: pii
+      type: operational
+      channel: operational
+      status: operational
+      details: phi  # PLT-047: free text the desk writes about a correction or erasure request
+      received_at: operational
+      due_at: operational
+      completed_at: operational
+      export_file_id: operational
+      export_link_id: operational
+      export_started_at: operational
+      export_attempts: operational
+      reminded_at: operational
+      closure_reason: operational
+      created_by: operational
+    dsr_request_events:
+      id: operational
+      tenant_id: operational
+      request_id: operational
+      at: operational
+      actor_type: operational
+      actor_id: operational
+      event: operational
+      note: operational
     secure_link_opens:
       id: operational
       tenant_id: operational

@@ -289,6 +289,8 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.BOOKING_ROUTED.type()); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove(DomainEventType.APPOINTMENT_NO_SHOW.type()); // ACC-025: Acc025NoShowApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
+        expected.remove("patient.dsr.received.v1"); // PLT-047: Plt047DsrApiTest
+        expected.remove("patient.dsr.export_ready.v1"); // PLT-047: produced by the export worker, Plt047DsrExportApiTest
         expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
         expected.remove(DomainEventType.USAGE_REPORTED.type()); // COM-015: produced by services/comms-gateway (Com015UsageTest)
         expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest

@@ -31,7 +31,8 @@ class PublicSecureLinkController {
     }
 
     @Schema(name = "SecureLinkOpenResponse")
-    record OpenResponse(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard) {
+    record OpenResponse(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard,
+                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) SecureLinkService.ExportFile dataExport) {
     }
 
     private final TenantScope tenantScope;
@@ -56,7 +57,7 @@ class PublicSecureLinkController {
         SecureLinkService.Result<SecureLinkService.Opened> r = tenantScope.run(tenant, () -> service.open(token, req.otp(), RequestMeta.clientIp(http), RequestMeta.userAgent(http)));
         refuse(r.refusal());
         SecureLinkService.Opened o = r.value();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new OpenResponse(o.fileUrl(), o.mime(), o.title(), o.packageCard()));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new OpenResponse(o.fileUrl(), o.mime(), o.title(), o.packageCard(), o.dataExport()));
     }
 
     private static UUID tenant(String token) {

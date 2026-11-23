@@ -82,7 +82,11 @@ public enum DomainEventType {
     /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
     REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
     /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
-    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab");
+    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab"),
+    /** PLT-047: a data-subject request (access, correction, erasure) was received. Ids, the type and the due date only. */
+    PATIENT_DSR_RECEIVED("patient.dsr.received.v1", "core/patient"),
+    /** PLT-047: the package of an access request is stored and its secure link was requested. Ids only; the link token never travels. */
+    PATIENT_DSR_EXPORT_READY("patient.dsr.export_ready.v1", "core/patient");
 
     private final String type;
     private final String source;
