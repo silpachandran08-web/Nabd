@@ -1,0 +1,318 @@
+# PLT-061: one tier per column of this database (same format and tiers as Core db/classification.yaml, PLT-052).
+# Tiers allowed here: pii | financial | operational. `phi` must never appear: NoPhiSchemaScanTest fails on it.
+# An untagged new column fails the same test. Lines with a trailing comment are judgement calls awaiting DPO review.
+version: 1
+schemas:
+  public:
+    tenant_directory:
+      tenant_id: operational
+      brand_id: operational
+      owner_id: operational
+      region_code: operational
+      cell: operational
+      status: operational
+      status_version: operational
+      created_at: operational
+      updated_at: operational
+  master:
+    activation_steps:
+      tenant_id: operational
+      step: operational
+      status: operational
+      first_seen_at: operational
+      completed_at: operational
+      attempts: operational
+      last_error_code: operational
+      nudges_sent: operational
+      last_nudged_at: operational
+      ticket_id: operational
+      last_event_id: operational
+      updated_at: operational
+    deletion_certificates:
+      id: operational
+      tenant_id: operational
+      brand_id: operational
+      request_id: operational
+      requested_at: operational
+      erased_at: operational
+      backup_purge_at: operational
+      region: operational
+      row_counts: operational
+      signed_doc: operational
+      signature: operational
+      kid: operational
+      doc_sha256: operational
+      issued_at: operational
+    discount_requests:
+      id: operational
+      tenant_id: operational
+      requested_by: operational
+      percent: financial
+      reason: pii
+      status: operational
+      reviewed_by: operational
+      reviewed_at: operational
+      created_at: operational
+    kill_switches:
+      feature_code: operational
+      active: operational
+      reason: pii
+      set_by: operational
+      set_at: operational
+    login_attempts:
+      id: operational
+      operator_id: operational
+      email: pii
+      ip_address: pii
+      succeeded: operational
+      attempted_at: operational
+    operator_audit_log:
+      id: operational
+      operator_id: operational
+      action: operational
+      target_tenant_id: operational
+      params: pii  # operator action parameters: ids and codes; free text is an operator duty (section 9)
+      row_count: operational
+      reason: pii
+      ip: pii
+      created_at: operational
+    operator_training_completions:
+      id: operational
+      operator_id: operational
+      module_id: operational
+      score: operational
+      completed_at: operational
+    operators:
+      id: operational
+      name: pii
+      email: pii
+      pin_hash: pii
+      role: operational
+      status: operational
+      mfa_enabled: operational
+      mfa_secret_enc: pii
+      created_at: operational
+      updated_at: operational
+      mfa_last_used_step: operational
+      pin_policy_version: operational
+      mfa_pending_secret_enc: pii
+      mfa_pending_created_at: operational
+    plan_entitlements:
+      plan_id: operational
+      plan_version: operational
+      module_code: operational
+      limits: operational
+    plan_versions:
+      plan_id: operational
+      version: operational
+      monthly_price_cents: financial
+      seat_limit: operational
+      branch_limit: operational
+      visits_per_month: operational
+      published_at: operational
+      whatsapp_message_allowance: operational
+    plans:
+      id: operational
+      code: operational
+      name: operational
+      monthly_price_cents: financial
+      currency: financial
+      seat_limit: operational
+      active: operational
+      created_at: operational
+      updated_at: operational
+      otp_hourly_cap: operational
+      api_requests_per_minute: operational
+      api_burst: operational
+      version: operational
+      market: operational
+      pricing_basis: operational
+      branch_limit: operational
+      visits_per_month: operational
+      on_trial_expiry: operational
+      trial_days: operational
+      white_glove_fee_minor: financial
+    platform_invoices:
+      id: operational
+      tenant_id: operational
+      number: financial
+      kind: operational
+      period_start: operational
+      period_end: operational
+      amount_minor: financial
+      currency: financial
+      status: operational
+      change_id: operational
+      issued_at: operational
+    provisioning_job_steps:
+      id: operational
+      job_id: operational
+      step_name: operational
+      step_order: operational
+      status: operational
+      started_at: operational
+      completed_at: operational
+      error_detail: pii
+      effect_committed_at: operational
+    provisioning_jobs:
+      id: operational
+      requested_by: operational
+      tenant_slug: operational
+      tenant_name: pii
+      region: operational
+      owner_email: pii
+      owner_name: pii
+      brand_name: pii
+      status: operational
+      created_tenant_id: operational
+      created_owner_id: operational
+      created_brand_id: operational
+      created_at: operational
+      updated_at: operational
+      owner_newly_created: operational
+      brand_newly_created: operational
+      path: operational
+      approved_at: operational
+      approved_by: operational
+      owner_mobile: pii
+      source_tenant_id: operational
+      requested_by_staff: operational
+      planned_tenant_id: operational
+      branch_code: operational
+      branch_address: pii
+      timezone: operational
+      copy_sections: operational
+      step_up_id: operational
+      edition: operational
+    regulatory_watch_entries:
+      id: operational
+      source: operational
+      market: operational
+      title: operational
+      impact_level: operational
+      impact: operational
+      linked_ref: operational
+      noticed_on: operational
+      recorded_at: operational
+      recorded_by: operational
+    sessions:
+      id: operational
+      operator_id: operational
+      family_id: operational
+      token_hash: operational
+      device_label: pii
+      ip_address: pii
+      user_agent: pii
+      created_at: operational
+      last_seen_at: operational
+      expires_at: operational
+      revoked_at: operational
+      revoked_reason: operational
+      family_started_at: operational
+    subscription_changes:
+      id: operational
+      tenant_id: operational
+      from_plan_id: operational
+      to_plan_id: operational
+      to_plan_version: operational
+      direction: operational
+      effective: operational
+      effective_at: operational
+      proration_minor: financial
+      currency: financial
+      status: operational
+      requested_by_staff: operational
+      step_up_id: operational
+      created_at: operational
+      applied_at: operational
+    subscriptions:
+      id: operational
+      tenant_id: operational
+      plan_id: operational
+      mrr_cents: financial
+      currency: financial
+      renewal_date: operational
+      created_at: operational
+      updated_at: operational
+      plan_version: operational
+      trial_ends_at: operational
+      status: operational
+      trial_reminded_days: operational
+      billing_period: financial
+    support_access_grants:
+      id: operational
+      tenant_id: operational
+      operator_id: operational
+      reason: pii  # operator-typed free text (section 9)
+      granted_at: operational
+      expires_at: operational
+      revoked_at: operational
+      ticket_id: operational
+      scope: operational
+      status: operational
+      minutes: operational
+      requested_at: operational
+      decided_by_staff_id: operational
+      decided_at: operational
+      decline_note: pii
+      window_started_at: operational
+      window_ends_at: operational
+    support_tickets:
+      id: operational
+      tenant_id: operational
+      source: operational
+      raised_by_staff_id: operational
+      raised_by_name: pii
+      raised_by_email: pii
+      raised_by_role: operational
+      subject: pii  # free text typed by clinic staff: may contain a patient name despite the form rule (docs/architecture/control-plane-extraction.md section 9)
+      description: pii  # same as subject
+      priority: operational
+      status: operational
+      sla_due_at: operational
+      resolved_at: operational
+      created_at: operational
+      updated_at: operational
+      body_redacted: pii
+      redaction_count: operational
+    tenant_feature_overrides:
+      tenant_id: operational
+      feature_code: operational
+      state: operational
+      reason: pii
+      set_by: operational
+      set_at: operational
+      expires_at: operational
+    trial_signups:
+      id: operational
+      mobile_hash: pii
+      ip_hash: pii
+      market: operational
+      region: operational
+      clinic_name: pii
+      specialty: operational
+      otp_hash: pii
+      otp_attempts: operational
+      status: operational
+      job_id: operational
+      created_at: operational
+    white_glove_engagements:
+      id: operational
+      tenant_id: operational
+      status: operational
+      fee_minor: financial
+      currency: financial
+      fee_status: financial
+      waiver_reason: pii
+      invoice_id: operational
+      preferred_slots: operational
+      notes: pii
+      slot_at: operational
+      operator_id: operational
+      ticket_id: operational
+      covered_steps: operational
+      requested_by_staff: operational
+      step_up_id: operational
+      created_at: operational
+      updated_at: operational
+      closed_at: operational
