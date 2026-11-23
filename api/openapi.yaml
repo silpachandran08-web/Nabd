@@ -6187,8 +6187,14 @@ paths:
         today > validity_end + grace_days (the instance's computed `expired` status) with units left; expiredOn = validity_end;
         remainingValue = sum of unconsumed units x allocated per-unit price (the liability formula), rounded to 2 dp.
         Revenue recognition (deferred vs earned) is NOT provided: an accounting decision is pending.
+        ADM-049: with `view` the answer is NOT the object below but the reports-library frame (kpis = totals, columns, rows,
+        nextCursor) of package-sales, package-redemption or package-expiry-loss, exactly as GET /reports/{reportId} answers it
+        (also needs packages:view; `days` does not apply; exports go through POST /reports/{reportId}/exports).
       x-required-permission: reports:view
       parameters:
+        - { name: view, in: query, required: false, schema: { type: string, enum: [sales, redemption, expiry] } }
+        - { name: branch, in: query, required: false, schema: { type: string, format: uuid }, description: "With view only: the caller's own facility." }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: "With view only: continues the rows." }
         - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
         - { name: from, in: query, required: false, schema: { type: string, format: date } }
         - { name: to, in: query, required: false, schema: { type: string, format: date } }

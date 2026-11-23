@@ -67,6 +67,12 @@ public class ReportLibraryService {
                 "Collected and billed per clinic day from the daily rollups (today is read live); rows are the payments recorded in the range.", null);
         reg("package-liability", "money", "Package liability",
                 "Money already collected for package sessions not yet delivered, valued at each item's allocated price. As of now; the range does not apply.", "packages:view");
+        reg("package-sales", "money", "Package sales",
+                "Packages sold in the range, per package: units, the package price as sold (tax is on the invoice) and the channel. Desk = sold by a staff member; WhatsApp = sold with no staff member (no such sale exists yet, so it reads 0). A package refunded later still counts as sold.", "packages:view");
+        reg("package-redemption", "money", "Package redemption",
+                "Packages sold in the range: sessions used so far out of sessions sold. Low redemption = of the packages sold at least 90 days ago, under half the sessions are used; newer sales are not judged yet. Pick a range that reaches back more than 90 days.", "packages:view");
+        reg("package-expiry-loss", "money", "Package expiry loss",
+                "Packages whose validity and grace period ended in the range with sessions unused (not refunded, cancelled or completed), valued at each item's allocated price. Win-back shows who has marketing consent and may be contacted.", "packages:view");
         reg("tax-summary", "money", "Tax summary",
                 "Tax recorded on non-void invoices per clinic day (today is read live). A summary of what was billed, not a filed return: rates and filing treatment need the clinic's accountant.", null);
         reg("patient-sources", "patients", "Where patients come from",
@@ -100,9 +106,11 @@ public class ReportLibraryService {
     private final ActorDirectory actors;
     private final ClinicClock clock;
     private final RegionRules regions;
+    private final PackageReports packageReports;
 
     ReportLibraryService(ReportLibraryRepository lib, ReportsRepository repo, StaffService staffService, AuditService audit, EventPublisher events,
-                         ActorDirectory actors, ClinicClock clock, RegionRules regions) {
+                         ActorDirectory actors, ClinicClock clock, RegionRules regions, PackageReports packageReports) {
+        this.packageReports = packageReports;
         this.lib = lib;
         this.repo = repo;
         this.staffService = staffService;
@@ -170,6 +178,7 @@ public class ReportLibraryService {
             case "leakage" -> leakage(c);
             case "takings" -> takings(c);
             case "package-liability" -> packageLiability(c);
+            case PackageReports.SALES, PackageReports.REDEMPTION, PackageReports.EXPIRY -> packageReport(c);
             case "tax-summary" -> taxSummary(c);
             case "patient-sources" -> patientSources(c);
             case "patient-retention" -> retention(c);
@@ -245,6 +254,15 @@ public class ReportLibraryService {
                 cols("patient", "Patient", "text", "package", "Package", "text", "validTo", "Valid until", "date", "left", "Sessions left", "number", "value", "Value left", "money"),
                 raw.stream().limit(c.limit()).map(r -> row("patient", r.get("patient"), "package", r.get("package"), "validTo", r.get("valid_to"),
                         "left", r.get("sessions_left"), "value", r.get("value_left"))).toList(), more ? String.valueOf(off + c.limit()) : null, null, clock.now(), false);
+    }
+
+    /** ADM-049: the Sales, Redemption and Expiry-loss tabs of the package report (figures as of now). */
+    private ReportFrame packageReport(Ctx c) {
+        PackageReports.Part p = packageReports.build(c.def().id(), c.tenant(), c.from(), c.to(), c.start(), c.end(), c.today(),
+                ClinicClock.startOf(c.today().minusDays(PackageReports.LOW_AFTER_DAYS - 1), c.zone()));
+        int off = offset(c.cursor());
+        return frame(c, p.kpis(), p.chart(), p.columns(), p.rows().stream().skip(off).limit(c.limit()).toList(),
+                p.rows().size() > off + c.limit() ? String.valueOf(off + c.limit()) : null, p.scopeNote(), clock.now(), false);
     }
 
     private ReportFrame patientSources(Ctx c) {
@@ -394,7 +412,7 @@ public class ReportLibraryService {
         return new Chart("column", title, true, m.keySet().stream().map(LocalDate::toString).toList(), List.of(new Series("value", title, new ArrayList<>(m.values()))));
     }
 
-    private <T> Chart barChart(String title, List<T> items, Function<T, String> label, Function<T, BigDecimal> value) {
+    static <T> Chart barChart(String title, List<T> items, Function<T, String> label, Function<T, BigDecimal> value) {
         if (items.isEmpty()) return null;
         List<T> top = items.stream().limit(CHART_CATEGORIES).toList();
         return new Chart("bar", title, false, top.stream().map(label).toList(), List.of(new Series("value", title, top.stream().map(value).toList())));
@@ -408,13 +426,13 @@ public class ReportLibraryService {
         return o == null ? BigDecimal.ZERO : o instanceof BigDecimal b ? b : new BigDecimal(o.toString());
     }
 
-    private static List<Column> cols(String... kvt) {
+    static List<Column> cols(String... kvt) {
         List<Column> l = new ArrayList<>();
         for (int i = 0; i < kvt.length; i += 3) l.add(new Column(kvt[i], kvt[i + 1], kvt[i + 2]));
         return l;
     }
 
-    private static Map<String, Object> row(Object... kv) {
+    static Map<String, Object> row(Object... kv) {
         Map<String, Object> m = new LinkedHashMap<>();
         for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);
         return m;
