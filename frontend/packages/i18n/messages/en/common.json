@@ -167,5 +167,49 @@
       "guard": "Every automatic reply is checked before it is sent. If a reply would mention another clinic, it is stopped, the patient is told \"Let me connect you to the clinic\", your desk takes over the chat and Nabd's team is alerted.",
       "discovery": "If Nabd later helps people find a clinic, that will only happen on Nabd's own number, for people who have not started a chat with any clinic. It is never offered in a chat with your clinic."
     }
+  },
+  "privacyRequests": {
+    "title": "Privacy requests",
+    "intro": "Patients' requests for a copy of their data, a correction or erasure. Each has a legal due date; the soonest is first. A request that is 75% through its time is flagged and reminded.",
+    "filter": {
+      "open": "Open",
+      "all": "All"
+    },
+    "typeFilter": "Request type",
+    "type": {
+      "all": "All types",
+      "access": "Copy of data",
+      "correction": "Correction",
+      "erasure": "Erasure"
+    },
+    "loading": "Loading privacy requests",
+    "loadError": "Couldn't load privacy requests. Try again.",
+    "forbidden": "You don't have access to privacy requests.",
+    "empty": "No privacy requests",
+    "emptyHint": "When a patient asks for their data on WhatsApp or at the desk, it appears here with its due date.",
+    "chip": {
+      "overdue": "{days, plural, one {# day} other {# days}} overdue",
+      "dueSoon": "Due soon, {days, plural, one {# day} other {# days}} left",
+      "daysLeft": "{days, plural, one {# day} other {# days}} left"
+    },
+    "status": {
+      "received": "Received",
+      "verifying": "Checking identity",
+      "in_progress": "In progress",
+      "awaiting_notice": "Waiting for notice",
+      "completed": "Completed",
+      "rejected": "Closed without action",
+      "extended": "Extended"
+    },
+    "channel": {
+      "whatsapp": "WhatsApp",
+      "web": "Patient web",
+      "desk": "Desk"
+    },
+    "byGuardian": "asked by a guardian",
+    "received": "Received {date}",
+    "due": "Due {date}",
+    "reminded": "Reminder sent",
+    "loadMore": "Load more"
   }
 }

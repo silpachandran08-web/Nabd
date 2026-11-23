@@ -8,6 +8,7 @@ import DocumentView from "./DocumentView";
 import ConsentView from "./ConsentView";
 import BookingView from "./BookingView";
 import PackageCardView from "./PackageCardView";
+import DataExportView from "./DataExportView";
 import styles from "./linkflow.module.css";
 
 const LOCALE_LABELS: Record<string, string> = { en: "English", hi: "हिन्दी", kn: "ಕನ್ನಡ", te: "తెలుగు" };
@@ -80,6 +81,7 @@ function Content({ linkId, locale, t, messages, phase, api, onExpired, onReload 
   const { resolved, token } = phase;
   if (resolved.kind === "document") return <DocumentView linkId={linkId} token={token} resolved={resolved} api={api} t={t} onExpired={onExpired} />;
   if (resolved.kind === "package") return <PackageCardView card={resolved.card} t={t} locale={locale} />;
+  if (resolved.kind === "dataExport") return <DataExportView file={resolved.file} t={t} />;
   if (resolved.kind === "unsupported") return <section className={styles.card}><h1 className={styles.h1}>{t("docTitle")}</h1><p className={styles.muted}>{t("docNotHere")}</p></section>;
   if (resolved.kind === "consent") return <ConsentView summary={resolved.consent} token={token} api={api} t={t} messages={messages} locale={locale} onExpired={onExpired} onReload={onReload} />;
   return <BookingView booking={resolved.booking} t={t} locale={locale} />;

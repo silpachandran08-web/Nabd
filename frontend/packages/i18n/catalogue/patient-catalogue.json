@@ -68,6 +68,10 @@
    "docPreviewTitle": "Document preview",
    "docTitle": "Your document",
    "docUnsupported": "This file cannot be shown here. Use the button to open or save it.",
+   "dxDownload": "Download my data",
+   "dxHint": "This file holds the copy of your data that you asked the clinic for: your record, a readable summary and the list of who opened your record.",
+   "dxPrivate": "Keep this file private. It is your medical information. The link works for 72 hours.",
+   "dxTitle": "Your data",
    "errorHint": "Check your connection and try again.",
    "errorTitle": "Something went wrong",
    "expiredFull": "This link has expired — ask the clinic to resend",
@@ -190,6 +194,10 @@
    "docPreviewTitle": "दस्तावेज़ का पूर्वावलोकन",
    "docTitle": "आपका दस्तावेज़",
    "docUnsupported": "यह फ़ाइल यहाँ नहीं दिखाई जा सकती। बटन से इसे खोलें या सहेजें।",
+   "dxDownload": "मेरा डेटा डाउनलोड करें",
+   "dxHint": "इस फ़ाइल में आपके द्वारा क्लिनिक से माँगी गई आपके डेटा की प्रति है: आपका रिकॉर्ड, पढ़ने योग्य सारांश और यह सूची कि आपका रिकॉर्ड किसने खोला।",
+   "dxPrivate": "इस फ़ाइल को निजी रखें। यह आपकी स्वास्थ्य जानकारी है। लिंक 72 घंटे तक काम करता है।",
+   "dxTitle": "आपका डेटा",
    "errorHint": "अपना कनेक्शन जाँचें और फिर कोशिश करें।",
    "errorTitle": "कुछ गड़बड़ हो गई",
    "expiredFull": "यह लिंक समाप्त हो गया है — क्लिनिक से दोबारा भेजने को कहें",
@@ -312,6 +320,10 @@
    "docPreviewTitle": "ದಾಖಲೆಯ ಪೂರ್ವವೀಕ್ಷಣೆ",
    "docTitle": "ನಿಮ್ಮ ದಾಖಲೆ",
    "docUnsupported": "ಈ ಫೈಲ್ ಅನ್ನು ಇಲ್ಲಿ ತೋರಿಸಲಾಗದು. ಬಟನ್ ಬಳಸಿ ತೆರೆಯಿರಿ ಅಥವಾ ಉಳಿಸಿ.",
+   "dxDownload": "ನನ್ನ ಮಾಹಿತಿಯನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+   "dxHint": "ನೀವು ಕ್ಲಿನಿಕ್‌ನಿಂದ ಕೇಳಿದ ನಿಮ್ಮ ಮಾಹಿತಿಯ ಪ್ರತಿ ಈ ಫೈಲ್‌ನಲ್ಲಿದೆ: ನಿಮ್ಮ ದಾಖಲೆ, ಓದಬಹುದಾದ ಸಾರಾಂಶ ಮತ್ತು ನಿಮ್ಮ ದಾಖಲೆಯನ್ನು ಯಾರು ತೆರೆದರು ಎಂಬ ಪಟ್ಟಿ.",
+   "dxPrivate": "ಈ ಫೈಲ್ ಅನ್ನು ಖಾಸಗಿಯಾಗಿಡಿ. ಇದು ನಿಮ್ಮ ಆರೋಗ್ಯ ಮಾಹಿತಿ. ಲಿಂಕ್ 72 ಗಂಟೆಗಳ ಕಾಲ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
+   "dxTitle": "ನಿಮ್ಮ ಮಾಹಿತಿ",
    "errorHint": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
    "errorTitle": "ಏನೋ ತಪ್ಪಾಯಿತು",
    "expiredFull": "ಈ ಲಿಂಕ್‌ನ ಅವಧಿ ಮುಗಿದಿದೆ — ಮತ್ತೆ ಕಳುಹಿಸಲು ಕ್ಲಿನಿಕ್‌ಗೆ ಕೇಳಿ",
@@ -434,6 +446,10 @@
    "docPreviewTitle": "పత్రం ప్రివ్యూ",
    "docTitle": "మీ పత్రం",
    "docUnsupported": "ఈ ఫైల్‌ను ఇక్కడ చూపలేము. బటన్‌తో తెరవండి లేదా సేవ్ చేయండి.",
+   "dxDownload": "నా సమాచారాన్ని డౌన్‌లోడ్ చేయండి",
+   "dxHint": "మీరు క్లినిక్‌ను అడిగిన మీ సమాచారం కాపీ ఈ ఫైల్‌లో ఉంది: మీ రికార్డు, చదవగలిగే సారాంశం మరియు మీ రికార్డును ఎవరు తెరిచారో జాబితా.",
+   "dxPrivate": "ఈ ఫైల్‌ను ప్రైవేట్‌గా ఉంచండి. ఇది మీ ఆరోగ్య సమాచారం. లింక్ 72 గంటలు పనిచేస్తుంది.",
+   "dxTitle": "మీ సమాచారం",
    "errorHint": "మీ కనెక్షన్ చూసి మళ్లీ ప్రయత్నించండి.",
    "errorTitle": "ఏదో తప్పు జరిగింది",
    "expiredFull": "ఈ లింక్ గడువు ముగిసింది — మళ్లీ పంపమని క్లినిక్‌ను అడగండి",
@@ -635,6 +651,18 @@
     "docUnsupported": {
      "status": "unreviewed"
     },
+    "dxDownload": {
+     "status": "unreviewed"
+    },
+    "dxHint": {
+     "status": "unreviewed"
+    },
+    "dxPrivate": {
+     "status": "unreviewed"
+    },
+    "dxTitle": {
+     "status": "unreviewed"
+    },
     "errorHint": {
      "status": "unreviewed"
     },
@@ -1061,6 +1089,18 @@
     "docUnsupported": {
      "status": "unreviewed"
     },
+    "dxDownload": {
+     "status": "unreviewed"
+    },
+    "dxHint": {
+     "status": "unreviewed"
+    },
+    "dxPrivate": {
+     "status": "unreviewed"
+    },
+    "dxTitle": {
+     "status": "unreviewed"
+    },
     "errorHint": {
      "status": "unreviewed"
     },
@@ -1485,6 +1525,18 @@
      "status": "unreviewed"
     },
     "docUnsupported": {
+     "status": "unreviewed"
+    },
+    "dxDownload": {
+     "status": "unreviewed"
+    },
+    "dxHint": {
+     "status": "unreviewed"
+    },
+    "dxPrivate": {
+     "status": "unreviewed"
+    },
+    "dxTitle": {
      "status": "unreviewed"
     },
     "errorHint": {
@@ -2161,5 +2213,5 @@
    }
   }
  },
- "version": "8c5a0b297264"
+ "version": "e87d5c97ff1d"
 }
