@@ -1257,6 +1257,20 @@ schemas:
       created_at: operational
       updated_at: operational
       change_seq: operational
+    lab_reference_ranges:
+      id: operational
+      tenant_id: operational
+      test_id: operational
+      version: operational
+      sex: operational
+      age_min_days: operational
+      age_max_days: operational
+      low: operational
+      high: operational
+      critical_low: operational
+      critical_high: operational
+      text_range: operational
+      effective_from: operational
     lab_tests:
       id: operational
       tenant_id: operational
