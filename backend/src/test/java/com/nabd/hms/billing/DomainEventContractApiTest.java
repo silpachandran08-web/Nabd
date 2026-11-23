@@ -320,6 +320,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.ORGANIZATION_BRANCH_CREATED.type()); // PLT-022: Plt022OwnerBranchApiTest
         expected.remove(DomainEventType.REPORTING_EXPORT_CREATED.type()); // ADM-047: Adm047ReportsLibraryApiTest
         expected.remove(DomainEventType.LAB_CATALOGUE_CHANGED.type()); // PHL-041: Phl041LabCatalogueApiTest
+        expected.remove(DomainEventType.REPORTING_OPS_ALERT_RAISED.type()); // ADM-042: produced by the alert pass, Adm042LiveOpsSseApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content
