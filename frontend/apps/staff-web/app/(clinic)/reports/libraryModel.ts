@@ -2,13 +2,18 @@
 
 export type ReportGroup = "money" | "patients" | "team";
 export type ChartFormat = "money" | "count";
-export type ReportDef = { key: string; group: ReportGroup; requires?: string; chart: ChartFormat };
+/** tabOf: the report opens as a tab of that library entry, not as its own entry. defaultDays: the range it opens with (30 when absent). */
+export type ReportDef = { key: string; group: ReportGroup; requires?: string; chart: ChartFormat; tabOf?: string; defaultDays?: number };
 
 /** Library order. The keys are the API ids (GET /v1/reports/{key}) and the `report` query value of the screen's URL: other screens link by them. */
 export const REPORT_CATALOG: ReportDef[] = [
   { key: "leakage", group: "money", chart: "money" },
   { key: "takings", group: "money", chart: "money" },
   { key: "package-liability", group: "money", requires: "packages:view", chart: "count" },
+  // ADM-049: tabs of the package report. Redemption judges sales at least 90 days old, so it opens on the last 12 months.
+  { key: "package-sales", group: "money", requires: "packages:view", chart: "count", tabOf: "package-liability" },
+  { key: "package-redemption", group: "money", requires: "packages:view", chart: "count", tabOf: "package-liability", defaultDays: 365 },
+  { key: "package-expiry-loss", group: "money", requires: "packages:view", chart: "money", tabOf: "package-liability" },
   { key: "tax-summary", group: "money", chart: "money" },
   { key: "patient-sources", group: "patients", chart: "count" },
   { key: "patient-retention", group: "patients", chart: "count" },
@@ -25,6 +30,13 @@ export function visibleReports(allowed: (permission: string) => boolean): Report
   return REPORT_CATALOG.filter((r) => !r.requires || allowed(r.requires));
 }
 
+/** The tabs a report sits in (its library entry first), or none when it stands alone. */
+export function tabsOf(def: ReportDef, catalog: ReportDef[]): ReportDef[] {
+  const root = def.tabOf ?? def.key;
+  const tabs = catalog.filter((r) => r.key === root || r.tabOf === root);
+  return tabs.length > 1 ? tabs : [];
+}
+
 export const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export type Preset = "d7" | "d30" | "month";
@@ -36,6 +48,14 @@ export function presetRange(p: Preset, now: Date): { from: string; to: string } 
   const from = new Date(now);
   from.setDate(from.getDate() - (p === "d7" ? 6 : 29));
   return { from: iso(from), to };
+}
+
+/** The range a report opens with when its link carries no dates: the last `days` days ending today (30 when the report names none). */
+export function defaultRange(days: number | undefined, now: Date): { from: string; to: string } {
+  if (!days) return presetRange("d30", now);
+  const from = new Date(now);
+  from.setDate(from.getDate() - (days - 1));
+  return { from: iso(from), to: iso(now) };
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
