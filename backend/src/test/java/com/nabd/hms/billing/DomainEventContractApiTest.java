@@ -320,6 +320,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.ORGANIZATION_BRANCH_CREATED.type()); // PLT-022: Plt022OwnerBranchApiTest
         expected.remove(DomainEventType.REPORTING_EXPORT_CREATED.type()); // ADM-047: Adm047ReportsLibraryApiTest
         expected.remove(DomainEventType.LAB_CATALOGUE_CHANGED.type()); // PHL-041: Phl041LabCatalogueApiTest
+        expected.remove(DomainEventType.EINVOICE_ACCEPTED.type()); // FIN-011: produced by the e-invoice worker, Fin011EinvoiceApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

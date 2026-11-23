@@ -72,6 +72,7 @@ public class CheckoutService {
     private final PaymentActedBy paymentActedBy; // IDC-011
     private final com.nabd.hms.organization.api.ClinicPolicies policies;
     private final DiscountApprovalService approvals; // FIN-018
+    private final com.nabd.hms.billing.einvoice.EinvoiceService einvoices; // FIN-011
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
@@ -79,7 +80,8 @@ public class CheckoutService {
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
                      com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies,
-                     DiscountApprovalService approvals) {
+                     DiscountApprovalService approvals, com.nabd.hms.billing.einvoice.EinvoiceService einvoices) {
+        this.einvoices = einvoices;
         this.approvals = approvals;
         this.paymentActedBy = paymentActedBy;
         this.policies = policies;
@@ -233,6 +235,7 @@ public class CheckoutService {
             eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.INVOICE_SETTLED, invoiceId, java.util.Map.of(
                     "invoiceId", invoiceId, "visitId", queueEntryId, "settledAt", clock.now(), "settledBy", staffId));
             visitCommands.completeVisit(tenantId, staffId, queueEntryId, ctx.queueStatus());
+            einvoices.onIssued(invoiceId); // FIN-011: the bill is final here; an interim stop may still add lines
         } else {
             visitCommands.advanceAfterBilling(tenantId, staffId, queueEntryId, ctx.queueStatus(), nextStatus);
         }
@@ -352,6 +355,7 @@ public class CheckoutService {
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId, approvalId);
         if (approvalId != null) approvals.markUsed(tenantId, approvalId, invoiceId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
+        einvoices.onIssued(invoiceId); // FIN-011
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());

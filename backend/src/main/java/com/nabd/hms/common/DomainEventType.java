@@ -82,7 +82,9 @@ public enum DomainEventType {
     /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
     REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
     /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
-    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab");
+    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab"),
+    /** FIN-011: the IRP registered a B2B invoice (IRN issued). Ids, the regime and the IRN only. */
+    EINVOICE_ACCEPTED("billing.einvoice.accepted.v1", "core/billing");
 
     private final String type;
     private final String source;
