@@ -137,7 +137,7 @@ class ReportsRepository {
     }
 
     BigDecimal outstandingTotal(UUID tenantId) {
-        return nz(jdbc.queryForObject("SELECT COALESCE(SUM(total - paid), 0) FROM invoices " +
+        return nz(jdbc.queryForObject("SELECT COALESCE(SUM(total - payer_share - paid), 0) FROM invoices " +
                 "WHERE tenant_id = ? AND status IN ('unpaid', 'partial')", BigDecimal.class, tenantId));
     }
 

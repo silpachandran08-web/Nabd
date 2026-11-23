@@ -342,7 +342,7 @@ class CheckoutRepository {
 
     private static final String INVOICE_SELECT =
             "SELECT id, invoice_number, queue_entry_id, patient_id, doctor_id, subtotal, discount, tax, round_off, " +
-                    "total, paid, status, created_at FROM invoices ";
+                    "total, paid, status, created_at, payer_share FROM invoices ";
 
     private RowMapper<InvoiceRow> invoiceMapper() {
         return (rs, i) -> new InvoiceRow(
@@ -350,7 +350,7 @@ class CheckoutRepository {
                 uuidOrNull(rs, "queue_entry_id"), uuidOrNull(rs, "patient_id"),
                 uuidOrNull(rs, "doctor_id"), rs.getBigDecimal("subtotal"), rs.getBigDecimal("discount"),
                 rs.getBigDecimal("tax"), rs.getBigDecimal("round_off"), rs.getBigDecimal("total"), rs.getBigDecimal("paid"),
-                rs.getString("status"), rs.getTimestamp("created_at").toInstant());
+                rs.getString("status"), rs.getTimestamp("created_at").toInstant(), rs.getBigDecimal("payer_share"));
     }
 
     /** NB-186: OTC sale invoices leave queue_entry_id/patient_id/doctor_id null. */

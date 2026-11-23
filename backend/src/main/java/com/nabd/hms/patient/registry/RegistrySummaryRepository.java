@@ -49,7 +49,7 @@ class RegistrySummaryRepository {
             SELECT p.tenant_id, p.id, lower(p.name), p.mrn, right(regexp_replace(p.phone, '\\D', '', 'g'), 10),
                    (SELECT max(q.queue_date) FROM queue_entries q WHERE q.tenant_id = p.tenant_id AND q.patient_id = p.id AND q.status <> 'no_show'),
                    na.start_time, na.doctor_id,
-                   COALESCE((SELECT sum(i.total - i.paid) FROM invoices i WHERE i.tenant_id = p.tenant_id AND i.patient_id = p.id
+                   COALESCE((SELECT sum(i.total - i.payer_share - i.paid) FROM invoices i WHERE i.tenant_id = p.tenant_id AND i.patient_id = p.id
                              AND i.status IN ('unpaid', 'partial')), 0),
                    EXISTS (SELECT 1 FROM chronic_conditions c WHERE c.tenant_id = p.tenant_id AND c.patient_id = p.id AND c.status = 'active'),
                    (SELECT min(c.review_due_date) FROM chronic_conditions c WHERE c.tenant_id = p.tenant_id AND c.patient_id = p.id AND c.status = 'active'),

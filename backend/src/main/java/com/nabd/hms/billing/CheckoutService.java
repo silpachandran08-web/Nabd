@@ -72,6 +72,7 @@ public class CheckoutService {
     private final PaymentActedBy paymentActedBy; // IDC-011
     private final com.nabd.hms.organization.api.ClinicPolicies policies;
     private final DiscountApprovalService approvals; // FIN-018
+    private final PayerSplitService payerSplit; // FIN-036
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
@@ -79,7 +80,8 @@ public class CheckoutService {
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
                      com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies,
-                     DiscountApprovalService approvals) {
+                     DiscountApprovalService approvals, PayerSplitService payerSplit) {
+        this.payerSplit = payerSplit;
         this.approvals = approvals;
         this.paymentActedBy = paymentActedBy;
         this.policies = policies;
@@ -220,6 +222,7 @@ public class CheckoutService {
             log.info("invoice {} extended at queue entry {} by {} (tenant {}, new total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         }
+        payerSplit.apply(tenantId, queueEntryId, invoiceId); // FIN-036: nothing happens unless the visit is insured
         repo.markProceduresBilled(tenantId, queueEntryId); // NB-146: whatever wasn't already billed at this visit never will be pending again
 
         // Closes the loop NB-102 left open: a doctor's "Complete consultation" moves a visit to
@@ -570,7 +573,7 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-not-payable", "Invoice can't take payments",
                     "This invoice is " + invoice.status() + "; it can't take payments.");
         }
-        BigDecimal balance = invoice.total().subtract(invoice.paid());
+        BigDecimal balance = invoice.due().subtract(invoice.paid()); // FIN-036: the patient's balance; the payer's share is not the desk's to collect
         if (req.amount().compareTo(balance) > 0) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "overpayment", "Payment is more than the balance",
                     "The balance due is " + balance.toPlainString() + "; a payment can't be more than that.",
@@ -581,9 +584,9 @@ public class CheckoutService {
                 series.allocate(SeriesAllocator.Kind.RECEIPT).formatted());
         paymentActedBy.stamp(tenantId, paymentId, invoice.patientId(), req); // IDC-011
         BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
-        String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
+        String newStatus = InvoiceStatus.derive(invoice.status(), invoice.due(), newPaid);
         repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
-        BigDecimal newBalance = invoice.total().subtract(newPaid);
+        BigDecimal newBalance = invoice.due().subtract(newPaid);
 
         String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.payment_recorded", "invoice", invoiceId,
@@ -620,6 +623,7 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-has-payments", "Invoice has payments",
                     "Payments were taken on this invoice, so it can't be voided. Refund the payments first.");
         }
+        payerSplit.requireNoPayerPayments(tenantId, invoiceId); // FIN-036
         String reason = req.reason().trim();
         if (reason.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required", "A reason is required to void an invoice.");
@@ -669,9 +673,10 @@ public class CheckoutService {
                 : repo.findStaffName(tenantId, row.doctorId()).orElse("Unknown doctor");
         return new InvoiceResponse(row.id(), row.invoiceNumber(), row.queueEntryId(), row.patientId(), patientName,
                 row.doctorId(), doctorName, currencyFor(tenantId), row.subtotal(), row.discount(), row.tax(),
-                row.roundOff(), row.total(), row.paid(), row.total().subtract(row.paid()), row.status(),
+                row.roundOff(), row.total(), row.paid(), row.due().subtract(row.paid()), row.status(),
                 lineItems, payments, row.createdAt(),
-                com.nabd.hms.billing.tax.TaxService.BILL_OF_SUPPLY.equals(docMeta[0]) ? "Bill of Supply" : "Invoice", docMeta[1]);
+                com.nabd.hms.billing.tax.TaxService.BILL_OF_SUPPLY.equals(docMeta[0]) ? "Bill of Supply" : "Invoice", docMeta[1],
+                row.payerShare().signum() == 0 ? null : payerSplit.view(tenantId, row.id()));
     }
 
     private ChargeResponse toChargeResponse(ChargeRow c) {

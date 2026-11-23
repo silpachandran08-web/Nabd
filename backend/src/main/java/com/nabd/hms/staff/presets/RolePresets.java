@@ -18,11 +18,12 @@ import java.util.stream.Stream;
  * nursing, specialty_dental, departments and lab (PHL-041) are not in the matrix; their rows are marked "extension" in the golden file.
  * lab flags map to the named lab permissions in GrantsFlattener (create = order, edit = collect + result, approve = validate + release,
  * delete = catalogue + qc).
+ * insurance (FIN-036) is an extension too: view = read payers, policies and coverage, edit = add policies, set coverage, record payer payments.
  * Bump VERSION whenever a definition changes; reset-to-preset then moves a role to the new definition.
  */
 public final class RolePresets {
 
-    public static final int VERSION = 2; // 2: PHL-041 lab module on every preset, Lab technician preset
+    public static final int VERSION = 3; // 2: PHL-041 lab module on every preset, Lab technician preset; 3: FIN-036 insurance module (the desk roles view and edit)
 
     public record Preset(String code, String name, boolean builtIn, List<ModuleGrant> grants) {
     }
@@ -31,31 +32,31 @@ public final class RolePresets {
             g("patients", "YYYYY-Y"), g("queue", "YYYYY-Y"), g("clinical", "YNNYN-Y", true),
             g("billing", "YYYYYYY"), g("packages", "YYYYYYY"), g("pharmacy", "PPPPPPP"), g("reports", "Y---Y-Y"),
             g("staff", "YYYYY-Y"), g("setup", "Y-Y---Y"), g("compliance", "Y--YY-Y"),
-            g("nursing", "YYYYYYY"), g("specialty_dental", "YYYYYYY"), g("departments", "YYYYYYY"), g("lab", "YYYYYYY")));
+            g("nursing", "YYYYYYY"), g("specialty_dental", "YYYYYYY"), g("departments", "YYYYYYY"), g("lab", "YYYYYYY"), g("insurance", "YYYYYYY")));
 
     private static final Preset DOCTOR = new Preset("doctor", "Doctor", false, List.of(
             g("patients", "YYY-N--"), g("queue", "Y-Y----"), g("clinical", "YYYYN--"),
             g("billing", "Y------"), g("packages", "YYY----"), g("pharmacy", "PPN----"), g("reports", "Y---N--"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "YY-----"), g("specialty_dental", "YYY----"), g("departments", "Y------"), g("lab", "YY-----")));
+            g("nursing", "YY-----"), g("specialty_dental", "YYY----"), g("departments", "Y------"), g("lab", "YY-----"), g("insurance", "N------")));
 
     private static final Preset NURSE = new Preset("nurse", "Nurse", false, List.of(
             g("patients", "YNY-N--"), g("queue", "Y-Y----"), g("clinical", "YYY-N--"),
             g("billing", "N------"), g("packages", "Y-Y----"), g("pharmacy", "PNN----"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "YYY----"), g("specialty_dental", "Y------"), g("departments", "Y------"), g("lab", "N------")));
+            g("nursing", "YYY----"), g("specialty_dental", "Y------"), g("departments", "Y------"), g("lab", "N------"), g("insurance", "N------")));
 
     private static final Preset RECEPTIONIST = new Preset("receptionist", "Receptionist", false, List.of(
             g("patients", "YYY-N--"), g("queue", "YYY----"), g("clinical", "N------"),
             g("billing", "YYYNYN-"), g("packages", "YYN----"), g("pharmacy", "PPN----"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "N------")));
+            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "N------"), g("insurance", "Y-Y----")));
 
     private static final Preset FRONTDESK_VITALS = new Preset("frontdesk_vitals", "Front-desk + Vitals", false, List.of(
             g("patients", "YYY-N--"), g("queue", "YYY----"), g("clinical", "YYN-N--"),
             g("billing", "YYYNYN-"), g("packages", "YYN----"), g("pharmacy", "PPN----"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "N------")));
+            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "N------"), g("insurance", "Y-Y----")));
 
     /** MF-52: an owner who is also a clinician — Owner and Doctor combined, plus clinical:approve. */
     private static final Preset OWNER_DOCTOR = new Preset("owner_doctor", "Owner-doctor", false, ownerDoctorGrants());
@@ -65,7 +66,7 @@ public final class RolePresets {
             g("patients", "Y------"), g("queue", "N------"), g("clinical", "N------"),
             g("billing", "N------"), g("packages", "N------"), g("pharmacy", "N------"), g("reports", "N------"),
             g("staff", "N------"), g("setup", "N------"), g("compliance", "N------"),
-            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "Y-Y----")));
+            g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"), g("lab", "Y-Y----"), g("insurance", "N------")));
 
     public static final List<Preset> ALL = List.of(OWNER, OWNER_DOCTOR, DOCTOR, NURSE, RECEPTIONIST, FRONTDESK_VITALS, LAB_TECHNICIAN);
 

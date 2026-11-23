@@ -83,7 +83,7 @@ class DayCloseRepository {
     /** Balances still owed on the day's own bills. */
     DayCloseSummaryResponse.Outstanding outstanding(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.queryForObject("""
-                SELECT COALESCE(SUM(total - paid), 0) AS amount, count(DISTINCT patient_id) AS patients, count(*) AS bills
+                SELECT COALESCE(SUM(total - payer_share - paid), 0) AS amount, count(DISTINCT patient_id) AS patients, count(*) AS bills
                 FROM invoices WHERE tenant_id = ? AND status IN ('unpaid', 'partial') AND created_at >= ? AND created_at < ?
                 """, (rs, i) -> new DayCloseSummaryResponse.Outstanding(rs.getBigDecimal("amount"), rs.getInt("patients"),
                         rs.getInt("bills")), tenantId, ts(dayStart), ts(dayEnd));

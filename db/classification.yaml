@@ -1095,6 +1095,8 @@ schemas:
       sac_hsn: financial
       batch_id: operational
       paper_rx_line_id: operational
+      patient_share_minor: financial
+      payer_share_minor: financial
     invoice_line_taxes:
       id: operational
       tenant_id: operational
@@ -1209,6 +1211,59 @@ schemas:
       fy_start_month: operational
       prefix_pattern: operational
       pad: operational
+    insurance_payers:
+      id: operational
+      tenant_id: operational
+      name: operational
+      kind: operational
+      jurisdiction: operational
+      identifiers: operational
+      active: operational
+      created_at: operational
+    insurance_plans:
+      id: operational
+      tenant_id: operational
+      payer_id: operational
+      name: operational
+      copay_percent: financial
+      active: operational
+      created_at: operational
+    invoice_payer_payments:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      payer_id: operational
+      method: financial
+      amount: financial
+      reference: financial
+      recorded_by: operational
+      recorded_at: operational
+    patient_policies:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      payer_id: pii
+      plan_id: pii
+      member_id_enc: pii
+      policy_number_enc: pii
+      valid_from: pii
+      valid_to: pii
+      relationship: pii
+      card_document_ids: pii
+      status: operational
+      created_by: operational
+      created_at: operational
+    visit_coverages:
+      id: operational
+      tenant_id: operational
+      visit_id: operational
+      mode: financial
+      policy_id: pii
+      eligibility_ref: financial
+      copay_rule: financial
+      updated_by: operational
+      created_at: operational
+      updated_at: operational
     invoices:
       id: operational
       tenant_id: operational
@@ -1242,6 +1297,12 @@ schemas:
       buyer_gstin: financial
       change_seq: operational
       updated_at: operational
+      payer_id: operational
+      payer_share: financial
+      payer_share_minor: financial
+      patient_share_minor: financial
+      payer_paid: financial
+      payer_shortfall_status: operational
     lab_panel_tests:
       tenant_id: operational
       panel_id: operational

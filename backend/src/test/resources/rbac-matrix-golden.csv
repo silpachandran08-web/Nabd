@@ -85,3 +85,9 @@ lab_technician,nursing,N,-,-,-,-,-,-,extension
 lab_technician,specialty_dental,N,-,-,-,-,-,-,extension
 lab_technician,departments,Y,-,-,-,-,-,-,extension
 lab_technician,lab,Y,-,Y,-,-,-,-,extension
+owner,insurance,Y,Y,Y,Y,Y,Y,Y,extension
+doctor,insurance,N,-,-,-,-,-,-,extension
+nurse,insurance,N,-,-,-,-,-,-,extension
+receptionist,insurance,Y,-,Y,-,-,-,-,extension
+frontdesk_vitals,insurance,Y,-,Y,-,-,-,-,extension
+lab_technician,insurance,N,-,-,-,-,-,-,extension

@@ -82,7 +82,9 @@ public enum DomainEventType {
     /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
     REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
     /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
-    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab");
+    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab"),
+    /** FIN-036: the desk marked a visit insured or self-pay. Ids and the mode only: no policy, member or payer detail. */
+    INSURANCE_COVERAGE_SET("insurance.coverage.set.v1", "core/insurance");
 
     private final String type;
     private final String source;
