@@ -1,0 +1,16 @@
+/* CLN-012 coded-diagnosis field. Tokens only; logical properties (RTL). The listbox and option styles are RxPad's. */
+.wrap { display: flex; flex-direction: column; gap: var(--nb-space-8); min-inline-size: 0; }
+.search { position: relative; display: flex; flex-direction: column; gap: var(--nb-space-4); }
+.meta { margin: 0; font-size: 12px; color: var(--nb-text-secondary); }
+.error { margin: 0; font-size: 12px; color: var(--nb-warn-500); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-8); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); }
+.title { flex: 1 1 200px; min-inline-size: 0; font-size: 13px; color: var(--nb-text-primary); }
+.code { font-weight: 600; font-variant-numeric: tabular-nums; margin-inline-end: var(--nb-space-8); }
+.qualifier { flex: 1 1 100%; }
+.act { min-block-size: 36px; min-inline-size: 36px; padding: 0 var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.act:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
+.act:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 1px; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.fav { margin-inline-start: auto; }
+@media (pointer: coarse) { .act { min-block-size: 44px; min-inline-size: 44px; } }

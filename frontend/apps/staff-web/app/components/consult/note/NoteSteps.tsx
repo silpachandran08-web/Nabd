@@ -6,7 +6,7 @@ import { useNoteFieldLabels } from "../noteLabels";
 import { can } from "../../../lib/permissions";
 import type { AuthedFetch, PatientDetail, Row } from "../shared";
 import type { ClinicalContext } from "../clinical";
-import DiagnosisField from "../DiagnosisField";
+import DiagnosisCombobox, { type DiagnosisVisit } from "../diagnosis/DiagnosisCombobox";
 import NoteTemplates from "../NoteTemplates";
 import SpecialtySlot from "../specialty/SpecialtySlot";
 import VitalsCard from "../VitalsCard";
@@ -58,7 +58,7 @@ export function ExamineStep({ entry, patient, authedFetch, locked, noteLoaded, o
   );
 }
 
-export function AssessStep({ note, disabled, onChange }: NoteFieldProps) {
+export function AssessStep({ note, disabled, onChange, visit }: NoteFieldProps & { visit: DiagnosisVisit }) {
   const tn = useTranslations("consult.noteSteps");
   const L = useNoteFieldLabels();
   return (
@@ -70,7 +70,7 @@ export function AssessStep({ note, disabled, onChange }: NoteFieldProps) {
           <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={disabled} onChange={(e) => onChange("assessment", e.target.value)} />
         </div>
         <div className={styles.noteField}>
-          <DiagnosisField value={note.diagnosis} disabled={disabled} inputClassName={styles.input} onChange={(v) => onChange("diagnosis", v)} />
+          <DiagnosisCombobox key={visit.entryId} visit={visit} value={note.diagnosis} disabled={disabled} inputClassName={styles.input} onChange={(v) => onChange("diagnosis", v)} />
         </div>
       </div>
     </div>
