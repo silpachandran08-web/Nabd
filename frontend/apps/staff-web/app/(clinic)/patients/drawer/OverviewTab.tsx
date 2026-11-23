@@ -15,6 +15,7 @@ import CompleteInChat from "../CompleteInChat";
 import NotificationPrefs from "../NotificationPrefs";
 import MedicinesSection from "./MedicinesSection";
 import TimelineSection from "./TimelineSection";
+import BrandLinksSection from "../../../components/brandDirectory/BrandLinksSection";
 
 // The drawer's Overview tab: header facts plus one self-loading section per clinical record.
 export default function OverviewTab({ patient, listLastVisit, perms, onRegistryChanged }: {
@@ -77,6 +78,7 @@ export default function OverviewTab({ patient, listLastVisit, perms, onRegistryC
 
       <GuardianSection patient={patient} patientsEdit={patientsEdit} onRegistryChanged={onRegistryChanged} />
       <NotificationPrefs key={`prefs-${patient.id}`} patientId={patient.id} canEdit={patientsEdit} />
+      <BrandLinksSection key={`brand-${patient.id}`} patientId={patient.id} canEdit={patientsEdit} />
 
       {clinicalView ? (
         <>
