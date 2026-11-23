@@ -15,10 +15,14 @@ export type Row = QueueEntry & { patientName: string; patient: PatientDetail | n
 export type RxReasonOption = { code: string; label: string };
 export type RxDecision = { kind: string; reasonCode: string; reasonLabel: string | null; note: string | null; by: string | null; byName: string | null; at: string | null };
 export type RxWarning = {
-  kind: "allergy" | "pregnancy" | "controlled"; severity: string; message: string; matched: string;
+  kind: "allergy" | "pregnancy" | "controlled" | "ddi" | "duplicate"; severity: string; message: string; matched: string;
   requiresDecision: boolean; resolved: boolean; reasonOptions: RxReasonOption[]; decision: RxDecision | null;
+  // CLN-032, ddi and duplicate only (the knowledge base's own data; any may be null): the other medicine and where it is
+  // (otherLineRef = 0-based line of this prescription, null for an active medicine), why, what to do, "<KB> <month>".
+  otherLineRef?: number | null; otherDrug?: string | null; otherFrom?: "draft" | "rx" | "reported" | null;
+  mechanism?: string | null; management?: string | null; source?: string | null; sourceRef?: string | null; totalDailyDose?: string | null;
 };
-export type RxDecisionInput = { kind: string; reasonCode: string; note?: string };
+export type RxDecisionInput = { kind: string; reasonCode: string; note?: string; matched?: string };
 export type PrescriptionItem = {
   id?: string; drugName: string; dosage: string; frequency: string; duration: string;
   instructions: string; allergyOverrideReason?: string | null; allergyWarning?: string | null;
@@ -30,6 +34,8 @@ export type PrescriptionItem = {
   drugId?: string | null; coded?: boolean; genericName?: string | null;
   // CLN-024: what the doctor asked for (null = the class default) and what applies (server-computed, read-only)
   validityDays?: number | null; refills?: number | null; validity?: RxLineValidity | null;
+  // CLN-032: "checked" | "not_checked" (free text: nothing can be said about it); null = no knowledge base, nothing was checked
+  interactionCheck?: "checked" | "not_checked" | null;
 };
 /** CLN-024: a line's validity. Draft: the values signing would apply now and the class limits (fixed = a controlled class whose values
  * apply whatever is entered). Signed: the applied days/refills and validUntil; the limits are null. days null = no class rule. */

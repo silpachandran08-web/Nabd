@@ -1060,5 +1060,18 @@
   },
   "quickActionBar": {
     "title": "Quick actions"
+  },
+  "rxInteractions": {
+    "with": {
+      "draft": "With {drug} (line {line} of this prescription)",
+      "rx": "With {drug} (from a prescription that is still running)",
+      "reported": "With {drug} (reported by the patient)"
+    },
+    "totalDailyDose": "Total daily dose: {dose}. Check the working: it takes one unit of the dose pattern to hold the stated strength.",
+    "why": "Why?",
+    "mechanism": "Mechanism",
+    "management": "What to do",
+    "source": "Source",
+    "notChecked": "Not checked for interactions or duplicate therapy: this medicine is free text. Pick it from the drug list to have it checked."
   }
 }

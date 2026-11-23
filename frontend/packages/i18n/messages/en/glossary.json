@@ -93,5 +93,21 @@
   },
   "condition": {
     "chronic": "Chronic"
+  },
+  "interaction": {
+    "warning": {
+      "title": "Drug interaction"
+    },
+    "severity": {
+      "contraindicated": "Contraindicated",
+      "major": "Major",
+      "moderate": "Moderate",
+      "minor": "Minor"
+    }
+  },
+  "duplicate": {
+    "warning": {
+      "title": "Duplicate therapy"
+    }
   }
 }

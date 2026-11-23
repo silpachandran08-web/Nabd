@@ -379,6 +379,42 @@
       "approved": [
         "en"
       ]
+    },
+    "interaction.warning.title": {
+      "definition": "Title of the warning for a drug-drug interaction between two medicines the patient would be taking together.",
+      "approved": [
+        "en"
+      ]
+    },
+    "interaction.severity.contraindicated": {
+      "definition": "Interaction or duplicate-therapy severity: contraindicated. Blocks signing until a clinician records a decision.",
+      "approved": [
+        "en"
+      ]
+    },
+    "interaction.severity.major": {
+      "definition": "Interaction or duplicate-therapy severity: major. Blocks signing until a clinician records a decision.",
+      "approved": [
+        "en"
+      ]
+    },
+    "interaction.severity.moderate": {
+      "definition": "Interaction or duplicate-therapy severity: moderate. Shown as advisory; does not block signing.",
+      "approved": [
+        "en"
+      ]
+    },
+    "interaction.severity.minor": {
+      "definition": "Interaction or duplicate-therapy severity: minor. Shown as advisory; does not block signing.",
+      "approved": [
+        "en"
+      ]
+    },
+    "duplicate.warning.title": {
+      "definition": "Title of the warning for duplicate therapy: the same ingredient twice, or two medicines of a class that must not be combined.",
+      "approved": [
+        "en"
+      ]
     }
   }
 }

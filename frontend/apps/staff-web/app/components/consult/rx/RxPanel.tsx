@@ -19,6 +19,7 @@ import RxQuickActions from "./RxQuickActions";
 import MedicinesList from "../MedicinesList";
 import RxPad from "../RxPad";
 import RxWarnings, { OverrideDialog, WARNING_TITLE_ID } from "../RxWarnings";
+import RxInteractionWarnings from "../RxInteractionWarnings";
 import { rxItemLine } from "../shared";
 import { openWarningCount } from "./rxLogic";
 import type { RxPad as Pad } from "./useRxPad";
@@ -95,6 +96,7 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
               onRemove={rxItems.length > 1 ? () => pad.removeRxItem(i) : undefined}
               source={rxSource}
             />
+            <RxInteractionWarnings item={item} locked={signed} onOverride={mayDecideRx ? (warning) => signing.askOverride(i, warning) : undefined} onChangeMedicine={() => focusDrug(i)} onRemove={rxItems.length > 1 ? () => pad.removeRxItem(i) : undefined} />
           </div>
         ))}
         {!signed && <button type="button" className={styles.backBtn} onClick={pad.addRxItem}>{tx("addDrug")}</button>}
@@ -132,7 +134,7 @@ export default function RxPanel({ entry, patient, authedFetch, ctx, reloadCtx, p
                 {tx("decisionsRecordedOnThisPrescription")}
                 <ul className={p.noticeList}>
                   {rxItems.flatMap((i) => (i.warnings ?? []).filter((w) => w.decision).map((w) => (
-                    <li key={`${i.drugName}-${w.kind}`}>{i.drugName}: {g(WARNING_TITLE_ID[w.kind])} — {w.decision?.reasonLabel ?? w.decision?.reasonCode}{w.decision?.byName ? ` (${w.decision.byName})` : ""}</li>
+                    <li key={`${i.drugName}-${w.kind}-${w.matched}`}>{i.drugName}: {g(WARNING_TITLE_ID[w.kind])} — {w.decision?.reasonLabel ?? w.decision?.reasonCode}{w.decision?.byName ? ` (${w.decision.byName})` : ""}</li>
                   )))}
                 </ul>
               </span>
