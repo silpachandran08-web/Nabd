@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
@@ -18,14 +19,14 @@ function useNow(ms: number): number {
 }
 
 /** Reception's requests inbox (prototype reception.requests): why it needs review, SLA countdown, a suggested alternative, and one-key decisions (J/K move, A accept, S suggest, D decline). */
-export default function RequestsInbox() {
+export default function RequestsInbox({ only = null }: { only?: string[] | null }) {
   const r = useBookingRequests();
   const tz = useClinicTimeZone();
   const now = useNow(15_000);
   const [selRaw, setSel] = useState(0);
   const [dialog, setDialog] = useState<{ kind: "suggest" | "decline"; item: RequestItem } | null>(null);
   const rows = useRef<(HTMLLIElement | null)[]>([]);
-  const items = r.items ?? [];
+  const items = (r.items ?? []).filter((it) => !only || only.includes(it.appointmentId)); // ADM-042: the live board's alert opens the inbox on its requests
   const sel = Math.min(selRaw, Math.max(0, items.length - 1)); // the list can shrink under the cursor
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -68,9 +69,15 @@ export default function RequestsInbox() {
           <button type="button" className={styles.linkBtn} onClick={() => r.setNotice(null)} aria-label="Dismiss message"><Icon name="x" size={14} /></button>
         </div>
       )}
+      {only && r.items !== null && (
+        <div className={styles.notice} role="status">
+          {items.length === 0 ? "The requests from the alert have been decided." : `Showing the ${items.length} ${items.length === 1 ? "request" : "requests"} from the live board alert.`}
+          <Link href="/requests" className={styles.moreLink}>Show all requests</Link>
+        </div>
+      )}
       {r.items === null && !r.failed ? <Skeleton rows={4} label="Loading booking requests" />
         : r.failed && r.items === null ? <ErrorState message="Couldn't load the booking requests. Check your connection and try again." onRetry={() => void r.reload()} />
-        : items.length === 0 ? <EmptyState icon="inbox" title="No requests waiting." hint="New bookings that need a decision appear here by themselves." />
+        : items.length === 0 ? (only ? null : <EmptyState icon="inbox" title="No requests waiting." hint="New bookings that need a decision appear here by themselves." />)
         : (
           <ul className={styles.list} aria-label="Pending booking requests">
             {items.map((it, i) => {

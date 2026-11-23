@@ -67,3 +67,9 @@ export function keyAction(e: { key: string; ctrlKey?: boolean; metaKey?: boolean
     default: return null;
   }
 }
+
+/** ADM-042: the request ids a /requests?ids=a,b link carries (the live board's alert); null when the inbox is not filtered. */
+export function requestFilter(param: string | null | undefined): string[] | null {
+  const ids = (param ?? "").split(",").map((s) => s.trim()).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  return ids.length ? ids : null;
+}
