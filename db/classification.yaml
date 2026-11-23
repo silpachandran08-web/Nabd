@@ -1242,6 +1242,37 @@ schemas:
       buyer_gstin: financial
       change_seq: operational
       updated_at: operational
+    lab_order_items:
+      id: operational
+      tenant_id: operational
+      order_id: operational
+      test_id: phi  # which test was ordered for a patient
+      panel_id: phi
+      status: operational
+      price_snapshot: financial
+      charge_line_ref: operational
+      display_order: operational
+    lab_orders:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      encounter_id: operational
+      queue_entry_id: operational
+      ordering_doctor_id: operational
+      referring_doctor_id: operational
+      source: operational
+      priority: operational
+      destination_kind: operational
+      partner_lab_id: operational
+      status: operational
+      clinical_note: phi
+      fasting_hours: phi
+      ordered_at: operational
+      cancelled_at: operational
+      cancelled_by: operational
+      cancel_reason: phi
+      change_seq: operational
+      updated_at: operational
     lab_panel_tests:
       tenant_id: operational
       panel_id: operational
@@ -2563,6 +2594,17 @@ schemas:
       notes: phi
       administered_at: operational
       created_at: operational
+    visit_pending_charges:
+      id: operational
+      tenant_id: operational
+      queue_entry_id: operational
+      source: operational
+      source_ref: operational
+      charge_item_id: phi  # uncertain: a pending charge on a visit reveals the service ordered
+      status: operational
+      invoice_id: operational
+      created_at: operational
+      settled_at: operational
     vitals:
       id: operational
       tenant_id: operational

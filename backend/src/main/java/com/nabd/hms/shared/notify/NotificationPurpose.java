@@ -47,6 +47,8 @@ public enum NotificationPurpose {
     PACKAGE_EXPIRY("package_expiry", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** COM-044: validity ended, sessions usable until the grace end; 2 params: first name, grace end date. */
     PACKAGE_GRACE("package_grace", ConsentClass.MESSAGING, Priority.REMINDER, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** PHL-043: the doctor ordered tests that need fasting; 2 params: first name, hours to fast (no test name). */
+    LAB_FASTING("lab_fasting", ConsentClass.MESSAGING, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
     OTP("otp", ConsentClass.NONE, Priority.OTP, ChannelPolicy.WHATSAPP_THEN_SMS),
     /** PLT-012: owner alert (staff recipient, no patient consent). */
     EMERGENCY_ACCESS_USED("emergency_access_used", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),

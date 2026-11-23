@@ -20,7 +20,9 @@
    "cat_allergies",
    "cat_visit_notes"
   ],
-  "templates": []
+  "templates": [
+   "lab_fasting"
+  ]
  },
  "locales": [
   "en",
@@ -907,6 +909,9 @@
     "feedback_request": {
      "status": "unreviewed"
     },
+    "lab_fasting": {
+     "status": "unreviewed"
+    },
     "leave_now": {
      "status": "unreviewed"
     },
@@ -1331,6 +1336,9 @@
      "status": "unreviewed"
     },
     "feedback_request": {
+     "status": "unreviewed"
+    },
+    "lab_fasting": {
      "status": "unreviewed"
     },
     "leave_now": {
@@ -1759,6 +1767,9 @@
     "feedback_request": {
      "status": "unreviewed"
     },
+    "lab_fasting": {
+     "status": "unreviewed"
+    },
     "leave_now": {
      "status": "unreviewed"
     },
@@ -1941,6 +1952,24 @@
    },
    "te": {
     "body": "నమస్కారం {{1}}, {{2}} గారితో మీ సందర్శన ఎలా సాగింది? దయచేసి ఇక్కడ రెండు మాటలు రాయండి: {{3}} ధన్యవాదాలు.",
+    "category": "UTILITY"
+   }
+  },
+  "lab_fasting": {
+   "en": {
+    "body": "Hello {{1}}, your doctor has asked you to fast before your next visit. Please do not eat for {{2}} hours before you come. If you have questions, contact the clinic.",
+    "category": "UTILITY"
+   },
+   "hi": {
+    "body": "नमस्ते {{1}}, आपके डॉक्टर ने अगली बार आने से पहले खाली पेट रहने को कहा है। कृपया आने से पहले {{2}} घंटे तक कुछ न खाएं। कोई सवाल हो तो क्लिनिक से संपर्क करें।",
+    "category": "UTILITY"
+   },
+   "kn": {
+    "body": "ನಮಸ್ಕಾರ {{1}}, ಮುಂದಿನ ಭೇಟಿಗೆ ಮೊದಲು ಖಾಲಿ ಹೊಟ್ಟೆಯಲ್ಲಿ ಇರಲು ನಿಮ್ಮ ವೈದ್ಯರು ಹೇಳಿದ್ದಾರೆ. ದಯವಿಟ್ಟು ಬರುವ ಮೊದಲು {{2}} ಗಂಟೆಗಳ ಕಾಲ ಏನನ್ನೂ ತಿನ್ನಬೇಡಿ. ಪ್ರಶ್ನೆಗಳಿದ್ದರೆ ಕ್ಲಿನಿಕ್ ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "category": "UTILITY"
+   },
+   "te": {
+    "body": "నమస్కారం {{1}}, తదుపరి సందర్శనకు ముందు ఖాళీ కడుపుతో ఉండాలని మీ డాక్టర్ గారు చెప్పారు. దయచేసి వచ్చే ముందు {{2}} గంటల పాటు ఏమీ తినకండి. సందేహాలు ఉంటే క్లినిక్ ను సంప్రదించండి.",
     "category": "UTILITY"
    }
   },
@@ -2161,5 +2190,5 @@
    }
   }
  },
- "version": "8c5a0b297264"
+ "version": "6a62eaf22af5"
 }

@@ -290,6 +290,7 @@ export type ExpiryReport = { asOf?: string; lines?: Array<ExpiryReportLine>; tot
 export type ExpiryReportLine = { batchId?: string; batchNo?: string; daysToExpiry?: number; expiryDate?: string; itemId?: string; itemName?: string; purchaseRate?: number; qtyOnHand?: number; suggestedAction?: string; valueAtRisk?: number; };
 export type ExportJobResponse = { createdAt?: string; errorMessage?: string; exportType?: string; id?: string; resultUrl?: string; status?: string; };
 export type ExtendRequest = { newValidityEnd: string; reason: string; };
+export type ExternalLabSheetRequest = { clinicalNote?: string; fastingHours?: number; labName?: string; priority?: string; tests: Array<string>; };
 export type FacilityCheckInConfig = { checkinCode?: string; geofenceRadiusM?: number; geofenceRequired?: boolean; lat?: number; lng?: number; walkinAllowed?: boolean; whatsappNumber?: string; };
 export type FamilyMemberAdd = { caregiverRef: string; dob: string; name: string; phone?: string; relation: string; sex?: string; };
 export type FamilyMemberAdded = { memberRef?: string; proxyStatus?: string; };
@@ -400,6 +401,18 @@ export type KillRequest = { active?: boolean; reason: string; };
 export type Kpi = { format?: string; key?: string; label?: string; value?: number; };
 export type LabImportRequest = { dryRun?: boolean; pack: string; };
 export type LabImportResult = { created: number; dryRun: boolean; pack: string; reviewNote?: string; reviewed: boolean; skipped: Array<string>; toCreate: Array<string>; };
+export type LabOrder = { accessionHint: string; cancellable: boolean; clinicalNote?: string; destinationKind: string; fastingHours?: number; id: string; items: Array<LabOrderItem>; orderedAt: string; orderingDoctorId?: string; patientId: string; priority: string; queueEntryId?: string; status: string; total: number; };
+export type LabOrderCancelRequest = { reason: string; };
+export type LabOrderCancelled = { chargesAlreadyBilled: number; chargesRemoved: number; orderId: string; status: string; };
+export type LabOrderCharge = { amount: number; chargeCode: string; name: string; };
+export type LabOrderDestination = { kind: string; partnerLabId?: string; };
+export type LabOrderFavourite = { code: string; id: string; kind: string; name: string; orders: number; price: number; };
+export type LabOrderFavourites = { items: Array<LabOrderFavourite>; };
+export type LabOrderItem = { code: string; id: string; name: string; panelId?: string; panelName?: string; price: number; status: string; testId: string; };
+export type LabOrderItemRequest = { panelId?: string; testId?: string; };
+export type LabOrderList = { items: Array<LabOrder>; };
+export type LabOrderPlaced = { accessionHint: string; charges: Array<LabOrderCharge>; fastingNotice?: string; orderId: string; };
+export type LabOrderRequest = { clinicalNote?: string; destination: LabOrderDestination; encounterId?: string; fastingHours?: number; items: Array<LabOrderItemRequest>; patientId: string; priority: string; queueEntryId?: string; };
 export type LabOutsourced = { partnerLabId: string; };
 export type LabPanel = { active: boolean; chargeCode: string; chargeItemId: string; code: string; discount: number; id: string; name: string; price: number; tests: Array<LabPanelTest>; testsTotal: number; };
 export type LabPanelList = { items: Array<LabPanel>; };
@@ -1071,6 +1084,7 @@ export type Operations = {
   ClinicalDocumentController_listForVisit: { method: "get"; path: "/v1/clinical/visits/{queueEntryId}/documents"; permission: "clinical:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: Array<DocumentResponse> };
   ClinicalDocumentController_create: { method: "post"; path: "/v1/clinical/visits/{queueEntryId}/documents"; permission: "clinical:edit"; pathParams: { queueEntryId: string; }; query: never; body: CreateRequest; response: DocumentResponse };
   ClinicalDocumentController_summaryPrefill: { method: "get"; path: "/v1/clinical/visits/{queueEntryId}/documents/summary-prefill"; permission: "clinical:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: SummaryPrefillResponse };
+  LabOrderController_externalSheet: { method: "post"; path: "/v1/clinical/visits/{queueEntryId}/lab-order-sheet"; permission: "clinical:edit"; pathParams: { queueEntryId: string; }; query: never; body: ExternalLabSheetRequest; response: string };
   VisitSummaryController_get: { method: "get"; path: "/v1/clinical/visits/{queueEntryId}/summary"; permission: "clinical:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: VisitSummaryResponse };
   AttachmentController_list: { method: "get"; path: "/v1/clinical/visits/{visitId}/attachments"; permission: "clinical:view"; pathParams: { visitId: string; }; query: never; body: never; response: VisitAttachmentList };
   AttachmentController_attach: { method: "post"; path: "/v1/clinical/visits/{visitId}/attachments"; permission: "clinical:edit"; pathParams: { visitId: string; }; query: never; body: AttachmentCreateRequest; response: AttachmentCreateResponse };
@@ -1126,6 +1140,11 @@ export type Operations = {
   DeskExceptionController_list: { method: "get"; path: "/v1/front-desk/exceptions"; permission: "queue:view"; pathParams: never; query: { kind?: string; cursor?: string; limit?: number; }; body: never; response: DeskExceptionPage };
   DeskExceptionController_act: { method: "post"; path: "/v1/front-desk/exceptions/{id}/{action}"; permission: "queue:edit"; pathParams: { id: string; action: string; }; query: never; body: ActionRequest; response: DeskExceptionActionResponse };
   LabController_importCatalogue: { method: "post"; path: "/v1/lab/catalogue/imports"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabImportRequest; response: LabImportResult };
+  LabOrderController_favourites: { method: "get"; path: "/v1/lab/order-favourites"; permission: "lab:order"; pathParams: never; query: never; body: never; response: LabOrderFavourites };
+  LabOrderController_forVisit: { method: "get"; path: "/v1/lab/orders"; permission: "lab:order"; pathParams: never; query: { queueEntryId: string; }; body: never; response: LabOrderList };
+  LabOrderController_place: { method: "post"; path: "/v1/lab/orders"; permission: "lab:order"; pathParams: never; query: never; body: LabOrderRequest; response: LabOrderPlaced };
+  LabOrderController_cancel: { method: "post"; path: "/v1/lab/orders/{id}/cancel"; permission: "lab:order"; pathParams: { id: string; }; query: never; body: LabOrderCancelRequest; response: LabOrderCancelled };
+  LabOrderController_sheet: { method: "get"; path: "/v1/lab/orders/{id}/sheet"; permission: "lab:order"; pathParams: { id: string; }; query: never; body: never; response: string };
   LabController_panels: { method: "get"; path: "/v1/lab/panels"; permission: "lab:view"; pathParams: never; query: never; body: never; response: LabPanelList };
   LabController_createPanel: { method: "post"; path: "/v1/lab/panels"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabPanelRequest; response: LabPanel };
   LabController_tests: { method: "get"; path: "/v1/lab/tests"; permission: "lab:view"; pathParams: never; query: { q?: string; cursor?: string; limit?: number; }; body: never; response: LabTestPage };
@@ -1559,6 +1578,7 @@ export type Permission =
   | "departments:view"
   | "kb_import:edit"
   | "lab:catalogue"
+  | "lab:order"
   | "lab:view"
   | "messaging_operations:override"
   | "nursing:create"

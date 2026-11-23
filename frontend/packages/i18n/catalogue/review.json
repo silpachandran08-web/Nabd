@@ -7,7 +7,7 @@
       "rxOfflineValid", "rxOfflineHint", "rxOfflineNoKey", "rxLines", "rxPrivacy",
       "cat_prescriptions", "cat_lab_reports", "cat_imaging", "cat_diagnoses", "cat_allergies", "cat_visit_notes"
     ],
-    "templates": []
+    "templates": ["lab_fasting"]
   },
   "reviews": []
 }

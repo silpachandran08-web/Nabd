@@ -12,7 +12,8 @@ public enum RealtimeTopic {
     EXCEPTIONS("exceptions", "queue:view"),
     MESSAGES("messages", "patients:view"), // COM-006: delivery ticks on the patient file
     BILLING("billing", "billing:view"), // FIN-020: an invoice turns paid on the checkout screen
-    PHARMACY_WORKLIST("pharmacy.worklist", "pharmacy:dispense"); // PHL-012: the In-house dispensing worklist
+    PHARMACY_WORKLIST("pharmacy.worklist", "pharmacy:dispense"), // PHL-012: the In-house dispensing worklist
+    LAB_WORKLIST("lab.worklist", "lab:view"); // PHL-043: a lab order was placed (ids, priority and count only)
 
     private final String wire;
     private final String permission;

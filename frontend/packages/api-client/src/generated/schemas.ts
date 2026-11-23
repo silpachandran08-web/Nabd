@@ -319,6 +319,7 @@ export const ExpiryReportLineSchema = z.object({ batchId: z.string().optional(),
 export const ExpiryReportSchema = z.object({ asOf: z.string().optional(), lines: z.array(ExpiryReportLineSchema).optional(), totalValueAtRisk: z.number().optional(), withinDays: z.number().int().optional() });
 export const ExportJobResponseSchema = z.object({ createdAt: z.string().optional(), errorMessage: z.string().optional(), exportType: z.string().optional(), id: z.string().optional(), resultUrl: z.string().optional(), status: z.string().optional() });
 export const ExtendRequestSchema = z.object({ newValidityEnd: z.string(), reason: z.string().min(1) });
+export const ExternalLabSheetRequestSchema = z.object({ clinicalNote: z.string().min(0).max(500).optional(), fastingHours: z.number().int().gte(1).lte(24).optional(), labName: z.string().min(0).max(120).optional(), priority: z.string().optional(), tests: z.array(z.string().min(0).max(120)) });
 export const FacilityCheckInConfigSchema = z.object({ checkinCode: z.string().optional(), geofenceRadiusM: z.number().int().optional(), geofenceRequired: z.boolean().optional(), lat: z.number().optional(), lng: z.number().optional(), walkinAllowed: z.boolean().optional(), whatsappNumber: z.string().optional() });
 export const FamilyMemberAddSchema = z.object({ caregiverRef: z.string().min(0).max(64), dob: z.string(), name: z.string().min(0).max(120), phone: z.string().min(0).max(20).optional(), relation: z.string().min(1), sex: z.string().optional() });
 export const FamilyMemberAddedSchema = z.object({ memberRef: z.string().optional(), proxyStatus: z.string().optional() });
@@ -431,6 +432,18 @@ export const KillRequestSchema = z.object({ active: z.boolean().optional(), reas
 export const KpiSchema = z.object({ format: z.string().optional(), key: z.string().optional(), label: z.string().optional(), value: z.number().optional() });
 export const LabImportRequestSchema = z.object({ dryRun: z.boolean().optional(), pack: z.string().min(1) });
 export const LabImportResultSchema = z.object({ created: z.number().int(), dryRun: z.boolean(), pack: z.string(), reviewNote: z.string().optional(), reviewed: z.boolean(), skipped: z.array(z.string()), toCreate: z.array(z.string()) });
+export const LabOrderItemSchema = z.object({ code: z.string(), id: z.string(), name: z.string(), panelId: z.string().optional(), panelName: z.string().optional(), price: z.number(), status: z.string(), testId: z.string() });
+export const LabOrderSchema = z.object({ accessionHint: z.string(), cancellable: z.boolean(), clinicalNote: z.string().optional(), destinationKind: z.string(), fastingHours: z.number().int().optional(), id: z.string(), items: z.array(LabOrderItemSchema), orderedAt: z.string(), orderingDoctorId: z.string().optional(), patientId: z.string(), priority: z.string(), queueEntryId: z.string().optional(), status: z.string(), total: z.number() });
+export const LabOrderCancelRequestSchema = z.object({ reason: z.string().min(0).max(200) });
+export const LabOrderCancelledSchema = z.object({ chargesAlreadyBilled: z.number().int(), chargesRemoved: z.number().int(), orderId: z.string(), status: z.string() });
+export const LabOrderChargeSchema = z.object({ amount: z.number(), chargeCode: z.string(), name: z.string() });
+export const LabOrderDestinationSchema = z.object({ kind: z.string(), partnerLabId: z.string().optional() });
+export const LabOrderFavouriteSchema = z.object({ code: z.string(), id: z.string(), kind: z.string(), name: z.string(), orders: z.number().int(), price: z.number() });
+export const LabOrderFavouritesSchema = z.object({ items: z.array(LabOrderFavouriteSchema) });
+export const LabOrderItemRequestSchema = z.object({ panelId: z.string().optional(), testId: z.string().optional() });
+export const LabOrderListSchema = z.object({ items: z.array(LabOrderSchema) });
+export const LabOrderPlacedSchema = z.object({ accessionHint: z.string(), charges: z.array(LabOrderChargeSchema), fastingNotice: z.string().optional(), orderId: z.string() });
+export const LabOrderRequestSchema = z.object({ clinicalNote: z.string().min(0).max(500).optional(), destination: LabOrderDestinationSchema, encounterId: z.string().optional(), fastingHours: z.number().int().gte(1).lte(24).optional(), items: z.array(LabOrderItemRequestSchema), patientId: z.string(), priority: z.string(), queueEntryId: z.string().optional() });
 export const LabOutsourcedSchema = z.object({ partnerLabId: z.string() });
 export const LabPanelTestSchema = z.object({ code: z.string(), id: z.string(), name: z.string(), price: z.number() });
 export const LabPanelSchema = z.object({ active: z.boolean(), chargeCode: z.string(), chargeItemId: z.string(), code: z.string(), discount: z.number(), id: z.string(), name: z.string(), price: z.number(), tests: z.array(LabPanelTestSchema), testsTotal: z.number() });
@@ -1073,6 +1086,7 @@ export const operationSchemas = {
   ClinicalDocumentController_listForVisit: { response: z.array(DocumentResponseSchema) },
   ClinicalDocumentController_create: { body: CreateRequestSchema, response: DocumentResponseSchema },
   ClinicalDocumentController_summaryPrefill: { response: SummaryPrefillResponseSchema },
+  LabOrderController_externalSheet: { body: ExternalLabSheetRequestSchema, response: z.string() },
   VisitSummaryController_get: { response: VisitSummaryResponseSchema },
   AttachmentController_list: { response: VisitAttachmentListSchema },
   AttachmentController_attach: { body: AttachmentCreateRequestSchema, response: AttachmentCreateResponseSchema },
@@ -1128,6 +1142,11 @@ export const operationSchemas = {
   DeskExceptionController_list: { response: DeskExceptionPageSchema },
   DeskExceptionController_act: { body: ActionRequestSchema, response: DeskExceptionActionResponseSchema },
   LabController_importCatalogue: { body: LabImportRequestSchema, response: LabImportResultSchema },
+  LabOrderController_favourites: { response: LabOrderFavouritesSchema },
+  LabOrderController_forVisit: { response: LabOrderListSchema },
+  LabOrderController_place: { body: LabOrderRequestSchema, response: LabOrderPlacedSchema },
+  LabOrderController_cancel: { body: LabOrderCancelRequestSchema, response: LabOrderCancelledSchema },
+  LabOrderController_sheet: { response: z.string() },
   LabController_panels: { response: LabPanelListSchema },
   LabController_createPanel: { body: LabPanelRequestSchema, response: LabPanelSchema },
   LabController_tests: { response: LabTestPageSchema },
