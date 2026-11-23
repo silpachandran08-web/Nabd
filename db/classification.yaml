@@ -1257,6 +1257,14 @@ schemas:
       created_at: operational
       updated_at: operational
       change_seq: operational
+    lab_settings:
+      tenant_id: operational
+      accreditation_no: operational
+      pathologist_staff_id: operational
+      pathologist_registration_no: pii
+      letterhead_lines: operational
+      printer_tested_at: operational
+      updated_at: operational
     lab_tests:
       id: operational
       tenant_id: operational

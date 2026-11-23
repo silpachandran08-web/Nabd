@@ -80,16 +80,28 @@ public final class RolePresets {
 
     public static final List<Preset> PHARMACY = List.of(OWNER, PHARMACIST_IN_CHARGE, PHARMACIST, COUNTER_STAFF);
 
+    /** PHL-056: the roles a lab-only tenant starts with (the Owner, Lab manager, Pathologist, Lab technician, Front desk); no clinical,
+     * scheduling or pharmacy module is granted. Lab flags (GrantsFlattener): create = order, edit = collect + result,
+     * approve = validate + release, delete = catalogue + QC. NEEDS PRODUCT CHECK: who may do what in a lab is a first draft. */
+    private static final Preset LAB_MANAGER = new Preset("lab_manager", "Lab manager", false, labGrants(
+            "YYY----", "YYYNYYY", "YYYYYYY", "Y---N-Y", "Y------", "Y-Y----", "Y------"));
+    private static final Preset PATHOLOGIST = new Preset("pathologist", "Pathologist", false, labGrants(
+            "Y------", "N------", "Y-Y-Y--", "Y------", "N------", "N------", "N------"));
+    private static final Preset LAB_FRONT_DESK = new Preset("lab_front_desk", "Front desk", false, labGrants(
+            "YYY----", "YYY----", "YY-----", "N------", "N------", "N------", "N------"));
+
+    public static final List<Preset> LAB = List.of(OWNER, LAB_MANAGER, PATHOLOGIST, LAB_TECHNICIAN, LAB_FRONT_DESK);
+
     private RolePresets() {
     }
 
     /** The presets a new tenant of this edition is seeded with. */
     public static List<Preset> forEdition(String edition) {
-        return "pharmacy".equals(edition) ? PHARMACY : ALL;
+        return "pharmacy".equals(edition) ? PHARMACY : "lab".equals(edition) ? LAB : ALL;
     }
 
     public static Optional<Preset> byCode(String code) {
-        return Stream.concat(ALL.stream(), PHARMACY.stream()).filter(p -> p.code().equals(code)).findFirst();
+        return Stream.of(ALL, PHARMACY, LAB).flatMap(List::stream).filter(p -> p.code().equals(code)).findFirst();
     }
 
     /** Flags per module in the order patients, billing, pharmacy, reports, staff, setup, compliance; every other module is none. */
@@ -98,6 +110,14 @@ public final class RolePresets {
         return List.of(g("patients", patients), g("queue", "N------"), g("clinical", "N------"), g("billing", billing),
                 g("packages", "N------"), g("pharmacy", pharmacy), g("reports", reports), g("staff", staff), g("setup", setup),
                 g("compliance", compliance), g("nursing", "N------"), g("specialty_dental", "N------"), g("departments", "Y------"));
+    }
+
+    /** PHL-056: the same seven columns with lab in place of pharmacy (pharmacy is none). */
+    private static List<ModuleGrant> labGrants(String patients, String billing, String lab, String reports, String staff,
+                                              String setup, String compliance) {
+        List<ModuleGrant> out = new ArrayList<>(pharmacyGrants(patients, billing, "N------", reports, staff, setup, compliance));
+        out.add(g("lab", lab));
+        return List.copyOf(out);
     }
 
     private static List<ModuleGrant> ownerDoctorGrants() {

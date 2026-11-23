@@ -47,7 +47,7 @@ modules:
   lab:
     # PHL-041: the test and panel catalogue. Prices live on charge_catalogue and are read and written through
     # organization.api.ChargeCatalogue, never by SQL from here.
-    owns: [lab_panel_tests, lab_panels, lab_tests]
+    owns: [lab_panel_tests, lab_panels, lab_settings, lab_tests]  # PHL-056: lab_settings is the setup wizard's record
     reads: []
   messaging:
     owns: [comms_cutover_flags, message_usage_alerts, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
