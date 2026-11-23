@@ -109,7 +109,7 @@ test("Rx-only items stay gated (PHL-001): the line waits until a prescription is
   assert.match(screen, /<PaperRxDialog item=\{\{ id: l\.item\.id/);
   assert.match(screen, /paperRxLineId: paper\.paperRxLineId/);
   assert.doesNotMatch(screen + src("(clinic)/pharmacy/pos/posCart.ts"), /paperRxId\b/, "core only knows paperRxLineId");
-  assert.match(screen, /cart\.length > 0 && !waitingRx && \(\s*<button ref=\{payRef\}/, "no pay button while an Rx line waits");
+  assert.match(screen, /cart\.length > 0 && !waitingRx && !waitingAck && \(\s*<button ref=\{payRef\}/, "no pay button while an Rx line waits (PHL-023: or a confirmation)");
 });
 
 test("AC4: cash 200 + UPI 150 on a 350 bill settles it and is sent as two payment rows; any other sum does not settle", () => {

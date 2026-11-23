@@ -17,6 +17,8 @@ import StatusPill from "../../../components/ui/StatusPill";
 import { stockErrorMessage } from "../../../components/ui/StockPill";
 import RxLinkPicker from "../../../components/checkout/RxLinkPicker";
 import PaperRxDialog, { type PaperRxLink } from "../../../components/checkout/PaperRxDialog";
+import ScheduleAckDialog from "../../../components/checkout/ScheduleAckDialog";
+import { needsAck, pharmacistWarning, type CounterRules } from "../../../components/checkout/scheduleAck";
 import TenderRows from "../../../components/checkout/TenderRows";
 import { rxErrorMessage } from "../../../components/checkout/rxLink";
 import type { Tender } from "../../../components/checkout/tender";
@@ -33,6 +35,8 @@ import styles from "./pos.module.css";
 // A barcode adds its item: typed by a keyboard-wedge scanner (into the search box, or anywhere through the shell's
 // BarcodeWedge) or read by the camera. Prices, tax, the first-expiry batch and the prescription rule are the server's:
 // the total comes from POST /billing/quotes, the batches from POST /pharmacy/picks, the sale is one POST /billing/otc-checkout.
+// PHL-023: GET /pharmacy/counter-rules (pharmacy:dispense, like the index) says which schedule classes need the seller's second
+// confirmation before payment and whether the "no registered pharmacist on duty" banner shows; an OTC line asks for nothing.
 
 type Note = { text: string; bad: boolean };
 type ForCart<T> = { key: string; value: T };
@@ -47,6 +51,8 @@ export default function PosScreen() {
   const canPaperRx = can("pharmacy:dispense"); // PHL-020: every /pharmacy/paper-prescriptions call needs it; absent otherwise
 
   const [index, setIndex] = useState<PosIndex | null>(null);
+  const [rules, setRules] = useState<CounterRules | null>(null);
+  const [lastAck, setLastAck] = useState(""); // the seller's last confirmation reason: prefilled, so a repeat sale is one Enter
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hi, setHi] = useState(0);
@@ -76,7 +82,9 @@ export default function PosScreen() {
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      setIndex(buildIndex(await api.get<PharmacyItemIndexEntry[]>("/pharmacy/items/index")));
+      const [rows, counter] = await Promise.all([api.get<PharmacyItemIndexEntry[]>("/pharmacy/items/index"), api.get<CounterRules>("/pharmacy/counter-rules")]);
+      setRules(counter);
+      setIndex(buildIndex(rows));
     } catch (e) {
       setLoadError(errorText(e, t("loadFailed")));
     }
@@ -113,6 +121,7 @@ export default function PosScreen() {
   const linePicks = (l: CartLine) => (picks?.key === cartKey ? batchLabels(picks.value[l.item.id] ?? [], batches[l.item.id] ?? []) : []);
   const rows: Tender[] = tenders ?? [{ id: 1, method: "cash", amount: (totalMinor / 100).toFixed(2) }];
   const waitingRx = cart.some(needsRx);
+  const waitingAck = !!rules && cart.some((l) => needsAck(l, rules)); // PHL-023
   const money = (minor: number | undefined) => formatMoney(minor ?? 0, currency, { minor: true });
 
   function add(item: PosItem) {
@@ -160,6 +169,11 @@ export default function PosScreen() {
     setLinking(null);
     searchRef.current?.focus();
   }
+  function ack(code: string, reason: string) {
+    patchLine(code, { ackReason: reason });
+    setLastAck(reason);
+    searchRef.current?.focus();
+  }
   function linkPaper(code: string, paper: PaperRxLink) {
     patchLine(code, { paperRxLineId: paper.paperRxLineId, paperLabel: t("paperRxLinked", { doctor: paper.prescriberName, qty: paper.qty }) });
     setPaperFor(null);
@@ -181,7 +195,7 @@ export default function PosScreen() {
   };
 
   async function completeSale() {
-    if (busy || cart.length === 0 || waitingRx) return;
+    if (busy || cart.length === 0 || waitingRx || waitingAck) return;
     if (canPay && !tenderSettles(rows, totalMinor)) {
       setSaleError(totals ? t("tenderMismatch", { total: money(totalMinor) }) : t("totalPending"));
       return;
@@ -219,7 +233,7 @@ export default function PosScreen() {
   }
 
   function pay() {
-    if (invoice || cart.length === 0 || waitingRx) return;
+    if (invoice || cart.length === 0 || waitingRx || waitingAck) return;
     if (paying || !canPay) void completeSale();
     else setPaying(true);
   }
@@ -259,7 +273,7 @@ export default function PosScreen() {
   }
 
   if (loadError && !index) return <main className={co.page}><ErrorState message={loadError} onRetry={() => void load()} /></main>;
-  if (!index) return <main className={co.page}><Skeleton rows={6} label={t("loading")} /></main>;
+  if (!index || !rules) return <main className={co.page}><Skeleton rows={6} label={t("loading")} /></main>;
 
   const header = (
     <div className={co.strip}>
@@ -311,6 +325,8 @@ export default function PosScreen() {
     <main className={co.page}>
       {header}
       {loadError && <p className={co.errorState} role="alert">{loadError}</p>}
+      {/* PHL-023: stays for as long as the cart holds a line of a class that warns; the sale is not blocked, the server audits it */}
+      {pharmacistWarning(cart, rules) && <p className={co.errorState} role="alert" data-testid="pos-no-pharmacist">{t("noPharmacist")}</p>}
       <div className={styles.layout}>
         <section className={co.card} aria-label={t("searchLabel")}>
           <div className={styles.searchRow}>
@@ -361,6 +377,9 @@ export default function PosScreen() {
                         {canPaperRx && needsRx(l) && paperFor !== code && <button type="button" className={co.rxLinkBtn} data-testid={`paper-rx-${code}`} onClick={() => { setLinking(null); setPaperFor(code); }}>{t("paperRx")}</button>}
                         {linking === code && <RxLinkPicker itemName={l.item.name} onPick={(line) => link(code, line)} onCancel={() => setLinking(null)} />}
                         {paperFor === code && <PaperRxDialog item={{ id: l.item.id, name: l.item.name }} quantity={l.qty} onLinked={(p) => linkPaper(code, p)} onCancel={() => setPaperFor(null)} />}
+                        {l.ackReason && <div className={co.muted} data-testid={`ack-done-${code}`}>{t("ackDone", { reason: l.ackReason })}</div>}
+                        {/* PHL-023: the second confirmation, once no prescription panel is open on the line; payment stays off until it is given */}
+                        {needsAck(l, rules) && linking !== code && paperFor !== code && <ScheduleAckDialog itemName={l.item.name} initial={lastAck} onConfirm={(reason) => ack(code, reason)} />}
                       </td>
                       <td>
                         <span className={co.qtyStepper}>
@@ -389,12 +408,13 @@ export default function PosScreen() {
           </div>
           {quoteProblem && <p className={co.errorState} role="alert">{quoteProblem}</p>}
           {waitingRx && <p className={co.errorState} role="status" data-testid="pos-rx-wait">{t("rxWait")}</p>}
+          {waitingAck && !waitingRx && <p className={co.errorState} role="status" data-testid="pos-ack-wait">{t("ackWait")}</p>}
           {paying && canPay && totals && (
             <TenderRows rows={rows} onChange={setTenders} region={region} balanceMinor={totalMinor} disabled={busy} />
           )}
           {paying && canPay && !totals && !quoteProblem && <p className={styles.hint} role="status">{t("totalPending")}</p>}
           {saleError && <p className={co.errorState} role="alert">{saleError}</p>}
-          {cart.length > 0 && !waitingRx && (
+          {cart.length > 0 && !waitingRx && !waitingAck && (
             <button ref={payRef} type="button" className={co.checkoutBtn} aria-keyshortcuts="F9" disabled={busy} onClick={pay}>
               {busy ? t("selling") : !canPay ? t("createBill") : paying ? t("completeSale") : t("pay")} <kbd className={styles.kbd}>F9</kbd>
             </button>

@@ -10,6 +10,8 @@ export type CartLine = {
   prescriptionItemId?: string; rxLabel?: string;
   /** PHL-020: the paper / WhatsApp-photo prescription line (core's LineItemRequest.paperRxLineId), with the text shown under the item. */
   paperRxLineId?: string; paperLabel?: string;
+  /** PHL-023: the seller's second confirmation of a flagged schedule class (core's LineItemRequest.scheduleAckReason). */
+  ackReason?: string;
 };
 
 /** One more of the item (a new line, or +1). Never above the stock on hand; `added` is false when nothing changed. */
@@ -39,6 +41,7 @@ export function saleBody(cart: CartLine[], tenders?: Tender[]) {
       chargeCode: l.item.code, quantity: l.qty,
       ...(l.prescriptionItemId ? { prescriptionItemId: l.prescriptionItemId } : {}),
       ...(l.paperRxLineId ? { paperRxLineId: l.paperRxLineId } : {}),
+      ...(l.ackReason ? { scheduleAckReason: l.ackReason } : {}),
     })),
     ...(tenders ? { payments: filled(tenders).map((t) => ({ method: t.method, amount: (toMinor(t.amount) ?? 0) / 100 })) } : {}),
   };
