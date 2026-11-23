@@ -436,6 +436,9 @@ export const LabPanelTestSchema = z.object({ code: z.string(), id: z.string(), n
 export const LabPanelSchema = z.object({ active: z.boolean(), chargeCode: z.string(), chargeItemId: z.string(), code: z.string(), discount: z.number(), id: z.string(), name: z.string(), price: z.number(), tests: z.array(LabPanelTestSchema), testsTotal: z.number() });
 export const LabPanelListSchema = z.object({ items: z.array(LabPanelSchema) });
 export const LabPanelRequestSchema = z.object({ code: z.string().min(1), name: z.string().min(0).max(120), price: z.number().gte(0), testIds: z.array(z.string()) });
+export const LabRangeBandSchema = z.object({ ageMaxDays: z.number().int().gte(1).lte(55000).optional(), ageMinDays: z.number().int().gte(0).lte(55000), criticalHigh: z.number().optional(), criticalLow: z.number().optional(), high: z.number().optional(), low: z.number().optional(), sex: z.string(), text: z.string().min(0).max(200).optional() });
+export const LabRangeSetSchema = z.object({ effectiveFrom: z.string().optional(), ranges: z.array(LabRangeBandSchema), version: z.number().int() });
+export const LabRangeSetRequestSchema = z.object({ ranges: z.array(LabRangeBandSchema) });
 export const LabTestSchema = z.object({ active: z.boolean(), chargeCode: z.string(), chargeItemId: z.string(), code: z.string(), container: z.string(), id: z.string(), loinc: z.string().optional(), method: z.string().optional(), name: z.string(), price: z.number(), sampleType: z.string(), tatMinutes: z.number().int(), taxCode: z.string().optional(), unit: z.string().optional(), updatedAt: z.string(), volumeMl: z.number().optional() });
 export const LabTestPageSchema = z.object({ items: z.array(LabTestSchema), nextCursor: z.string().optional() });
 export const LabTestRequestSchema = z.object({ code: z.string().min(1), container: z.string().min(0).max(40), loinc: z.string().optional(), method: z.string().min(0).max(80).optional(), name: z.string().min(0).max(120), outsourced: LabOutsourcedSchema.optional(), price: z.number().gte(0), sampleType: z.string().min(0).max(40), tatMinutes: z.number().int().gte(1).lte(43200), taxCode: z.string().min(0).max(20).optional(), unit: z.string().min(0).max(40), volumeMl: z.number().gt(0) });
@@ -1133,6 +1136,8 @@ export const operationSchemas = {
   LabController_tests: { response: LabTestPageSchema },
   LabController_createTest: { body: LabTestRequestSchema, response: LabTestSchema },
   LabController_updateTest: { body: LabTestUpdateRequestSchema, response: LabTestSchema },
+  LabRangeController_ranges: { response: LabRangeSetSchema },
+  LabRangeController_replace: { body: LabRangeSetRequestSchema, response: LabRangeSetSchema },
   MeEntitlementsController_get: { response: MeEntitlementsSchema },
   StaffOnboardingController_get: { response: StaffOnboardingProgressSchema },
   StaffOnboardingController_complete: { response: StaffOnboardingProgressSchema },

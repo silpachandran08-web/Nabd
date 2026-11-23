@@ -262,6 +262,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/lab/tests`, () => HttpResponse.json({"items":[{"active":false,"chargeCode":"string","chargeItemId":"00000000-0000-7000-8000-000000000000","code":"string","container":"string","id":"00000000-0000-7000-8000-000000000000","loinc":"string","method":"string","name":"string","price":0,"sampleType":"string","tatMinutes":0,"taxCode":"string","unit":"string","updatedAt":"2026-01-01T00:00:00Z","volumeMl":0}],"nextCursor":"string"}, { status: 200 })), // LabController_tests
     http.post(`${baseUrl}/v1/lab/tests`, () => HttpResponse.json({"active":false,"chargeCode":"string","chargeItemId":"00000000-0000-7000-8000-000000000000","code":"string","container":"string","id":"00000000-0000-7000-8000-000000000000","loinc":"string","method":"string","name":"string","price":0,"sampleType":"string","tatMinutes":0,"taxCode":"string","unit":"string","updatedAt":"2026-01-01T00:00:00Z","volumeMl":0}, { status: 200 })), // LabController_createTest
     http.patch(`${baseUrl}/v1/lab/tests/:id`, () => HttpResponse.json({"active":false,"chargeCode":"string","chargeItemId":"00000000-0000-7000-8000-000000000000","code":"string","container":"string","id":"00000000-0000-7000-8000-000000000000","loinc":"string","method":"string","name":"string","price":0,"sampleType":"string","tatMinutes":0,"taxCode":"string","unit":"string","updatedAt":"2026-01-01T00:00:00Z","volumeMl":0}, { status: 200 })), // LabController_updateTest
+    http.get(`${baseUrl}/v1/lab/tests/:id/ranges`, () => HttpResponse.json({"effectiveFrom":"2026-01-01T00:00:00Z","ranges":[{"ageMaxDays":1,"ageMinDays":0,"criticalHigh":0,"criticalLow":0,"high":0,"low":0,"sex":"string","text":"string"}],"version":0}, { status: 200 })), // LabRangeController_ranges
+    http.put(`${baseUrl}/v1/lab/tests/:id/ranges`, () => HttpResponse.json({"effectiveFrom":"2026-01-01T00:00:00Z","ranges":[{"ageMaxDays":1,"ageMinDays":0,"criticalHigh":0,"criticalLow":0,"high":0,"low":0,"sex":"string","text":"string"}],"version":0}, { status: 200 })), // LabRangeController_replace
     http.get(`${baseUrl}/v1/me/entitlements`, () => HttpResponse.json({"edition":"string","killedFeatures":["string"],"modules":[{"code":"string","enabled":false}],"seatLimit":0,"tenantStatus":"string"}, { status: 200 })), // MeEntitlementsController_get
     http.get(`${baseUrl}/v1/me/onboarding`, () => HttpResponse.json({"competencyPassedAt":"2026-01-01T00:00:00Z","completed":["string"]}, { status: 200 })), // StaffOnboardingController_get
     http.put(`${baseUrl}/v1/me/onboarding/:key`, () => HttpResponse.json({"competencyPassedAt":"2026-01-01T00:00:00Z","completed":["string"]}, { status: 200 })), // StaffOnboardingController_complete
@@ -666,4 +668,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 652;
+export const operationCount = 654;

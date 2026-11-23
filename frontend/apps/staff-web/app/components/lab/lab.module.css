@@ -64,3 +64,27 @@
   color: var(--nb-text-secondary);
   margin-block-start: 2px;
 }
+
+/* PHL-042: one band of the reference range grid. */
+.band {
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12);
+  margin-block-end: var(--nb-space-12);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.pair {
+  display: flex;
+  gap: var(--nb-space-8);
+}
+
+.narrow {
+  max-inline-size: 12ch;
+}

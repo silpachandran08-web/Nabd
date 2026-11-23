@@ -405,6 +405,9 @@ export type LabPanel = { active: boolean; chargeCode: string; chargeItemId: stri
 export type LabPanelList = { items: Array<LabPanel>; };
 export type LabPanelRequest = { code: string; name: string; price: number; testIds: Array<string>; };
 export type LabPanelTest = { code: string; id: string; name: string; price: number; };
+export type LabRangeBand = { ageMaxDays?: number; ageMinDays: number; criticalHigh?: number; criticalLow?: number; high?: number; low?: number; sex: string; text?: string; };
+export type LabRangeSet = { effectiveFrom?: string; ranges: Array<LabRangeBand>; version: number; };
+export type LabRangeSetRequest = { ranges: Array<LabRangeBand>; };
 export type LabTest = { active: boolean; chargeCode: string; chargeItemId: string; code: string; container: string; id: string; loinc?: string; method?: string; name: string; price: number; sampleType: string; tatMinutes: number; taxCode?: string; unit?: string; updatedAt: string; volumeMl?: number; };
 export type LabTestPage = { items: Array<LabTest>; nextCursor?: string; };
 export type LabTestRequest = { code: string; container: string; loinc?: string; method?: string; name: string; outsourced?: LabOutsourced; price: number; sampleType: string; tatMinutes: number; taxCode?: string; unit: string; volumeMl: number; };
@@ -1131,6 +1134,8 @@ export type Operations = {
   LabController_tests: { method: "get"; path: "/v1/lab/tests"; permission: "lab:view"; pathParams: never; query: { q?: string; cursor?: string; limit?: number; }; body: never; response: LabTestPage };
   LabController_createTest: { method: "post"; path: "/v1/lab/tests"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabTestRequest; response: LabTest };
   LabController_updateTest: { method: "patch"; path: "/v1/lab/tests/{id}"; permission: "lab:catalogue"; pathParams: { id: string; }; query: never; body: LabTestUpdateRequest; response: LabTest };
+  LabRangeController_ranges: { method: "get"; path: "/v1/lab/tests/{id}/ranges"; permission: "lab:view"; pathParams: { id: string; }; query: { version?: number; }; body: never; response: LabRangeSet };
+  LabRangeController_replace: { method: "put"; path: "/v1/lab/tests/{id}/ranges"; permission: "lab:validate"; pathParams: { id: string; }; query: never; body: LabRangeSetRequest; response: LabRangeSet };
   MeEntitlementsController_get: { method: "get"; path: "/v1/me/entitlements"; permission: "isAuthenticated()"; pathParams: never; query: never; body: never; response: MeEntitlements };
   StaffOnboardingController_get: { method: "get"; path: "/v1/me/onboarding"; permission: "authenticated"; pathParams: never; query: never; body: never; response: StaffOnboardingProgress };
   StaffOnboardingController_complete: { method: "put"; path: "/v1/me/onboarding/{key}"; permission: "authenticated"; pathParams: { key: string; }; query: never; body: never; response: StaffOnboardingProgress };
@@ -1559,6 +1564,7 @@ export type Permission =
   | "departments:view"
   | "kb_import:edit"
   | "lab:catalogue"
+  | "lab:validate"
   | "lab:view"
   | "messaging_operations:override"
   | "nursing:create"

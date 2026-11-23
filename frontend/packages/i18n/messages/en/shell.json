@@ -963,6 +963,66 @@
       "name": "Enter a name of up to 120 characters.",
       "tests": "Choose between 1 and 60 tests.",
       "price": "Enter a price of 0 or more with up to two decimals."
+    },
+    "ranges": {
+      "open": "Ranges",
+      "openOf": "Reference ranges of {name}",
+      "title": "Reference ranges: {name}",
+      "unit": "Limits are in {unit}.",
+      "noUnit": "This test has no unit yet. Enter the limits in the unit the lab reports.",
+      "loading": "Loading the reference ranges",
+      "loadFailed": "Couldn't load the reference ranges.",
+      "empty": "No reference ranges yet.",
+      "emptyHint": "Until the pathologist adds them, results of this test show 'no reference range'.",
+      "version": "Version {version}, in use since {date}.",
+      "versionHint": "Saving creates a new version. Results already flagged keep the version they were flagged with.",
+      "ageHint": "A band starts on its 'from' age and ends just before its 'to' age, so '0 to 12 years' and '12 years onwards' meet without a gap. A patient who fits no band gets 'no reference range'.",
+      "band": "Band {row}",
+      "sex": "Sex",
+      "sexOption": {
+        "any": "Any",
+        "F": "Female",
+        "M": "Male"
+      },
+      "from": "From age",
+      "to": "To age (blank: no upper age)",
+      "fromUnit": "Unit of the 'from' age",
+      "toUnit": "Unit of the 'to' age",
+      "ageUnit": {
+        "d": "days",
+        "m": "months",
+        "y": "years"
+      },
+      "age": {
+        "d": "{count, plural, one {# day} other {# days}}",
+        "m": "{count, plural, one {# month} other {# months}}",
+        "y": "{count, plural, one {# year} other {# years}}"
+      },
+      "ageCol": "Age",
+      "ageBand": "{from} to under {to}",
+      "ageFrom": "{from} and older",
+      "low": "Low",
+      "high": "High",
+      "criticalLow": "Critical low",
+      "criticalHigh": "Critical high",
+      "text": "Text range or note (optional)",
+      "textCol": "Text range or note",
+      "add": "Add band",
+      "remove": "Remove band",
+      "removeOf": "Remove band {row}",
+      "save": "Save as a new version",
+      "saved": "Saved as version {version}.",
+      "saveFailed": "Couldn't save the ranges. Try again.",
+      "errors": {
+        "none": "Add at least one band.",
+        "age": "Band {row}: enter each age as a whole number of days, months or years.",
+        "ageOrder": "Band {row}: the 'to' age must be above the 'from' age.",
+        "number": "Band {row}: enter each limit as a number with up to six decimals.",
+        "order": "Band {row}: the limits must rise in this order: critical low, low, high, critical high.",
+        "empty": "Band {row}: enter at least one limit or a text range.",
+        "overlap": "Bands {row} and {other} cover the same patients. Change the sex or the ages so that each patient fits one band.",
+        "invalid": "Band {row} is not valid. Check its ages, and that its limits rise from critical low to critical high."
+      }
     }
   }
 }
