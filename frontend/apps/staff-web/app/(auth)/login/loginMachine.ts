@@ -3,6 +3,7 @@
 // each transition (PIN, MFA verify / recovery / enrol, WhatsApp OTP, forgot PIN, forced PIN change, errors, lockout, back).
 import type { Problem } from "@nabd/api-client/types";
 import { lockedMinutes } from "../../lib/pinPolicy.ts";
+import { isBranchChoice, type BranchChoice } from "../../lib/branches.ts";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
 export type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
@@ -12,12 +13,14 @@ export type MfaSetupRequired = { setupToken: string; expiresIn: number };
 export type LoginProblem = Problem & { retryAfterSeconds?: number };
 
 export type View = "login" | "mfaVerify" | "mfaSetup" | "mfaSetupDone" | "forgotRequest" | "forgotConfirm" | "forgotDone"
-  | "otpRequest" | "otpVerify" | "pinChange";
+  | "otpRequest" | "otpVerify" | "pinChange" | "branchPick";
 
 export type LoginState = {
   view: View;
   tenantSlug: string; email: string; pin: string; mobilePhone: string; resetToken: string; newPin: string; code: string;
   challenge: MfaChallenge | null; setupRequired: MfaSetupRequired | null;
+  branchChoice: BranchChoice | null; // PLT-023: signed in, works in more than one branch: pick one
+
   useRecovery: boolean; // PLT-004: sign in with a one-time recovery code
   secretBase32: string; otpauthUri: string; recoveryCodes: string[];
   fieldErrors: Record<string, string>; formError: string | null;
@@ -39,6 +42,7 @@ export type LoginAction =
   | { type: "enrolStarted" }
   | { type: "enrolSecret"; secretBase32: string; otpauthUri: string }
   | { type: "mfaChallenge"; body: MfaChallenge } // PIN or OTP sign-in: an authenticator code is needed
+  | { type: "branchChoice"; body: BranchChoice } // PLT-023: sign-in passed; the answer is a choice token, not a session
   | { type: "toggleRecovery" }
   | { type: "mfaEnrolled"; recoveryCodes: string[] }
   | { type: "pinChangeRequired" } // signed in with a PIN that predates the 6-8 digit policy
@@ -50,7 +54,7 @@ export type LoginAction =
 
 export const initialLogin: LoginState = {
   view: "login", tenantSlug: "", email: "", pin: "", mobilePhone: "", resetToken: "", newPin: "", code: "",
-  challenge: null, setupRequired: null, useRecovery: false, secretBase32: "", otpauthUri: "", recoveryCodes: [],
+  challenge: null, setupRequired: null, branchChoice: null, useRecovery: false, secretBase32: "", otpauthUri: "", recoveryCodes: [],
   fieldErrors: {}, formError: null, loading: false, slow: false, timedOut: false,
 };
 
@@ -68,6 +72,7 @@ export function loginReducer(s: LoginState, a: LoginAction): LoginState {
     case "enrolStarted": return { ...s, formError: null };
     case "enrolSecret": return { ...s, secretBase32: a.secretBase32, otpauthUri: a.otpauthUri };
     case "mfaChallenge": return { ...s, challenge: a.body, view: "mfaVerify" };
+    case "branchChoice": return { ...s, branchChoice: a.body, view: "branchPick", pin: "", code: "", formError: null };
     case "toggleRecovery": return { ...s, useRecovery: !s.useRecovery, code: "", formError: null };
     case "mfaEnrolled": return { ...s, recoveryCodes: a.recoveryCodes, view: "mfaSetupDone" };
     case "pinChangeRequired": return { ...s, newPin: "", formError: null, view: "pinChange" };
@@ -75,7 +80,7 @@ export function loginReducer(s: LoginState, a: LoginAction): LoginState {
     case "otpSent": return { ...s, view: "otpVerify" };
     case "forgotSent": return { ...s, view: "forgotConfirm" };
     case "forgotDone": return { ...s, view: "forgotDone" };
-    case "back": return { ...s, view: "login", challenge: null, setupRequired: null, code: "", pin: "", formError: null };
+    case "back": return { ...s, view: "login", challenge: null, setupRequired: null, branchChoice: null, code: "", pin: "", formError: null };
   }
 }
 
@@ -94,8 +99,9 @@ export function problemAction(status: number, problem: LoginProblem, t: T): Logi
   return { type: "error", message: problem.detail || t("errors.invalid") };
 }
 
-/** The three answers of PIN / OTP sign-in: enrol MFA first, verify a code, or tokens (null: the caller signs in). */
-export function signInAction(body: TokenPair | MfaChallenge | MfaSetupRequired): LoginAction | null {
+/** The answers of PIN / OTP sign-in: enrol MFA first, verify a code, pick a branch (PLT-023), or tokens (null: the caller signs in). */
+export function signInAction(body: TokenPair | MfaChallenge | MfaSetupRequired | BranchChoice): LoginAction | null {
+  if (isBranchChoice(body)) return { type: "branchChoice", body };
   if ("setupToken" in body) return { type: "mfaSetupRequired", body };
   if ("challengeId" in body) return { type: "mfaChallenge", body };
   return null;

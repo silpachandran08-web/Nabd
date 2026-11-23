@@ -964,5 +964,12 @@
       "tests": "Choose between 1 and 60 tests.",
       "price": "Enter a price of 0 or more with up to two decimals."
     }
+  },
+  "branch": {
+    "chip": "Branch: {name}. Switch branch",
+    "menu": "Switch branch",
+    "allReports": "All branches (reports)",
+    "switching": "Switching…",
+    "failed": "Couldn't switch branch. You are still signed in here."
   }
 }

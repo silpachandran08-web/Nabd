@@ -185,3 +185,12 @@
   border: 1px solid currentColor;
   margin-block-start: var(--nb-space-8);
 }
+
+/* PLT-023: the branch colour chip on the sign-in picker (same six chart tokens as the top-bar switcher) */
+.branchDot { display: inline-block; inline-size: 10px; block-size: 10px; border-radius: 50%; margin-inline-end: var(--nb-space-8); }
+.branchDot1 { background: var(--nb-chart-1); }
+.branchDot2 { background: var(--nb-chart-2); }
+.branchDot3 { background: var(--nb-chart-3); }
+.branchDot4 { background: var(--nb-chart-4); }
+.branchDot5 { background: var(--nb-chart-5); }
+.branchDot6 { background: var(--nb-chart-6); }

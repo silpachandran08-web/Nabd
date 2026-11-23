@@ -10,6 +10,7 @@ import { useLiveStatus } from "./lib/live";
 import { useTranslations } from "next-intl";
 import LanguagePicker from "./LanguagePicker";
 import ShellUserMenu from "./shell/ShellUserMenu";
+import BranchSwitcher from "./shell/BranchSwitcher";
 import TrialChip from "./components/setup/TrialChip";
 import { keyHint } from "./shell/shortcuts";
 import { formatClinicTime } from "./lib/clinicTime";
@@ -172,6 +173,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
         <span className={styles.syncTime}>{!pillWarn && lastSync ? `· ${lastSync}` : ""}</span>
         <span className={styles.srOnly}>{[pillHint, lastSyncText].filter(Boolean).join(" ")}</span>
       </div>
+      <BranchSwitcher />{/* PLT-023: only when linked to more than one branch */}
       <ShellUserMenu />
     </div>
   );
