@@ -15,6 +15,7 @@ import { usePaymentMethodLabel } from "../../lib/paymentMethodText";
 import { key as queryKey } from "../../lib/query";
 import { getIdentity } from "../../lib/session";
 import { GROUPS, decodeBase64, framePath, presetRange, rangeProblem, reportHref, visibleReports, words, type Preset } from "./libraryModel";
+import TaxExportsCard from "./TaxExportsCard";
 import s from "./library.module.css";
 
 // ADM-047: the reports library. Library list left, report right: range filters, KPI tiles (tap opens the rows behind them), the rule,
@@ -243,6 +244,7 @@ export default function ReportsLibrary() {
               </div>
             </section>
           )}
+          <TaxExportsCard /> {/* FIN-011 */}
         </div>
       </div>
     </main>
