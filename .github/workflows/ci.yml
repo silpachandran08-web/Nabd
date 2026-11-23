@@ -122,6 +122,12 @@ jobs:
         name: JUnit unit tests (no Docker; ApiTestBase classes run in stage 3)
         working-directory: backend
         run: mvn -B -q test -Dtest='!*ApiTest,!*IT' -Dsurefire.failIfNoSpecifiedTests=false
+      # IDC-055: the golden FHIR bundles (compared by FhirGoldenFileTest above) against the NRCeS profiles. The HL7 validator jar is
+      # not on the runner yet: until FHIR_VALIDATOR_JAR points at one this step prints SKIPPED and passes (docs/architecture/fhir-mapping.md).
+      - if: needs.changes.outputs.backend == 'true'
+        name: FHIR profile validation (NRCeS ndhm.in; SKIPPED without the validator jar)
+        env: { FHIR_VALIDATOR_JAR: "${{ vars.FHIR_VALIDATOR_JAR }}" }
+        run: scripts/ci/fhir_validate.sh
       # OPS-033: ArchitectureRulesTest (above) writes Modulith + ArchUnit findings; arch.py adds the SQL scans and the gate
       - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
         uses: actions/setup-python@v5

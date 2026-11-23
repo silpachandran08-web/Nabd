@@ -37,6 +37,12 @@ modules:
     # COM-052: recall orders (the retention engine). Booking a follow-up reaches it through engagement.api.RecallBookings.
     owns: [recall_orders]
     reads: [appointments, queue_entries]  # COM-052: the closing visit's patient, doctor and clinic date; an upcoming follow-up already booked with that doctor (ids and status only)
+  exchange:
+    # IDC-055: the health-information exchange (FHIR R4 mapping). Owns no table. A signed consult is read only through the owners'
+    # APIs (clinical.api.SignedConsults, queue.api.VisitEncounters, patient.api.PatientDemographics, iam.api.PractitionerRecords,
+    # identity.api.HealthIds); the one SQL read is the clinic's name for the Organization resource.
+    owns: []
+    reads: [tenants]
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
