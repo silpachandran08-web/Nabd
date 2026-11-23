@@ -29,6 +29,8 @@ import ChargeButton from "../../../components/ui/ChargeButton";
 import { tierPrice, tierToSend, type TierLine, type TierName } from "../../../lib/pricingTier";
 import RxPrefillBlock from "../../../components/checkout/RxPrefillBlock";
 import { initialTicks, toBillLine, type PrefillLine } from "../../../components/checkout/rxPrefill";
+import CoverageBar from "../../../components/checkout/CoverageBar"; // FIN-036
+import InsuranceSplit from "../../../components/checkout/InsuranceSplit";
 
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
@@ -582,6 +584,8 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      {can("insurance:view") && <CoverageBar visitId={queueEntryId} />}
+
       {invoice && (
         <div className={styles.layout} style={{ gridTemplateColumns: "1fr 300px" }}>
           <div className={styles.card}>
@@ -605,6 +609,7 @@ export default function CheckoutPage() {
                 ))}
               </tbody>
             </table>
+            {invoice.insurance && <InsuranceSplit insurance={invoice.insurance} lines={invoice.lineItems} currency={invoice.currency} />}
             {invoice.payments.length > 0 && (
               <>
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>{tr("payments")}</h2>

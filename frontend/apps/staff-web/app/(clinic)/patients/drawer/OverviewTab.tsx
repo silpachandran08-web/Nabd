@@ -13,6 +13,8 @@ import ConditionsSection from "./ConditionsSection";
 import GuardianSection from "./GuardianSection";
 import CompleteInChat from "../CompleteInChat";
 import NotificationPrefs from "../NotificationPrefs";
+import PolicyCard from "../PolicyCard"; // FIN-036
+import { can } from "../../../lib/permissions";
 import MedicinesSection from "./MedicinesSection";
 import TimelineSection from "./TimelineSection";
 
@@ -77,6 +79,7 @@ export default function OverviewTab({ patient, listLastVisit, perms, onRegistryC
 
       <GuardianSection patient={patient} patientsEdit={patientsEdit} onRegistryChanged={onRegistryChanged} />
       <NotificationPrefs key={`prefs-${patient.id}`} patientId={patient.id} canEdit={patientsEdit} />
+      {can("insurance:view") && <PolicyCard key={`policies-${patient.id}`} patientId={patient.id} />}
 
       {clinicalView ? (
         <>

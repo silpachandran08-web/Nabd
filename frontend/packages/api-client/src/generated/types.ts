@@ -162,6 +162,9 @@ export type ConsentWithdrawResponse = { status?: string; };
 export type ConsultExtendRequest = { minutes: number; };
 export type ConsultExtendResponse = { extendedBy?: number; queueEntryId?: string; };
 export type Counts = { appointments?: number; freeSlots?: number; walkIns?: number; };
+export type Coverage = { copayPercent?: number; eligibilityRef?: string; locked?: boolean; mode?: string; payerName?: string; policies?: Array<CoveragePolicy>; policyId?: string; visitDate?: string; visitId?: string; };
+export type CoveragePolicy = { copayPercent?: number; id?: string; memberIdMasked?: string; payerName?: string; planName?: string; validFrom?: string; validTo?: string; warning?: string; };
+export type CoverageRequest = { eligibilityRef?: string; mode: string; policyId?: string; };
 export type CreateProvisioningJobRequest = { brandName: string; edition?: string; ownerEmail: string; ownerMobile: string; ownerName: string; path: string; region: string; tenantName: string; tenantSlug: string; };
 export type CreateRequest = { body?: Record<string, string>; type?: string; };
 export type CreditNotes = { count?: number; tax?: number; taxable?: number; total?: number; };
@@ -366,6 +369,8 @@ export type InstanceEventResponse = { actorName?: string; createdAt?: string; de
 export type InstanceItemResponse = { allocatedMinor?: number; allocatedPrice?: number; id?: string; itemType?: string; name?: string; quantityConsumed?: number; quantityTotal?: number; taxCategory?: string; taxMinor?: number; taxRatePercent?: number; unitListPrice?: number; };
 export type InstanceResponse = { events?: Array<InstanceEventResponse>; graceDays?: number; id?: string; invoiceId?: string; invoiceNumber?: string; items?: Array<InstanceItemResponse>; packageId?: string; packageName?: string; patientId?: string; patientName?: string; soldPrice?: number; soldTax?: number; status?: string; validityEnd?: string; validityStart?: string; };
 export type InstantiateRequest = { languages?: Array<string>; };
+export type Insurance = { lines?: Array<InsuranceLine>; patientShare?: number; payerId?: string; payerPaid?: number; payerShare?: number; pendingDecision?: number; };
+export type InsuranceLine = { lineId?: string; patientShareMinor?: number; payerShareMinor?: number; };
 export type InternalAppointmentActionRequest = { actedByRef?: string; newStartTime?: string; note?: string; patientRef: string; reasonCode?: string; };
 export type InternalAvailability = { doctors?: Array<InternalDoctorSessions>; v?: number; };
 export type InternalBookRequest = { actedByRef?: string; doctorId: string; patientRef: string; startTime: string; };
@@ -386,7 +391,7 @@ export type InvoiceItem = { amountMinor?: number; currency?: string; id?: string
 export type InvoiceListItem = { balanceDue?: number; createdAt?: string; doctorId?: string; id?: string; invoiceNumber?: string; paid?: number; patientId?: string; patientName?: string; status?: string; total?: number; writtenOff?: number; };
 export type InvoiceListResponse = { items?: Array<InvoiceListItem>; nextCursor?: string; };
 export type InvoicePage = { items?: Array<InvoiceItem>; nextCursor?: string; };
-export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
+export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; insurance?: Insurance; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
 export type InvoiceSeriesResponse = { fiscalYear?: string; fyStartMonth?: number; id?: string; kind?: string; nextNumber?: number; pad?: number; prefix?: string; prefixPattern?: string; taxRegistrationId?: string; };
@@ -530,6 +535,11 @@ export type PatientRegistryRow = { age?: number; allergy?: string; archived?: bo
 export type PatientResponse = { dob?: string; gender?: string; id?: string; isMinor?: boolean; matchedOn?: string; mrn?: string; name?: string; phone?: string; status?: string; };
 export type PatientViewResponse = { birthYear?: number; initials?: string; maskedPhone?: string; mrn?: string; };
 export type PatientWriteRequest = { address?: string; confirmedNotDuplicate?: boolean; dob?: string; gender: string; guardianConsent?: GuardianConsent; guardianId?: string; name: string; nationalId?: string; note?: string; phone: string; source?: string; synthetic?: boolean; yearOfBirth?: number; };
+export type Payer = { global?: boolean; id?: string; identifiers?: Record<string, string>; jurisdiction?: string; kind?: string; name?: string; plans?: Array<Plan>; };
+export type PayerList = { items?: Array<Payer>; };
+export type PayerPaymentRequest = { amount: number; reference?: string; };
+export type PayerPosition = { currency?: string; invoiceId?: string; patientShare?: number; payerId?: string; payerPaid?: number; payerShare?: number; pendingDecision?: number; };
+export type PayerRequest = { identifiers?: Record<string, string>; kind: string; name: string; };
 export type PaymentIntentCreated = { expiresAt?: string; intentId?: string; qrPayload?: string; url?: string; };
 export type PaymentIntentRequest = { amount?: number; caregiverId?: string; kind: string; recipient?: string; };
 export type PaymentIntentStatus = { gatewayRef?: string; paidAt?: string; status?: string; };
@@ -564,12 +574,17 @@ export type PinAssertionRequest = { approvalId?: string; pin: string; };
 export type PinChangeRequest = { currentPin: string; newPin: string; };
 export type PinResetConfirmRequest = { mobilePhone: string; newPin: string; tenantSlug: string; token: string; };
 export type PinResetRequestRequest = { mobilePhone: string; tenantSlug: string; };
+export type Plan = { copayPercent?: number; global?: boolean; id?: string; name?: string; };
 export type PlanCatalogueEntry = { code?: string; currency?: string; limits?: Limits; modules?: Array<string>; name?: string; priceMinor?: number; pricingBasis?: string; };
 export type PlanMixResponse = { planCode?: string; tenantCount?: number; };
 export type PlanOption = { branchLimit?: number; code?: string; modules?: Array<string>; monthlyMinor?: number; name?: string; pricingBasis?: string; seatLimit?: number; version?: number; };
+export type PlanRequest = { copayPercent: number; name: string; };
 export type PlanResponse = { active?: boolean; branchLimit?: number; code?: string; createdAt?: string; currency?: string; id?: string; market?: string; modules?: Array<string>; monthlyPriceCents?: number; name?: string; onTrialExpiry?: string; pricingBasis?: string; seatLimit?: number; version?: number; visitsPerMonth?: number; };
 export type PlanVersionResponse = { branchLimit?: number; modules?: Array<string>; monthlyPriceCents?: number; publishedAt?: string; seatLimit?: number; subscriptions?: number; version?: number; visitsPerMonth?: number; };
 export type PlanWriteRequest = { active?: boolean; code: string; currency: string; limits?: Limits; market?: string; modules?: Array<string>; monthlyPriceCents: number; name: string; onTrialExpiry?: string; pricingBasis?: string; seatLimit?: number; };
+export type Policy = { cardDocumentIds?: Array<string>; copayPercent?: number; createdAt?: string; expired?: boolean; id?: string; memberId?: string; patientId?: string; payerId?: string; payerName?: string; planId?: string; planName?: string; policyNumber?: string; relationship?: string; status?: string; validFrom?: string; validTo?: string; };
+export type PolicyList = { items?: Array<Policy>; };
+export type PolicyRequest = { cardDocumentIds?: Array<string>; memberId: string; payerId: string; planId?: string; policyNumber: string; relationship: string; validFrom: string; validTo: string; };
 export type PolicyResponse = { id?: string; policyKey?: string; value?: string; version?: number; };
 export type PolicyWriteRequest = { value: string; };
 export type PregnancyEventResponse = { actorId?: string; actorName?: string; after?: Record<string, Record<string, unknown>>; before?: Record<string, Record<string, unknown>>; id?: string; occurredAt?: string; };
@@ -1125,6 +1140,14 @@ export type Operations = {
   AttachmentController_downloadUrl: { method: "post"; path: "/v1/files/{id}/download-url"; permission: "clinical:view"; pathParams: { id: string; }; query: never; body: never; response: FileDownloadUrlResponse };
   DeskExceptionController_list: { method: "get"; path: "/v1/front-desk/exceptions"; permission: "queue:view"; pathParams: never; query: { kind?: string; cursor?: string; limit?: number; }; body: never; response: DeskExceptionPage };
   DeskExceptionController_act: { method: "post"; path: "/v1/front-desk/exceptions/{id}/{action}"; permission: "queue:edit"; pathParams: { id: string; action: string; }; query: never; body: ActionRequest; response: DeskExceptionActionResponse };
+  InsuranceController_recordPayerPayment: { method: "post"; path: "/v1/insurance/invoices/{invoiceId}/payer-payments"; permission: "insurance:edit"; pathParams: { invoiceId: string; }; query: never; body: PayerPaymentRequest; response: PayerPosition };
+  InsuranceController_policies: { method: "get"; path: "/v1/insurance/patients/{patientId}/policies"; permission: "insurance:view"; pathParams: { patientId: string; }; query: never; body: never; response: PolicyList };
+  InsuranceController_addPolicy: { method: "post"; path: "/v1/insurance/patients/{patientId}/policies"; permission: "insurance:edit"; pathParams: { patientId: string; }; query: never; body: PolicyRequest; response: Policy };
+  InsuranceController_payers: { method: "get"; path: "/v1/insurance/payers"; permission: "insurance:view"; pathParams: never; query: { jurisdiction?: string; q?: string; }; body: never; response: PayerList };
+  InsuranceController_createPayer: { method: "post"; path: "/v1/insurance/payers"; permission: "insurance:edit"; pathParams: never; query: never; body: PayerRequest; response: Payer };
+  InsuranceController_createPlan: { method: "post"; path: "/v1/insurance/payers/{payerId}/plans"; permission: "insurance:edit"; pathParams: { payerId: string; }; query: never; body: PlanRequest; response: Plan };
+  InsuranceController_coverage: { method: "get"; path: "/v1/insurance/visits/{visitId}/coverage"; permission: "insurance:view"; pathParams: { visitId: string; }; query: never; body: never; response: Coverage };
+  InsuranceController_setCoverage: { method: "put"; path: "/v1/insurance/visits/{visitId}/coverage"; permission: "insurance:edit"; pathParams: { visitId: string; }; query: never; body: CoverageRequest; response: Coverage };
   LabController_importCatalogue: { method: "post"; path: "/v1/lab/catalogue/imports"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabImportRequest; response: LabImportResult };
   LabController_panels: { method: "get"; path: "/v1/lab/panels"; permission: "lab:view"; pathParams: never; query: never; body: never; response: LabPanelList };
   LabController_createPanel: { method: "post"; path: "/v1/lab/panels"; permission: "lab:catalogue"; pathParams: never; query: never; body: LabPanelRequest; response: LabPanel };
@@ -1557,6 +1580,8 @@ export type Permission =
   | "departments:delete"
   | "departments:edit"
   | "departments:view"
+  | "insurance:edit"
+  | "insurance:view"
   | "kb_import:edit"
   | "lab:catalogue"
   | "lab:view"
