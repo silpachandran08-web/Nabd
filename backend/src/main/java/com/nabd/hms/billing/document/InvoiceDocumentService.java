@@ -69,8 +69,10 @@ public class InvoiceDocumentService {
         byte[] pdf = thermal ? SimplePdf.render(lines, 226.8f, 0, 12f, 7f, true) : SimplePdf.render(lines, 595.3f, 841.9f, 40f, 9f, false);
         String key = "tenants/" + tenantId + "/billing/" + invoiceId + "/" + kind + "-" + layout + "-v" + version + ".pdf";
         if (repo.store(tenantId, invoiceId, kind, layout, version, key, sha256(pdf), pdf)) {
-            String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
-            audit.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.document_rendered", "invoice", invoiceId, null,
+            // COM-050: staffId is null when the document is first rendered for the patient's own request in chat
+            String[] actor = staffId == null ? new String[]{"patient via edge", "patient-access-edge"}
+                    : actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
+            audit.record(tenantId, staffId == null ? "system" : "staff", staffId, actor[0], actor[1], null, "billing.document_rendered", "invoice", invoiceId, null,
                     Map.of("kind", kind, "layout", layout, "version", version));
             return pdf;
         }
