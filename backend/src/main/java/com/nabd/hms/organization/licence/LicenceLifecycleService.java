@@ -31,7 +31,7 @@ import java.util.UUID;
  * Everything is derived from dates and stored markers, so running it twice changes nothing.
  */
 @Service
-public class LicenceLifecycleService {
+public class LicenceLifecycleService implements com.nabd.hms.organization.api.StaffLicences {
 
     private static final Logger log = LoggerFactory.getLogger(LicenceLifecycleService.class);
     /** shortcut: fixed ceiling like CLN-005's signing override (MAX_OVERRIDE); make it a clinic policy if a regulator needs another window. */
@@ -54,6 +54,12 @@ public class LicenceLifecycleService {
         this.tenantContext = tenantContext;
         this.audit = audit;
         this.actors = actors;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean holdsCurrent(UUID staffId, String licenceType) {
+        return repo.holdsCurrent(staffId, licenceType, clock.today(tenantContext.current()));
     }
 
     /** What one pass did, for logs and tests. */

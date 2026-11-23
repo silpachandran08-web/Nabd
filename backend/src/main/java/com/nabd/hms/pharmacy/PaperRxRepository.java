@@ -19,7 +19,7 @@ import java.util.UUID;
 class PaperRxRepository {
 
     /** What the item's schedule class asks of a prescription in this market (pharmacy_schedule_rules, data not code). */
-    record ItemRule(boolean duplicateRxCopy, Integer validityDays) {
+    record ItemRule(boolean duplicateRxCopy, Integer validityDays, Integer retentionYears) { // PHL-023: years the duplicate copy is kept
     }
 
     record LineRow(UUID id, UUID itemId, int qty, LocalDate rxDate, LocalDate validUntil, UUID documentId, boolean duplicateCopyRetained) {
@@ -33,18 +33,20 @@ class PaperRxRepository {
 
     /** Empty when the item is not in this clinic's price list. An item without a profile follows the OTC rule, as the worklist does. */
     Optional<ItemRule> itemRule(UUID tenantId, String market, UUID itemId) {
-        return jdbc.query("SELECT COALESCE(r.duplicate_rx_copy, false) AS copy, r.rx_validity_days FROM charge_catalogue c " +
+        return jdbc.query("SELECT COALESCE(r.duplicate_rx_copy, false) AS copy, r.rx_validity_days, r.retention_years FROM charge_catalogue c " +
                         "LEFT JOIN pharmacy_item_profiles p ON p.item_id = c.id AND p.tenant_id = c.tenant_id " +
                         "LEFT JOIN pharmacy_schedule_rules r ON r.market = ? AND r.schedule_class = COALESCE(p.schedule_class, 'OTC') " +
                         "WHERE c.tenant_id = ? AND c.id = ?",
-                (rs, i) -> new ItemRule(rs.getBoolean("copy"), (Integer) rs.getObject("rx_validity_days")), market, tenantId, itemId).stream().findFirst();
+                (rs, i) -> new ItemRule(rs.getBoolean("copy"), (Integer) rs.getObject("rx_validity_days"), (Integer) rs.getObject("retention_years")),
+                market, tenantId, itemId).stream().findFirst();
     }
 
-    UUID insert(UUID tenantId, PaperRxDtos.CreateRequest req, LocalDate validUntil, UUID staffId) {
+    UUID insert(UUID tenantId, PaperRxDtos.CreateRequest req, LocalDate validUntil, LocalDate retainUntil, UUID staffId) {
         return jdbc.queryForObject("INSERT INTO paper_prescriptions (tenant_id, prescriber_name, prescriber_reg_no, rx_date, customer_name, " +
-                        "customer_phone, document_id, duplicate_copy_retained, valid_until, created_by) VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id", UUID.class,
+                        "customer_phone, document_id, duplicate_copy_retained, valid_until, retain_until, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING id", UUID.class,
                 tenantId, req.prescriberName().trim(), req.prescriberRegNo().trim(), Date.valueOf(req.rxDate()), blankToNull(req.patientName()),
-                blankToNull(req.patientPhone()), req.documentId(), req.duplicateCopyRetained(), validUntil == null ? null : Date.valueOf(validUntil), staffId);
+                blankToNull(req.patientPhone()), req.documentId(), req.duplicateCopyRetained(), validUntil == null ? null : Date.valueOf(validUntil),
+                retainUntil == null ? null : Date.valueOf(retainUntil), staffId);
     }
 
     UUID insertLine(UUID tenantId, UUID paperRxId, PaperRxDtos.LineRequest l) {
@@ -64,6 +66,12 @@ class PaperRxRepository {
                         rs.getObject("document_id", UUID.class), rs.getBoolean("duplicate_copy_retained"))),
                 tenantId, ids.toArray(new UUID[0]));
         return out;
+    }
+
+    /** PHL-023: the retained copy of the record this line belongs to is kept at least until {@code date}; never moved earlier. */
+    void keepUntil(UUID tenantId, UUID lineId, LocalDate date) {
+        jdbc.update("UPDATE paper_prescriptions p SET retain_until = GREATEST(p.retain_until, ?) FROM paper_prescription_lines l " +
+                "WHERE l.tenant_id = ? AND l.id = ? AND p.id = l.paper_rx_id AND p.tenant_id = l.tenant_id", Date.valueOf(date), tenantId, lineId);
     }
 
     /** The photo of this clinic's paper prescription; empty when there is no such record or it has no photo. */

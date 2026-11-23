@@ -1542,6 +1542,7 @@ schemas:
       valid_until: operational
       created_by: operational
       created_at: operational
+      retain_until: operational
     patient_allergies:
       unconfirmed: operational
       id: operational
@@ -1737,6 +1738,8 @@ schemas:
       refill_self_serve_allowed: operational
       drug_master_flag: operational
       rx_validity_days: operational
+      dispense_ack_required: operational
+      pharmacist_warning: operational
     pharmacy_settings:
       tenant_id: operational
       mode: operational

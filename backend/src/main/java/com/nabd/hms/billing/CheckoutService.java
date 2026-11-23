@@ -342,6 +342,8 @@ public class CheckoutService {
         // PHL-001: a counter sale of an Rx line needs a signed in-system prescription (the invoice then carries that patient)
         // or, PHL-020, a recorded outside prescription line.
         UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
+        // PHL-023: the second confirmation of a flagged schedule class, checked before the invoice number is taken
+        java.util.function.Consumer<UUID> counterSale = trusted ? null : rxGate.checkCounterSale(tenantId, counterLines(items, req.lineItems()), staffId, ip);
         Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
         UUID approvalId = trusted ? null : gate(tenantId, null, t, List.of(), BigDecimal.ZERO, req);
 
@@ -352,6 +354,7 @@ public class CheckoutService {
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId, approvalId);
         if (approvalId != null) approvals.markUsed(tenantId, approvalId, invoiceId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
+        if (!trusted) counterSale.accept(invoiceId);
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
@@ -360,6 +363,13 @@ public class CheckoutService {
     private static List<com.nabd.hms.pharmacy.RxGate.Line> rxLines(List<LineItemInput> items) {
         return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.Line(i.chargeCode(), i.catalogueId(), i.isRx(), i.quantity(),
                 i.prescriptionItemId(), i.paperRxLineId())).toList();
+    }
+
+    /** PHL-023: a confirmation given for a charge code covers every line of that code on the bill. */
+    private static List<com.nabd.hms.pharmacy.RxGate.CounterLine> counterLines(List<LineItemInput> items, List<com.nabd.hms.billing.dto.LineItemRequest> requested) {
+        java.util.Map<String, String> acks = new java.util.HashMap<>();
+        for (var r : requested) if (r.scheduleAckReason() != null) acks.putIfAbsent(r.chargeCode(), r.scheduleAckReason());
+        return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.CounterLine(i.chargeCode(), i.catalogueId(), acks.get(i.chargeCode()))).toList();
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,
