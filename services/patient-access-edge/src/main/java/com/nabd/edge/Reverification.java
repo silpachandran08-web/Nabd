@@ -44,7 +44,7 @@ class Reverification implements Intent {
 
     static boolean recordsRequest(Message m) {
         String a = m.buttonAction();
-        return "menu:mine".equals(a) || StatusIntent.BUTTON.equals(a)
+        return "menu:mine".equals(a) || StatusIntent.BUTTON.equals(a) || RecordsFlow.claims(m) // COM-050: 'My records' and every tap in it
                 || (a == null && m.text() != null && StatusIntent.WORDS.contains(StatusIntent.normalise(m.text())));
     }
 
