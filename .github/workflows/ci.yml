@@ -89,6 +89,28 @@ jobs:
       - name: Pilot UAT pack complete (OPS-049) and its tools
         run: python3 scripts/ci/uat_pack.py check && python3 scripts/ci/test_ops049_uat.py
 
+  # IDC-026: Cedar policies in policies/ must validate against the schema (a schema error fails this job). Not a required
+  # check yet (its name does not start with "stage"): IDC-027 makes it required when the product starts loading policies/.
+  cedar-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Pinned cedar CLI release. Keep it on the Cedar 4.x line of cedar-java in spikes/cedar/pom.xml (4.11.0 binds
+      # cedar-policy 4.11.2; 4.12.0 is the first CLI release with a published binary and checksum).
+      CEDAR_CLI_VERSION: "4.12.0"
+      CEDAR_CLI_SHA256: fc29b830bca41763c7cbb6ce66d1a14040fc2d077318479512c6a83052b70851
+    steps:
+      - uses: actions/checkout@v4
+      - name: install the cedar CLI (checksum verified)
+        run: |
+          f=cedar-policy-cli-x86_64-unknown-linux-gnu.tar.xz
+          curl -sSfL -o "$RUNNER_TEMP/$f" "https://github.com/cedar-policy/cedar/releases/download/cedar-policy-cli-v$CEDAR_CLI_VERSION/$f"
+          echo "$CEDAR_CLI_SHA256  $RUNNER_TEMP/$f" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP" --strip-components=1 "${f%.tar.xz}/cedar"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: cedar validate policies/ against the schema, and the gate's own test (a known schema error must be rejected)
+        run: policies/validate.sh
+
   stage2-unit:
     needs: changes
     runs-on: ubuntu-latest
