@@ -17,7 +17,7 @@ import FlowOverviewSection from "./FlowOverview";
 import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
-import { pharmacyKnown, useEntitlementsStatus } from "../../lib/entitlements";
+import { editionKnown, pharmacyKnown, useEntitlementsStatus } from "../../lib/entitlements";
 
 
 // Matches GET /v1/reports/overview (ReportsController.overview → OverviewResponse).
@@ -99,6 +99,7 @@ function OverviewInner() {
   // absent and never requested. Decided only once the entitlements have answered, so nothing is fetched and then taken away.
   const { ent, settled } = useEntitlementsStatus();
   const clinical = settled && !pharmacyKnown(ent); // a failed answer falls back to the edition last seen on this device (T1-BUG-15)
+  const lab = settled && editionKnown(ent) === "lab"; // PHL-056: a lab-only tenant has no queue or consultations either
 
   const load = useCallback(async () => {
     setError(null);
@@ -208,7 +209,7 @@ function OverviewInner() {
         </section>
       )}
 
-      {clinical && <FlowOverviewSection />}
+      {clinical && !lab && <FlowOverviewSection />}
 
       <div className={styles.kpis}>
         <div className={styles.card}>
@@ -235,7 +236,7 @@ function OverviewInner() {
 
       <div className={styles.columns}>
         <div className={styles.column}>
-          {clinical && can("reports:view") && <EtaAccuracyTile />}
+          {clinical && !lab && can("reports:view") && <EtaAccuracyTile />}
           <section className={styles.card} aria-label="Payment split">
             <div className={styles.cardLabel}>Payment split</div>
             {splitTotal === 0 ? (

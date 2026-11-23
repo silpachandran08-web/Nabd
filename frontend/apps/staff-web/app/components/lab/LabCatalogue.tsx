@@ -207,7 +207,7 @@ function TestDrawer({ test, onClose, onSaved }: { test: LabTest | null; onClose:
 }
 
 /** Dry run first: the diff is shown before anything is created; the import itself needs a second, explicit press. */
-function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: (created: number) => void }) {
+export function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: (created: number) => void }) {
   const t = useTranslations("shell.lab");
   const [diff, setDiff] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);

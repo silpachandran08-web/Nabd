@@ -5,17 +5,18 @@ import Link from "next/link";
 import styles from "../setup.module.css";
 import AccessGate from "../../../components/ui/AccessGate";
 import PatientImport from "../../../components/setup/PatientImport";
+import BusinessDetailsStep, { type BusinessProfile } from "../../../components/setup/BusinessDetailsStep";
 import { ErrorState, Skeleton } from "../../../components/ui/StateViews";
 import { api, reasonText } from "../../../lib/api";
 import { can } from "../../../lib/permissions";
 import {
   PIC_REGISTRATION_KEY, blockerText, doneCount, licenceLabel, mergeLicences, printerTestHtml, wizardSteps,
-  type PharmacySetup, type ProfileFacts, type WizardStep,
+  type PharmacySetup, type WizardStep,
 } from "./pharmacyWizardModel";
 
 // PHL-032: the five-step pharmacy setup. It only reads and writes existing endpoints (clinic profile, pharmacy settings, the ADM-013 stock
 // import) plus GET /pharmacy/setup for the state, so each step can be left and resumed from any device.
-type Profile = ProfileFacts & { timezone: string; taxIdType: string | null; whatsappNumber: string | null; specialties: string[] };
+type Profile = BusinessProfile;
 type Settings = { licenceNumbers: Record<string, string>; pharmacistInChargeStaffId: string | null };
 type StaffRow = { id: string; name: string; status: string };
 
@@ -65,7 +66,7 @@ function Wizard() {
         {steps.map((step, i) => (
           <section key={step.key} className={styles.card} aria-label={step.title}>
             <h2 className={styles.cardTitle}>{i + 1}. {step.title} <StepPill step={step} /></h2>
-            {step.key === "business" && <Business profile={profile} canEdit={canEdit} onSaved={load} onError={setError} />}
+            {step.key === "business" && <BusinessDetailsStep profile={profile} canEdit={canEdit} onSaved={load} onError={setError} />}
             {step.key === "licence" && <Licences setup={setup} settings={settings} canEdit={canEdit} onSaved={load} onError={setError} />}
             {step.key === "in_charge" && <InCharge settings={settings} staff={staff} canEdit={canEdit} onSaved={load} onError={setError} />}
             {step.key === "printer" && <Printer shop={profile.name} done={step.done} canEdit={canEdit} onSaved={load} onError={setError} />}
@@ -90,30 +91,6 @@ function StepPill({ step }: { step: WizardStep }) {
 }
 
 type StepProps = { canEdit: boolean; onSaved: () => Promise<void>; onError: (m: string | null) => void };
-
-function Business({ profile, canEdit, onSaved, onError }: StepProps & { profile: Profile }) {
-  const [name, setName] = useState(profile.name);
-  const [type, setType] = useState(profile.taxIdType ?? "GSTIN");
-  const [taxId, setTaxId] = useState(profile.taxId ?? "");
-  const [busy, setBusy] = useState(false);
-  const save = async () => {
-    setBusy(true); onError(null);
-    try { await api.patch("/setup/profile", { name: name.trim(), timezone: profile.timezone, taxIdType: type, taxId: taxId.trim() || null, whatsappNumber: profile.whatsappNumber, specialties: profile.specialties }); await onSaved(); }
-    catch (e) { onError(reasonText(e, "Could not save the business details.")); }
-    setBusy(false);
-  };
-  return (
-    <form onSubmit={(e) => { e.preventDefault(); void save(); }}>
-      <div className={styles.field}><label className={styles.label} htmlFor="pw-name">Legal name</label><input id="pw-name" className={styles.input} value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} required /></div>
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="pw-taxtype">Tax number type</label>
-        <select id="pw-taxtype" className={styles.input} value={type} onChange={(e) => setType(e.target.value)} disabled={!canEdit}><option value="GSTIN">GSTIN (India)</option><option value="VAT">VAT number</option></select>
-      </div>
-      <div className={styles.field}><label className={styles.label} htmlFor="pw-taxid">{type === "VAT" ? "VAT number" : "GSTIN"}</label><input id="pw-taxid" className={styles.input} value={taxId} onChange={(e) => setTaxId(e.target.value)} disabled={!canEdit} /></div>
-      {canEdit && <button type="submit" className={styles.btnPrimary} disabled={busy || !name.trim()}>{busy ? "Saving" : "Save"}</button>}
-    </form>
-  );
-}
 
 function Licences({ setup, settings, canEdit, onSaved, onError }: StepProps & { setup: PharmacySetup; settings: Settings }) {
   const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(setup.requiredLicenceKeys.map((k) => [k, settings.licenceNumbers[k] ?? ""])));

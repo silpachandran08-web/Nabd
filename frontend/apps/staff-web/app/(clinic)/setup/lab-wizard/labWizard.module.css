@@ -1,0 +1,48 @@
+/* PHL-056: the letterhead preview and the price list diff. Logical properties (RTL), --nb-* tokens, 44 px targets. */
+.letterhead {
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-1);
+  color: var(--nb-text-primary);
+  padding: var(--nb-space-16);
+  margin-block: var(--nb-space-12);
+  text-align: center;
+  font-size: 13px;
+}
+
+.letterheadName {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 var(--nb-space-8);
+}
+
+.letterhead p {
+  margin: 0;
+}
+
+.letterheadFoot {
+  border-block-start: 1px solid var(--nb-border-subtle);
+  margin-block-start: var(--nb-space-12);
+  padding-block-start: var(--nb-space-8);
+  text-align: end;
+}
+
+.target {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nb-space-12);
+  margin-block: var(--nb-space-12);
+}
+
+.problems {
+  margin: 0;
+  padding-inline-start: var(--nb-space-16);
+  color: var(--nb-danger-500);
+  font-size: 13px;
+}
