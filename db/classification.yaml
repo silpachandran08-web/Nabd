@@ -2343,6 +2343,44 @@ schemas:
       max_days: operational
       max_refills: operational
       fixed: operational
+    drug_interaction_versions:
+      id: operational
+      region: operational
+      kb_version: operational
+      kb: operational
+      data_month: operational
+      duplicate_ingredient_severity: operational
+      status: operational
+      feed_checksum: operational
+      cso_ack_ref: operational
+      created_by: operational
+      created_at: operational
+      activated_at: operational
+    drug_interactions:
+      region: operational
+      kb_version: operational
+      ingredient_a: operational
+      ingredient_b: operational
+      severity: operational
+      mechanism: operational
+      management: operational
+      source_ref: operational
+    drug_duplicate_classes:
+      region: operational
+      kb_version: operational
+      class_id: operational
+      severity: operational
+      source_ref: operational
+    patient_reported_medicines:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      drug_id: phi
+      text: phi
+      started_on: phi
+      stopped_on: phi
+      recorded_by: operational
+      recorded_at: operational
     service_points:
       id: operational
       tenant_id: operational

@@ -61,6 +61,10 @@ import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionRow;
  * against the current allergies, so an allergy recorded after the draft was saved still blocks. A decision
  * records who and when, is audited when made, is kept on later saves while the same warning applies, and is
  * never silently cleared. Moderate and mild allergy matches stay advisory (NB-107).
+ *
+ * CLN-032: coded lines also get drug-drug interaction (ddi) and duplicate-therapy (duplicate) warnings from the licensed
+ * knowledge base (RxInteractionChecker). They ride the same warnings[] and decision flow: contraindicated and major need
+ * a recorded decision, moderate and minor are advisory. A decision on one of them is bound to its own `matched`.
  */
 @Service
 public class PrescriptionService {
@@ -92,12 +96,14 @@ public class PrescriptionService {
     private final RxDocumentService rxDocuments;
     private final PrescriptionPrintRepository printRepo;
     private final RxValidityRules validity;
+    private final RxInteractionChecker interactions;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
                          SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors,
                          DrugCoding coding, RxSafetyService safety, RxDocumentService rxDocuments, PrescriptionPrintRepository printRepo,
-                         RxValidityRules validity) {
+                         RxValidityRules validity, RxInteractionChecker interactions) {
+        this.interactions = interactions;
         this.validity = validity;
         this.rxDocuments = rxDocuments;
         this.printRepo = printRepo;
@@ -192,19 +198,33 @@ public class PrescriptionService {
         ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(ApiException::notFound);
         RxValidityRules.RuleSet rules = validity.effective(dict.region(), dict.version());
 
+        // CLN-032: interaction and duplicate-therapy findings of every coded line against the lines above it and the
+        // patient's active medicines (nothing when no knowledge base is active for the region).
+        List<List<RxSafetyService.Finding>> cross = interactions.check(tenantId, owner.patientId(), prescriptionId, items.stream()
+                .map(i -> new RxInteractionChecker.Line(blankToNull(i.drugId()), lineName(i.drugName(), i.brandName()), i.sigPattern())).toList(),
+                today, null).findings();
         List<PrescriptionItemRow> rows = new ArrayList<>();
         List<StoredDecision> kept = new ArrayList<>();
+        int lineNo = 0;
         for (PrescriptionItemRequest item : items) {
             List<StoredDecision> decisions = new ArrayList<>();
             // CLN-021: a drug master id must exist (404 DRUG_NOT_FOUND); its ingredients and classes join the text checks.
             String drugId = blankToNull(item.drugId());
             DrugCoding.Codes codes = drugId == null ? null : coding.resolve(drugId).codes();
-            for (RxSafetyService.Finding d : safety.checkLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today)) {
+            if (item.overrides() != null && item.overrides().stream()
+                    .anyMatch(o -> RxInteractionRules.isInteractionKind(o.kind()) && blankToNull(o.matched()) == null)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-override-match", "Name the warning",
+                        "A decision on an interaction or duplicate-therapy warning must name the warning it is for.");
+            }
+            List<RxSafetyService.Finding> findings = new ArrayList<>(safety.checkLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today));
+            findings.addAll(cross.get(lineNo++));
+            for (RxSafetyService.Finding d : findings) {
                 if (!d.requiresDecision()) {
                     continue;
                 }
                 RxWarningDecision requested = item.overrides() == null ? null : item.overrides().stream()
-                        .filter(o -> d.kind().equals(o.kind())).findFirst().orElse(null);
+                        .filter(o -> d.kind().equals(o.kind()) && (o.matched() == null || RxSafetyService.sameMatch(o.matched(), d.matched())))
+                        .findFirst().orElse(null);
                 StoredDecision prior = findStored(existing, item.drugName(), d.kind(), d.matched());
                 if (requested != null) {
                     if (RxSafetyChecks.reasonLabel(d.kind(), requested.reasonCode()) == null) {
@@ -247,7 +267,8 @@ public class PrescriptionService {
         // A decision that no longer applies (drug changed or removed, warning gone) is withdrawn on the record, not dropped silently.
         for (PrescriptionItemRow old : existing) {
             for (StoredDecision d : parseDecisions(old.overridesJson())) {
-                boolean stillHeld = kept.stream().anyMatch(k -> k.kind().equals(d.kind()) && k.at().equals(d.at()));
+                boolean stillHeld = kept.stream().anyMatch(k -> k.kind().equals(d.kind()) && k.at().equals(d.at())
+                        && Objects.equals(k.matched(), d.matched()));
                 if (!stillHeld) {
                     auditWithdrawn(tenantId, callerStaffId, actor, ipAddress, prescriptionId, old.drugName(), d);
                 }
@@ -549,7 +570,9 @@ public class PrescriptionService {
                 "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems,
                         "signedByVisitDoctor", owner.doctorId().equals(callerStaffId), "licenceNo", licence.registrationNo(),
                         "allergySnapshotState", snapshot.state(), "allergySnapshotActiveCount", snapshot.allergies().size(),
-                        "safetyDictionaryVersion", dict.label()));
+                        "safetyDictionaryVersion", dict.label(),
+                        // CLN-032: what the interaction check ran against; "not_checked" = no knowledge base was active
+                        "interactionKb", current.interactionKb() == null ? "not_checked" : current.interactionKb()));
         Map<String, Object> event = new LinkedHashMap<>();
         event.put("tenantId", tenantId.toString());
         event.put("prescriptionId", row.id().toString());
@@ -601,15 +624,24 @@ public class PrescriptionService {
         boolean signed = "signed".equals(p.status());
         RxValidityRules.RuleSet rules = signed ? null : validity.effective(dict.region(), dict.version());
         List<PrescriptionWarningResponse> flat = new ArrayList<>();
-        List<PrescriptionItemResponse> items = repo.findItems(tenantId, p.id()).stream()
+        List<PrescriptionItemRow> rows = repo.findItems(tenantId, p.id());
+        // CLN-032: a signed prescription is checked as of its signing day against what was signed before it.
+        RxInteractionChecker.Result cross = interactions.check(tenantId, p.patientId(), p.id(), rows.stream()
+                .map(i -> new RxInteractionChecker.Line(i.drugId(), lineName(i.drugName(), i.brandName()), i.sigPattern())).toList(),
+                signed && p.signedAt() != null ? p.signedAt().atZone(clock.zone(tenantId)).toLocalDate() : today,
+                signed ? p.signedAt() : null);
+        List<PrescriptionItemResponse> items = rows.stream()
                 .map(i -> {
+                    int lineIndex = itemNo[0];
                     List<StoredDecision> stored = parseDecisions(i.overridesJson());
                     List<RxWarningResponse> warnings = new ArrayList<>();
                     String allergyWarning = null;
                     String pregnancyWarning = null;
                     String controlledWarning = null;
                     DrugCoding.Codes codes = coding.codes(i.drugId()).orElse(null);
-                    for (RxSafetyService.Finding d : safety.checkLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today)) {
+                    List<RxSafetyService.Finding> findings = new ArrayList<>(safety.checkLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today));
+                    findings.addAll(cross.findings().get(lineIndex));
+                    for (RxSafetyService.Finding d : findings) {
                         StoredDecision held = !d.requiresDecision() ? null : stored.stream()
                                 .filter(s -> s.kind().equals(d.kind()) && RxSafetyService.sameMatch(s.matched(), d.matched())
                                         && RxSafetyChecks.reasonLabel(d.kind(), s.reasonCode()) != null)
@@ -618,12 +650,17 @@ public class PrescriptionService {
                         if (!resolved) {
                             unresolved[0]++;
                         }
+                        RxInteractionRules.Detail x = d.interaction();
                         warnings.add(new RxWarningResponse(d.kind(), d.severity(), d.message(), d.matched(), d.requiresDecision(), resolved,
-                                d.requiresDecision() ? RxSafetyChecks.reasonOptions(d.kind()) : List.<RxReasonOption>of(), held == null ? null : view(held)));
+                                d.requiresDecision() ? RxSafetyChecks.reasonOptions(d.kind()) : List.<RxReasonOption>of(), held == null ? null : view(held),
+                                x == null ? null : x.otherLineRef(), x == null ? null : x.otherDrug(), x == null ? null : x.otherFrom(),
+                                x == null ? null : x.mechanism(), x == null ? null : x.management(), x == null ? null : x.source(),
+                                x == null ? null : x.sourceRef(), x == null ? null : x.totalDailyDose()));
                         switch (d.kind()) {
                             case RxSafetyChecks.KIND_ALLERGY -> allergyWarning = d.message();
                             case RxSafetyChecks.KIND_PREGNANCY -> pregnancyWarning = d.message();
-                            default -> controlledWarning = d.message();
+                            case RxSafetyChecks.KIND_CONTROLLED -> controlledWarning = d.message();
+                            default -> { } // CLN-032 ddi / duplicate: in warnings[] only, no plain-text twin
                         }
                     }
                     for (RxWarningResponse w : warnings) {
@@ -644,13 +681,19 @@ public class PrescriptionService {
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,
                             pregnancyWarning, controlledWarning, warnings, i.brandName(), i.sigPattern(), i.route(),
                             i.quantity(), i.quantityUnit(), i.drugId(), i.drugId() != null, i.genericName(),
-                            i.validityDays(), i.refillsAllowed(), lineValidity);
+                            i.validityDays(), i.refillsAllowed(), lineValidity,
+                            cross.kb() == null ? null : cross.checked().get(lineIndex) ? "checked" : "not_checked");
                 })
                 .toList();
         String signedByName = p.signedBy() == null ? null : actors.findActor(tenantId, p.signedBy()).map(ActorDirectory.Actor::name).orElse(null);
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
                 p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat,
-                p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo(), signedByName, p.revokedAt());
+                p.safetyDictionaryVersion(), p.signedBy(), p.signedByRegistrationNo(), signedByName, p.revokedAt(), cross.kb());
+    }
+
+    /** CLN-032: how a line is named to the prescriber in a finding on another line: the brand when there is one. */
+    private static String lineName(String drugName, String brandName) {
+        return brandName == null || brandName.isBlank() ? drugName : brandName.trim();
     }
 
     /** CLN-024: a stored line against a rule set (its stored input as the request). */
@@ -794,6 +837,8 @@ public class PrescriptionService {
         String action = switch (d.kind()) {
             case RxSafetyChecks.KIND_ALLERGY -> "prescription.allergy_override";
             case RxSafetyChecks.KIND_PREGNANCY -> "prescription.pregnancy_override";
+            case RxInteractionRules.KIND_DDI -> "prescription.interaction_override";
+            case RxInteractionRules.KIND_DUPLICATE -> "prescription.duplicate_override";
             default -> "prescription.controlled_acknowledged";
         };
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "prescription", prescriptionId, null, after);
