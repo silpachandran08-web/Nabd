@@ -1060,5 +1060,88 @@
   },
   "quickActionBar": {
     "title": "Quick actions"
+  },
+  "labTests": {
+    "title": "Tests",
+    "loading": "Loading tests",
+    "entitlementsFailed": "Couldn't check whether your clinic has the lab module, so the Tests card is not shown.",
+    "loadFailed": "Couldn't load the lab test list.",
+    "ordersFailed": "Couldn't load this visit's test orders.",
+    "search": "Order a test or panel",
+    "searchHint": "Type a name or code, for example lip",
+    "noMatch": "No active test or panel matches that.",
+    "suggestions": "Matching tests and panels",
+    "kind": {
+      "test": "Test",
+      "panel": "Panel"
+    },
+    "favourites": "Your usual tests",
+    "picked": "Tests in this order",
+    "remove": "Remove {name}",
+    "clash": "{name} and {other} share a test. Remove one of them first.",
+    "priority": "Priority",
+    "priorities": {
+      "routine": "Routine",
+      "urgent": "Urgent",
+      "stat": "STAT"
+    },
+    "destination": "Where to send it",
+    "destinations": {
+      "inhouse": "Our lab",
+      "external": "Outside lab"
+    },
+    "externalHint": "An order sheet is printed for a lab outside Nabd. Nothing is added to the bill.",
+    "fasting": "Patient must fast",
+    "fastingHours": "Hours",
+    "note": "Clinical note for the lab (optional)",
+    "order": "Order",
+    "ordering": "Ordering",
+    "shortcut": "Ctrl+Enter to order",
+    "errors": {
+      "items": "Pick at least one test or panel (at most 30).",
+      "fasting": "Enter the fasting hours as a whole number from 1 to 24.",
+      "note": "The clinical note is too long (500 characters at most)."
+    },
+    "placeFailed": "Couldn't place the order. Nothing was ordered; try again.",
+    "placed": "Order {reference} placed.",
+    "charged": "{total} added to this visit's bill.",
+    "notCharged": "Not charged here",
+    "fastingSent": "The patient is being sent the fasting instructions.",
+    "fastingBlocked": "The patient has not agreed to messages, so no fasting instructions were sent. Please tell them yourself.",
+    "fastingNoTemplate": "The clinic's fasting message is not approved yet, so none was sent. Please tell the patient yourself.",
+    "ordersTitle": "Orders for this visit",
+    "noOrders": "No tests ordered for this visit yet.",
+    "status": {
+      "ordered": "Ordered",
+      "partially_collected": "Partly collected",
+      "collected": "Collected",
+      "in_progress": "In progress",
+      "partially_resulted": "Partly resulted",
+      "resulted": "Resulted",
+      "validated": "Validated",
+      "released": "Released",
+      "cancelled": "Cancelled"
+    },
+    "printSheet": "Print order sheet",
+    "sheetFailed": "Couldn't open the order sheet. Try again.",
+    "cancel": "Cancel order",
+    "cancelReason": "Reason for cancelling",
+    "cancelConfirm": "Cancel this order",
+    "keep": "Keep order",
+    "cancelled": "Order cancelled. {count, plural, =0 {No charge was} one {# charge was} other {# charges were}} taken off the bill.",
+    "cancelledBilled": "Order cancelled. {count, plural, one {# charge was} other {# charges were}} already billed and stay on the invoice; the desk decides about a refund.",
+    "cancelFailed": "Couldn't cancel the order. Try again.",
+    "externalOnly": "Your clinic has no lab module. Print an order sheet for the outside lab.",
+    "sheetTests": "Tests to order",
+    "sheetTestsHint": "One test per line.",
+    "sheetLab": "Lab name (optional)",
+    "sheetErrors": {
+      "tests": "Enter at least one test, one per line (at most 30).",
+      "testLength": "A test name is too long (120 characters at most).",
+      "fasting": "Enter the fasting hours as a whole number from 1 to 24.",
+      "note": "The clinical note is too long (500 characters at most)."
+    },
+    "printing": "Preparing",
+    "sheetOpened": "The order sheet opened in a new tab."
   }
 }

@@ -108,8 +108,10 @@ public class CheckoutService {
         ConsultationTier.Context tierCtx = tierContext(tenantId, queueEntryId, ctx);
         boolean followUpEligible = tierCtx.followUpEligible();
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
-        List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
-                .map(this::toChargeResponse).toList();
+        List<UUID> ordered = repo.pendingChargeItemIds(tenantId, queueEntryId); // PHL-043: lab orders of this visit, pre-loaded like a finished procedure
+        List<ChargeResponse> pendingProcedures = java.util.stream.Stream.concat(
+                repo.listPendingProcedures(tenantId, queueEntryId).stream().map(this::toChargeResponse),
+                charges.stream().filter(c -> ordered.contains(c.id()))).toList();
         List<PrescribedItemResponse> prescribedItems = repo.findSignedPrescriptionItems(tenantId, queueEntryId).stream()
                 .map(p -> new PrescribedItemResponse(p.id(), p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions(),
                         p.quantity(), p.quantity() == null ? BigDecimal.ZERO : p.quantity().subtract(p.dispensed()).max(BigDecimal.ZERO)))
@@ -221,6 +223,7 @@ public class CheckoutService {
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         }
         repo.markProceduresBilled(tenantId, queueEntryId); // NB-146: whatever wasn't already billed at this visit never will be pending again
+        repo.markPendingChargesBilled(tenantId, queueEntryId, invoiceId, lineItems.stream().map(LineItemInput::catalogueId).toList()); // PHL-043
 
         // Closes the loop NB-102 left open: a doctor's "Complete consultation" moves a visit to
         // checkout_pending; billing finishing at the TERMINAL checkpoint is what finally moves it

@@ -48,6 +48,7 @@ class SseFanoutConsumer implements EventConsumer {
         Route worklist = new Route(List.of(RealtimeTopic.PHARMACY_WORKLIST), "entryId"); // PHL-012: ids and status only
         all.put("pharmacy.worklist.entry_created.v1", worklist);
         all.put("pharmacy.worklist.status_changed.v1", worklist);
+        all.put("lab.order.placed.v1", new Route(List.of(RealtimeTopic.LAB_WORKLIST), "orderId")); // PHL-043: a STAT order reaches the open lab worklist
         ROUTES = java.util.Map.copyOf(all);
     }
     /** Revocation: these end the staff member's open streams (or the tenant's, for a role) so permissions are re-checked on reconnect. */

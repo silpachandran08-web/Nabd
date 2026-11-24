@@ -41,7 +41,8 @@
         "package_card",
         "package_session_nudge",
         "package_expiry",
-        "package_grace"
+        "package_grace",
+        "lab_fasting"
       ]
     },
     "priority": {

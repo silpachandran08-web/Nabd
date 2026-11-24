@@ -21,7 +21,7 @@
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
-    owns: [billing_documents, charge_catalogue, claim_pack_formats, claim_packs, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
+    owns: [billing_documents, charge_catalogue, claim_pack_formats, claim_packs, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules, visit_pending_charges]
     reads: [charge_doctor_fees, licence_registry, patients, pharmacy_item_profiles, staff, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout; FIN-035: the claim pack prints the doctor's registration number (staff) and the facility licence (licence_registry)
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, clinical_photos, dental_chair_notes, dental_chart_entries, dental_chart_events, dental_images, dental_preset_overrides, dental_settings, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, photo_consents, prescription_items, prescription_rx_tokens, prescription_signer_backfill, prescriptions, rx_coding_suggestions, rx_validity_rules, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
@@ -47,8 +47,8 @@ modules:
   lab:
     # PHL-041: the test and panel catalogue. Prices live on charge_catalogue and are read and written through
     # organization.api.ChargeCatalogue, never by SQL from here.
-    owns: [lab_panel_tests, lab_panels, lab_tests]
-    reads: []
+    owns: [lab_order_items, lab_orders, lab_panel_tests, lab_panels, lab_tests]
+    reads: [tenants]  # PHL-043: the lab order sheet names the clinic
   messaging:
     owns: [comms_cutover_flags, message_usage_alerts, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands

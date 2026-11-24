@@ -7606,6 +7606,51 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:view
+  /v1/clinical/visits/{queueEntryId}/lab-order-sheet:
+    post:
+      operationId: LabOrderController_externalSheet
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExternalLabSheetRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: clinical:edit
   /v1/clinical/visits/{queueEntryId}/summary:
     get:
       operationId: VisitSummaryController_get
@@ -9781,6 +9826,194 @@ paths:
       tags:
       - lab
       x-required-permission: lab:catalogue
+  /v1/lab/order-favourites:
+    get:
+      operationId: LabOrderController_favourites
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderFavourites"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+  /v1/lab/orders:
+    get:
+      operationId: LabOrderController_forVisit
+      parameters:
+      - in: query
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+    post:
+      operationId: LabOrderController_place
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabOrderRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderPlaced"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+  /v1/lab/orders/{id}/cancel:
+    post:
+      operationId: LabOrderController_cancel
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabOrderCancelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderCancelled"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+  /v1/lab/orders/{id}/sheet:
+    get:
+      operationId: LabOrderController_sheet
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
   /v1/lab/panels:
     get:
       operationId: LabController_panels
@@ -29766,6 +29999,38 @@ components:
       required:
       - newValidityEnd
       - reason
+    ExternalLabSheetRequest:
+      type: object
+      properties:
+        clinicalNote:
+          type: string
+          maxLength: 500
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+        fastingHours:
+          type: integer
+          format: int32
+          maximum: 24
+          minimum: 1
+        labName:
+          type: string
+          maxLength: 120
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+        priority:
+          type: string
+          pattern: routine|urgent|stat
+        tests:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+            minLength: 0
+            pattern: "^[^\\x00-\\x1F\\x7F]*$"
+          maxItems: 30
+          minItems: 0
+      required:
+      - tests
     FacilityCheckInConfig:
       type: object
       properties:
@@ -31493,6 +31758,245 @@ components:
       - reviewed
       - skipped
       - toCreate
+    LabOrder:
+      type: object
+      properties:
+        accessionHint:
+          type: string
+        cancellable:
+          type: boolean
+        clinicalNote:
+          type: string
+        destinationKind:
+          type: string
+        fastingHours:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderItem"
+        orderedAt:
+          type: string
+          format: date-time
+        orderingDoctorId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        priority:
+          type: string
+        queueEntryId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        total:
+          type: number
+      required:
+      - accessionHint
+      - cancellable
+      - destinationKind
+      - id
+      - items
+      - orderedAt
+      - patientId
+      - priority
+      - status
+      - total
+    LabOrderCancelRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 200
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+      required:
+      - reason
+    LabOrderCancelled:
+      type: object
+      properties:
+        chargesAlreadyBilled:
+          type: integer
+          format: int32
+        chargesRemoved:
+          type: integer
+          format: int32
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - chargesAlreadyBilled
+      - chargesRemoved
+      - orderId
+      - status
+    LabOrderCharge:
+      type: object
+      properties:
+        amount:
+          type: number
+        chargeCode:
+          type: string
+        name:
+          type: string
+      required:
+      - amount
+      - chargeCode
+      - name
+    LabOrderDestination:
+      type: object
+      properties:
+        kind:
+          type: string
+          pattern: inhouse|partner|external
+        partnerLabId:
+          type: string
+          format: uuid
+      required:
+      - kind
+    LabOrderFavourite:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        name:
+          type: string
+        orders:
+          type: integer
+          format: int32
+        price:
+          type: number
+      required:
+      - code
+      - id
+      - kind
+      - name
+      - orders
+      - price
+    LabOrderFavourites:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderFavourite"
+      required:
+      - items
+    LabOrderItem:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        panelId:
+          type: string
+          format: uuid
+        panelName:
+          type: string
+        price:
+          type: number
+        status:
+          type: string
+        testId:
+          type: string
+          format: uuid
+      required:
+      - code
+      - id
+      - name
+      - price
+      - status
+      - testId
+    LabOrderItemRequest:
+      type: object
+      properties:
+        panelId:
+          type: string
+          format: uuid
+        testId:
+          type: string
+          format: uuid
+    LabOrderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrder"
+      required:
+      - items
+    LabOrderPlaced:
+      type: object
+      properties:
+        accessionHint:
+          type: string
+        charges:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderCharge"
+        fastingNotice:
+          type: string
+        orderId:
+          type: string
+          format: uuid
+      required:
+      - accessionHint
+      - charges
+      - orderId
+    LabOrderRequest:
+      type: object
+      properties:
+        clinicalNote:
+          type: string
+          maxLength: 500
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+        destination:
+          $ref: "#/components/schemas/LabOrderDestination"
+        encounterId:
+          type: string
+          format: uuid
+        fastingHours:
+          type: integer
+          format: int32
+          maximum: 24
+          minimum: 1
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderItemRequest"
+          maxItems: 30
+          minItems: 0
+        patientId:
+          type: string
+          format: uuid
+        priority:
+          type: string
+          pattern: routine|urgent|stat
+        queueEntryId:
+          type: string
+          format: uuid
+      required:
+      - destination
+      - items
+      - patientId
+      - priority
     LabOutsourced:
       type: object
       properties:
