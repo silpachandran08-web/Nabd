@@ -46,8 +46,8 @@ modules:
     reads: [patients, phi_read_log, specialty_profiles, staff_specialty_profiles]  # CLN-042: the access token carries the staff member's specialty claim and specialty_<code> permissions; PLT-013: the owner's break-glass review lists what the holder read (phi_read_log by grant) with the patient's name and MRN
   lab:
     # PHL-041: the test and panel catalogue. Prices live on charge_catalogue and are read and written through
-    # organization.api.ChargeCatalogue, never by SQL from here.
-    owns: [lab_order_items, lab_orders, lab_panel_tests, lab_panels, lab_reference_ranges, lab_tests]
+    # organization.api.ChargeCatalogue, never by SQL from here. PHL-045: sample collection and accession tracking.
+    owns: [lab_accession_sequences, lab_container_order, lab_order_items, lab_orders, lab_panel_tests, lab_panels, lab_reference_ranges, lab_sample_items, lab_samples, lab_tests]
     reads: [tenants]  # PHL-043: the lab order sheet names the clinic; PHL-042: lab_reference_ranges
   messaging:
     owns: [comms_cutover_flags, message_usage_alerts, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
