@@ -201,6 +201,7 @@ public class LabOrderService {
         VisitCharges.Removed removed = visitCharges.remove(tenantId, CHARGE_SOURCE, orderId);
         if (!"cancelled".equals(o.status())) {
             notifications.cancelBySubject(NOTICE_SUBJECT, orderId, CancelReason.SUBJECT_CHANGED); // a fasting notice not sent yet is stopped
+            events.publish(tenantId, DomainEventType.LAB_ORDER_STATUS_CHANGED, orderId, Map.of("orderId", orderId, "status", "cancelled"));
             record(tenantId, staffId, ip, "lab.order_cancelled", "lab_order", orderId, Map.of("status", o.status()),
                     Map.of("status", "cancelled", "reason", reason.trim(), "chargesRemoved", removed.removed(), "chargesAlreadyBilled", removed.alreadyBilled()));
         }

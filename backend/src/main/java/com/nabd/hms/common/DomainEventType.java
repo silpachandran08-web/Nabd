@@ -83,7 +83,9 @@ public enum DomainEventType {
     REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
     /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
     LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab"),
-    LAB_ORDER_PLACED("lab.order.placed.v1", "core/lab");
+    LAB_ORDER_PLACED("lab.order.placed.v1", "core/lab"),
+    /** PHL-044: an order's status changed in the worklist (ordered -> collected -> ...). Ids only, no PHI. */
+    LAB_ORDER_STATUS_CHANGED("lab.order.status_changed.v1", "core/lab");
 
     private final String type;
     private final String source;
