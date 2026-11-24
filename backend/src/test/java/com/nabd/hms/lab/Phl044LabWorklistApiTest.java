@@ -32,7 +32,10 @@ class Phl044LabWorklistApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         ModuleGrant[] grants = java.util.stream.Stream.of("patients", "queue", "clinical", "billing", "setup", "departments", "lab")
                 .map(ApiTestBase::fullGrant).toArray(ModuleGrant[]::new);
-        SeededStaff tech = seedStaff(t, seedRole(t.id(), "Lab Tech", false, new ModuleGrant("lab", true, false, true, false, false, false, false)),
+        ModuleGrant[] techGrants = java.util.stream.Stream.of("lab", "patients")
+                .map(m -> "lab".equals(m) ? new ModuleGrant("lab", true, false, false, false, false, false, false)
+                        : fullGrant(m)).toArray(ModuleGrant[]::new);
+        SeededStaff tech = seedStaff(t, seedRole(t.id(), "Lab Tech", false, techGrants),
                 "tech" + SEQ.incrementAndGet() + "@test.lab", phone(), false);
         SeededStaff doctor = seedStaff(t, seedRole(t.id(), "Doctor", true, grants), "doc" + SEQ.incrementAndGet() + "@test.lab", phone(), false);
         String docToken = loginAndGetAccessToken(doctor);
@@ -108,7 +111,10 @@ class Phl044LabWorklistApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         ModuleGrant[] grants = java.util.stream.Stream.of("patients", "queue", "clinical", "billing", "setup", "departments", "lab")
                 .map(ApiTestBase::fullGrant).toArray(ModuleGrant[]::new);
-        SeededStaff tech = seedStaff(t, seedRole(t.id(), "Lab Tech", false, new ModuleGrant("lab", true, false, true, false, false, false, false)),
+        ModuleGrant[] techGrants = java.util.stream.Stream.of("lab", "patients")
+                .map(m -> "lab".equals(m) ? new ModuleGrant("lab", true, false, false, false, false, false, false)
+                        : fullGrant(m)).toArray(ModuleGrant[]::new);
+        SeededStaff tech = seedStaff(t, seedRole(t.id(), "Lab Tech", false, techGrants),
                 "tech" + SEQ.incrementAndGet() + "@test.lab", phone(), false);
         SeededStaff doctor = seedStaff(t, seedRole(t.id(), "Doctor", true, grants), "doc" + SEQ.incrementAndGet() + "@test.lab", phone(), false);
         String docToken = loginAndGetAccessToken(doctor);
@@ -117,21 +123,25 @@ class Phl044LabWorklistApiTest extends ApiTestBase {
         // Create a test
         ResponseEntity<Map> testResp = exchange("/v1/lab/tests", HttpMethod.POST, authedJsonBody(docToken, Map.of(
                 "code", "LOAD_TEST", "name", "Load Test", "sampleType", "serum", "container", "sst_gold",
-                "volumeMl", 3, "unit", "ng/L", "tatMinutes", 60, "price", 500)), Map.class);
-        assertThat(testResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+                "volumeMl", Integer.valueOf(3), "unit", "ng/L", "tatMinutes", Integer.valueOf(60), "price", Integer.valueOf(500))), Map.class);
+        assertThat(testResp.getStatusCode()).as("%s", testResp.getBody()).isEqualTo(HttpStatus.CREATED);
         UUID testId = UUID.fromString((String) testResp.getBody().get("id"));
 
         // Seed 100 patients and orders (simpler than 600 for this test, but demonstrates scale)
         for (int i = 0; i < 100; i++) {
-            String pat = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(docToken, Map.of(
-                    "name", "Patient " + i, "phone", phone(), "dob", LocalDate.of(1980, 1, 1).toString(), "gender", "male")), Map.class)
-                    .getBody().get("id");
-            String entry = (String) exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(docToken, Map.of(
-                    "patientId", pat, "doctorId", doctor.id().toString())), Map.class).getBody().get("id");
-            exchange("/v1/lab/orders", HttpMethod.POST, authedJsonBody(docToken, Map.of(
+            ResponseEntity<Map> patResp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(docToken, Map.of(
+                    "name", "Patient " + i, "phone", phone(), "dob", LocalDate.of(1980, 1, 1).toString(), "gender", "male")), Map.class);
+            assertThat(patResp.getStatusCode()).as("patient %d creation failed: %s", i, patResp.getBody()).isEqualTo(HttpStatus.CREATED);
+            String pat = (String) patResp.getBody().get("id");
+            ResponseEntity<Map> entryResp = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(docToken, Map.of(
+                    "patientId", pat, "doctorId", doctor.id().toString())), Map.class);
+            assertThat(entryResp.getStatusCode()).as("check-in %d failed: %s", i, entryResp.getBody()).isEqualTo(HttpStatus.CREATED);
+            String entry = (String) entryResp.getBody().get("id");
+            ResponseEntity<Map> orderResp = exchange("/v1/lab/orders", HttpMethod.POST, authedJsonBody(docToken, Map.of(
                     "patientId", pat, "queueEntryId", entry, "items", List.of(Map.of("testId", testId.toString())),
                     "priority", i % 3 == 0 ? "stat" : (i % 3 == 1 ? "urgent" : "routine"),
                     "destination", Map.of("kind", "inhouse"))), Map.class);
+            assertThat(orderResp.getStatusCode()).as("order %d failed: %s", i, orderResp.getBody()).isEqualTo(HttpStatus.CREATED);
         }
 
         // Measure worklist load
