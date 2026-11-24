@@ -85,7 +85,9 @@ public enum DomainEventType {
     LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab"),
     LAB_ORDER_PLACED("lab.order.placed.v1", "core/lab"),
     /** PHL-045: samples were collected for a lab order. Order and sample ids. */
-    LAB_SAMPLE_COLLECTED("lab.sample.collected.v1", "core/lab");
+    LAB_SAMPLE_COLLECTED("lab.sample.collected.v1", "core/lab"),
+    /** PHL-044: an order's status changed in the worklist (ordered -> collected -> ...). Ids only, no PHI. */
+    LAB_ORDER_STATUS_CHANGED("lab.order.status_changed.v1", "core/lab");
 
     private final String type;
     private final String source;
