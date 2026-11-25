@@ -1,0 +1,255 @@
+{
+  "resourceType" : "Bundle",
+  "type" : "collection",
+  "entry" : [ {
+    "fullUrl" : "https://nabd.example/fhir/Composition/ed7dcde8-ffba-306c-a837-f585fe72b197",
+    "resource" : {
+      "resourceType" : "Composition",
+      "id" : "ed7dcde8-ffba-306c-a837-f585fe72b197",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/OPConsultRecord" ]
+      },
+      "status" : "amended",
+      "type" : {
+        "coding" : [ {
+          "system" : "http://snomed.info/sct",
+          "code" : "371530004",
+          "display" : "Clinical consultation report"
+        } ]
+      },
+      "subject" : {
+        "reference" : "Patient/2a2d79e9-20c8-355b-879d-286bebaf4fac"
+      },
+      "encounter" : {
+        "reference" : "Encounter/8ef39d1b-cd3f-3770-8b69-a8fc95cc6e91"
+      },
+      "date" : "2026-01-20T07:05:15Z",
+      "author" : [ {
+        "reference" : "Practitioner/e8cdfddf-99a6-319c-8c1a-bb414461b249"
+      } ],
+      "title" : "Consultation Report",
+      "custodian" : {
+        "reference" : "Organization/2f4934ce-f81f-31d3-9b8b-e242d9101294"
+      },
+      "section" : [ {
+        "title" : "Medications",
+        "code" : {
+          "coding" : [ {
+            "system" : "http://snomed.info/sct",
+            "code" : "721912009",
+            "display" : "Medication summary document"
+          } ]
+        },
+        "entry" : [ {
+          "reference" : "MedicationRequest/fdfd0d9d-fd73-3a6f-8e8d-7939ddf51956"
+        } ]
+      }, {
+        "title" : "Subjective",
+        "text" : {
+          "status" : "additional",
+          "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\">Test subjective text 15</div>"
+        }
+      }, {
+        "title" : "Assessment",
+        "text" : {
+          "status" : "additional",
+          "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\">Test assessment text 15</div>"
+        }
+      }, {
+        "title" : "Plan",
+        "text" : {
+          "status" : "additional",
+          "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\">Test plan text 15</div>"
+        }
+      }, {
+        "title" : "Diagnosis",
+        "text" : {
+          "status" : "additional",
+          "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\">Test diagnosis text 15</div>"
+        }
+      }, {
+        "title" : "Amendment",
+        "text" : {
+          "status" : "additional",
+          "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\">Reason: Test amendment reason 15<br/>Diagnosis: Test amended diagnosis 15</div>"
+        },
+        "author" : [ {
+          "reference" : "Practitioner/e8cdfddf-99a6-319c-8c1a-bb414461b249"
+        } ]
+      }, {
+        "title" : "Amendment",
+        "text" : {
+          "status" : "additional",
+          "div" : "<div xmlns=\"http://www.w3.org/1999/xhtml\">Reason: Test second amendment reason 15<br/>Plan: Test amended plan 15</div>"
+        },
+        "author" : [ {
+          "reference" : "Practitioner/e8cdfddf-99a6-319c-8c1a-bb414461b249"
+        } ]
+      } ]
+    }
+  }, {
+    "fullUrl" : "https://nabd.example/fhir/Patient/2a2d79e9-20c8-355b-879d-286bebaf4fac",
+    "resource" : {
+      "resourceType" : "Patient",
+      "id" : "2a2d79e9-20c8-355b-879d-286bebaf4fac",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Patient" ]
+      },
+      "identifier" : [ {
+        "type" : {
+          "coding" : [ {
+            "system" : "http://terminology.hl7.org/CodeSystem/v2-0203",
+            "code" : "MR",
+            "display" : "Medical record number"
+          } ]
+        },
+        "system" : "urn:nabd:tenant:2f4934ce-f81f-31d3-9b8b-e242d9101294:mrn",
+        "value" : "MRN-TEST-15"
+      }, {
+        "type" : {
+          "coding" : [ {
+            "system" : "https://nrces.in/ndhm/fhir/r4/CodeSystem/ndhm-identifier-type-code",
+            "code" : "ABHA",
+            "display" : "Ayushman Bharat Health Account (ABHA) ID"
+          } ]
+        },
+        "value" : "test.patient15@abdm"
+      } ],
+      "name" : [ {
+        "text" : "Test Patient 15"
+      } ],
+      "gender" : "male",
+      "birthDate" : "1965-04-16"
+    }
+  }, {
+    "fullUrl" : "https://nabd.example/fhir/Encounter/8ef39d1b-cd3f-3770-8b69-a8fc95cc6e91",
+    "resource" : {
+      "resourceType" : "Encounter",
+      "id" : "8ef39d1b-cd3f-3770-8b69-a8fc95cc6e91",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Encounter" ]
+      },
+      "status" : "in-progress",
+      "class" : {
+        "system" : "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+        "code" : "AMB",
+        "display" : "ambulatory"
+      },
+      "subject" : {
+        "reference" : "Patient/2a2d79e9-20c8-355b-879d-286bebaf4fac"
+      },
+      "participant" : [ {
+        "individual" : {
+          "reference" : "Practitioner/e8cdfddf-99a6-319c-8c1a-bb414461b249"
+        }
+      } ],
+      "period" : {
+        "start" : "2026-01-20T04:45:15Z"
+      },
+      "serviceProvider" : {
+        "reference" : "Organization/2f4934ce-f81f-31d3-9b8b-e242d9101294"
+      }
+    }
+  }, {
+    "fullUrl" : "https://nabd.example/fhir/Organization/2f4934ce-f81f-31d3-9b8b-e242d9101294",
+    "resource" : {
+      "resourceType" : "Organization",
+      "id" : "2f4934ce-f81f-31d3-9b8b-e242d9101294",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Organization" ]
+      },
+      "identifier" : [ {
+        "type" : {
+          "coding" : [ {
+            "system" : "http://terminology.hl7.org/CodeSystem/v2-0203",
+            "code" : "PRN",
+            "display" : "Provider number"
+          } ]
+        },
+        "system" : "https://facility.ndhm.gov.in",
+        "value" : "IN-TEST-HFR-15"
+      } ],
+      "name" : "Test Clinic 15"
+    }
+  }, {
+    "fullUrl" : "https://nabd.example/fhir/Practitioner/e8cdfddf-99a6-319c-8c1a-bb414461b249",
+    "resource" : {
+      "resourceType" : "Practitioner",
+      "id" : "e8cdfddf-99a6-319c-8c1a-bb414461b249",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner" ]
+      },
+      "identifier" : [ {
+        "type" : {
+          "coding" : [ {
+            "system" : "http://terminology.hl7.org/CodeSystem/v2-0203",
+            "code" : "MD",
+            "display" : "Medical License number"
+          } ]
+        },
+        "value" : "TEST/REG/15"
+      } ],
+      "name" : [ {
+        "text" : "Dr Test Doctor 15"
+      } ]
+    }
+  }, {
+    "fullUrl" : "https://nabd.example/fhir/Practitioner/989d2071-647c-354d-a681-08ee10cb012e",
+    "resource" : {
+      "resourceType" : "Practitioner",
+      "id" : "989d2071-647c-354d-a681-08ee10cb012e",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/Practitioner" ]
+      },
+      "identifier" : [ {
+        "type" : {
+          "coding" : [ {
+            "system" : "http://terminology.hl7.org/CodeSystem/v2-0203",
+            "code" : "MD",
+            "display" : "Medical License number"
+          } ]
+        },
+        "value" : "TEST/REG/S15"
+      } ],
+      "name" : [ {
+        "text" : "Dr Test Second 15"
+      } ]
+    }
+  }, {
+    "fullUrl" : "https://nabd.example/fhir/MedicationRequest/fdfd0d9d-fd73-3a6f-8e8d-7939ddf51956",
+    "resource" : {
+      "resourceType" : "MedicationRequest",
+      "id" : "fdfd0d9d-fd73-3a6f-8e8d-7939ddf51956",
+      "meta" : {
+        "profile" : [ "https://nrces.in/ndhm/fhir/r4/StructureDefinition/MedicationRequest" ]
+      },
+      "status" : "active",
+      "intent" : "order",
+      "medicationCodeableConcept" : {
+        "text" : "Test drug 15-0"
+      },
+      "subject" : {
+        "reference" : "Patient/2a2d79e9-20c8-355b-879d-286bebaf4fac"
+      },
+      "encounter" : {
+        "reference" : "Encounter/8ef39d1b-cd3f-3770-8b69-a8fc95cc6e91"
+      },
+      "authoredOn" : "2026-01-20T05:10:15Z",
+      "requester" : {
+        "reference" : "Practitioner/989d2071-647c-354d-a681-08ee10cb012e"
+      },
+      "dosageInstruction" : [ {
+        "text" : "1 unit, 1-0-1",
+        "route" : {
+          "text" : "oral"
+        }
+      } ],
+      "dispenseRequest" : {
+        "quantity" : {
+          "value" : 10.00,
+          "unit" : "tablet"
+        }
+      }
+    }
+  } ]
+}
