@@ -1,0 +1,32 @@
+# PLT-061 Control Plane (phase 1). Everything environment-specific comes from env vars; no secrets in this file.
+server:
+  port: ${PORT:8080}
+spring:
+  application.name: control-plane
+  datasource:
+    url: ${CONTROL_DB_URL:jdbc:postgresql://localhost:5432/control_plane}
+    username: ${CONTROL_DB_USER:control_app}
+    password: ${CONTROL_DB_PASSWORD:}
+    hikari.maximum-pool-size: ${CONTROL_DB_POOL:5}
+  # Migrations run as a separate job with the owning role; off in the app (same rule as Core and the Edge).
+  flyway:
+    enabled: ${CONTROL_FLYWAY:false}
+  data.redis:
+    url: ${VALKEY_URL:redis://localhost:6379}
+    connect-timeout: 500ms
+    timeout: 250ms
+  task.scheduling.pool.size: 2
+management:
+  # Metrics and health live on their own port: never routed by the ingress.
+  server.port: ${MANAGEMENT_PORT:8081}
+  endpoints.web.exposure.include: health,prometheus
+control-plane:
+  # Cells whose ev:<cell>:organization stream is on this Valkey (events.md section 8). One Valkey per cell: see the extraction doc.
+  regions: ${CONTROL_REGIONS:in}
+  consumer-name: ${CONTROL_CONSUMER_NAME:control-plane-1}
+  # One-off job, never set on the running service: copy | verify | directory (docs/architecture/control-plane-extraction.md).
+  copy:
+    mode: ${CONTROL_COPY_MODE:}
+    source-url: ${CONTROL_COPY_SOURCE_URL:}
+    source-user: ${CONTROL_COPY_SOURCE_USER:}
+    source-password: ${CONTROL_COPY_SOURCE_PASSWORD:}

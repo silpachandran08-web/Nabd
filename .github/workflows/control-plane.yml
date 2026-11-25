@@ -1,0 +1,26 @@
+# PLT-061: the Control Plane builds, tests and ships on its own. The feed test reads Core's published event schemas, so a change
+# to those triggers it too; nothing here triggers Core. (Drift between Core's master schema and migration V2 is caught on
+# Core's side, by backend test Plt061ControlPlaneSchemaTest.)
+# Deploying the image, its database and the ops.nabd.health ingress is Needs external action (phase 2).
+name: control-plane
+on:
+  pull_request:
+    paths: ['services/control-plane/**', 'api/events/organization.**', 'scripts/log-phi-scan.py', '.github/workflows/control-plane.yml']
+  push:
+    branches: [main]
+    paths: ['services/control-plane/**']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - run: python3 scripts/log-phi-scan.py services/control-plane/src/main/java
+      - name: Unit and Testcontainers (Postgres 16) tests, including the no-PHI schema scan and the copy-and-verify job
+        run: mvn -B -f services/control-plane/pom.xml verify
+      - name: Image build (no push)
+        run: docker build -t control-plane:ci services/control-plane
