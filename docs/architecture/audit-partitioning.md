@@ -266,6 +266,9 @@ volume, replica lag and the lock time of the swap. Its approval is part of the d
   therefore drop months that are already past approved retention without a valid file. Mitigations to add with the
   infrastructure: grant the function to a separate worker role when the worker gets its own DataSource (same step as the
   `nabd_platform` note of PLT-009), and the object-lock bucket.
+- `audit_archive_rows` (EXECUTE granted to `nabd_app`) reads every tenant's rows of a month past RLS, because the export is
+  one file per month. It refuses a month that is not due, so the API role can read across tenants only in months that are
+  already past approved retention (and, with no approved policy, in none). Same mitigation: a separate worker role.
 - Archive files hold what `audit_log` holds: clinical before/after values (PHI), actor names and IP addresses. They need
   the same protection as the database: in-region bucket, object lock, encryption with the region key. The local adapter
   provides none of this.

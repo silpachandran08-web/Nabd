@@ -252,6 +252,41 @@ schemas:
       prev_hash: operational
       row_hash: operational
       hash_v: operational
+    audit_log_unpartitioned:  # OPS-068: the pre-conversion copy of audit_log, kept for rollback; same columns, same tiers
+      id: operational
+      tenant_id: operational
+      actor_type: operational
+      actor_id: operational
+      actor_name: pii
+      actor_role: operational
+      ip_address: pii
+      action: operational
+      entity_type: operational
+      entity_id: operational
+      before: phi  # uncertain: entity snapshots, include clinical rows
+      after: phi  # uncertain: entity snapshots, include clinical rows
+      created_at: operational
+      prev_hash: operational
+      row_hash: operational
+      hash_v: operational
+    archive_manifests:
+      table_name: operational
+      partition_name: operational
+      month: operational
+      region: operational
+      object_key: operational
+      row_count: operational
+      sha256: operational
+      archived_at: operational
+      restored_at: operational
+    data_retention_policies:
+      region: operational
+      data_class: operational
+      online_months: operational
+      archive_years: operational
+      legal_basis: operational
+      approved_by: operational
+      approved_at: operational
     brands:
       id: operational
       owner_id: operational
