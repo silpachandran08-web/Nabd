@@ -21,5 +21,9 @@ public record PrescriptionResponse(UUID id, UUID queueEntryId, UUID patientId, U
                                     // CLN-022: the signer's name, for the Rx pad's "Repeat last (date, doctor)"; null on a draft
                                     String signedByName,
                                     // T1-BUG-1 (CLN-023): when the prescriber revoked it; null when not revoked. Never a repeat source.
-                                    Instant revokedAt) {
+                                    Instant revokedAt,
+                                    // CLN-032: "<KB> <month>" of the interaction knowledge base the coded lines were checked
+                                    // against. NULL = no knowledge base is active for the region: interactions and duplicate
+                                    // therapy were NOT CHECKED (never to be read as "none found"). Uncoded lines are never checked.
+                                    String interactionKb) {
 }

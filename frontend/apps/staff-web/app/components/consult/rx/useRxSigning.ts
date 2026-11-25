@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { deleteDraft } from "../draftStore";
 import type { AuthedFetch, Prescription, Problem, RxWarning } from "../shared";
+import { decisionMatch } from "./interactionWarnings";
 import type { RxPad } from "./useRxPad";
 
 export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxPad, reloadCtx: () => void, setNotice: (n: string | null) => void) {
@@ -62,7 +63,7 @@ export function useRxSigning(authedFetch: AuthedFetch, entryId: string, pad: RxP
   async function confirmOverride(reasonCode: string, note: string) {
     if (!override) return;
     setOverrideError(null);
-    const saved = await pad.saveRx({ index: override.index, kind: override.warning.kind, reasonCode, note });
+    const saved = await pad.saveRx({ index: override.index, kind: override.warning.kind, reasonCode, note, matched: decisionMatch(override.warning) });
     if (!saved) { setOverrideError(t("decisionFailed")); return; }
     setOverride(null);
     setNotice(t("decisionRecorded"));

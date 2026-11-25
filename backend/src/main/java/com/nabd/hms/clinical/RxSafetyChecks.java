@@ -35,6 +35,15 @@ final class RxSafetyChecks {
                     new RxReasonOption("obstetric_consultation", "Documented obstetric consultation"));
             case KIND_CONTROLLED -> List.of(
                     new RxReasonOption("documentation_confirmed", "Additional documentation recorded"));
+            // CLN-032. NEEDS CSO REVIEW: workflow reasons for the record, not clinical content; the wording is the CSO's to change.
+            case RxInteractionRules.KIND_DDI -> List.of(
+                    new RxReasonOption("benefit_outweighs_risk", "Clinical benefit outweighs risk"),
+                    new RxReasonOption("no_suitable_alternative", "No suitable therapeutic alternative"),
+                    new RxReasonOption("monitoring_arranged", "Patient will be monitored"));
+            case RxInteractionRules.KIND_DUPLICATE -> List.of(
+                    new RxReasonOption("intended_combination", "Intended combination"),
+                    new RxReasonOption("continuing_existing", "Continuing or renewing the existing medicine"),
+                    new RxReasonOption("replacing_existing", "Replaces the other medicine, which is being stopped"));
             default -> List.of();
         };
     }

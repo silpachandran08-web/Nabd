@@ -14,12 +14,23 @@ import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
 public interface RxSafetyService {
 
     /** One finding on a line. requiresDecision = signing is blocked until a named reason is recorded. */
-    record Finding(String kind, String severity, String message, String matched, boolean requiresDecision) {
+    record Finding(String kind, String severity, String message, String matched, boolean requiresDecision,
+                   RxInteractionRules.Detail interaction) {
+
+        /** Allergy, pregnancy and controlled findings: no other medicine involved. */
+        Finding(String kind, String severity, String message, String matched, boolean requiresDecision) {
+            this(kind, severity, message, matched, requiresDecision, null);
+        }
     }
 
     /** DOC-033: the checks run on the generic text AND the brand text (and CLN-021 coded ids); findings are not duplicated. */
     List<Finding> checkLine(String drugName, String brandName, DrugCoding.Codes codes, List<AllergyRow> allergies,
                             PrescriptionRepository.PatientProfile profile, SafetyDictionary dict, LocalDate today);
+
+    /** CLN-032: drug-drug interaction and duplicate-therapy findings per draft line (same order as draft; a null entry is
+     * an uncoded line) against the lines above it and the patient's active medicines. Pure, like checkLine: the caller
+     * loads the medicines and the knowledge-base rows. */
+    List<List<Finding>> checkInteractions(List<RxInteractionRules.Med> draft, List<RxInteractionRules.Med> active, RxInteractionRules.Kb kb);
 
     /** Two findings (or a finding and a stored decision) are about the same thing: case- and space-insensitive. */
     static boolean sameMatch(String a, String b) {

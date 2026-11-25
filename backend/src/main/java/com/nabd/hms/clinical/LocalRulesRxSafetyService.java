@@ -38,6 +38,11 @@ class LocalRulesRxSafetyService implements RxSafetyService {
         return found;
     }
 
+    @Override
+    public List<List<Finding>> checkInteractions(List<RxInteractionRules.Med> draft, List<RxInteractionRules.Med> active, RxInteractionRules.Kb kb) {
+        return RxInteractionRules.check(draft, active, kb);
+    }
+
     private List<Finding> detect(String drugName, List<AllergyRow> allergies, PrescriptionRepository.PatientProfile profile,
                                  SafetyDictionary dict, LocalDate today) {
         List<Finding> found = new ArrayList<>();

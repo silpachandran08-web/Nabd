@@ -17,7 +17,7 @@ import type { SignAuthority } from "../signAuthority";
 import type { SaveState } from "../visit/types";
 import { BLANK_RX_ITEM, padItems, rxFingerprint } from "./rxLogic";
 
-export type RxOverrideInput = { index: number; kind: string; reasonCode: string; note: string };
+export type RxOverrideInput = { index: number; kind: string; reasonCode: string; note: string; matched?: string };
 export type RxConflict = { mine: PrescriptionItem[]; server: PrescriptionItem[] };
 /** What the local draft holds: the lines and the fingerprint of the server copy they were based on. */
 export type RxDraftData = { items: PrescriptionItem[]; base: string };
@@ -112,7 +112,7 @@ export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
           brandName: i.brandName?.trim() || undefined, sigPattern: i.sigPattern || undefined, route: i.route || undefined,
           quantity: i.quantity ?? undefined, quantityUnit: i.quantityUnit?.trim() || undefined, drugId: i.drugId || undefined,
           validityDays: i.validityDays ?? undefined, refills: i.refills || undefined, // CLN-024
-          overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined }] : undefined,
+          overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined, matched: overrides.matched }] : undefined,
         }));
       const res = await authedFetch(`/clinical/prescriptions/${entryId}`, { method: "PATCH", body: JSON.stringify({ items }) });
       if (!res?.ok) {

@@ -189,7 +189,8 @@ public class DrugMasterImportService {
 
     // ── helpers ──────────────────────────────────────────────────────────
 
-    private Path resolve(String feedUri) {
+    /** Package-visible: the CLN-032 interaction loader reads its feed from the same directory under the same rules. */
+    Path resolve(String feedUri) {
         if (feedDir == null) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "FEED_IMPORT_DISABLED", "Drug feed import is not configured",
                     "app.drug-master.feed-dir is not set in this cell.");
@@ -204,7 +205,7 @@ public class DrugMasterImportService {
         return p;
     }
 
-    private static String sha256(Path file) {
+    static String sha256(Path file) {
         try (InputStream in = new DigestInputStream(Files.newInputStream(file), MessageDigest.getInstance("SHA-256"))) {
             in.transferTo(java.io.OutputStream.nullOutputStream());
             return HexFormat.of().formatHex(((DigestInputStream) in).getMessageDigest().digest());
@@ -217,7 +218,7 @@ public class DrugMasterImportService {
         return mapper.writeValueAsString(o);
     }
 
-    private static ApiException invalid(String slug, String detail) {
+    static ApiException invalid(String slug, String detail) {
         return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, slug, "Feed invalid", detail);
     }
 
