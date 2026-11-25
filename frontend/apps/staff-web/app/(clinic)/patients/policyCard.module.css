@@ -1,0 +1,27 @@
+/* FIN-036: policy card in the patient file. Logical properties only (RTL), 44 px targets. */
+.policy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-8);
+  padding-block: var(--nb-space-12);
+  border-block-end: 1px solid var(--nb-border-subtle);
+}
+.policy:last-of-type { border-block-end: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8); font-weight: 600; }
+.pill {
+  font-size: 12px;
+  padding-block: 2px;
+  padding-inline: var(--nb-space-8);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-success-tint);
+  color: var(--nb-success-500);
+}
+.pillBad { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--nb-space-12); margin: 0; font-size: 13.5px; }
+.facts dt { color: var(--nb-text-tertiary); }
+.facts dd { margin: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--nb-space-12); margin-block: var(--nb-space-12); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field select, .field input { max-inline-size: none; min-block-size: 44px; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); margin-block-start: var(--nb-space-8); }
+.btn { min-block-size: 44px; min-inline-size: 44px; }

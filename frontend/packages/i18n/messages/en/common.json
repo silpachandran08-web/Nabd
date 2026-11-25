@@ -167,5 +167,113 @@
       "guard": "Every automatic reply is checked before it is sent. If a reply would mention another clinic, it is stopped, the patient is told \"Let me connect you to the clinic\", your desk takes over the chat and Nabd's team is alerted.",
       "discovery": "If Nabd later helps people find a clinic, that will only happen on Nabd's own number, for people who have not started a chat with any clinic. It is never offered in a chat with your clinic."
     }
+  },
+  "insurance": {
+    "title": "Insurance",
+    "loadError": "Couldn't load insurance details.",
+    "empty": "No insurance policy on file.",
+    "add": "Add policy",
+    "cancel": "Cancel",
+    "save": "Save policy",
+    "saving": "Saving…",
+    "saved": "Policy saved.",
+    "show": "Show",
+    "hide": "Hide",
+    "states": {
+      "active": "Active",
+      "expired": "Expired",
+      "ended": "Ended"
+    },
+    "fields": {
+      "payer": "Insurer",
+      "plan": "Plan",
+      "memberId": "Member ID",
+      "policyNumber": "Policy number",
+      "validFrom": "Valid from",
+      "validTo": "Valid to",
+      "relationship": "Relationship to patient"
+    },
+    "validity": "{from} to {to}",
+    "copay": "Patient pays {percent}% of each bill",
+    "noPlan": "No plan on this policy, so the patient's share is not known",
+    "relationships": {
+      "self": "Self",
+      "spouse": "Spouse",
+      "child": "Child",
+      "parent": "Parent",
+      "other": "Other"
+    },
+    "kinds": {
+      "insurer": "Insurer",
+      "tpa": "TPA",
+      "government_scheme": "Government scheme"
+    },
+    "form": {
+      "pickPayer": "Choose an insurer",
+      "noPlan": "No plan",
+      "newPayer": "Add a new insurer",
+      "newPlan": "Add a new plan",
+      "newPayerName": "Insurer name",
+      "newPayerKind": "Kind",
+      "newPlanName": "Plan name",
+      "newPlanCopay": "Patient pays (%)",
+      "errors": {
+        "payer": "Choose an insurer.",
+        "newPayerName": "Enter the insurer's name.",
+        "newPlanName": "Enter the plan's name.",
+        "newPlanCopay": "Enter a percentage from 0 to 100 (at most two decimals).",
+        "memberId": "Enter the member ID.",
+        "policyNumber": "Enter the policy number.",
+        "dates": "Enter both dates.",
+        "datesOrder": "The last day cannot be before the first day."
+      }
+    },
+    "cover": {
+      "title": "Insurance cover for this visit",
+      "selfPay": "Self-pay",
+      "insured": "Insured",
+      "policy": "Policy",
+      "pickPolicy": "Choose a policy",
+      "eligibilityRef": "Eligibility reference (optional)",
+      "noPolicies": "This patient has no policy on file. Add one in the patient file, or bill the visit as self-pay.",
+      "save": "Save cover",
+      "saving": "Saving…",
+      "saved": "Cover saved.",
+      "locked": "This visit is billed, so its cover can no longer be changed.",
+      "summary": "{mode}: {payer}, patient pays {percent}%",
+      "summarySelf": "Self-pay",
+      "option": "{payer} · {plan} · {member} · valid to {to}",
+      "optionNoPlan": "{payer} · {member} · valid to {to}"
+    },
+    "warnings": {
+      "expired": "This policy has expired before the date of this visit. Add the renewed policy, or bill the visit as self-pay.",
+      "notStarted": "This policy starts after the date of this visit. Choose another policy, or bill the visit as self-pay.",
+      "ended": "This policy has been ended. Choose another policy, or bill the visit as self-pay.",
+      "planRequired": "This policy has no plan, so the patient's share is not known. Add the policy again with its plan."
+    },
+    "split": {
+      "title": "Patient and insurer shares",
+      "charge": "Charge",
+      "patientPays": "Patient pays",
+      "payerPays": "Insurer pays",
+      "patientShare": "Patient's share (collect at the desk)",
+      "payerShare": "Insurer's share",
+      "payerPaid": "Insurer has paid",
+      "pending": "Unpaid by the insurer, waiting for a decision (not billed to the patient)"
+    },
+    "errors": {
+      "generic": "Couldn't save. Check your connection and try again.",
+      "forbidden": "Your role isn't allowed to do this.",
+      "payerUnknown": "That insurer is not on your clinic's list.",
+      "planUnknown": "That plan does not belong to the insurer.",
+      "invalidValidity": "The last day cannot be before the first day.",
+      "duplicatePayer": "Your clinic already has an insurer with this name.",
+      "duplicatePlan": "This insurer already has a plan with this name.",
+      "policyExpired": "This policy has expired before the date of this visit.",
+      "policyNotStarted": "This policy starts after the date of this visit.",
+      "policyEnded": "This policy has been ended.",
+      "planRequired": "This policy has no plan, so the patient's share is not known.",
+      "visitBilled": "This visit is already billed, so its cover can no longer be changed."
+    }
   }
 }

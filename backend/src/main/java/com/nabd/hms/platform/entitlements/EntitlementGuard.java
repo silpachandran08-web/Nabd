@@ -52,7 +52,7 @@ class EntitlementGuard implements WebMvcConfigurer, HandlerInterceptor {
     static final List<String> PHARMACY_EDITION_BLOCKED = List.of("/v1/appointments", "/v1/booking-requests", "/v1/booking-policy",
             "/v1/clinical", "/v1/queue", "/v1/schedule", "/v1/waitlist", "/v1/nursing", "/v1/specialty", "/v1/packages", "/v1/doctors",
             "/v1/recall-orders", "/v1/front-desk", "/v1/display", "/v1/display-devices", "/v1/facility",
-            "/v1/queue-settings", "/v1/clinic", "/v1/abha");
+            "/v1/queue-settings", "/v1/clinic", "/v1/abha", "/v1/insurance"); // FIN-036: insurance covers visits, which a pharmacy has none of
     /**
      * Structural net for the prefix list: every controller of these scheduling/clinical modules is blocked whatever its path (reports and
      * staff sub-resources live under other prefixes), so a new endpoint cannot slip through. Shared with billing: the reason-code picker.

@@ -258,6 +258,11 @@ class QueueRepository {
                 tenantId, id).stream().findFirst();
     }
 
+    Optional<java.time.LocalDate> visitDate(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT queue_date FROM queue_entries WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> rs.getDate(1).toLocalDate(), tenantId, id).stream().findFirst();
+    }
+
     List<VisitQueries.VisitDay> completedVisits(UUID tenantId, UUID patientId, UUID doctorId) {
         return jdbc.query("SELECT id, queue_date FROM queue_entries WHERE tenant_id = ? AND patient_id = ? AND doctor_id = ? " +
                         "AND status = 'completed' ORDER BY queue_date DESC",
