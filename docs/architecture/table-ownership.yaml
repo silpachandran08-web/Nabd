@@ -67,8 +67,8 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_notification_preferences, patient_proxies, patient_registry_summary, patients, phone_reverifications, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
-    reads: [appointments, clinical_documents, queue_entries, tenants]  # IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
+    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_branch_links, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_notification_preferences, patient_proxies, patient_registry_summary, patients, phone_reverifications, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
+    reads: [appointments, clinical_documents, phi_read_log, queue_entries, tenants]  # PLT-024: the owner's brand-directory log lists the clinic's own phi_read_log rows of purpose brand_directory_lookup (read-only; they are written by the V3690 functions); IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
     # PLT-036 / PHL-003 AC1: the cached stock balance of an item is the one column of another module's table that pharmacy writes
     # (UPDATE ... SET stock_qty only; StockWriteOwnershipTest keeps every other package out). Rows are created and changed by billing.

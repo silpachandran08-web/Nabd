@@ -28,7 +28,9 @@ public record PatientWriteRequest(
         // ADM-014: 'paper_import' = typed from a paper card: yearOfBirth instead of dob, optional note (last visit and doctor).
         @Pattern(regexp = "desk|paper_import") String source,
         Integer yearOfBirth,
-        @Size(max = 500) String note
+        @Size(max = 500) String note,
+        // PLT-024: true = the patient chose at registration not to be found from the brand's other branches.
+        Boolean brandDirectoryOptOut
 ) {
     public record GuardianConsent(Boolean confirmed, String channel) {
     }

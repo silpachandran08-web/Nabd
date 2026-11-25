@@ -269,6 +269,9 @@ public class PatientService {
         byte[] nationalIdEnc = encryptOrNull(tenantId, id, req.nationalId());
         repo.insert(id, tenantId, req.name(), phone, dob, req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc, synthetic);
+        if (Boolean.TRUE.equals(req.brandDirectoryOptOut())) {
+            repo.update(tenantId, id, Map.of("brand_directory_opt_out", true)); // PLT-024: opted out before the row can ever be listed
+        }
         if (paper) {
             boolean hasNote = req.note() != null && !req.note().isBlank();
             repo.markPaperImport(tenantId, id, hasNote ? req.note().strip() : null);

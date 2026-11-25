@@ -260,6 +260,16 @@ schemas:
       created_at: operational
       updated_at: operational
       data_visibility_scope: operational
+      chain_sharing_profile: operational  # PLT-024: NONE | DEMOGRAPHICS
+    patient_branch_links:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      linked_tenant_id: operational
+      linked_patient_ref: pii  # PLT-024: pairwise reference of the other clinic's patient (a hash, not its id)
+      linked_by: operational
+      basis: operational
+      created_at: operational
     file_objects:
       id: operational
       tenant_id: operational
@@ -1631,6 +1641,7 @@ schemas:
       change_seq: operational
       updated_at: operational
     patients:
+      brand_directory_opt_out: pii  # PLT-024: the patient's choice not to be found from sibling branches
       registration_source: operational
       profile_completed_at: operational
       chat_completion_requested_at: operational
