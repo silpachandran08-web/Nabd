@@ -67,7 +67,7 @@ public class AuthSessionRepository {
      */
     public Optional<SessionRow> findSessionByTokenHash(String tokenHash) {
         return jdbc.query(
-                "SELECT id, tenant_id, staff_id, family_id, token_hash, expires_at, revoked_at, revoked_reason, device_label, ip_address::text, last_seen_at " +
+                "SELECT id, tenant_id, staff_id, family_id, token_hash, expires_at, revoked_at, revoked_reason, device_label, ip_address::text, last_seen_at, reports_only " +
                         "FROM find_session_by_token_hash(?)",
                 sessionMapper(), tokenHash
         ).stream().findFirst();
@@ -75,7 +75,7 @@ public class AuthSessionRepository {
 
     public List<SessionRow> listActiveSessions(UUID staffId) {
         return jdbc.query(
-                "SELECT id, tenant_id, staff_id, family_id, token_hash, expires_at, revoked_at, revoked_reason, device_label, ip_address::text, last_seen_at " +
+                "SELECT id, tenant_id, staff_id, family_id, token_hash, expires_at, revoked_at, revoked_reason, device_label, ip_address::text, last_seen_at, reports_only " +
                         "FROM sessions WHERE staff_id = ? AND revoked_at IS NULL ORDER BY last_seen_at DESC",
                 sessionMapper(), staffId
         );
@@ -87,6 +87,11 @@ public class AuthSessionRepository {
                 "SELECT COUNT(*) FROM sessions WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL AND expires_at > now()",
                 Integer.class, tenantId, sessionId);
         return count != null && count > 0;
+    }
+
+    /** PLT-023: an 'All branches (reports)' session; refresh reads it back so the mode outlives the access token. */
+    public void markReportsOnly(UUID sessionId) {
+        jdbc.update("UPDATE sessions SET reports_only = true WHERE id = ?", sessionId);
     }
 
     public void revokeSession(UUID sessionId, String reason) {
@@ -132,7 +137,8 @@ public class AuthSessionRepository {
                     rs.getString("revoked_reason"),
                     rs.getString("device_label"),
                     rs.getString("ip_address"),
-                    rs.getTimestamp("last_seen_at").toInstant());
+                    rs.getTimestamp("last_seen_at").toInstant(),
+                    rs.getBoolean("reports_only"));
         };
     }
 }

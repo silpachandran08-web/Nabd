@@ -75,7 +75,7 @@ public class AuthService {
         otp.confirmPinReset(req, ip);
     }
 
-    public TokenPairResponse verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
+    public Object verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
         return mfa.verifyMfa(req, ip, device, userAgent);
     }
 

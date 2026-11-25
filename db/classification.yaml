@@ -252,6 +252,15 @@ schemas:
       prev_hash: operational
       row_hash: operational
       hash_v: operational
+    brand_login_token_uses:
+      jti: operational
+      used_at: operational
+    brand_logins:
+      id: operational
+      brand_id: operational
+      phone_hmac: pii
+      email_lower: pii
+      created_at: operational
     brands:
       id: operational
       owner_id: operational
@@ -2369,6 +2378,7 @@ schemas:
       revoked_at: operational
       revoked_reason: operational
       family_started_at: operational
+      reports_only: operational
     shedlock:
       name: operational
       lock_until: operational
@@ -2415,6 +2425,7 @@ schemas:
       hpr_verified_at: operational
       registration_council: operational
       signature_file_id: operational
+      brand_login_id: operational
     staff_clinician_review:
       tenant_id: operational
       staff_id: operational

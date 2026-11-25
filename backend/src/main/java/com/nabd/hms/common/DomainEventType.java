@@ -32,6 +32,8 @@ public enum DomainEventType {
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),
+    /** PLT-023: a person entered another branch of their brand with the same login (BranchService). Consumer: core.audit. */
+    BRANCH_SWITCHED("iam.branch.switched.v1", "core/iam"),
     CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing"),
     NOTIFICATION_REQUESTED("comms.notification.requested.v1", "core/messaging"),
     NOTIFICATION_CANCELLED("comms.notification.cancelled.v1", "core/messaging"),

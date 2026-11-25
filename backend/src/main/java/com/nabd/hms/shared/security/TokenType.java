@@ -11,6 +11,7 @@ public enum TokenType {
     MFA_SETUP("mfa_setup", Audience.MFA, Audience.PLATFORM_MFA),
     STEP_UP("step_up", Audience.STEP_UP),
     OWNER_SELECT("owner_select", Audience.OWNER_SELECT),
+    BRAND_SELECT("brand_select", Audience.BRAND_SELECT), // PLT-023: after sign-in, picks one branch; read from the request body only
     INTERNAL("internal", Audience.INTERNAL); // PLT-009: only /internal/v1/** accepts it
 
     public static final String CLAIM = "typ";

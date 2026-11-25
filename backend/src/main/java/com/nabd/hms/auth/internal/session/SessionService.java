@@ -147,7 +147,7 @@ public class SessionService {
         log.debug("session refreshed for staff {} (family {})", staff.id(), session.familyId());
         // PLT-013: a refresh without X-Device-Label (the BFF's background refresh) keeps the label the session was signed in with
         String label = com.nabd.hms.common.RequestMeta.UNKNOWN_DEVICE.equals(device) && session.deviceLabel() != null ? session.deviceLabel() : device;
-        return tokens.mintTokenPair(staff, session.familyId(), ip, label, userAgent);
+        return tokens.mintTokenPair(staff, session.familyId(), ip, label, userAgent, null, session.reportsOnly()); // PLT-023: a reports-only session stays one
     }
 
     @Transactional
