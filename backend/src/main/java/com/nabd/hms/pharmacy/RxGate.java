@@ -28,6 +28,10 @@ public class RxGate {
     public record Line(String chargeCode, UUID catalogueId, boolean isRx, int quantity, UUID prescriptionItemId, UUID paperRxLineId) {
     }
 
+    /** PHL-023: one counter-sale line with the seller's second confirmation (null when none was given). */
+    public record CounterLine(String chargeCode, UUID catalogueId, String ackReason) {
+    }
+
     /** refills: dispenses allowed after the first (CLN-024); lapsed: the line's own validity has passed. */
     record RxItemRow(UUID id, UUID patientId, String status, BigDecimal quantity, boolean revoked, int refills, boolean lapsed) {
     }
@@ -41,9 +45,11 @@ public class RxGate {
     private final com.nabd.hms.common.TenantContext tenantContext;
     private final PharmacyWorklistRepository worklist;
     private final PaperRxService paper;
+    private final ScheduleCounterService counter;
 
     RxGate(RxGateRepository repo, RxGateBlockRecorder recorder, com.nabd.hms.common.TenantContext tenantContext, PharmacyWorklistRepository worklist,
-           PaperRxService paper) {
+           PaperRxService paper, ScheduleCounterService counter) {
+        this.counter = counter;
         this.paper = paper;
         this.worklist = worklist;
         this.repo = repo;
@@ -129,6 +135,18 @@ public class RxGate {
             }
         }
         return owner;
+    }
+
+    /**
+     * PHL-023, counter sale only, inside its transaction and before anything is written: 422 schedule-ack-required for a line whose
+     * schedule class needs the second confirmation and has no reason.
+     *
+     * @return call it with the invoice id once the invoice exists (same transaction): it audits the confirmations and, when no
+     * registered pharmacist is on duty, that fact
+     */
+    public java.util.function.Consumer<UUID> checkCounterSale(UUID tenantId, List<CounterLine> lines, UUID staffId, String ip) {
+        ScheduleCounterService.Checked checked = counter.check(tenantId, lines, staffId, ip);
+        return invoiceId -> counter.record(tenantId, invoiceId, checked, staffId, ip);
     }
 
     /** OTC "Link prescription" picker: signed lines with quantity left for the patients on this phone number. */

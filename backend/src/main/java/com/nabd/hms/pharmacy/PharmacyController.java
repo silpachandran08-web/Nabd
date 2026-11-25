@@ -36,8 +36,10 @@ public class PharmacyController {
 
     private final PharmacyService service;
     private final BatchService batchService;
+    private final ScheduleCounterService counterRules;
 
-    PharmacyController(PharmacyService service, BatchService batchService) {
+    PharmacyController(PharmacyService service, BatchService batchService, ScheduleCounterService counterRules) {
+        this.counterRules = counterRules;
         this.service = service;
         this.batchService = batchService;
     }
@@ -55,6 +57,14 @@ public class PharmacyController {
     public PharmacySettingsResponse updateSettings(@CurrentTenant UUID tenantId, @CurrentStaff UUID staffId,
                                                      @Valid @RequestBody PharmacySettingsWriteRequest req, HttpServletRequest http) {
         return service.updateSettings(tenantId, staffId, RequestMeta.clientIp(http), req);
+    }
+
+    /** PHL-023: what the counter asks of the signed-in seller (second confirmation classes, pharmacist-on-duty warning). */
+    @GetMapping("/counter-rules")
+    @RequiresPharmacyMode(PharmacyMode.HYBRID)
+    @PreAuthorize("hasAuthority('pharmacy:dispense')")
+    public com.nabd.hms.pharmacy.dto.CounterRulesResponse counterRules(@CurrentStaff UUID staffId) {
+        return counterRules.view(staffId);
     }
 
     @GetMapping("/items")

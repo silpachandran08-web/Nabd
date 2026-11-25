@@ -1,0 +1,556 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2868
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;\f1\fswiss\fcharset0 Helvetica;\f2\fnil\fcharset0 Menlo-Bold;
+\f3\fnil\fcharset0 HelveticaNeue;\f4\fmodern\fcharset0 Courier;\f5\fnil\fcharset0 Menlo-Italic;
+}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;\red162\green168\blue247;\red215\green150\blue45;
+\red235\green160\blue54;\red47\green180\blue29;\red46\green174\blue187;\red180\green36\blue25;\red64\green11\blue217;
+\red65\green148\blue255;\red217\green217\blue217;\red63\green63\blue63;\red42\green42\blue42;\red255\green255\blue255;
+\red135\green135\blue135;}
+{\*\expandedcolortbl;;\csgray\c0;\cssrgb\c69412\c72549\c97647;\cssrgb\c87843\c65098\c22745;
+\cssrgb\c94118\c68627\c27059\c14118;\cssrgb\c20241\c73898\c14950;\cssrgb\c20199\c73241\c78251;\cssrgb\c76411\c21697\c12527;\cssrgb\c32309\c18666\c88229;
+\cssrgb\c30980\c65882\c100000;\cssrgb\c87843\c87843\c87843;\cssrgb\c31373\c31373\c31373;\cssrgb\c21569\c21569\c21569;\cssrgb\c100000\c100000\c100000;
+\cssrgb\c60000\c60000\c60000;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww37860\viewh21260\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f0\fs22 \cf2 \CocoaLigature0                                                                                                                                                                                          
+\f1\fs24 \cf0 \CocoaLigature1 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f0\fs22 \cf2 \CocoaLigature0      \
+\
+DB_URL=jdbc:postgresql://ep-holy-sound-b5unikks-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require\
+  DB_USER=neondb_owner\
+  DB_PASSWORD=npg_0yGL7sOiAenR\
+  APP_CRYPTO_KEY=JfsaMTtcBYsySq+vHFwfeNGMW4Uk9T8CdfC0/gQXnnk=\
+\
+\
+\
+1. 
+\f2\b Log in
+\f0\b0  at \cf3 https://nabd-nu.vercel.app/platform/login\cf2  with email \cf3 haridoeseasy@gmail.com\cf2 , PIN \cf3 614048\cf2 .\
+  2. Go to 
+\f2\b Tenant Provisioning
+\f0\b0  (\cf3 /platform/provisioning\cf2 ) \uc0\u8594  
+\f2\b New provisioning job
+\f0\b0  (or similar "create" button) and fill in:\
+     - Tenant slug \'97 a short unique code for your clinic (e.g. \cf3 my-clinic\cf2 )\
+     - Tenant name \'97 display name\
+     - Region \'97 \cf3 IN\cf2  or \cf3 KSA\cf2 \
+     - Owner email / name / mobile \'97 the actual clinic owner's details\
+     - Brand name\
+     - Path \'97 pick 
+\f2\b self_serve
+\f0\b0  (simpler; \cf3 enterprise\cf2  needs an extra manual approval step)\
+  3. Submit, then click 
+\f2\b "Run to completion"
+\f0\b0  on the job \'97 it runs all six provisioning steps (create, migrate, seed, WhatsApp, verify & invite owner, go live) automatically.\
+  4. Once it reaches "Verify & invite owner," two one-time links appear on the job row \'97 use the 
+\f2\b Owner account invite
+\f0\b0  link (\cf3 /owner/accept-invite/...\cf2 ) to set the owner's PIN and log in at \cf3 /owner/login\cf2 .\
+\
+\
+\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs25 \cf4 \cb5 \expnd0\expndtw0\kerning0
+\CocoaLigature1 Owner invite link (shown once \'97 relay by hand, no email service yet):\'a0
+\f4 \cb1 https://nabd-nu.vercel.app/accept-invite/hrc1R9n7hakvq9dHT3K3w871ZmxUlOrsr6S1vESKAI8
+\f3 \cb5 Owner invite link (shown once \'97 relay by hand, no email service yet):\'a0
+\f4 \cb1 https://nabd-nu.vercel.app/accept-invite/hrc1R9n7hakvq9dHT3K3w871ZmxUlOrsr6S1vESKAI8
+\f0\fs22 \cf2 \kerning1\expnd0\expndtw0 \CocoaLigature0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+\
+\
+\
+                                                                                                                                                                                    
+\f1\fs24 \cf0 \CocoaLigature1 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+Steps to test\
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f2\b\fs22 \cf2 \CocoaLigature0 Every time you want to test:
+\f0\b0 \
+\
+  \cf6 # Terminal 1 \'97 backend\cf2 \
+  \cf7 cd\cf2  \cf8 "/Users/silpapremachandran/Documents/Nabd/Code/backend"\cf2 \
+  mvn -q clean package -DskipTests\
+  DB_URL=\cf8 "jdbc:postgresql://localhost:5555/nabd_test"\cf2  DB_USER=nabd_app DB_PASSWORD=nabd_app \\\
+    APP_CRYPTO_KEY=$(openssl rand -\cf7 base64\cf2  32) SPRING_FLYWAY_ENABLED=\cf9 false\cf2  \\\
+    java -jar target/hms-backend-0.1.0.jar\
+\
+  \cf6 # Terminal 2 \'97 frontend\cf2 \
+  \cf7 cd\cf2  \cf8 "/Users/silpapremachandran/Documents/Nabd/Code/frontend"\cf2 \
+  npm run dev\
+\
+  Then open 
+\f2\b http://localhost:3000
+\f0\b0  (redirects to \cf3 /login\cf2 ) and:\
+  \
+  \uc0\u9484 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9516 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9488 \
+  \uc0\u9474         What to try        \u9474                            What should happen                            \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  \cf3 clinic-a\cf2  / \cf3 owner@a.com\cf2  /  \uc0\u9474  "Signed in" \'97 check DevTools \u8594  Application \u8594  Local Storage for          \u9474 \
+  \uc0\u9474  \cf3 1234\cf2                       \uc0\u9474  \cf3 nabd_access_token\cf2                                                        \uc0\u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  Wrong PIN, 5 times in a   \u9474  6th attempt shows "Too many failed attempts" (423 lockout)              \u9474 \
+  \uc0\u9474  row                       \u9474                                                                          \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  Unknown email             \u9474  Same generic "Invalid credentials" message as wrong PIN \'97 this is       \u9474 \
+  \uc0\u9474                            \u9474  intentional anti-enumeration, not a bug                                 \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  Empty clinic code /       \u9474  Inline field errors under each input                                    \u9474 \
+  \uc0\u9474  malformed email           \u9474                                                                          \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  Stop the backend, then    \u9474  "Couldn't reach the server" message                                     \u9474 \
+  \uc0\u9474  submit                    \u9474                                                                          \u9474 \
+  \uc0\u9492 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9524 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9496 \
+  \
+  Open DevTools \uc0\u8594  Network tab and filter \cf3 auth\cf2  to watch the actual request/response bodies, or \cf3 tail -f\cf2  the\
+  backend's stdout to watch the correlation-ID-tagged log lines for each attempt \'97 same technique used\
+  throughout this session.\
+\
+  To reset between test runs: \cf3 pg_ctl -D /tmp/nabd_pg stop\cf2  when done, or just re-run step 5 with a fresh UUID\
+  to add another staff member without wiping everything.\
+\
+\
+\
+  
+\f2\b Working example for \cf3 /platform/login\cf2 :
+\f0\b0 \
+  - Email: \cf3 admin@nabd.health\cf2 \
+  - PIN: \cf3 1234xcz  vim kvf,c kfmdc, b hnxnz hsjmnzjsnzjsnxz\
+\
+\
+\
+\
+\
+\
+=========================================================================================================================\
+
+\f2\b \cf2 To unblock your front desk account right now:
+\f0\b0 \
+  1. Go to \cf3 https://nabd-nu.vercel.app/login\cf2 \
+  2. Click 
+\f2\b "Sign in with WhatsApp OTP instead"
+\f0\b0 \
+  3. Enter clinic code \cf3 walkthrough-clinic1\cf2  and the front desk staff's mobile number (exactly as it was entered when they were invited \'97 must match character-for-character)\
+  4. Click "Send code" \
+  5. Since there's no real WhatsApp channel yet, the 6-digit code is only logged, not delivered \'97 open the 
+\f2\b Render dashboard \uc0\u8594  your backend service \u8594  Logs
+\f0\b0 , and search for \cf3 [MOCK WhatsApp OTP]\cf2 . You'll see a\
+  line like \cf3 would send 483920 to +91...\cf2 \
+  6. Enter that code on the verify screen \'97 this logs the staff member in 
+\f5\i and
+\f0\i0  flips mobile_verified permanently, so from then on their normal PIN login works fine for patient data too.\
+\
+  Do this once per staff member; it's a one-time unlock, not something needed on every login.\
+\
+\
+\
+\
+\
+\
+============================================================================================================================================================\
+\
+ 
+\f2\b URL:
+\f0\b0  \cf10 \ul \ulc10 https://nabd-nu.vercel.app/platform/login\cf2 \ulnone                                                                                                                                                              \
+   \cf11 \'95 \cf2 Email: \cf10 haridoeseasy@gmail.com\cf2                                                                                                                                                                             \
+   \cf11 \'95 \cf2 PIN: \cf10 614048\cf2                                                                                                                                                                                               \
+   \cf11 \'95 \cf2 Role: super_admin (can create hospitals, view fleet/billing/tickets)                                                                                                                                     \
+                                                                                                                                                                                                              \
+   
+\f2\b \cf11 Hospital \'97 "QA Care Hospital"
+\f0\b0 \cf2                                                                                                                                                                               \
+                                                                                                                                                                                                              \
+   \cf11 \'95 \cf2 Clinic code: \cf10 qa-care-hospital\cf2                                                                                                                                                                             \
+   \cf11 \'95 \cf2 Status: trialing | Region: IN                                                                                                                                                                            \
+                                                                                                                                                                                                              \
+   
+\f2\b \cf11 Staff logins \'97 \ul https://nabd-nu.vercel.app/login\ulnone  (all PIN 
+\f0\b0 \cf10 1234
+\f2\b \cf11 )
+\f0\b0 \cf2                                                                                                                                              \
+                                                                                                                                                                                                              \
+ Here are all the registered phone numbers (file updated too):                                                                                                                                              \
+                                                                                                                                                                                                              \
+   
+\f2\b \cf11 Platform admin
+\f0\b0 \cf2                                                                                                                                                                                              \
+                                                                                                                                                                                                              \
+   \cf11 \'95 \cf10 haridoeseasy@gmail.com\cf2  / PIN \cf10 614048\cf2  \'97 
+\f2\b no phone number
+\f0\b0 ; platform operator login is email + PIN only (no mobile field exists/visible via API)                                                              \
+                                                                                                                                                                                                              \
+   
+\f2\b \cf11 QA Care Hospital \'97 staff (clinic code 
+\f0\b0 \cf10 qa-care-hospital
+\f2\b \cf11 )
+\f0\b0 \cf2                                                                                                                                                     \
+                                                                                                                                                                                                              \
+   \uc0\u9484 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9516 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9516 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9516 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9488                                                                                                         \
+   \uc0\u9474  
+\f2\b Role                            
+\f0\b0  \uc0\u9474  
+\f2\b Email                   
+\f0\b0  \uc0\u9474  
+\f2\b PIN          
+\f0\b0  \uc0\u9474  
+\f2\b Registered mobile
+\f0\b0  \uc0\u9474                                                                                                         \
+   \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508                                                                                                         \
+   \uc0\u9474  Owner                            \u9474  \cf10 \ul owner@qacarehospital.com\cf2 \ulnone  \uc0\u9474  1234          \u9474  
+\f2\b +919800000001
+\f0\b0      \uc0\u9474                                                                                                         \
+   \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508                                                                                                         \
+   \uc0\u9474  Doctor                           \u9474  \cf10 \ul doctor1@qacare.com\cf2 \ulnone        \uc0\u9474  1234          \u9474  
+\f2\b +919800000101
+\f0\b0      \uc0\u9474                                                                                                         \
+   \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508                                                                                                         \
+   \uc0\u9474  Nurse                            \u9474  \cf10 \ul nurse1@qacare.com\cf2 \ulnone         \uc0\u9474  1234          \u9474  
+\f2\b +919800000102
+\f0\b0      \uc0\u9474                                                                                                         \
+   \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508                                                                                                         \
+   \uc0\u9474  Front Desk                       \u9474  \cf10 \ul frontdesk1@qacare.com\cf2 \ulnone     \uc0\u9474  1234          \u9474  
+\f2\b +919800000103
+\f0\b0      \uc0\u9474                                                                                                         \
+   \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508                                                                                                         \
+   \uc0\u9474  Doctor (unused, still "invited") \u9474  \cf10 \ul doctor2@qacare.com\cf2 \ulnone        \uc0\u9474  \'97 (never set) \u9474  
+\f2\b +919800000111
+\f0\b0      \uc0\u9474                                                                                                         \
+   \uc0\u9492 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9524 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9524 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9524 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9496                                                                                                         \
+                                                                                                                                                                                                              \
+   Notes:                                                                                                                                                                                                     \
+   \cf11 \'95 \cf2 These mobiles are what you'd enter on the 
+\f2\b "Sign in with WhatsApp OTP"
+\f0\b0  screen (clinic code + mobile number, exactly as shown above with the \cf10 +91\cf2  prefix). Since WhatsApp isn't wired up, the 6-digit codes \
+     land in the Render logs as \cf10 [MOCK WhatsApp OTP] would send <code> to <number>\cf2 .                                                                                                                            \
+   \cf11 \'95 \cf2 Patient test phones (for the patient records): Ravi +919820012345, Priya +919820012346, Lakshmi +919820012348, Aarav +919820012347.                                                                      \
+   \cf11 \'95 \cf2 The owner's owner-account login (\cf10 /owner/login\cf2 ) uses the same email + PIN \'97 no separate phone entry there.  \
+\
+\
+\
+\
+\
+W\cf12 \cb13 \uc0\u10095  \cf14 https://developers.facebook.com/documentation/development/create-an-app this link explain the new way of creating an app in \cf2      \cb1 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+\cb13   \cf14 meta. Read this and give me steps to configure whatasapp chats\cf2                                                                    \cb1 \
+\cf15  \cf2  \cf15 \uc0\u9151 \cf2  \cf15 \'a0
+\f2\b 2
+\f0\b0  skills\cf2  \cf15 available\cf2 \
+\
+  \cf15 Called FireCrawl (ctrl+o to expand)\cf2 \
+\
+\cf14 \uc0\u9210 \cf2  I read Meta's page. The new process is built around 
+\f2\b use cases
+\f0\b0 : you pick 
+\f2\b "Connect with customers through WhatsApp"
+\f0\b0  while creating\
+  the app, and Meta adds the WhatsApp product and its permissions for you. The rest of the setup (token, webhook, template, backend\
+  settings) is the same as in my last answer.\
+\
+  The page only covers creating the app. I wrote the WhatsApp screen names after app creation from Meta's usual layout, not from\
+  this page, so they may be worded slightly differently.\
+                                                                                                                       \
+  
+\f2\b Reminder:
+\f0\b0  Nabd sends WhatsApp messages, but patients' replies are received and dropped, because there's no inbox page yet.\
+\
+  
+\f2\b 1.
+\f0\b0  
+\f2\b Create
+\f0\b0  
+\f2\b the
+\f0\b0  
+\f2\b app
+\f0\b0  
+\f2\b (the
+\f0\b0  
+\f2\b new
+\f0\b0  
+\f2\b flow)
+\f0\b0 \
+\
+  1. Go to 
+\f2\b developers.facebook.com/apps/creation/
+\f0\b0 . You need to be registered as a Meta developer.\
+  2. 
+\f2\b App
+\f0\b0  
+\f2\b details:
+\f0\b0  enter the app name (e.g. "Nabd") and a contact email, then click 
+\f2\b Next
+\f0\b0 .\
+  3. 
+\f2\b Use
+\f0\b0  
+\f2\b cases:
+\f0\b0  select 
+\f2\b Connect
+\f0\b0  
+\f2\b with
+\f0\b0  
+\f2\b customers
+\f0\b0  
+\f2\b through
+\f0\b0  
+\f2\b WhatsApp
+\f0\b0 , then click 
+\f2\b Next
+\f0\b0 .\
+     - This automatically adds the permissions Nabd needs: \cf3 whatsapp_business_messaging\cf2 , \cf3 whatsapp_business_management\cf2  and\
+       \cf3 public_profile\cf2 .\
+     - Don't add other use cases. Use cases can't be removed later, and some aren't compatible with WhatsApp.\
+  4. 
+\f2\b Business:
+\f0\b0  pick your business portfolio, or choose 
+\f2\b Create
+\f0\b0  
+\f2\b a
+\f0\b0  
+\f2\b business
+\f0\b0  
+\f2\b portfolio
+\f0\b0 . 
+\f2\b The
+\f0\b0  
+\f2\b WhatsApp
+\f0\b0  
+\f2\b use
+\f0\b0  
+\f2\b case
+\f0\b0  
+\f2\b needs
+\f0\b0  
+\f2\b one.
+\f0\b0  A verified\
+     portfolio is best; unverified works for testing.\
+  5. 
+\f2\b Requirements:
+\f0\b0  click 
+\f2\b Next
+\f0\b0 . App Review is only needed if people outside your business use the app. Nabd sends from your own\
+     WhatsApp account, so you don't need it.\
+  6. 
+\f2\b Overview:
+\f0\b0  check everything, then click 
+\f2\b Go
+\f0\b0  
+\f2\b to
+\f0\b0  
+\f2\b dashboard
+\f0\b0 .\
+\
+  
+\f2\b 2.
+\f0\b0  
+\f2\b Set
+\f0\b0  
+\f2\b up
+\f0\b0  
+\f2\b the
+\f0\b0  
+\f2\b WhatsApp
+\f0\b0  
+\f2\b use
+\f0\b0  
+\f2\b case
+\f0\b0 \
+\
+  In the dashboard, go to 
+\f2\b Use
+\f0\b0  
+\f2\b cases
+\f0\b0  
+\f2\b \uc0\u8594 
+\f0\b0  
+\f2\b Connect
+\f0\b0  
+\f2\b with
+\f0\b0  
+\f2\b customers
+\f0\b0  
+\f2\b through
+\f0\b0  
+\f2\b WhatsApp
+\f0\b0  
+\f2\b \uc0\u8594 
+\f0\b0  
+\f2\b Customize
+\f0\b0 . If it's offered, choose 
+\f2\b API
+\f0\b0  
+\f2\b Setup
+\f0\b0  (the\
+  WhatsApp Cloud API). This creates a WhatsApp Business Account and gives you a free test number.\
+\
+  
+\f2\b 3.
+\f0\b0  
+\f2\b Add
+\f0\b0  
+\f2\b the
+\f0\b0  
+\f2\b clinic's
+\f0\b0  
+\f2\b real
+\f0\b0  
+\f2\b phone
+\f0\b0  
+\f2\b number
+\f0\b0 \
+\
+  1. On 
+\f2\b API
+\f0\b0  
+\f2\b Setup
+\f0\b0 , click 
+\f2\b Add
+\f0\b0  
+\f2\b phone
+\f0\b0  
+\f2\b number
+\f0\b0 .\
+  2. Enter a display name; Meta reviews it.\
+  3. Verify the number with the SMS or voice code. The number must not be in use in the normal WhatsApp or WhatsApp Business app.\
+  4. Copy the 
+\f2\b Phone number ID
+\f0\b0  and the 
+\f2\b WhatsApp Business Account ID
+\f0\b0 .\
+\
+  
+\f2\b 4. Create a permanent access token
+\f0\b0 \
+\
+  The token shown on API Setup expires after 24 hours, so make a permanent one:\
+  1. Go to 
+\f2\b business.facebook.com \uc0\u8594  Settings \u8594  Users \u8594  System users \u8594  Add
+\f0\b0 , and create an 
+\f2\b Admin
+\f0\b0  system user.\
+  2. Click 
+\f2\b Assign assets
+\f0\b0 . Give it full control of the 
+\f2\b app
+\f0\b0  and of the 
+\f2\b WhatsApp account
+\f0\b0 .\
+  3. Click 
+\f2\b Generate token
+\f0\b0 . Choose the app, set expiry to 
+\f2\b Never
+\f0\b0 , and tick \cf3 whatsapp_business_messaging\cf2  and\
+     \cf3 whatsapp_business_management\cf2 .\
+  4. Copy the token now; Meta only shows it once.\
+  \
+  
+\f2\b 5. Copy the App Secret
+\f0\b0 \
+\
+  Go to 
+\f2\b App settings \uc0\u8594  Basic \u8594  App secret \u8594  Show
+\f0\b0  and copy it. The backend rejects every webhook if this is missing.\
+\
+  
+\f2\b 6. Set the backend environment variables (before the webhook)
+\f0\b0 \
+\
+  Set these where the backend runs, then redeploy:\
+  \cf3 WHATSAPP_PHONE_NUMBER_ID=<step 3>\cf2 \
+  \cf3 WHATSAPP_BUSINESS_ACCOUNT_ID=<step 3>\cf2 \
+  \cf3 WHATSAPP_ACCESS_TOKEN=<step 4>\cf2 \
+  \cf3 WHATSAPP_APP_SECRET=<step 5>\cf2 \
+  \cf3 WHATSAPP_VERIFY_TOKEN=<any random string you choose>\cf2 \
+  \cf3 WHATSAPP_LOG_OTP=true   # set to false once codes arrive on WhatsApp\cf2 \
+\
+  
+\f2\b 7. Configure the webhook
+\f0\b0 \
+\
+  1. Open the WhatsApp use case \uc0\u8594  
+\f2\b Configuration \uc0\u8594  Webhook
+\f0\b0 .\
+  2. Enter these values:\
+     - 
+\f2\b Callback URL:
+\f0\b0  \cf3 https://<your-backend-host>/v1/webhooks/whatsapp\cf2 \
+     - 
+\f2\b Verify token:
+\f0\b0  the same string you used for \cf3 WHATSAPP_VERIFY_TOKEN\cf2 \
+  3. Click 
+\f2\b Verify and save
+\f0\b0 . This only works if the backend from step 6 is already running.\
+  4. Under 
+\f2\b Webhook fields
+\f0\b0 , subscribe to \cf3 messages\cf2 , \cf3 message_template_status_update\cf2  and \cf3 message_template_quality_update\cf2 .\
+\
+  
+\f2\b 8. Create the login-code template
+\f0\b0 \
+\
+  In 
+\f2\b WhatsApp Manager \uc0\u8594  Message templates \u8594  Create template
+\f0\b0 , use these settings:\
+  - 
+\f2\b Category:
+\f0\b0  Authentication\
+  - 
+\f2\b Name:
+\f0\b0  \cf3 nabd_login_otp\cf2 \
+  - 
+\f2\b Language:
+\f0\b0  English (\cf3 en\cf2 )\
+  - 
+\f2\b Code delivery:
+\f0\b0  
+\f2\b Copy code
+\f0\b0  button\
+  \
+  The clinic's other templates are submitted from Nabd's 
+\f2\b Setup \uc0\u8594  WhatsApp
+\f0\b0  tab.\
+\
+  
+\f2\b 9. Go live
+\f0\b0 \
+\
+  1. Complete 
+\f2\b Business verification
+\f0\b0  in Meta Business Settings \uc0\u8594  Security Center. Until then, you can only message about 250 new\
+     people a day.                                                                                                     \
+  2. Add a 
+\f2\b payment method
+\f0\b0  in 
+\f2\b WhatsApp Manager \uc0\u8594  Billing
+\f0\b0 .\
+  3. Add a 
+\f2\b privacy policy URL
+\f0\b0  under 
+\f2\b App settings \uc0\u8594  Basic
+\f0\b0 , then switch the app to 
+\f2\b Live
+\f0\b0 .\
+  4. While you're still on the test number, messages only reach the up to 5 numbers you add under 
+\f2\b API Setup \uc0\u8594  To
+\f0\b0 .\
+\
+  
+\f2\b 10. Check it works
+\f0\b0 \
+\
+  1. Request a login code. It should arrive on WhatsApp, and the backend log should also show \cf3 [OTP] \'85\cf2 .\
+  2. Create a template in 
+\f2\b Setup \uc0\u8594  WhatsApp
+\f0\b0 . Its status should change to approved or rejected on its own.\
+  3. If webhooks have no effect, look for \cf3 401\cf2  in the backend log. That means the App Secret is wrong or missing.\
+\
+  If you'd like patients' WhatsApp replies to show up in Nabd, the next piece is a Messages inbox page. I can build it.}

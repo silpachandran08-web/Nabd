@@ -86,6 +86,7 @@ public class PaperRxService {
         String market = items.tenantMarket(t);
         boolean keepsCopy = false;
         Integer days = null;
+        Integer keepYears = null; // PHL-023: the longest retention among the classes that keep a duplicate copy
         for (PaperRxDtos.LineRequest l : req.lines()) {
             if (l.itemId() == null) {
                 if (l.drugText() == null || l.drugText().isBlank()) throw invalid("Each line needs an item or the drug as written on the prescription.");
@@ -94,6 +95,7 @@ public class PaperRxService {
             PaperRxRepository.ItemRule rule = repo.itemRule(t, market, l.itemId())
                     .orElseThrow(() -> invalid("A line names an item that is not in this clinic's price list."));
             keepsCopy |= rule.duplicateRxCopy();
+            if (rule.duplicateRxCopy() && rule.retentionYears() != null && (keepYears == null || rule.retentionYears() > keepYears)) keepYears = rule.retentionYears();
             if (rule.validityDays() != null && (days == null || rule.validityDays() < days)) days = rule.validityDays();
         }
         if (keepsCopy && (!req.duplicateCopyRetained() || req.documentId() == null)) {
@@ -110,7 +112,7 @@ public class PaperRxService {
         }
         UUID id;
         try {
-            id = repo.insert(t, req, validUntil, staffId);
+            id = repo.insert(t, req, validUntil, keepYears == null ? null : today.plusYears(keepYears), staffId);
         } catch (DuplicateKeyException e) { // single use: one photo backs one record
             throw new ApiException(HttpStatus.CONFLICT, "document-already-used", "Photo already used",
                     "This photo is already attached to another paper prescription. Take a new photo.");
@@ -188,6 +190,8 @@ public class PaperRxService {
                         "The linked paper prescription line for " + l.chargeCode() + " has " + Math.max(0, row.qty() - done)
                                 + " left; this bill asks for " + requested.get(row.id()) + ".");
             }
+            // PHL-023: the retained copy is kept for the class's retention period counted from this sale (rolls back with a refused bill)
+            if (rule != null && rule.duplicateRxCopy() && rule.retentionYears() != null) repo.keepUntil(tenantId, row.id(), today.plusYears(rule.retentionYears()));
         }
         return Optional.empty();
     }

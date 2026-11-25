@@ -45,6 +45,10 @@ ALTER ROLE nabd_app SET idle_in_transaction_session_timeout = '15s';
 ALTER ROLE nabd_reports SET statement_timeout = '60s';
 ALTER ROLE nabd_reports SET lock_timeout = '3s';
 ALTER ROLE nabd_reports SET idle_in_transaction_session_timeout = '60s';
+-- The migrate job must never be cut off mid-migration by a database- or project-level timeout (Neon): a role setting
+-- overrides those, so a long or slow-network migration runs to completion and Flyway's rollback stays clean.
+ALTER ROLE nabd_migrator SET statement_timeout = 0;
+ALTER ROLE nabd_migrator SET idle_in_transaction_session_timeout = 0;
 
 GRANT nabd_definer TO nabd_migrator;
 GRANT nabd_platform TO nabd_app WITH INHERIT FALSE, SET TRUE;  -- PG16+ syntax
@@ -58,7 +62,9 @@ END $$;
 GRANT USAGE, CREATE ON SCHEMA public TO nabd_migrator, nabd_definer;  -- CREATE: a role must have it to own functions in the schema
 GRANT USAGE ON SCHEMA public TO nabd_app, nabd_reports, nabd_platform;
 DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'master') THEN  -- present once the migrations have run once
+  -- present once the migrations have run once. Only while this login still holds the owner's rights: after
+  -- transfer-ownership.sql hands master to nabd_migrator, these grants already exist and a re-run must not fail here.
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'master' AND pg_has_role(current_user, nspowner, 'USAGE')) THEN
     GRANT USAGE, CREATE ON SCHEMA master TO nabd_migrator, nabd_definer;
   END IF;
 END $$;

@@ -15,6 +15,8 @@ import StatusPill from "../../../components/ui/StatusPill";
 import RxLinkPicker from "../../../components/checkout/RxLinkPicker";
 import PaperRxDialog, { type PaperRxLink } from "../../../components/checkout/PaperRxDialog";
 import { rxErrorMessage, unlinkedRx } from "../../../components/checkout/rxLink";
+import ScheduleAckDialog from "../../../components/checkout/ScheduleAckDialog";
+import { ackRefusedCode } from "../../../components/checkout/scheduleAck";
 import { api, ApiError, errorText, intentKeys } from "../../../lib/api";
 import { usePriceReasons } from "../../../components/checkout/priceReasons";
 import ApprovalBanner from "../../../components/checkout/ApprovalBanner";
@@ -62,7 +64,9 @@ function OtcCheckoutInner() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
 
-  const [items, setItems] = useState<(LineItem & { paperRxLineId?: string })[]>([]);
+  const [items, setItems] = useState<(LineItem & { paperRxLineId?: string; scheduleAckReason?: string })[]>([]);
+  // PHL-023: the line the server refused for a missing second confirmation (this screen may run without the pharmacy rules)
+  const [ackFor, setAckFor] = useState<string | null>(null);
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
   const [discountReason, setDiscountReason] = useState(""); // FIN-018: every discount carries a coded reason
@@ -178,7 +182,8 @@ function OtcCheckoutInner() {
       const body = {
         lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent,
           ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}),
-          ...(i.paperRxLineId ? { paperRxLineId: i.paperRxLineId } : {}) })),
+          ...(i.paperRxLineId ? { paperRxLineId: i.paperRxLineId } : {}),
+          ...(i.scheduleAckReason ? { scheduleAckReason: i.scheduleAckReason } : {}) })),
         ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
         ...(approval?.billStatus === "approved" ? { discountApprovalId: approval.approvalId } : {}),
       };
@@ -195,6 +200,7 @@ function OtcCheckoutInner() {
         keys.current.done("approval");
       }
     } catch (e) {
+      if (e instanceof ApiError) setAckFor(ackRefusedCode(e.problem));
       setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || tv("invoiceFailed")) : errorText(e, ""));
     } finally {
       setCreating(false);
@@ -374,6 +380,13 @@ function OtcCheckoutInner() {
                         {paperFor?.code === i.chargeCode && (
                           <PaperRxDialog item={{ id: paperFor.itemId, name: i.chargeName }} quantity={i.quantity}
                             onLinked={(p) => linkPaper(i.chargeCode, p)} onCancel={() => setPaperFor(null)} />
+                        )}
+                        {ackFor === i.chargeCode && (
+                          <ScheduleAckDialog itemName={i.chargeName} onCancel={() => setAckFor(null)} onConfirm={(reason) => {
+                            setItems((prev) => prev.map((x) => (x.chargeCode === i.chargeCode ? { ...x, scheduleAckReason: reason } : x)));
+                            setAckFor(null);
+                            setCreateError(null);
+                          }} />
                         )}
                       </td>
                       <td>
