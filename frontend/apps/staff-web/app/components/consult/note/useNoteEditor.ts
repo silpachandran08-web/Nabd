@@ -12,6 +12,7 @@ import type { AuthedFetch } from "../shared";
 import { useOnline } from "./useOnline";
 import { BLANK_DRAFT, LOCAL_DRAFT_MS, sameFields, toFields } from "./noteLogic";
 import { createAutosave } from "../../../lib/autosave";
+import { onBranchSwitchFlush } from "../../../lib/branches";
 import type { Note, NoteDraft, SaveState } from "../visit/types";
 
 export type Conflict = { mine: NoteFields; server: NoteFields; serverUpdatedAt: string | null };
@@ -137,6 +138,9 @@ export function useNoteEditor(authedFetch: AuthedFetch, entryId: string, setNoti
     autosaveRef.current = saver;
     return () => { saver.cancel(); autosaveRef.current = null; };
   }, []);
+
+  // PLT-023: a branch switch saves this note first (a failed save leaves the encrypted local draft).
+  useEffect(() => onBranchSwitchFlush(() => (dirtyRef.current ? saveRef.current() : undefined)), []);
 
   // On reconnect, retry straight away (the server copy is compared first).
   useEffect(() => {

@@ -100,5 +100,10 @@
     "mismatch": "That code didn't match. Check your authenticator app and try again.",
     "confirmFail": "Couldn't confirm the code.",
     "preparing": "Preparing your authenticator secret…"
+  },
+  "branch": {
+    "title": "Choose a branch",
+    "subtitle": "You work in more than one branch. Pick the one to open now.",
+    "entering": "Opening…"
   }
 }

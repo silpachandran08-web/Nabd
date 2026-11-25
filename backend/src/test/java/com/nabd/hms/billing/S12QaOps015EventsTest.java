@@ -369,6 +369,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("organization.tenant.region_pinned.v1");
         expected.remove("organization.tenant.status_changed.v1"); // ADM-020: operator-plane lifecycle move, Adm020LifecycleApiTest
         expected.remove("organization.branch.created.v1"); // PLT-022: Plt022OwnerBranchApiTest
+        expected.remove("iam.branch.switched.v1"); // PLT-023: Plt023BranchSwitchApiTest
         expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type());
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         expected.remove("comms.inbound.received.v1");

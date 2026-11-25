@@ -8,6 +8,7 @@ public enum Audience {
     PLATFORM_MFA("platform-mfa"),
     STEP_UP("step-up"),
     OWNER_SELECT("owner-select"),
+    BRAND_SELECT("brand-select"), // PLT-023
     INTERNAL("internal"); // PLT-009: service identities (Patient Access Edge, Comms Gateway)
 
     private final String value;

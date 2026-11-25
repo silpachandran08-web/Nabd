@@ -68,7 +68,7 @@ public class MfaService {
     }
 
     @Transactional(noRollbackFor = ApiException.class) // the failed-attempt row must survive the 401
-    public TokenPairResponse verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
+    public Object verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
         Jwt challenge;
         try {
             challenge = jwtDecoder.decode(req.challengeId(), TokenType.MFA_PENDING);
@@ -97,7 +97,7 @@ public class MfaService {
         }
         guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "totp", true);
         log.info("staff {} completed MFA", staff.id());
-        return tokens.mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+        return tokens.signedIn(staff, true, ip, device, userAgent); // PLT-023: the session, or a branch choice
     }
 
     // ── MFA enrollment (NB-042) ──────────────────────────────────────────

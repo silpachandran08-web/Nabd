@@ -318,6 +318,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.SPECIALTY_PHOTO_ADDED.type()); // CLN-047: Cln047DermPhotosApiTest
         expected.remove(DomainEventType.PHARMACY_OTC_SALE_COMPLETED.type()); // PHL-019: Phl019CounterSaleApiTest
         expected.remove(DomainEventType.ORGANIZATION_BRANCH_CREATED.type()); // PLT-022: Plt022OwnerBranchApiTest
+        expected.remove(DomainEventType.BRANCH_SWITCHED.type()); // PLT-023: Plt023BranchSwitchApiTest
         expected.remove(DomainEventType.REPORTING_EXPORT_CREATED.type()); // ADM-047: Adm047ReportsLibraryApiTest
         expected.remove(DomainEventType.LAB_CATALOGUE_CHANGED.type()); // PHL-041: Phl041LabCatalogueApiTest
         expected.remove(DomainEventType.LAB_ORDER_PLACED.type()); // PHL-043: Phl043LabOrderApiTest

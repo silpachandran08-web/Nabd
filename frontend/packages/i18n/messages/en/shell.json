@@ -1063,5 +1063,12 @@
         "invalid": "Band {row} is not valid. Check its ages, and that its limits rise from critical low to critical high."
       }
     }
+  },
+  "branch": {
+    "chip": "Branch: {name}. Switch branch",
+    "menu": "Switch branch",
+    "allReports": "All branches (reports)",
+    "switching": "Switching…",
+    "failed": "Couldn't switch branch. You are still signed in here."
   }
 }

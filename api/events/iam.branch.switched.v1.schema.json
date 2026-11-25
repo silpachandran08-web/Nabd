@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:iam.branch.switched.v1",
+  "title": "iam.branch.switched.v1",
+  "description": "A person entered another branch of their brand with the same login (PLT-023): a new single-branch session was issued in toTenantId (= tenantId). brandLoginId is absent for the brand's owner account. Ids only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "fromTenantId",
+    "toTenantId",
+    "status",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "brandLoginId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "fromTenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "toTenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "const": "switched"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "brandLoginId": "22222222-2222-4222-8222-222222222222",
+      "fromTenantId": "33333333-3333-4333-8333-333333333333",
+      "toTenantId": "11111111-1111-4111-8111-111111111111",
+      "status": "switched",
+      "version": 1
+    }
+  ]
+}

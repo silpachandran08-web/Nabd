@@ -258,6 +258,7 @@ V3650 PHL-056
 V3660 COM-050
 V3670 OPS-068
 V3671 OPS-068
+V3680 PLT-023
 # CI (ci/migration-lint) requires every NEW db/migrations/V<n>__*.sql to be listed here
 # Central version allocation. One line per reserved version: V<n> <owner squad/story>.
 # and to be greater than the highest version on main. Reserve a number here first, in its own PR.

@@ -100,6 +100,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `iam.role.changed.v1` | RoleService.create / update / resetToPreset | roleId, status |
 | `iam.staff.changed.v1` | StaffService.patch / suspend | staffId, status |
 | `iam.session.revoked.v1` | StaffService: role change, suspend, MFA reset (all sessions of the staff member) | staffId, scope, reasonCode, status |
+| `iam.branch.switched.v1` | BranchService.select (PLT-023): a person entered another branch of their brand with the same login; published in the branch entered, where the new single-branch session lives. Ids only; brandLoginId is absent for the owner account. Consumer core.audit: both branches get their audit row in the same request (auth.branch_selected, auth.branch_left), so no handler acts on the event yet | brandLoginId, fromTenantId, toTenantId, status |
 | `iam.break_glass.reviewed.v1` | BreakGlassReviewService.review (PLT-013): the owner marked an ended emergency-access grant justified or not justified; subject = the grant. Consumer core.audit (log-only handler; the audit row is written in the same transaction) | grantId, outcome |
 | `billing.package.sold.v1` | PackageInstanceService.sell (COM-044): a package sold and paid at the desk; subject = the package instance. Consumer core.billing (packages.PackageSoldConsumer: the package card message with an IDC-015 secure link) | packageInstanceId, patientId |
 | `billing.catalogue.changed.v1` | SetupService.addCharge / updateCharge | chargeHeadId, status |

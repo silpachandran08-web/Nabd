@@ -55,7 +55,7 @@ public class StaffDirectoryRepository {
 
     private static final String STAFF_COLUMNS =
             "id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status, scope, " +
-                    "email_verified, mobile_verified, mfa_enabled, mfa_secret_enc, mfa_pending_secret_enc, mfa_reset_required ";
+                    "email_verified, mobile_verified, mfa_enabled, mfa_secret_enc, mfa_pending_secret_enc, mfa_reset_required, brand_login_id ";
 
     public Optional<Staff> findStaffByEmail(UUID tenantId, String email) {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND email = ?::citext",
@@ -181,7 +181,8 @@ public class StaffDirectoryRepository {
                 rs.getBoolean("mfa_enabled"),
                 rs.getBytes("mfa_secret_enc"),
                 rs.getBytes("mfa_pending_secret_enc"),
-                rs.getBoolean("mfa_reset_required"));
+                rs.getBoolean("mfa_reset_required"),
+                rs.getObject("brand_login_id", UUID.class));
     }
 
     private RowMapper<Role> roleMapper() {
