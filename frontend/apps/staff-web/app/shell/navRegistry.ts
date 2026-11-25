@@ -1,7 +1,7 @@
 // FEF-052/053/054: the ONE nav registry. Role context -> items, each with its grants, plan module, badge source and the squad
 // that owns the screen. Pure (unit-tested): ClinicNav, the Ctrl+K palette and the planned-screen pages all read this.
 import type { IconName } from "../components/ui/Icon";
-import { NAV_MODULES, editionAllows, navAllowed, pharmacyEdition, pharmacyHref, type Entitlements } from "../lib/entitlementRules.ts";
+import { NAV_MODULES, editionAllows, editionHref, navAllowed, standaloneEdition, type Entitlements, type StandaloneEdition } from "../lib/entitlementRules.ts";
 
 export type RoleContext = "owner" | "doctor" | "nurse" | "reception" | "pharmacist" | "lab" | "billing" | "solo";
 export type BadgeSource = "waiting" | "checkout" | "myday" | "nurse-priority" | "nurse-admin" | "triage-urgent" | "stock-alerts";
@@ -168,6 +168,11 @@ const SOLO: NavItem[] = [
 /** PHL-032: the pharmacy setup wizard, first in an unfinished pharmacy owner's nav (setup:edit writes the profile and the licences). */
 const PHARMACY_SETUP: NavItem = { id: "ph-setup", href: "/setup/pharmacy-wizard", label: "Pharmacy setup", short: "Setup", icon: "settings", perms: ["setup:edit", "pharmacy:edit"], owner: MON, keywords: ["licence", "drug licence", "gstin", "opening stock", "printer"] };
 
+/** PHL-056: the lab setup wizard, in a lab owner's nav (setup:edit writes the profile, lab:catalogue the lab's record and prices). */
+const LAB_SETUP: NavItem = { id: "lab-setup", href: "/setup/lab-wizard", label: "Lab setup", short: "Setup", icon: "settings", perms: ["setup:edit", "lab:catalogue"], owner: DI, keywords: ["nabl", "accreditation", "pathologist", "letterhead", "price list", "gstin", "printer"] };
+/** The owner of a standalone edition runs the counter too: these come before the owner's own items. */
+const EDITION_OWNER_ITEMS: Record<StandaloneEdition, NavItem[]> = { pharmacy: [...PHARMACIST, PHARMACY_SETUP], lab: [...LAB, LAB_SETUP] };
+
 /** Counter role -> the grant that marks it, for a role that does not book patients (queue:create is the front desk's). */
 const COUNTER_SIGNAL: [RoleContext, string][] = [["pharmacist", "pharmacy:edit"], ["lab", LAB_GRANT], ["billing", "billing:create"]];
 export const COUNTER_ROLES: readonly RoleContext[] = COUNTER_SIGNAL.map(([r]) => r);
@@ -200,16 +205,17 @@ export function rolesFor(perms: readonly string[], owner: boolean, solo = false)
 
 export type NavInput = { perms: readonly string[]; owner: boolean; ent: Entitlements | null; override?: string | null; specialty?: string | null; solo?: boolean;
   /** T1-BUG-15: the edition last answered on this device; used only while `ent` is unknown. */
-  pharmacyHint?: boolean };
-export function navFor({ perms, owner, ent, override, specialty, solo, pharmacyHint }: NavInput): { role: RoleContext; roles: RoleContext[]; items: NavItem[] } {
+  pharmacyHint?: boolean; labHint?: boolean };
+export function navFor({ perms, owner, ent, override, specialty, solo, pharmacyHint, labHint }: NavInput): { role: RoleContext; roles: RoleContext[]; items: NavItem[] } {
   const roles = rolesFor(perms, owner, solo);
   let role = roles.find((r) => r === override) ?? roles[0];
   let items = NAV[role].filter((i) => itemVisible(i, perms, ent));
   // A trimmed Owner role (or a counter role) that can open none of its items falls back to the generic staff list.
   if (items.length === 0 && (role === "owner" || COUNTER_ROLES.includes(role))) { role = "reception"; items = NAV.reception.filter((i) => itemVisible(i, perms, ent)); }
   // T1-BUG-15: entitlements still unknown but this device last saw a pharmacy edition: the same areas as the answer would give
-  if (!ent && pharmacyHint) items = items.filter((i) => pharmacyHref(i.href));
-  if ((ent ? pharmacyEdition(ent) : pharmacyHint) && role === "owner") items = [...PHARMACIST, PHARMACY_SETUP].filter((i) => itemVisible(i, perms, ent) && !items.some((x) => x.href === i.href)).concat(items); // PHL-032: the owner of a pharmacy runs the counter too
+  const edition: StandaloneEdition | null = ent ? standaloneEdition(ent) : pharmacyHint ? "pharmacy" : labHint ? "lab" : null; // PHL-056: either standalone edition
+  if (!ent && edition) items = items.filter((i) => editionHref(edition, i.href));
+  if (edition && role === "owner") items = EDITION_OWNER_ITEMS[edition].filter((i) => itemVisible(i, perms, ent) && !items.some((x) => x.href === i.href)).concat(items); // PHL-032: the owner of a pharmacy runs the counter too
   if (specialty) items = items.map((i) => (i.id === "specialty" || i.id === "solo-specialty" ? { ...i, label: `${titleCase(specialty)} workspace`, short: titleCase(specialty), icon: SPECIALTY_ICON[specialty] ?? i.icon } : i));
   return { role, roles, items };
 }

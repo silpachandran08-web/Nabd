@@ -5,21 +5,33 @@ import { api } from "./api";
 import { getTenantId } from "./session";
 
 export * from "./entitlementRules";
-import { pharmacyEdition, type Entitlements } from "./entitlementRules";
+import { pharmacyEdition, standaloneEdition, type Entitlements, type StandaloneEdition } from "./entitlementRules";
 
-const PHARMACY_KEY = "nabd_pharmacy_edition"; // value = the clinic (tenant) id last answered as a pharmacy edition, like nabd_solo_mode
+// value = the clinic (tenant) id last answered as that edition, like nabd_solo_mode
+const EDITION_KEY: Record<StandaloneEdition, string> = { pharmacy: "nabd_pharmacy_edition", lab: "nabd_lab_edition" };
+const remembered = (edition: StandaloneEdition): boolean => {
+  try { const t = getTenantId(); return !!t && localStorage.getItem(EDITION_KEY[edition]) === t; } catch { return false; }
+};
 
 /** T1-BUG-15: the edition from the answer when there is one; while it is unknown (pending or failed), the last answer for this clinic
  * on this device, so a pharmacy owner keeps the counter menu. Reads storage: call it in an effect or after `settled`, never in a first render. */
 export function pharmacyKnown(ent: Entitlements | null): boolean {
   if (ent) return pharmacyEdition(ent);
-  try { const t = getTenantId(); return !!t && localStorage.getItem(PHARMACY_KEY) === t; } catch { return false; }
+  return remembered("pharmacy");
+}
+
+/** PHL-056: the same for either standalone edition: the answer when there is one, else what this device last saw for this clinic. */
+export function editionKnown(ent: Entitlements | null): StandaloneEdition | null {
+  if (ent) return standaloneEdition(ent);
+  return remembered("pharmacy") ? "pharmacy" : remembered("lab") ? "lab" : null;
 }
 
 function remember(t: string | null, e: Entitlements): void {
   try {
-    if (t && pharmacyEdition(e)) localStorage.setItem(PHARMACY_KEY, t);
-    else if (localStorage.getItem(PHARMACY_KEY) === t) localStorage.removeItem(PHARMACY_KEY);
+    for (const [edition, key] of Object.entries(EDITION_KEY)) {
+      if (t && e.edition === edition) localStorage.setItem(key, t);
+      else if (localStorage.getItem(key) === t) localStorage.removeItem(key);
+    }
   } catch { /* blocked storage: nothing remembered, same as before */ }
 }
 

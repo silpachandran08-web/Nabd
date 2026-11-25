@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { usePermissions } from "../lib/usePermissions";
-import { pharmacyKnown, useEntitlements } from "../lib/entitlements";
+import { editionKnown, pharmacyKnown, useEntitlements } from "../lib/entitlements";
 import { decodeAccessToken } from "../lib/session";
 import { navFor } from "./navRegistry";
 import { useRoleOverride } from "./roleContext";
@@ -14,17 +14,17 @@ export function useShellNav() {
   const { permissions } = usePermissions();
   const ent = useEntitlements();
   const override = useRoleOverride();
-  const [claims, setClaims] = useState<{ owner: boolean; specialty: string | null; tenantId: string | null; solo: boolean; pharmacy: boolean }>({ owner: false, specialty: null, tenantId: null, solo: false, pharmacy: false });
+  const [claims, setClaims] = useState<{ owner: boolean; specialty: string | null; tenantId: string | null; solo: boolean; pharmacy: boolean; lab: boolean }>({ owner: false, specialty: null, tenantId: null, solo: false, pharmacy: false, lab: false });
   useEffect(() => {
-    let c = { owner: false, specialty: null as string | null, tenantId: null as string | null, solo: false, pharmacy: false };
+    let c = { owner: false, specialty: null as string | null, tenantId: null as string | null, solo: false, pharmacy: false, lab: false };
     try {
       const t = localStorage.getItem("nabd_access_token");
       const d = t ? decodeAccessToken(t) : null;
-      c = { owner: d?.owner === true, specialty: d?.specialty ?? null, tenantId: d?.tenantId ?? null, solo: soloMode(d?.tenantId ?? null), pharmacy: pharmacyKnown(null) };
+      c = { owner: d?.owner === true, specialty: d?.specialty ?? null, tenantId: d?.tenantId ?? null, solo: soloMode(d?.tenantId ?? null), pharmacy: pharmacyKnown(null), lab: editionKnown(null) === "lab" };
     } catch { /* no storage: treated as signed out */ }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setClaims(c);
   }, [pathname, permissions]);
-  const input = { perms: permissions, owner: claims.owner, ent, override, specialty: claims.specialty, solo: claims.solo, pharmacyHint: claims.pharmacy };
+  const input = { perms: permissions, owner: claims.owner, ent, override, specialty: claims.specialty, solo: claims.solo, pharmacyHint: claims.pharmacy, labHint: claims.lab };
   return { input, owner: claims.owner, tenantId: claims.tenantId, ...navFor(input) };
 }
