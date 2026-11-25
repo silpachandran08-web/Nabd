@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- IDC-026 spike. Standalone: NOT a module of backend/pom.xml and never built by the product build.
+     Run: spikes/cedar/run-in-prod-image.sh (see docs/adr/0019-cedar-policy-engine-spike.md). -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.nabd.spike</groupId>
+  <artifactId>cedar-spike</artifactId>
+  <version>0.1.0</version>
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- >= 4.9.0 (IDC-026). Keep the cedar CLI in .github/workflows/ci.yml (job cedar-validate) on the cedar-policy
+         version this release binds (4.11.0 -> cedar-policy 4.11.2). -->
+    <cedar-java.version>4.11.0</cedar-java.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>com.cedarpolicy</groupId>
+      <artifactId>cedar-java</artifactId>
+      <version>${cedar-java.version}</version>
+      <!-- uber = the jar that carries the native libraries -->
+      <classifier>uber</classifier>
+    </dependency>
+  </dependencies>
+</project>
