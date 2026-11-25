@@ -19,7 +19,9 @@ public interface FlowHandler {
         /** COM-041 re-verification of a changed number */
         REVERIFY_OTP, REVERIFY_DOB,
         /** COM-044: 'Book session N of M' of a treatment package, or a regular visit */
-        CHOOSING_PACKAGE }
+        CHOOSING_PACKAGE,
+        /** PLT-047: 'my data' (own flow class MyDataFlow) */
+        MYDATA_OTP, MYDATA_DOB, MYDATA_WHO }
 
     /** Context keys the Edge may keep: ids, first name, age. Anything else is refused (no clinical content in the Edge DB). */
     Set<String> CONTEXT_KEYS = Set.of("doctorId", "slotStart", "holdId", "firstName", "age", "step", "lang", "noticeVersion", "care", "cands", "ciChannel",

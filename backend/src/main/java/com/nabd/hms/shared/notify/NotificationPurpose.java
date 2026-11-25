@@ -70,7 +70,9 @@ public enum NotificationPurpose {
     /** COM-015: the owner is told the clinic used 80% (or all) of the plan's WhatsApp allowance (staff recipient); 3 params: percent, used, allowance. */
     MESSAGE_USAGE_ALERT("message_usage_alert", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY),
     /** ADM-020: the owner is told the clinic was suspended or is being offboarded (staff recipient); 1 param: the new status. */
-    TENANT_STATUS_CHANGED("tenant_status_changed", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS);
+    TENANT_STATUS_CHANGED("tenant_status_changed", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_THEN_SMS),
+    /** PLT-047: a patient's privacy request has used 75% of its legal period (staff recipient: the owners); 1 param: whole days left. No patient data. */
+    DSR_DUE_REMINDER("dsr_due_reminder", ConsentClass.NONE, Priority.TRANSACTIONAL, ChannelPolicy.WHATSAPP_ONLY);
 
     private final String code;
     private final ConsentClass consentClass;
