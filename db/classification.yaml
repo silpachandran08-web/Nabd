@@ -1214,6 +1214,29 @@ schemas:
       total_minor: financial
       issued_at: operational
       issued_by: operational
+    einvoice_documents:
+      id: operational
+      tenant_id: operational
+      document_type: operational
+      document_id: operational
+      regime: operational
+      status: operational
+      external_id: financial
+      ack_ref: financial
+      ack_at: operational
+      qr_payload: financial
+      request_object_key: operational
+      response_object_key: operational
+      errors: operational
+      attempts: operational
+      next_attempt_at: operational
+      created_at: operational
+      updated_at: operational
+    einvoice_settings:
+      tenant_id: operational
+      irp_enabled: operational
+      updated_by: operational
+      updated_at: operational
     credit_note_lines:
       id: operational
       tenant_id: operational

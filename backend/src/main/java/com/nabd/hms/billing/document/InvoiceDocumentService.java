@@ -34,10 +34,13 @@ public class InvoiceDocumentService {
     private final com.nabd.hms.common.TenantContext tenantContext;
     private final com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy;
     private final com.nabd.hms.organization.api.RegionRules regions;
+    private final com.nabd.hms.billing.einvoice.EinvoiceService einvoices; // FIN-011
 
     InvoiceDocumentService(CheckoutService checkout, InvoiceDocumentRepository repo, AuditService audit, ActorDirectory actors,
                            com.nabd.hms.common.ClinicClock clock, com.nabd.hms.common.TenantContext tenantContext,
-                           com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy, com.nabd.hms.organization.api.RegionRules regions) {
+                           com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy, com.nabd.hms.organization.api.RegionRules regions,
+                           com.nabd.hms.billing.einvoice.EinvoiceService einvoices) {
+        this.einvoices = einvoices;
         this.regions = regions;
         this.pharmacy = pharmacy;
         this.clock = clock;
@@ -99,8 +102,11 @@ public class InvoiceDocumentService {
             String batch = h == null ? null : batches.get(h);
             return zero == null ? batch : batch == null ? zero : zero + "\n" + batch;
         }).toList();
-        return InvoiceDocumentText.build(inv, supplier, kind, "receipt".equals(kind) ? repo.latestReceiptNumber(tenantId, invoiceId) : null,
-                cols, repo.sacHsn(tenantId, invoiceId), notes);
+        List<String> out = new java.util.ArrayList<>(InvoiceDocumentText.build(inv, supplier, kind,
+                "receipt".equals(kind) ? repo.latestReceiptNumber(tenantId, invoiceId) : null, cols, repo.sacHsn(tenantId, invoiceId), notes));
+        // FIN-011: IRN, Ack No and Ack date (or "IRN pending") of a B2B e-invoice, above the closing line
+        if (!"receipt".equals(kind)) for (String l : einvoices.printLines(invoiceId)) out.addAll(out.size() - 1, InvoiceDocumentText.wrap(l, cols));
+        return out;
     }
 
     private static String sha256(byte[] b) {
