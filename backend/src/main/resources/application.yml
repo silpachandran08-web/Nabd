@@ -111,6 +111,12 @@ logging:
     com.nabd.hms: INFO
 
 app:
+  master-cutover-check:
+    # PLT-061: boot guard for after the Control Plane cut-over. OFF by default (the platform package still writes
+    # master.* from Core today); switch ON with true once the writers have moved to the Control Plane. Core then
+    # refuses to start if its database role can still change master.* tables (naming every offender), which is correct
+    # before the cut-over. Passes trivially once the master schema is dropped.
+    enabled: ${APP_MASTER_CUTOVER_CHECK_ENABLED:false}
   cors:
     # Comma-separated; overridable via APP_CORS_ALLOWED_ORIGINS without a redeploy. The deployed
     # web app's origin is a public value (not a secret), so it's safe to default it here rather
