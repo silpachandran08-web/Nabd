@@ -80,7 +80,7 @@ modules:
     reads: [owners, roles, staff]  # PLT-022: provisioning checks its own seed rows (built-in role, owner staff, owner by email) to be re-runnable, and the owner "Add branch" flow resolves the signed-in owner, brand and clinics (read-only; the seeds are written through ProvisioningSeeds)
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
-    owns: [daily_summary_settings, doctor_daily_metrics, tenant_daily_metrics]
+    owns: [daily_summary_settings, doctor_daily_metrics, ops_alert_thresholds, tenant_daily_metrics]  # ADM-042: the live board owns only its alert thresholds
     # ADM-043: the daily summary's close time (doctor_working_hours, day_closes), average wait (queue_entry_events), unbilled amount
     # (procedure_orders) and the brand's clinics for the combined message (tenants, brands)
     reads: [appointments, brands, day_closes, doctor_delays, doctor_working_hours, eta_accuracy_daily, invoice_line_items, invoice_payments, invoices, package_instance_items, package_instances, patients, procedure_orders, queue_entries, queue_entry_events, staff, tenants]  # OPS-010: the recompute-from-source of one tenant-day; ADM-041: the time KPIs of that day (stage events, working hours, ETA accuracy rollup); ADM-047: the library reads source rows of each report by design (staff and patient names, invoice lines, package items, announced doctor delays), read-only, masked or aggregated per report, every export audited

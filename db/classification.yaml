@@ -771,6 +771,10 @@ schemas:
       last_sent_day: operational
       updated_by: operational
       updated_at: operational
+    ops_alert_thresholds:  # ADM-042: owner live board alert thresholds (minutes and a flag)
+      tenant_id: operational
+      thresholds: operational
+      updated_at: operational
     dental_chart_entries:
       id: operational
       tenant_id: operational

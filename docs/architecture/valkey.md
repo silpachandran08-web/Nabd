@@ -131,6 +131,7 @@ produces that authority yet, so the `requests` topic is 403 for everyone until o
 |---|---|---|
 | `rt:{<tenantId>}:<utc day>` (stream) | resume log, one entry per delta, fields `topic`, `d`; the entry id is the SSE event id | trimmed to 30 min (`MINID`), key expires 35 min after the last write |
 | `t:<tenantId>:rt` (pub/sub) | `{i: entry id, t: topic, d: delta}` or `{ctl: close, staff}` | none |
+| `t:<tenantId>:ops:alerts` (set) | ADM-042: the alert keys active on the clinic's live operations board (`doctor_late:<doctorId>`, `pharmacy_wait`, `requests_waiting`); SADD decides which pod raises `reporting.ops_alert.raised.v1`, a cleared alert is removed | 12 h after the last alert pass |
 
 A pod subscribes to a tenant's channel only while it has a connection of that tenant. The `sse-fanout` consumer group
 appends and publishes; a delta is `{type, id, v, topic, fields}` with ids/statuses/versions only. Resume window 5 min
