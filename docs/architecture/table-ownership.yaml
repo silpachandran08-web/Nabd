@@ -27,7 +27,7 @@ modules:
     owns: [chronic_conditions, clinical_documents, clinical_notes, clinical_photos, dental_chair_notes, dental_chart_entries, dental_chart_events, dental_images, dental_preset_overrides, dental_settings, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, photo_consents, prescription_items, prescription_rx_tokens, prescription_signer_backfill, prescriptions, rx_coding_suggestions, rx_validity_rules, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
   common:
-    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, tenant_data_keys]
+    owns: [archive_manifests, audit_chain_heads, audit_chain_seals, audit_log, audit_log_unpartitioned, cross_tenant_ref_quarantine, crypto_reencrypt_progress, data_retention_policies, kms_region_keys, outbox_events, tenant_data_keys]
     reads: [tenants]  # PLT-045: TenantKeyService lists tenants and reads their region and status; the same read ClinicClock, TenantContext and CryptoReencryptJob already do
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
