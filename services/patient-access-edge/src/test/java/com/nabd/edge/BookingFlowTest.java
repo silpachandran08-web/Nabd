@@ -120,7 +120,7 @@ class BookingFlowTest extends BookingTestBase {
         Clinic c = clinic("Alpha", "Asia/Kolkata", FakeUpstreams.member("ref-aarav", "Aarav", 6, "dependent"), FakeUpstreams.member("ref-meera", "Meera", 4, "dependent"));
         int taps = 0;
         say(c, "Hi");                                   // the opening message is free text, not a booking tap
-        assertEquals(List.of("Book", "My appointment", "Talk to clinic"), titles());
+        assertEquals(List.of("Book", "My appointment", "My records", "Talk to clinic"), titles());
         tap(c, "Book"); taps++;
         assertEquals(List.of("Me", "Aarav (6)", "Meera (4)", "Add a child", "Someone else"), titles());
         assertTrue(last().has("rows"), "more than 3 options go out as a list message");
@@ -172,7 +172,7 @@ class BookingFlowTest extends BookingTestBase {
             long t0 = System.nanoTime();
             say(c, "Hi");
             millis.add((System.nanoTime() - t0) / 1_000_000);
-            assertEquals(List.of("Book", "My appointment", "Talk to clinic"), titles());
+            assertEquals(List.of("Book", "My appointment", "My records", "Talk to clinic"), titles());
             assertTrue(text().contains("Gamma"));
         }
         Collections.sort(millis);
@@ -288,7 +288,7 @@ class BookingFlowTest extends BookingTestBase {
         say(c, "Hi"); tap(c, "Book");
         superuser().update("update conversations set expires_at = now() - interval '1 minute' where tenant_id = ?::uuid", c.tenant().toString());
         say(c, "Hello");
-        assertEquals(List.of("Book", "My appointment", "Talk to clinic"), titles());
+        assertEquals(List.of("Book", "My appointment", "My records", "Talk to clinic"), titles());
     }
 
     // ---- criterion 8: two unrecognised messages hand over --------------------------------------------------------------------------
@@ -298,7 +298,7 @@ class BookingFlowTest extends BookingTestBase {
         Clinic c = clinic("Mike", "Asia/Kolkata");
         say(c, "Hi");
         say(c, "what are your fees");
-        assertEquals(List.of("Book", "My appointment", "Talk to clinic"), titles(), "first miss: the question again");
+        assertEquals(List.of("Book", "My appointment", "My records", "Talk to clinic"), titles(), "first miss: the question again");
         assertEquals("MENU", state(c));
         say(c, "hello?");
         assertEquals("HANDOFF", state(c));
@@ -309,7 +309,7 @@ class BookingFlowTest extends BookingTestBase {
         assertEquals(n, UP.sent.size(), "silent while staff hold the thread");
         assertTrue(handoff.handBack(c.tenant(), "whatsapp", c.hash()));
         say(c, "Hi");
-        assertEquals(List.of("Book", "My appointment", "Talk to clinic"), titles());
+        assertEquals(List.of("Book", "My appointment", "My records", "Talk to clinic"), titles());
     }
 
     @Test

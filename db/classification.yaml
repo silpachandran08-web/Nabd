@@ -975,6 +975,7 @@ schemas:
       sha256: operational
       content: financial
       created_at: operational
+      file_id: operational
     payment_intents:
       id: operational
       tenant_id: operational
