@@ -62,9 +62,22 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
 
     public enum Refusal { EXPIRED, LOCKED, RATE_LIMITED, OTP_INVALID, REVERIFY }
 
-    /** {@code packageCard} is set (and fileUrl/mime null) for a package_card link (COM-044). */
-    public record Opened(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard) {
+    /** {@code packageCard} is set (and fileUrl/mime null) for a package_card link (COM-044); {@code dataExport} for a data_export link (PLT-047). */
+    public record Opened(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard, ExportFile dataExport) {
     }
+
+    /** PLT-047: the patient's data package (a zip), handed over inline once the code is right.
+     * shortcut: base64 in the JSON answer (the package is capped by DsrExportService); stream it when packages grow past a few MB. */
+    @io.swagger.v3.oas.annotations.media.Schema(name = "SecureLinkExportFile")
+    public record ExportFile(String fileName, String contentBase64, String sha256) {
+    }
+
+    /** PLT-047: a minted data-export link. {@code url} carries the one-time-shown token: put it only in the message. */
+    public record ExportLink(UUID linkId, String url, String firstName, Instant expiresAt) {
+    }
+
+    static final Duration EXPORT_TTL = Duration.ofHours(72);
+    static final int EXPORT_MAX_OPENS = 3;
 
     public record Result<T>(T value, Refusal refusal) {
         static <T> Result<T> ok(T v) {
@@ -219,6 +232,18 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         return new com.nabd.hms.patient.api.SecureDocumentLinks.Issued(i.linkId(), i.expiresAt());
     }
 
+    /** PLT-047: a data-export link (72h OTP, up to 3 opens). */
+    @Transactional
+    public Optional<ExportLink> issueDataExport(UUID requestId, UUID patientId, UUID recipientId) {
+        Optional<String> firstName = recipient(recipientId);
+        if (firstName.isEmpty() || !processable(patientId)) {
+            return Optional.empty();
+        }
+        Minted m = mint(null, null, "data_export", requestId, patientId, recipientId, 3); // 72 hours = 3 days
+        jdbc.update("UPDATE secure_links SET max_opens = ? WHERE id = ?", EXPORT_MAX_OPENS, m.id());
+        return Optional.of(new ExportLink(m.id(), m.url(), firstName.get(), m.expires()));
+    }
+
     // ---------------------------------------------------------------- public: otp, open
 
     /** Token to tenant: the first 16 bytes of the token. Empty for anything malformed. */
@@ -321,7 +346,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
             logOpen(tenant, l.id(), ip, userAgent, "opened");
             audit.record(tenant, "system", null, "patient via secure link", "Patient", ip, "secure_link.opened", "secure_link", l.id(), null,
                     Map.of("documentType", l.documentType()));
-            return Result.ok(new Opened(null, null, "Package card", card.get()));
+            return Result.ok(new Opened(null, null, "Package card", card.get(), null));
         }
         Optional<FileStore.FileInfo> f = files.info(l.documentId()).filter(i -> "available".equals(i.status()) && l.patientId().equals(i.patientId()));
         if (f.isEmpty()) {
@@ -338,7 +363,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
             case "rx" -> "Prescription";
             case "invoice" -> "Invoice";
             default -> "Document";
-        }, null));
+        }, null, null));
     }
 
     // ---------------------------------------------------------------- helpers

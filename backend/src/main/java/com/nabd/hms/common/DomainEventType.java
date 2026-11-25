@@ -89,7 +89,19 @@ public enum DomainEventType {
     /** PHL-045: samples were collected for a lab order. Order and sample ids. */
     LAB_SAMPLE_COLLECTED("lab.sample.collected.v1", "core/lab"),
     /** PHL-044: an order's status changed in the worklist (ordered -> collected -> ...). Ids only, no PHI. */
-    LAB_ORDER_STATUS_CHANGED("lab.order.status_changed.v1", "core/lab");
+    LAB_ORDER_STATUS_CHANGED("lab.order.status_changed.v1", "core/lab"),
+    /** ADM-042: an alert of the owner's live operations board became active (doctor late, pharmacy wait, booking requests waiting). A code and a severity only. */
+    REPORTING_OPS_ALERT_RAISED("reporting.ops_alert.raised.v1", "core/reporting"),
+    /** PLT-024: a patient linked to a sibling branch; staff can now access shared record (cross-brand). Ids only, no PHI. */
+    PATIENT_BRANCH_LINK_CREATED("patient.branch_link.created.v1", "core/patient"),
+    /** FIN-036: a clinic's insurance coverage set for one patient (payer + plan + policy). Ids and coverage dates only. */
+    INSURANCE_COVERAGE_SET("billing.insurance.coverage_set.v1", "core/billing"),
+    /** FIN-011: an invoice was accepted by the GSTR-1 export system (or rejected with reason). Invoice id and status only. */
+    EINVOICE_ACCEPTED("billing.einvoice.accepted.v1", "core/billing"),
+    /** PLT-047: a data subject request (DSR) was received for export. Subject id, clinics, submission date, deadline, status only. */
+    PATIENT_DSR_RECEIVED("patient.dsr.received.v1", "core/patient"),
+    /** PLT-047: a patient data export package was built and secured (72h OTP link issued). Package id, link, expiry only. */
+    PATIENT_DSR_EXPORT_READY("patient.dsr.export_ready.v1", "core/patient");
 
     private final String type;
     private final String source;
