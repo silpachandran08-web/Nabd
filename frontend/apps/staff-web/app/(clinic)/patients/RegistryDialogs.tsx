@@ -14,6 +14,7 @@ import AbhaPanel from "./AbhaPanel";
 import { clinicToday } from "../../lib/clinicTime";
 import { can } from "../../lib/permissions";
 import ConsentBlock from "./ConsentBlock";
+import RegisterOptOut from "../../components/brandDirectory/RegisterOptOut";
 import AssistedConsent from "./AssistedConsent";
 import { buildCaptureBody, consentProblemText, NO_CONSENT, type ConsentState, type Toggles } from "../../lib/consentCapture";
 
@@ -42,7 +43,7 @@ const REGISTER_LABELS = { name: "Full name", phone: "Mobile", gender: "Sex", add
 export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
   onClose: () => void; onRegistered: (id: string) => void; onOpenExisting: (id: string) => void;
 }) {
-  const [form, setForm] = useState({ name: "", phone: "", dob: "", gender: "", address: "", nationalId: "" });
+  const [form, setForm] = useState({ name: "", phone: "", dob: "", gender: "", address: "", nationalId: "", brandOptOut: false }); // PLT-024: brandOptOut = not to be found from the brand's other branches
   // FEF-031: related fields share one useState each (a component keeps at most 8 hooks): guardian search, consent capture, registration result.
   const gs = useSlices({ guardianQuery: "", guardianResults: [] as { id: string; name: string; phone: string }[], guardian: null as { id: string; name: string } | null, candidates: null as Candidate[] | null });
   const [guardianQuery, setGuardianQuery] = gs("guardianQuery");
@@ -125,6 +126,7 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
       address: form.address.trim() || null, ...(form.nationalId.trim() ? { nationalId: form.nationalId.trim() } : {}), guardianId: minor ? guardian?.id ?? null : null,
       ...(minor && guardian ? { guardianConsent: { confirmed: true, channel } } : {}),
       ...(confirmed ? { confirmedNotDuplicate: true } : {}),
+      ...(form.brandOptOut ? { brandDirectoryOptOut: true } : {}),
     };
     try {
       const created = await api.post<{ id: string }>("/patients", body, { idempotencyKey: keys.current.get("register", body) });
@@ -214,6 +216,7 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
             <label className={styles.fieldLabel} htmlFor="reg-national-id">National ID, Aadhaar or Iqama (optional)</label>
             <input id="reg-national-id" className={styles.input} value={form.nationalId} autoComplete="off" {...fe.attrs("nationalId")} onChange={(e) => { fe.clearField("nationalId"); setForm({ ...form, nationalId: e.target.value }); }} />
             <FieldError fe={fe} name="nationalId" className={styles.errorInline} />
+            <RegisterOptOut checked={form.brandOptOut} onChange={(v) => setForm({ ...form, brandOptOut: v })} />
             {minor && (
               <>
                 <label className={styles.fieldLabel} htmlFor="reg-guardian">Guardian (required for under-18s)</label>

@@ -12,6 +12,7 @@ import { useRegistry } from "./registry/useRegistry";
 import RegistryTable from "./registry/RegistryTable";
 import RegistryOverlays from "./registry/RegistryOverlays";
 import PatientDrawer from "./drawer/PatientDrawer";
+import BrandDirectoryPanel from "../../components/brandDirectory/BrandDirectoryPanel";
 
 // FEF-031: the page only composes. Registry list + paging: registry/*; the patient drawer and its self-loading sections: drawer/*.
 export default function PatientsPage() {
@@ -34,6 +35,7 @@ function PatientsList() {
   const [overlay, setOverlay] = useState<"phones" | "duplicates" | "register" | "paper" | null>(null); // ACC-028 / ACC-030 / register / ADM-014
   const [flash, setFlash] = useState<string | null>(null);
   const tPaper = useTranslations("shell.paperEntry");
+  const tBrand = useTranslations("shell.brandDirectory");
   const { register: canRegister, billingView, patientsEdit, merge: canMerge } = perms;
   const reload = () => void load(q, filter);
 
@@ -95,6 +97,8 @@ function PatientsList() {
 
 
       {flash && <div className={styles.flash} role="status">{flash}</div>}
+
+      {canRegister && !forbidden && <BrandDirectoryPanel query={q} onLinked={(id) => { setFlash(tBrand("linked")); setDrawerId(id); reload(); }} />}
 
       {!forbidden && <GuardianReviews canAct={patientsEdit} onOpen={setDrawerId} onChanged={reload} />}
 
