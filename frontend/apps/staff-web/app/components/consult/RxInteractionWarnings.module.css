@@ -1,0 +1,7 @@
+/* CLN-032: the "Why?" expander of an interaction / duplicate-therapy card. */
+.why { margin: 0; }
+.why > summary { display: inline-flex; align-items: center; min-block-size: 44px; padding-inline: 0 var(--nb-space-8); cursor: pointer; font-weight: 600; text-decoration: underline; }
+.whyBody { display: flex; flex-direction: column; gap: var(--nb-space-4); margin: 0; padding-inline-start: var(--nb-space-12); border-inline-start: 2px solid currentColor; }
+.whyBody dt { font-size: 12px; font-weight: 600; }
+.whyBody dd { margin: 0 0 var(--nb-space-4); }
+.notChecked { display: flex; gap: var(--nb-space-8); align-items: flex-start; margin: 0; }

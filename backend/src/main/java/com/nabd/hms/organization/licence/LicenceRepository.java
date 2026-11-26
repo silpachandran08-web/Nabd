@@ -74,6 +74,13 @@ class LicenceRepository {
                 .stream().findFirst().orElse(null);
     }
 
+    /** PHL-023: an entry of this type held by the staff member that has not passed its expiry date. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    boolean holdsCurrent(UUID staffId, String licenceType, LocalDate today) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM licence_registry WHERE tenant_id = app_tenant_id() " +
+                "AND holder_id = ? AND licence_type = ? AND expiry_date >= ?)", Boolean.class, staffId, licenceType, Date.valueOf(today)));
+    }
+
     private static Set<Integer> ints(java.sql.Array a) throws java.sql.SQLException {
         return new HashSet<>(java.util.Arrays.asList((Integer[]) a.getArray()));
     }

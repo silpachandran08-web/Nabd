@@ -301,7 +301,10 @@
     "cameraPreview": "Camera preview",
     "cameraStarting": "Starting the camera…",
     "cameraBlocked": "The camera could not be used. Allow camera access, or type the barcode.",
-    "cameraHint": "Hold the barcode in front of the camera."
+    "cameraHint": "Hold the barcode in front of the camera.",
+    "noPharmacist": "No registered pharmacist on duty. This sale is not blocked, but it is recorded as made without one.",
+    "ackWait": "Confirm every flagged item and give a reason before taking payment.",
+    "ackDone": "Confirmed: {reason}"
   },
   "paperRx": {
     "dialog": "Paper prescription for {item}",
@@ -336,5 +339,14 @@
     "expired": "This prescription has passed its validity date and can no longer be dispensed.",
     "itemMismatch": "The paper prescription was recorded for a different item.",
     "saveFailed": "The paper prescription could not be saved. Try again."
+  },
+  "scheduleAck": {
+    "dialog": "Confirm the sale of {item}",
+    "title": "Confirm · {item}",
+    "body": "This item's schedule class needs a second confirmation. Check the prescription and the customer, then give your reason.",
+    "reason": "Reason for dispensing",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "needReason": "Give a reason of 3 to 200 characters."
   }
 }

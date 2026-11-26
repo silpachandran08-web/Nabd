@@ -1,0 +1,53 @@
+/* FIN-036: insurance cover and the patient / insurer split at checkout. Logical properties only (RTL), 44 px targets. */
+.cover {
+  background: var(--nb-surface-2);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  margin-block-end: var(--nb-space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-8);
+}
+.title { font-size: 13px; font-weight: 600; color: var(--nb-text-secondary); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-12); }
+.radio { display: inline-flex; align-items: center; gap: var(--nb-space-8); min-block-size: 44px; cursor: pointer; font-size: 14px; }
+.radio input { inline-size: 20px; block-size: 20px; }
+.select, .text {
+  min-block-size: 44px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding-inline: var(--nb-space-12);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  max-inline-size: 100%;
+}
+.warn {
+  background: var(--nb-warn-tint);
+  color: var(--nb-warn-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  font-size: 13px;
+}
+.err { color: var(--nb-danger-500); font-size: 13px; }
+.btn {
+  min-block-size: 44px;
+  padding-inline: var(--nb-space-16);
+  border: 0;
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled { background: var(--nb-surface-3); color: var(--nb-text-disabled); cursor: not-allowed; }
+.muted { font-size: 13px; color: var(--nb-text-tertiary); }
+.num { text-align: end; white-space: nowrap; }
+.split { inline-size: 100%; border-collapse: collapse; font-size: 13.5px; margin-block-start: var(--nb-space-16); }
+.split th { text-align: start; font-size: 12px; font-weight: 600; color: var(--nb-text-tertiary); padding: var(--nb-space-8); border-block-end: 1px solid var(--nb-border-subtle); }
+.split td { padding: var(--nb-space-8); border-block-end: 1px solid var(--nb-border-subtle); }
+.split th.num, .split td.num { text-align: end; }
+.sum { display: flex; justify-content: space-between; gap: var(--nb-space-12); padding-block: 4px; font-size: 13.5px; }
+.sumMain { font-weight: 600; }

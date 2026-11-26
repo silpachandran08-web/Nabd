@@ -100,7 +100,7 @@ public class PaymentIntentService {
         if (InvoiceStatus.CLOSED.contains(inv.status()) || "paid".equals(inv.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-not-payable", "Invoice can't take payments", "This invoice is " + inv.status() + ".");
         }
-        BigDecimal balance = inv.total().subtract(inv.paid());
+        BigDecimal balance = inv.due().subtract(inv.paid()); // FIN-036: a pay link never asks the patient for the payer's share
         BigDecimal pay = amount == null ? balance : amount;
         if (pay.signum() <= 0 || pay.compareTo(balance) > 0) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "amount-exceeds-balance", "Amount is more than the balance",

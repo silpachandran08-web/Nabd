@@ -1,0 +1,36 @@
+// IDC-026 spike schema: PROTOTYPE for the Cedar benchmark, modelled on the entities IDC-027 names
+// (Staff, Patient, Record + break-glass, delegation and facility visibility mode in the context).
+// Not the approved access model: IDC-027/029 own the real one. CI: job cedar-validate in .github/workflows/ci.yml.
+namespace Nabd {
+  entity Facility;
+  // doctor and nurse are in "clinician"; receptionist and billing are in "front_desk"
+  entity Role in [Role];
+  // specialtyAccess: "open" | "referral_only" | "break_glass_only" (IDC-031)
+  entity Department { specialtyAccess: String };
+  // scope: "all_patients" | "own_patients" (IDC-001)
+  entity Staff in [Role] { facility: Facility, department: Department, scope: String, suspended: Bool };
+  entity Patient { consentWithdrawn: Bool, verified: Bool, treatedBy: Set<Staff> };
+  // kind: "note" | "prescription" | "lab_result" | "vitals" | "document"
+  entity Record {
+    patient: Patient,
+    facility: Facility,
+    department: Department,
+    author: Staff,
+    careTeam: Set<Staff>,
+    referredTo: Set<Department>,
+    kind: String,
+    signed: Bool,
+    sensitive: Bool,
+    authorOnly: Bool
+  };
+  // visibilityMode: "SAME_DEPT_PLUS_REFERRED" | "CARE_TEAM_ONLY" (IDC-029). breakGlassPatient is set by the PEP only
+  // while a break_glass_grants row is active for that one patient (IDC-030).
+  type ReadContext = {
+    visibilityMode: String,
+    policyVersion: Long,
+    breakGlassPatient?: Patient,
+    delegatedFrom?: Staff
+  };
+  action readRecord, exportRecord appliesTo { principal: [Staff], resource: [Record], context: ReadContext };
+  action readPatient appliesTo { principal: [Staff], resource: [Patient], context: ReadContext };
+}

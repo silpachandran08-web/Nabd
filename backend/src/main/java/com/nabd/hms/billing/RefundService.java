@@ -55,8 +55,12 @@ public class RefundService {
     private final ClinicPolicies policies;
     private final com.nabd.hms.pharmacy.api.ReturnPolicy returnPolicy;
 
+    private final PayerSplitService payerSplit; // FIN-036
+
     RefundService(RefundRepository repo, TenantContext tenantContext, DayCloseService dayClose, SeriesAllocator series, AuditService audit,
-                  EventPublisher events, ActorDirectory actors, ClinicPolicies policies, com.nabd.hms.pharmacy.api.ReturnPolicy returnPolicy) {
+                  EventPublisher events, ActorDirectory actors, ClinicPolicies policies, com.nabd.hms.pharmacy.api.ReturnPolicy returnPolicy,
+                  PayerSplitService payerSplit) {
+        this.payerSplit = payerSplit;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.dayClose = dayClose;
@@ -77,6 +81,7 @@ public class RefundService {
         if (InvoiceStatus.CLOSED.contains(invoice.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-not-refundable", "Invoice can't be refunded", "This invoice is " + invoice.status() + ".");
         }
+        payerSplit.requireNoPayerShare(tenantId, invoiceId); // FIN-036: a credit note on an insured bill waits for FIN-044
         if ((req.lines() == null || req.lines().isEmpty()) == (req.amount() == null)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "refund-basis", "Lines or amount", "Send either the lines to reverse or an amount, not both and not neither.");
         }

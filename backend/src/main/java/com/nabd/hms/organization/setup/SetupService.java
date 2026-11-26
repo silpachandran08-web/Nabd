@@ -68,13 +68,16 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final PriceChangeLog pricingLog;
     private final com.nabd.hms.organization.api.PlanAccount planAccount;
     private final SetupStepEvents stepEvents;
+    private final com.nabd.hms.patient.api.PrivacyRequests privacyRequests;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
                  com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
                  com.nabd.hms.iam.api.ActorDirectory actors, com.nabd.hms.patient.api.PrivacyNotices privacyNotices,
                  CalendarService calendar,
                  com.nabd.hms.organization.licence.LicenceLifecycleService licences, PriceChangeLog pricingLog,
-                 com.nabd.hms.organization.api.PlanAccount planAccount, SetupStepEvents stepEvents) {
+                 com.nabd.hms.organization.api.PlanAccount planAccount, SetupStepEvents stepEvents,
+                 com.nabd.hms.patient.api.PrivacyRequests privacyRequests) {
+        this.privacyRequests = privacyRequests;
         this.stepEvents = stepEvents;
         this.planAccount = planAccount;
         this.calendar = calendar;
@@ -402,9 +405,14 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         String status = c[2] > 0 ? "expired" : (c[1] > 0 || c[0] == 0) ? "attention" : "ok";
         String detail = c[0] == 0 ? "No licences registered"
                 : c[0] + " registered, " + c[1] + " expiring within 30 days, " + c[2] + " expired";
-        // shortcut: consent templates and retention settings have no tables yet, so only the licence item exists
+        // PLT-047: patients' privacy requests; overdue is the red state ("expired" is the card's red, as for licences)
+        var dsr = privacyRequests.health();
+        String dsrStatus = dsr.overdue() > 0 ? "expired" : dsr.dueSoon() > 0 ? "attention" : "ok";
+        String dsrDetail = dsr.open() == 0 ? "No open requests" : dsr.open() + " open, " + dsr.dueSoon() + " due soon, " + dsr.overdue() + " overdue";
+        // shortcut: consent templates and retention settings have no tables yet, so only the licence and privacy-request items exist
         return new ComplianceHealthResponse(new ComplianceHealthResponse.Licences(c[0], c[1], c[2]),
-                List.of(new ComplianceHealthResponse.Item("licence", "Licences", status, detail, "/setup?tab=licences")));
+                List.of(new ComplianceHealthResponse.Item("licence", "Licences", status, detail, "/setup?tab=licences"),
+                        new ComplianceHealthResponse.Item("dsr", "Privacy requests", dsrStatus, dsrDetail, "/compliance")));
     }
 
     @Transactional

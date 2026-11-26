@@ -5,18 +5,32 @@ export type Entitlements = {
   seatLimit: number | null;
   /** ADM-020: the clinic's lifecycle state (suspended = read-only, overdue = the owner's payment banner). Absent on an older server. */
   tenantStatus?: string | null;
-  /** PHL-032: "pharmacy" for a pharmacy-only tenant; absent on an older backend (treated as a clinic). */
+  /** PHL-032, PHL-056: "pharmacy" or "lab" for a pharmacy-only or lab-only tenant; absent on an older backend (treated as a clinic). */
   edition?: string;
 };
 
 /** PHL-032: a pharmacy-only tenant sees only these areas (and their sub-routes); the server answers 403 on every clinical or scheduling endpoint. */
 export const PHARMACY_EDITION_HREFS = ["/pharmacy", "/checkout/otc", "/billing", "/reports", "/overview", "/setup", "/staff", "/plan", "/compliance", "/account", "/patients"];
 export const pharmacyEdition = (ent: Entitlements | null): boolean => ent?.edition === "pharmacy";
-export function pharmacyHref(href: string): boolean {
+
+/** PHL-056: the editions sold without the clinic modules. A lab-only tenant sees the lab instead of the pharmacy; the server answers 403
+ * on every clinical, scheduling and pharmacy endpoint. */
+export type StandaloneEdition = "pharmacy" | "lab";
+export const EDITION_HREFS: Record<StandaloneEdition, string[]> = {
+  pharmacy: PHARMACY_EDITION_HREFS,
+  lab: ["/lab", "/billing", "/reports", "/overview", "/setup", "/staff", "/plan", "/compliance", "/account", "/patients"],
+};
+export const standaloneEdition = (ent: Entitlements | null): StandaloneEdition | null =>
+  ent?.edition === "pharmacy" || ent?.edition === "lab" ? ent.edition : null;
+export function editionHref(edition: StandaloneEdition, href: string): boolean {
   const path = href.split("?")[0];
-  return PHARMACY_EDITION_HREFS.some((h) => path === h || path.startsWith(`${h}/`));
+  return EDITION_HREFS[edition].some((h) => path === h || path.startsWith(`${h}/`));
 }
-export const editionAllows = (href: string, ent: Entitlements | null): boolean => !pharmacyEdition(ent) || pharmacyHref(href);
+export const pharmacyHref = (href: string): boolean => editionHref("pharmacy", href);
+export function editionAllows(href: string, ent: Entitlements | null): boolean {
+  const edition = standaloneEdition(ent);
+  return !edition || editionHref(edition, href);
+}
 
 // Nav item -> the plan modules that make it useful (any one is enough). Items not listed are never gated by plan.
 export const NAV_MODULES: Record<string, string[]> = {

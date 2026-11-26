@@ -184,10 +184,11 @@ class PharmacyRepository {
 
     List<RuleRow> rulesForMarket(String market) {
         return jdbc.query("SELECT schedule_class, label, requires_rx, register_type, duplicate_rx_copy, retention_years, " +
-                        "refill_self_serve_allowed, drug_master_flag FROM pharmacy_schedule_rules WHERE market = ? ORDER BY schedule_class <> 'OTC', schedule_class",
+                        "refill_self_serve_allowed, drug_master_flag, dispense_ack_required, pharmacist_warning FROM pharmacy_schedule_rules WHERE market = ? ORDER BY schedule_class <> 'OTC', schedule_class",
                 (rs, i) -> new RuleRow(rs.getString("schedule_class"), rs.getString("label"), rs.getBoolean("requires_rx"),
                         rs.getString("register_type"), rs.getBoolean("duplicate_rx_copy"), (Integer) rs.getObject("retention_years"),
-                        rs.getBoolean("refill_self_serve_allowed"), rs.getString("drug_master_flag")), market);
+                        rs.getBoolean("refill_self_serve_allowed"), rs.getString("drug_master_flag"),
+                        rs.getBoolean("dispense_ack_required"), rs.getBoolean("pharmacist_warning")), market);
     }
 
     /** PHL-004: lower-cased names of active items this clinic does not dispense (flagged in_house = false). */

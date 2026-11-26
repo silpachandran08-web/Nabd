@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import styles from "./login.module.css";
 import type { Field, LoginAction, LoginState } from "./loginMachine";
+import { branchColorIndex } from "../../lib/branches";
 
 type ViewProps = { s: LoginState; dispatch: Dispatch<LoginAction> };
 const fieldOf = (dispatch: Dispatch<LoginAction>, name: Field) => (value: string) => dispatch({ type: "field", name, value });
@@ -111,6 +112,28 @@ export function MfaVerifyView({ s, dispatch, onSubmit }: ViewProps & { onSubmit:
             {useRecovery ? t("mfa.useAuthenticator") : t("mfa.useRecovery")}
           </button>
         </form>
+      </div>
+    </main>
+  );
+}
+
+/** PLT-023: one sign-in, several branches: each button enters that branch and only that branch. */
+export function BranchPickView({ s, dispatch, onPick }: ViewProps & { onPick: (tenantId: string) => void }) {
+  const t = useTranslations("login");
+  return (
+    <main className={styles.page}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>{t("branch.title")}</h1>
+        <p className={styles.subtitle}>{t("branch.subtitle")}</p>
+        {s.formError && <div className={styles.formError} role="alert">{s.formError}</div>}
+        {(s.branchChoice?.branches ?? []).map((b) => (
+          <button key={b.tenantId} type="button" className={`${styles.submit} ${styles.altSubmit}`} disabled={s.loading} onClick={() => onPick(b.tenantId)}>
+            <span aria-hidden="true" className={`${styles.branchDot} ${styles[`branchDot${branchColorIndex(b.tenantId)}`]}`} />
+            <bdi>{b.name}</bdi>
+          </button>
+        ))}
+        {s.loading && <p className={styles.subtitle} role="status">{t("branch.entering")}</p>}
+        <button className={styles.linkBtn} type="button" onClick={() => dispatch({ type: "back" })}>{t("forgot.back")}</button>
       </div>
     </main>
   );

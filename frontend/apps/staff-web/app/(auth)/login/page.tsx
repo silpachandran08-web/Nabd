@@ -17,7 +17,8 @@ import { signInCookiesFrom } from "../../lib/bff";
 import { loadSoloMode } from "../../shell/soloMode";
 import { LOCALE_COOKIE } from "@nabd/i18n";
 import { initialLogin, loginReducer, problemAction, signInAction, type LoginProblem, type MfaChallenge, type MfaSetupRequired, type TokenPair } from "./loginMachine";
-import { ForgotView, MfaSetupView, MfaVerifyView, OtpView, PinChangeView, SignInView } from "./LoginViews";
+import { selectBody, type BranchChoice } from "../../lib/branches";
+import { BranchPickView, ForgotView, MfaSetupView, MfaVerifyView, OtpView, PinChangeView, SignInView } from "./LoginViews";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -57,7 +58,7 @@ export default function LoginPage() {
   }
 
   /** PIN and OTP sign-in answer the same three ways: enrol MFA, verify a code, or tokens. */
-  async function signedIn(body: TokenPair | MfaChallenge | MfaSetupRequired) {
+  async function signedIn(body: TokenPair | MfaChallenge | MfaSetupRequired | BranchChoice) {
     const next = signInAction(body);
     if (!next) return handleTokens(body as TokenPair);
     dispatch(next);
@@ -169,12 +170,29 @@ export default function LoginPage() {
       });
       const body = await res.json();
       if (res.ok) {
-        await handleTokens(body as TokenPair);
+        await signedIn(body); // a session, or (PLT-023) the choice of branch
         return;
       }
       applyProblem(res.status, body as LoginProblem);
     } catch {
       dispatch({ type: "error", message: t("errors.network") });
+    } finally {
+      dispatch({ type: "settled" });
+    }
+  }
+
+  // PLT-023: the choice token is single use and short lived; the answer is a session for the chosen branch only.
+  async function pickBranch(tenantId: string) {
+    if (!s.branchChoice) return;
+    dispatch({ type: "submit" });
+    try {
+      const res = await loginFetch(`${API_BASE}/auth/branches/select`, { method: "POST", headers: { "Content-Type": "application/json", ...deviceLabelHeader() },
+        body: JSON.stringify(selectBody(s.branchChoice, tenantId)) }, slow);
+      const body = await res.json();
+      if (res.ok) await handleTokens(body as TokenPair);
+      else dispatch({ type: "error", message: (body as LoginProblem).detail || t("errors.invalid") }); // used or expired (401), not linked or suspended there (403)
+    } catch (err) {
+      failed(err);
     } finally {
       dispatch({ type: "settled" });
     }
@@ -265,6 +283,7 @@ export default function LoginPage() {
   }
 
   if (view === "pinChange") return <PinChangeView s={s} dispatch={dispatch} onSubmit={submitPinChange} />;
+  if (view === "branchPick" && s.branchChoice) return <BranchPickView s={s} dispatch={dispatch} onPick={(id) => void pickBranch(id)} />;
   if (view === "mfaSetup" || view === "mfaSetupDone") return <MfaSetupView s={s} dispatch={dispatch} onSubmit={submitMfaSetupConfirm} />;
   if (view === "mfaVerify" && challenge) return <MfaVerifyView s={s} dispatch={dispatch} onSubmit={submitMfa} />;
   if (view === "forgotRequest" || view === "forgotConfirm" || view === "forgotDone") {

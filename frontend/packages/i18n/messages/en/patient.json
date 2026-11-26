@@ -118,5 +118,9 @@
  "pkgStatus_expired": "Expired",
  "pkgStatus_completed": "All sessions used",
  "pkgStatus_refunded": "Refunded",
- "pkgStatus_cancelled": "Cancelled"
+ "pkgStatus_cancelled": "Cancelled",
+ "dxTitle": "Your data",
+ "dxHint": "This file holds the copy of your data that you asked the clinic for: your record, a readable summary and the list of who opened your record.",
+ "dxDownload": "Download my data",
+ "dxPrivate": "Keep this file private. It is your medical information. The link works for 72 hours."
 }

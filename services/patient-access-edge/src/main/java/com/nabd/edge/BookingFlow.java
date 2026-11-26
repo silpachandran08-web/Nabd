@@ -208,6 +208,7 @@ class BookingFlow {
         keep.put("lang", l);
         return new Outcome(State.MENU, keep, BookingCopy.t(l, "menu", content(c).profile().clinicName()),
                 List.of(new Button("menu:book", BookingCopy.t(l, "menu.book")), new Button("menu:mine", BookingCopy.t(l, "menu.mine")),
+                        new Button(RecordsFlow.BUTTON, BookingCopy.t(l, "menu.records")), // COM-050: a fourth option, so the menu is a list message
                         new Button("menu:talk", BookingCopy.t(l, "menu.talk"))));
     }
 

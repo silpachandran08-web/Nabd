@@ -26,6 +26,11 @@ final class ProvisioningModels {
             return branch == null && "pharmacy".equals(edition);
         }
 
+        /** PHL-056: a lab-only tenant; never an add-branch job. */
+        boolean lab() {
+            return branch == null && "lab".equals(edition);
+        }
+
         boolean isGatedAndUnapproved() {
             return "enterprise".equals(path) && approvedAt == null;
         }

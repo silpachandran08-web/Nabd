@@ -10,7 +10,7 @@ export type CacheLike = {
 };
 
 /** Resources that live messages keep fresh; a snapshot (connect, resume gap) invalidates all of them. */
-export const LIVE_RESOURCES = ["queue", "wait-estimate", "doctor-delay", "nursing", "roster", "doctor-status", "patient-messages", "desk-exceptions", "pharmacy-worklist"] as const;
+export const LIVE_RESOURCES = ["queue", "wait-estimate", "doctor-delay", "nursing", "roster", "doctor-status", "patient-messages", "desk-exceptions", "pharmacy-worklist", "live-ops"] as const;
 
 /** Event type (without the .vN suffix) -> the cache resources it makes stale. */
 export function resourcesFor(type: string): readonly string[] {
@@ -23,6 +23,7 @@ export function resourcesFor(type: string): readonly string[] {
   if (type.startsWith("desk.exception.")) return ["desk-exceptions"]; // ACC-032
   if (type.startsWith("billing.discount.")) return ["discount-approvals"]; // FIN-018: desk banner + owner inbox
   if (type.startsWith("pharmacy.worklist.")) return ["pharmacy-worklist"]; // PHL-012: the In-house dispensing worklist
+  if (type.startsWith("reporting.ops_alert.")) return ["live-ops"]; // ADM-042: the owner's live operations board
   return [];
 }
 

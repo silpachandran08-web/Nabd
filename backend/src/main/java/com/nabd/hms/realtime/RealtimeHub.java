@@ -295,6 +295,17 @@ public class RealtimeHub {
         }
     }
 
+    /** ADM-042: the tenants with an open stream on this pod that subscribed to the topic. */
+    public Set<UUID> tenantsWatching(RealtimeTopic topic) {
+        Set<UUID> out = new java.util.HashSet<>();
+        byTenant.forEach((tenant, set) -> {
+            if (set.stream().anyMatch(c -> !c.closed() && c.topics.contains(topic))) {
+                out.add(tenant);
+            }
+        });
+        return out;
+    }
+
     static String channel(UUID tenantId) {
         return "t:" + tenantId + ":rt";
     }

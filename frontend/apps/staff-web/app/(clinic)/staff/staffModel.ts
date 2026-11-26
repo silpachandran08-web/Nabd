@@ -49,6 +49,7 @@ export const MODULES: { key: string; label: string }[] = [
   { key: "pharmacy", label: "Pharmacy" },
   // PHL-041: Create = order tests, Edit = collect samples and enter results, Approve = validate and release, Delete = catalogue and QC.
   { key: "lab", label: "Lab" },
+  { key: "insurance", label: "Insurance" },
   { key: "reports", label: "Reports" },
   { key: "staff", label: "Staff & Access" },
   { key: "setup", label: "Clinic Setup" },

@@ -6,6 +6,7 @@ import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
 import { rxItemLine, type PrescriptionItem, type RxWarning } from "./shared";
+import { genericWarnings } from "./rx/interactionWarnings";
 import s from "./consultParts.module.css";
 
 /** Glossary ids (packages/i18n/glossary): the warning title is a clinical term, so every screen shows the same reviewed wording. */
@@ -13,6 +14,8 @@ export const WARNING_TITLE_ID: Record<RxWarning["kind"], string> = {
   allergy: "allergy.warning.title",
   pregnancy: "pregnancy.warning.title",
   controlled: "controlled.warning.title",
+  ddi: "interaction.warning.title",
+  duplicate: "duplicate.warning.title",
 };
 
 type Glossary = ReturnType<typeof useTranslations>;
@@ -37,7 +40,7 @@ export default function RxWarnings({
 }) {
   const t = useTranslations("consult.rxWarnings");
   const g = useTranslations("glossary");
-  const warnings = item.warnings ?? [];
+  const warnings = genericWarnings(item); // CLN-032: ddi and duplicate have their own cards (RxInteractionWarnings)
   if (warnings.length === 0) return null;
   return (
     <div className={s.warnStack}>

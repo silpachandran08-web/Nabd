@@ -21,13 +21,13 @@
 modules:
   billing:
     # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
-    owns: [billing_documents, charge_catalogue, claim_pack_formats, claim_packs, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules]
+    owns: [billing_documents, charge_catalogue, claim_pack_formats, claim_packs, payment_gateway_accounts, credit_note_lines, credit_notes, day_close_events, day_closes, dues_reminders, gateway_webhook_events, discount_approvals, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, payment_intents, refund_requests, tax_rules, visit_pending_charges]
     reads: [charge_doctor_fees, licence_registry, patients, pharmacy_item_profiles, staff, tenants]  # FIN-015: the per-doctor consultation fee is read at checkout; FIN-035: the claim pack prints the doctor's registration number (staff) and the facility licence (licence_registry)
   clinical:
-    owns: [chronic_conditions, clinical_documents, clinical_notes, clinical_photos, dental_chair_notes, dental_chart_entries, dental_chart_events, dental_images, dental_preset_overrides, dental_settings, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, photo_consents, prescription_items, prescription_rx_tokens, prescription_signer_backfill, prescriptions, rx_coding_suggestions, rx_validity_rules, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
+    owns: [chronic_conditions, clinical_documents, clinical_notes, clinical_photos, dental_chair_notes, dental_chart_entries, dental_chart_events, dental_images, dental_preset_overrides, dental_settings, drug_classes, drug_duplicate_classes, drug_ingredients, drug_interaction_versions, drug_interactions, drug_master, drug_master_imports, drug_master_stage, drug_usage, drug_usage_applied, favourite_rx_set_items, favourite_rx_sets, ingredients, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, patient_reported_medicines, photo_consents, prescription_items, prescription_rx_tokens, prescription_signer_backfill, prescriptions, rx_coding_suggestions, rx_validity_rules, safety_dictionary_entries, safety_dictionary_versions, visit_attachments, vitals]
     reads: []
   common:
-    owns: [audit_chain_heads, audit_chain_seals, audit_log, cross_tenant_ref_quarantine, crypto_reencrypt_progress, kms_region_keys, outbox_events, tenant_data_keys]
+    owns: [archive_manifests, audit_chain_heads, audit_chain_seals, audit_log, audit_log_unpartitioned, cross_tenant_ref_quarantine, crypto_reencrypt_progress, data_retention_policies, kms_region_keys, outbox_events, tenant_data_keys]
     reads: [tenants]  # PLT-045: TenantKeyService lists tenants and reads their region and status; the same read ClinicClock, TenantContext and CryptoReencryptJob already do
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
@@ -37,18 +37,24 @@ modules:
     # COM-052: recall orders (the retention engine). Booking a follow-up reaches it through engagement.api.RecallBookings.
     owns: [recall_orders]
     reads: [appointments, queue_entries]  # COM-052: the closing visit's patient, doctor and clinic date; an upcoming follow-up already booked with that doctor (ids and status only)
+  exchange:
+    # IDC-055: the health-information exchange (FHIR R4 mapping). Owns no table. A signed consult is read only through the owners'
+    # APIs (clinical.api.SignedConsults, queue.api.VisitEncounters, patient.api.PatientDemographics, iam.api.PractitionerRecords,
+    # identity.api.HealthIds); the one SQL read is the clinic's name for the Organization resource.
+    owns: []
+    reads: [tenants]
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
     # (remaining direct staff reads elsewhere are baseline debt).
     packages: [iam, auth, staff]
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences, training_completions]
+    owns: [brand_login_token_uses, brand_logins, break_glass_alerts, break_glass_grants, login_attempts, pin_assertion_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review, staff_onboarding_progress, staff_preferences, training_completions]
     reads: [patients, phi_read_log, specialty_profiles, staff_specialty_profiles]  # CLN-042: the access token carries the staff member's specialty claim and specialty_<code> permissions; PLT-013: the owner's break-glass review lists what the holder read (phi_read_log by grant) with the patient's name and MRN
   lab:
     # PHL-041: the test and panel catalogue. Prices live on charge_catalogue and are read and written through
-    # organization.api.ChargeCatalogue, never by SQL from here.
-    owns: [lab_panel_tests, lab_panels, lab_tests]
-    reads: []
+    # organization.api.ChargeCatalogue, never by SQL from here. PHL-045: sample collection and accession tracking.
+    owns: [lab_accession_sequences, lab_container_order, lab_order_items, lab_orders, lab_panel_tests, lab_panels, lab_reference_ranges, lab_sample_items, lab_samples, lab_tests]
+    reads: [tenants]  # PHL-043: the lab order sheet names the clinic; PHL-042: lab_reference_ranges
   messaging:
     owns: [comms_cutover_flags, message_usage_alerts, messaging_suppressions, notification_requests, template_catalogue, template_lint_rules, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, outbox_events, patients]  # COM-008: consent export version; COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands
@@ -67,8 +73,8 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_notification_preferences, patient_proxies, patient_registry_summary, patients, phone_reverifications, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
-    reads: [appointments, clinical_documents, queue_entries, tenants]  # IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
+    owns: [chat_added_members, chat_consents, consents, internal_patient_refs, notice_templates, patient_branch_links, patient_desk_tasks, patient_duplicate_dismissals, patient_merges, patient_notification_preferences, patient_proxies, patient_registry_summary, patients, phone_reverifications, privacy_notices, profile_claims, proxy_invites, registry_dirty, secure_link_opens, secure_links]
+    reads: [appointments, clinical_documents, phi_read_log, queue_entries, tenants]  # PLT-024: the owner's brand-directory log lists the clinic's own phi_read_log rows of purpose brand_directory_lookup (read-only; they are written by the V3690 functions); IDC-014: the care fan-out reads the no-show appointment, the visit and its issued visit summary (ids and status only); IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
     # PLT-036 / PHL-003 AC1: the cached stock balance of an item is the one column of another module's table that pharmacy writes
     # (UPDATE ... SET stock_qty only; StockWriteOwnershipTest keeps every other package out). Rows are created and changed by billing.
@@ -80,7 +86,7 @@ modules:
     reads: [owners, roles, staff]  # PLT-022: provisioning checks its own seed rows (built-in role, owner staff, owner by email) to be re-runnable, and the owner "Add branch" flow resolves the signed-in owner, brand and clinics (read-only; the seeds are written through ProvisioningSeeds)
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
-    owns: [daily_summary_settings, doctor_daily_metrics, tenant_daily_metrics]
+    owns: [daily_summary_settings, doctor_daily_metrics, ops_alert_thresholds, tenant_daily_metrics]  # ADM-042: the live board owns only its alert thresholds
     # ADM-043: the daily summary's close time (doctor_working_hours, day_closes), average wait (queue_entry_events), unbilled amount
     # (procedure_orders) and the brand's clinics for the combined message (tenants, brands)
     reads: [appointments, brands, day_closes, doctor_delays, doctor_working_hours, eta_accuracy_daily, invoice_line_items, invoice_payments, invoices, package_instance_items, package_instances, patients, procedure_orders, queue_entries, queue_entry_events, staff, tenants]  # OPS-010: the recompute-from-source of one tenant-day; ADM-041: the time KPIs of that day (stage events, working hours, ETA accuracy rollup); ADM-047: the library reads source rows of each report by design (staff and patient names, invoice lines, package items, announced doctor delays), read-only, masked or aggregated per report, every export audited

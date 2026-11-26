@@ -15,6 +15,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -33,6 +34,14 @@ class EntitlementGuard implements WebMvcConfigurer, HandlerInterceptor {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(this).addPathPatterns("/v1/**");
+        // PHL-056: a lab must hear MODULE_NOT_ENTITLED on /v1/pharmacy, not the pharmacy-mode answer PharmacyModeGuard gives first
+        registry.addInterceptor(new HandlerInterceptor() {
+            @Override
+            public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+                editionCheck(request, handler);
+                return true;
+            }
+        }).addPathPatterns("/v1/pharmacy/**").order(-1);
     }
 
     /**
@@ -43,7 +52,7 @@ class EntitlementGuard implements WebMvcConfigurer, HandlerInterceptor {
     static final List<String> PHARMACY_EDITION_BLOCKED = List.of("/v1/appointments", "/v1/booking-requests", "/v1/booking-policy",
             "/v1/clinical", "/v1/queue", "/v1/schedule", "/v1/waitlist", "/v1/nursing", "/v1/specialty", "/v1/packages", "/v1/doctors",
             "/v1/recall-orders", "/v1/front-desk", "/v1/display", "/v1/display-devices", "/v1/facility",
-            "/v1/queue-settings", "/v1/clinic", "/v1/abha");
+            "/v1/queue-settings", "/v1/clinic", "/v1/abha", "/v1/insurance"); // FIN-036: insurance covers visits, which a pharmacy has none of
     /**
      * Structural net for the prefix list: every controller of these scheduling/clinical modules is blocked whatever its path (reports and
      * staff sub-resources live under other prefixes), so a new endpoint cannot slip through. Shared with billing: the reason-code picker.
@@ -52,22 +61,53 @@ class EntitlementGuard implements WebMvcConfigurer, HandlerInterceptor {
             "com.nabd.hms.specialty", "com.nabd.hms.packages");
     private static final List<String> PHARMACY_EDITION_ALLOWED = List.of("/v1/clinical/drug", "/v1/reason-codes");
 
-    static boolean blockedForPharmacy(String path, Class<?> controller) {
-        if (PHARMACY_EDITION_ALLOWED.stream().anyMatch(path::startsWith)) return false;
-        return PHARMACY_EDITION_BLOCKED.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/"))
-                || PHARMACY_EDITION_BLOCKED_PACKAGES.stream().anyMatch(controller.getPackageName()::startsWith);
+    /** What one standalone edition (tenants.facility_type) does not have: path prefixes, whole controller packages, and the exceptions. */
+    record EditionRule(String detail, List<String> blocked, List<String> blockedPackages, List<String> allowed) {
+        boolean blocks(String path, Class<?> controller) {
+            if (allowed.stream().anyMatch(path::startsWith)) return false;
+            return blocked.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/"))
+                    || blockedPackages.stream().anyMatch(controller.getPackageName()::startsWith);
+        }
+    }
+
+    private static List<String> plus(List<String> base, String... more) {
+        return java.util.stream.Stream.concat(base.stream(), java.util.stream.Stream.of(more)).toList();
+    }
+
+    /**
+     * PHL-056: a lab-only tenant has everything the pharmacy edition lacks and no pharmacy either: the pharmacy, clinical (the drug
+     * master and visit attachments included) and engagement (recalls) packages are blocked whatever the path.
+     */
+    static final Map<String, EditionRule> EDITIONS = Map.of(
+            "pharmacy", new EditionRule("This is a pharmacy account: clinical and scheduling modules are not part of it.",
+                    PHARMACY_EDITION_BLOCKED, PHARMACY_EDITION_BLOCKED_PACKAGES, PHARMACY_EDITION_ALLOWED),
+            "lab", new EditionRule("This is a lab account: clinical, scheduling and pharmacy modules are not part of it.",
+                    plus(PHARMACY_EDITION_BLOCKED, "/v1/pharmacy", "/v1/encounters"),
+                    plus(PHARMACY_EDITION_BLOCKED_PACKAGES, "com.nabd.hms.pharmacy", "com.nabd.hms.clinical", "com.nabd.hms.engagement"),
+                    List.of("/v1/reason-codes")));
+
+    /** "pharmacy" or "lab" for a standalone edition; every other facility type is a clinic. */
+    static String editionOf(String facilityType) {
+        return EDITIONS.containsKey(facilityType) ? facilityType : "clinic";
+    }
+
+    private void editionCheck(HttpServletRequest request, Object handler) {
+        if (!(handler instanceof HandlerMethod hm)) return;
+        if (SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken t
+                && t.getToken().getClaimAsString("tenantId") != null) {
+            for (Map.Entry<String, EditionRule> e : EDITIONS.entrySet()) { // the facility type is read only for a path some edition blocks
+                if (e.getValue().blocks(request.getRequestURI(), hm.getBeanType())
+                        && e.getKey().equals(entitlements.facilityType(UUID.fromString(t.getToken().getClaimAsString("tenantId"))))) {
+                    throw new ApiException(HttpStatus.FORBIDDEN, "module-not-entitled", "MODULE_NOT_ENTITLED", e.getValue().detail());
+                }
+            }
+        }
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod hm)) return true;
-        if (SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken t
-                && t.getToken().getClaimAsString("tenantId") != null
-                && blockedForPharmacy(request.getRequestURI(), hm.getBeanType())
-                && "pharmacy".equals(entitlements.facilityType(UUID.fromString(t.getToken().getClaimAsString("tenantId"))))) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "module-not-entitled", "MODULE_NOT_ENTITLED",
-                    "This is a pharmacy account: clinical and scheduling modules are not part of it.");
-        }
+        editionCheck(request, handler);
         if (SAFE.contains(request.getMethod())) return true;
         RequiresEntitlement req = AnnotatedElementUtils.findMergedAnnotation(hm.getMethod(), RequiresEntitlement.class);
         if (req == null) req = AnnotatedElementUtils.findMergedAnnotation(hm.getBeanType(), RequiresEntitlement.class);

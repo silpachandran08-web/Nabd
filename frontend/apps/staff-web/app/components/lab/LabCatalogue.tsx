@@ -9,6 +9,7 @@ import { formatNumber } from "@nabd/i18n";
 import styles from "../../(clinic)/setup/setup.module.css";
 import lab from "./lab.module.css";
 import Dialog from "../ui/Dialog";
+import LabRanges from "./LabRanges";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { api, ApiError, errorText } from "../../lib/api";
 import { can } from "../../lib/permissions";
@@ -52,6 +53,7 @@ function TestsTab({ canEdit }: { canEdit: boolean }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [editing, setEditing] = useState<LabTest | "new" | null>(null);
   const [importing, setImporting] = useState(false);
+  const [ranges, setRanges] = useState<LabTest | null>(null); // PHL-042
 
   const path = (q: string, cursor?: string) => `/lab/tests?limit=50${q ? `&q=${encodeURIComponent(q)}` : ""}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
   const load = useCallback(async (q: string) => {
@@ -101,6 +103,7 @@ function TestsTab({ canEdit }: { canEdit: boolean }) {
                     <th scope="col">{t("col.tat")}</th>
                     <th scope="col" className={lab.num}>{t("col.price")}</th>
                     <th scope="col">{t("col.status")}</th>
+                    <th scope="col"><span className="srOnly">{t("ranges.open")}</span></th>
                     {canEdit && <th scope="col"><span className="srOnly">{t("col.actions")}</span></th>}
                   </tr>
                 </thead>
@@ -118,6 +121,7 @@ function TestsTab({ canEdit }: { canEdit: boolean }) {
                         <td>{t(`tat.${tat.unit}`, { count: tat.value })}</td>
                         <td className={lab.num}>{needsPrice(x) ? t("tests.noPrice") : money(x.price)}</td>
                         <td>{needsPrice(x) ? t("status.needsPrice") : x.active ? t("status.active") : t("status.inactive")}</td>
+                        <td><button type="button" className={`${styles.btn} ${lab.target}`} aria-label={t("ranges.openOf", { name: x.name })} onClick={() => setRanges(x)}>{t("ranges.open")}</button></td>
                         {canEdit && <td><button type="button" className={`${styles.btn} ${lab.target}`} aria-label={t("tests.editOf", { name: x.name })} onClick={() => { setNotice(null); setEditing(x); }}>{t("tests.edit")}</button></td>}
                       </tr>
                     );
@@ -129,6 +133,7 @@ function TestsTab({ canEdit }: { canEdit: boolean }) {
           </>
         )}
       {editing && <TestDrawer test={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={(name) => saved(t("tests.saved", { name }))} />}
+      {ranges && <LabRanges test={ranges} onClose={() => setRanges(null)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} onDone={(n) => saved(t("import.done", { count: n }))} />}
     </section>
   );
@@ -207,7 +212,7 @@ function TestDrawer({ test, onClose, onSaved }: { test: LabTest | null; onClose:
 }
 
 /** Dry run first: the diff is shown before anything is created; the import itself needs a second, explicit press. */
-function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: (created: number) => void }) {
+export function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: (created: number) => void }) {
   const t = useTranslations("shell.lab");
   const [diff, setDiff] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);

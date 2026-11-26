@@ -40,6 +40,7 @@ class ProvisioningStepRunner {
     private static final Logger log = LoggerFactory.getLogger(ProvisioningStepRunner.class);
 
     private static final String PHARMACY_PLAN = "pharmacy_basic";
+    private static final String LAB_PLAN = "lab_basic"; // PHL-056
 
     private final ProvisioningRepository repo;
     private final com.nabd.hms.pharmacy.api.PharmacyEdition pharmacyEdition;
@@ -187,7 +188,7 @@ class ProvisioningStepRunner {
             return;
         }
         tenantContext.set(tenantId);
-        repo.deleteSubscription(tenantId); // PHL-032: the pharmacy plan subscription (no-op for a clinic); before the tenant row (FK)
+        repo.deleteSubscription(tenantId); // PHL-032, PHL-056: the pharmacy or lab plan subscription (no-op for a clinic); before the tenant row (FK)
         iamSeeds.deleteSeededRoles(tenantId);
         departmentSeeds.deleteAll(tenantId); // before undoCreateTenant deletes the tenant row (FK)
     }
@@ -242,7 +243,7 @@ class ProvisioningStepRunner {
 
         UUID tenantId = job.isBranch() ? repo.insertBranchTenant(job.branch(), job.tenantSlug(), job.tenantName(), brandId)
                 : repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
-        if (job.pharmacy()) repo.setFacilityType(tenantId, job.edition()); // PHL-032 (pharmacy() is never true for an add-branch job)
+        if (job.pharmacy() || job.lab()) repo.setFacilityType(tenantId, job.edition()); // PHL-032, PHL-056 (never true for an add-branch job)
         repo.setJobCreatedRefs(job.id(), tenantId, ownerId, brandId);
         repo.setJobCreationFlags(job.id(), ownerIsNew, brandIsNew);
         tenantKeys.provision(tenantId, job.region()); // PLT-045: the tenant's DEK exists before any patient row can be written
@@ -261,13 +262,16 @@ class ProvisioningStepRunner {
         if (repo.hasBuiltInRole(tenantId)) {
             return; // retry after a later step failed — already seeded (all presets in this one transaction), nothing to redo
         }
-        for (RolePresets.Preset p : RolePresets.forEdition(job.pharmacy() ? job.edition() : "clinic")) {
+        for (RolePresets.Preset p : RolePresets.forEdition(job.pharmacy() || job.lab() ? job.edition() : "clinic")) {
             iamSeeds.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
         }
         departmentSeeds.seedDefault(tenantId);
         if (job.pharmacy()) { // PHL-032: the pharmacy edition keeps stock in-house from day one and sells on the pharmacy plan
             pharmacyEdition.startInHouse(tenantId);
             repo.subscribeToPlan(tenantId, PHARMACY_PLAN, regions.region(job.region()).currency());
+        }
+        if (job.lab()) { // PHL-056: the lab edition sells on the lab plan (lab and billing modules); the catalogue is loaded in the wizard
+            repo.subscribeToPlan(tenantId, LAB_PLAN, regions.region(job.region()).currency());
         }
     }
 

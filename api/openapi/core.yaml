@@ -7606,6 +7606,51 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:view
+  /v1/clinical/visits/{queueEntryId}/lab-order-sheet:
+    post:
+      operationId: LabOrderController_externalSheet
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExternalLabSheetRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: clinical:edit
   /v1/clinical/visits/{queueEntryId}/summary:
     get:
       operationId: VisitSummaryController_get
@@ -9744,6 +9789,334 @@ paths:
       tags:
       - queue
       x-required-permission: queue:edit
+  /v1/insurance/invoices/{invoiceId}/payer-payments:
+    post:
+      operationId: InsuranceController_recordPayerPayment
+      parameters:
+      - in: path
+        name: invoiceId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayerPaymentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PayerPosition"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:edit
+  /v1/insurance/patients/{patientId}/policies:
+    get:
+      operationId: InsuranceController_policies
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PolicyList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:view
+    post:
+      operationId: InsuranceController_addPolicy
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Policy"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:edit
+  /v1/insurance/payers:
+    get:
+      operationId: InsuranceController_payers
+      parameters:
+      - in: query
+        name: jurisdiction
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PayerList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:view
+    post:
+      operationId: InsuranceController_createPayer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayerRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Payer"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:edit
+  /v1/insurance/payers/{payerId}/plans:
+    post:
+      operationId: InsuranceController_createPlan
+      parameters:
+      - in: path
+        name: payerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Plan"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:edit
+  /v1/insurance/visits/{visitId}/coverage:
+    get:
+      operationId: InsuranceController_coverage
+      parameters:
+      - in: path
+        name: visitId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Coverage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:view
+    put:
+      operationId: InsuranceController_setCoverage
+      parameters:
+      - in: path
+        name: visitId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CoverageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Coverage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - insurance
+      x-required-permission: insurance:edit
   /v1/lab/catalogue/imports:
     post:
       operationId: LabController_importCatalogue
@@ -9781,6 +10154,194 @@ paths:
       tags:
       - lab
       x-required-permission: lab:catalogue
+  /v1/lab/order-favourites:
+    get:
+      operationId: LabOrderController_favourites
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderFavourites"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+  /v1/lab/orders:
+    get:
+      operationId: LabOrderController_forVisit
+      parameters:
+      - in: query
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderList"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+    post:
+      operationId: LabOrderController_place
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabOrderRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderPlaced"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+  /v1/lab/orders/{id}/cancel:
+    post:
+      operationId: LabOrderController_cancel
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabOrderCancelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabOrderCancelled"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
+  /v1/lab/orders/{id}/sheet:
+    get:
+      operationId: LabOrderController_sheet
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:order
   /v1/lab/panels:
     get:
       operationId: LabController_panels
@@ -9977,6 +10538,93 @@ paths:
       tags:
       - lab
       x-required-permission: lab:catalogue
+  /v1/lab/tests/{id}/ranges:
+    get:
+      operationId: LabRangeController_ranges
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: version
+        required: false
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabRangeSet"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:view
+    put:
+      operationId: LabRangeController_replace
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabRangeSetRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LabRangeSet"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - lab
+      x-required-permission: lab:validate
   /v1/me/entitlements:
     get:
       operationId: MeEntitlementsController_get
@@ -27656,6 +28304,69 @@ components:
         walkIns:
           type: integer
           format: int32
+    Coverage:
+      type: object
+      properties:
+        copayPercent:
+          type: number
+        eligibilityRef:
+          type: string
+        locked:
+          type: boolean
+        mode:
+          type: string
+        payerName:
+          type: string
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoveragePolicy"
+        policyId:
+          type: string
+          format: uuid
+        visitDate:
+          type: string
+          format: date
+        visitId:
+          type: string
+          format: uuid
+    CoveragePolicy:
+      type: object
+      properties:
+        copayPercent:
+          type: number
+        id:
+          type: string
+          format: uuid
+        memberIdMasked:
+          type: string
+        payerName:
+          type: string
+        planName:
+          type: string
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type: string
+          format: date
+        warning:
+          type: string
+    CoverageRequest:
+      type: object
+      properties:
+        eligibilityRef:
+          type: string
+          maxLength: 80
+          minLength: 0
+        mode:
+          type: string
+          pattern: self_pay|insured
+        policyId:
+          type: string
+          format: uuid
+      required:
+      - mode
     CreateProvisioningJobRequest:
       type: object
       properties:
@@ -29766,6 +30477,38 @@ components:
       required:
       - newValidityEnd
       - reason
+    ExternalLabSheetRequest:
+      type: object
+      properties:
+        clinicalNote:
+          type: string
+          maxLength: 500
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+        fastingHours:
+          type: integer
+          format: int32
+          maximum: 24
+          minimum: 1
+        labName:
+          type: string
+          maxLength: 120
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+        priority:
+          type: string
+          pattern: routine|urgent|stat
+        tests:
+          type: array
+          items:
+            type: string
+            maxLength: 120
+            minLength: 0
+            pattern: "^[^\\x00-\\x1F\\x7F]*$"
+          maxItems: 30
+          minItems: 0
+      required:
+      - tests
     FacilityCheckInConfig:
       type: object
       properties:
@@ -30927,6 +31670,36 @@ components:
           type: array
           items:
             type: string
+    Insurance:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InsuranceLine"
+        patientShare:
+          type: number
+        payerId:
+          type: string
+          format: uuid
+        payerPaid:
+          type: number
+        payerShare:
+          type: number
+        pendingDecision:
+          type: number
+    InsuranceLine:
+      type: object
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        patientShareMinor:
+          type: integer
+          format: int64
+        payerShareMinor:
+          type: integer
+          format: int64
     InternalAppointmentActionRequest:
       type: object
       properties:
@@ -31271,6 +32044,8 @@ components:
         id:
           type: string
           format: uuid
+        insurance:
+          $ref: "#/components/schemas/Insurance"
         invoiceNumber:
           type: string
         lineItems:
@@ -31493,6 +32268,245 @@ components:
       - reviewed
       - skipped
       - toCreate
+    LabOrder:
+      type: object
+      properties:
+        accessionHint:
+          type: string
+        cancellable:
+          type: boolean
+        clinicalNote:
+          type: string
+        destinationKind:
+          type: string
+        fastingHours:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderItem"
+        orderedAt:
+          type: string
+          format: date-time
+        orderingDoctorId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        priority:
+          type: string
+        queueEntryId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        total:
+          type: number
+      required:
+      - accessionHint
+      - cancellable
+      - destinationKind
+      - id
+      - items
+      - orderedAt
+      - patientId
+      - priority
+      - status
+      - total
+    LabOrderCancelRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 200
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+      required:
+      - reason
+    LabOrderCancelled:
+      type: object
+      properties:
+        chargesAlreadyBilled:
+          type: integer
+          format: int32
+        chargesRemoved:
+          type: integer
+          format: int32
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - chargesAlreadyBilled
+      - chargesRemoved
+      - orderId
+      - status
+    LabOrderCharge:
+      type: object
+      properties:
+        amount:
+          type: number
+        chargeCode:
+          type: string
+        name:
+          type: string
+      required:
+      - amount
+      - chargeCode
+      - name
+    LabOrderDestination:
+      type: object
+      properties:
+        kind:
+          type: string
+          pattern: inhouse|partner|external
+        partnerLabId:
+          type: string
+          format: uuid
+      required:
+      - kind
+    LabOrderFavourite:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        name:
+          type: string
+        orders:
+          type: integer
+          format: int32
+        price:
+          type: number
+      required:
+      - code
+      - id
+      - kind
+      - name
+      - orders
+      - price
+    LabOrderFavourites:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderFavourite"
+      required:
+      - items
+    LabOrderItem:
+      type: object
+      properties:
+        code:
+          type: string
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        panelId:
+          type: string
+          format: uuid
+        panelName:
+          type: string
+        price:
+          type: number
+        status:
+          type: string
+        testId:
+          type: string
+          format: uuid
+      required:
+      - code
+      - id
+      - name
+      - price
+      - status
+      - testId
+    LabOrderItemRequest:
+      type: object
+      properties:
+        panelId:
+          type: string
+          format: uuid
+        testId:
+          type: string
+          format: uuid
+    LabOrderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrder"
+      required:
+      - items
+    LabOrderPlaced:
+      type: object
+      properties:
+        accessionHint:
+          type: string
+        charges:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderCharge"
+        fastingNotice:
+          type: string
+        orderId:
+          type: string
+          format: uuid
+      required:
+      - accessionHint
+      - charges
+      - orderId
+    LabOrderRequest:
+      type: object
+      properties:
+        clinicalNote:
+          type: string
+          maxLength: 500
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+        destination:
+          $ref: "#/components/schemas/LabOrderDestination"
+        encounterId:
+          type: string
+          format: uuid
+        fastingHours:
+          type: integer
+          format: int32
+          maximum: 24
+          minimum: 1
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabOrderItemRequest"
+          maxItems: 30
+          minItems: 0
+        patientId:
+          type: string
+          format: uuid
+        priority:
+          type: string
+          pattern: routine|urgent|stat
+        queueEntryId:
+          type: string
+          format: uuid
+      required:
+      - destination
+      - items
+      - patientId
+      - priority
     LabOutsourced:
       type: object
       properties:
@@ -31592,6 +32606,65 @@ components:
       - id
       - name
       - price
+    LabRangeBand:
+      type: object
+      properties:
+        ageMaxDays:
+          type: integer
+          format: int32
+          maximum: 55000
+          minimum: 1
+        ageMinDays:
+          type: integer
+          format: int32
+          maximum: 55000
+          minimum: 0
+        criticalHigh:
+          type: number
+        criticalLow:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        sex:
+          type: string
+          pattern: ^(M|F|any)$
+        text:
+          type: string
+          maxLength: 200
+          minLength: 0
+          pattern: "^[^\\x00-\\x1F\\x7F]*$"
+      required:
+      - ageMinDays
+      - sex
+    LabRangeSet:
+      type: object
+      properties:
+        effectiveFrom:
+          type: string
+          format: date-time
+        ranges:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabRangeBand"
+        version:
+          type: integer
+          format: int32
+      required:
+      - ranges
+      - version
+    LabRangeSetRequest:
+      type: object
+      properties:
+        ranges:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabRangeBand"
+          maxItems: 100
+          minItems: 0
+      required:
+      - ranges
     LabTest:
       type: object
       properties:
@@ -33908,6 +34981,84 @@ components:
       - gender
       - name
       - phone
+    Payer:
+      type: object
+      properties:
+        global:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        jurisdiction:
+          type: string
+        kind:
+          type: string
+        name:
+          type: string
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plan"
+    PayerList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payer"
+    PayerPaymentRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: false
+          minimum: 0.01
+        reference:
+          type: string
+          maxLength: 100
+          minLength: 0
+      required:
+      - amount
+    PayerPosition:
+      type: object
+      properties:
+        currency:
+          type: string
+        invoiceId:
+          type: string
+          format: uuid
+        patientShare:
+          type: number
+        payerId:
+          type: string
+          format: uuid
+        payerPaid:
+          type: number
+        payerShare:
+          type: number
+        pendingDecision:
+          type: number
+    PayerRequest:
+      type: object
+      properties:
+        identifiers:
+          type: object
+          additionalProperties:
+            type: string
+        kind:
+          type: string
+          pattern: insurer|tpa|government_scheme
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+      required:
+      - kind
+      - name
     PaymentIntentCreated:
       type: object
       properties:
@@ -34541,6 +35692,18 @@ components:
       required:
       - mobilePhone
       - tenantSlug
+    Plan:
+      type: object
+      properties:
+        copayPercent:
+          type: number
+        global:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
     PlanCatalogueEntry:
       type: object
       properties:
@@ -34594,6 +35757,22 @@ components:
         version:
           type: integer
           format: int32
+    PlanRequest:
+      type: object
+      properties:
+        copayPercent:
+          type: number
+          exclusiveMaximum: false
+          exclusiveMinimum: false
+          maximum: 100
+          minimum: 0
+        name:
+          type: string
+          maxLength: 120
+          minLength: 0
+      required:
+      - copayPercent
+      - name
     PlanResponse:
       type: object
       properties:
@@ -34705,6 +35884,98 @@ components:
       - currency
       - monthlyPriceCents
       - name
+    Policy:
+      type: object
+      properties:
+        cardDocumentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        copayPercent:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        expired:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        memberId:
+          type: string
+        patientId:
+          type: string
+          format: uuid
+        payerId:
+          type: string
+          format: uuid
+        payerName:
+          type: string
+        planId:
+          type: string
+          format: uuid
+        planName:
+          type: string
+        policyNumber:
+          type: string
+        relationship:
+          type: string
+        status:
+          type: string
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type: string
+          format: date
+    PolicyList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Policy"
+    PolicyRequest:
+      type: object
+      properties:
+        cardDocumentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 4
+          minItems: 0
+        memberId:
+          type: string
+          maxLength: 64
+          minLength: 0
+        payerId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+          format: uuid
+        policyNumber:
+          type: string
+          maxLength: 64
+          minLength: 0
+        relationship:
+          type: string
+          pattern: self|spouse|child|parent|other
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type: string
+          format: date
+      required:
+      - memberId
+      - payerId
+      - policyNumber
+      - relationship
+      - validFrom
+      - validTo
     PolicyResponse:
       type: object
       properties:

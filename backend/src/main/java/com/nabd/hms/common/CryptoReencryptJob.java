@@ -38,6 +38,8 @@ public class CryptoReencryptJob {
             new Target("master.operators", "mfa_secret_enc", "mfa_secret", false, List.of("id")),
             new Target("master.operators", "mfa_pending_secret_enc", "mfa_secret", false, List.of("id")),
             new Target("patients", "national_id_enc", "national_id_enc", true, List.of("id")),
+            new Target("patient_policies", "member_id_enc", "member_id_enc", true, List.of("id")), // FIN-036
+            new Target("patient_policies", "policy_number_enc", "policy_number_enc", true, List.of("id")),
             new Target("idempotency_keys", "response_body_enc", "response_body_enc", true, List.of("actor_id", "idem_key")));
 
     public record Result(boolean finished, int batches) {

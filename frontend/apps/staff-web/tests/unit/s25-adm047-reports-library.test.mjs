@@ -15,10 +15,10 @@ const hi = JSON.parse(read("../../../../packages/i18n/messages/hi/shell.json")).
 test("AC1: Money, Patients and Team hold the spec's reports, in order", () => {
   const by = (g) => REPORT_CATALOG.filter((r) => r.group === g).map((r) => r.key);
   assert.deepEqual(GROUPS, ["money", "patients", "team"]);
-  assert.deepEqual(by("money"), ["leakage", "takings", "package-liability", "tax-summary"]);
+  assert.deepEqual(by("money"), ["leakage", "takings", "package-liability", "package-sales", "package-redemption", "package-expiry-loss", "tax-summary"]); // ADM-049: three tabs of the package report
   assert.deepEqual(by("patients"), ["patient-sources", "patient-retention", "no-show-watch"]);
   assert.deepEqual(by("team"), ["staff-activity", "doctor-productivity", "doctor-on-time"]);
-  assert.equal(new Set(REPORT_CATALOG.map((r) => r.key)).size, 10);
+  assert.equal(new Set(REPORT_CATALOG.map((r) => r.key)).size, 13);
 });
 
 test("the catalogue matches the backend registry (keys, groups, required grant)", () => {
@@ -27,7 +27,7 @@ test("the catalogue matches the backend registry (keys, groups, required grant)"
 });
 
 test("a report behind a grant the caller lacks is absent, not disabled", () => {
-  assert.equal(visibleReports(() => true).length, 10);
+  assert.equal(visibleReports(() => true).length, 13);
   const keys = visibleReports((p) => p !== "packages:view").map((r) => r.key);
   assert.equal(keys.length, 9);
   assert.ok(!keys.includes("package-liability"));

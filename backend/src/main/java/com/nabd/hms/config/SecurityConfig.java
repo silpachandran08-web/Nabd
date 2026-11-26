@@ -247,6 +247,7 @@ public class SecurityConfig {
                                 "/v1/auth/pin/reset-request",
                                 "/v1/auth/pin/reset-confirm",
                                 "/v1/auth/refresh",
+                                "/v1/auth/branches/select", // PLT-023: a sign-in step; the brand_select token travels in the body (BranchService)
                                 // PLT-001: consume their own challenge token (mfa_setup in the body) via ChallengeTokenDecoder; MfaCaller refuses with 401
                                 "/v1/auth/mfa/enroll",
                                 "/v1/auth/mfa/confirm",

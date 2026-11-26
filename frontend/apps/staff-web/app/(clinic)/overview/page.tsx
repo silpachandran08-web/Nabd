@@ -14,6 +14,7 @@ import { DpaReacceptBanner } from "../../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
 import EtaAccuracyTile from "./EtaAccuracyTile";
 import FlowOverviewSection from "./FlowOverview";
+import LiveOpsSection from "./LiveOps";
 import DailySummaryDialog from "./DailySummaryDialog";
 import AllFacilities from "../../components/facilities/AllFacilities";
 import { useFacilityScope } from "../../shell/facilityScope";
@@ -208,6 +209,7 @@ function OverviewInner() {
         </section>
       )}
 
+      <LiveOpsSection />
       {clinical && <FlowOverviewSection />}
 
       <div className={styles.kpis}>

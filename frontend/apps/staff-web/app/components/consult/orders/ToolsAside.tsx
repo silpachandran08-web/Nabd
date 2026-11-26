@@ -1,6 +1,6 @@
 "use client";
 
-// FEF-030: the side column of the workspace: prescription summary, doctor orders, follow-up, package.
+// FEF-030: the side column of the workspace: prescription summary, doctor orders, PHL-043 lab tests, follow-up, package.
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { can } from "../../../lib/permissions";
@@ -9,6 +9,7 @@ import DoctorOrders from "../DoctorOrders";
 import FollowUpPanel from "../FollowUpPanel";
 import type { Recall } from "../recall";
 import PackageSessionCard from "../PackageSessionCard";
+import LabTestsCard from "../LabTestsCard";
 import RxSummary from "../rx/RxSummary";
 import PanelBoundary from "../visit/PanelBoundary";
 import styles from "../consult.module.css";
@@ -27,6 +28,7 @@ export default function ToolsAside({ entry, patient, authedFetch, rxItems, rxSta
     <aside className={styles.tools} aria-label={t("contextualTools")}>
       <PanelBoundary panel="rxSummary"><RxSummary items={rxItems} status={rxStatus} onOpen={onOpenRx} /></PanelBoundary>
       <PanelBoundary panel="orders"><DoctorOrders authedFetch={authedFetch} queueEntryId={entry.id} /></PanelBoundary>
+      <PanelBoundary panel="labTests"><LabTestsCard key={entry.id} entry={entry} /></PanelBoundary>
       <PanelBoundary panel="followUp">
         <FollowUpPanel key={entry.id} authedFetch={authedFetch} entryId={entry.id} doctorId={entry.doctorId} patientId={entry.patientId} onBooked={onFollowUp} canBook={can("queue:create")}
           recall={{ canSet: canSetRecall, canView: can("clinical:view"), onChange: onRecall }} />

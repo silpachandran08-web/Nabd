@@ -181,7 +181,7 @@ export default function VisitWorkspace(w: WorkspaceProps) {
 
           {wf.step === "reason" && <PanelBoundary panel="reason"><ReasonStep entry={entry} ctx={ctx} onRetry={reloadCtx} onNext={() => dispatch({ type: "goto", step: "examine" })} /></PanelBoundary>}
           {wf.step === "examine" && <ExamineStep {...field} entry={entry} patient={patient} authedFetch={authedFetch} locked={locked} noteLoaded={n.noteLoad === "ok"} onOpenDental={() => dispatch({ type: "dental", open: true })} />}
-          {wf.step === "assess" && <AssessStep {...field} />}
+          {wf.step === "assess" && <AssessStep {...field} visit={{ entryId: entry.id, locked, canAmend: mayAmendNote }} />}
           {wf.step === "plan" && (
             <>
               <PlanField {...field} />

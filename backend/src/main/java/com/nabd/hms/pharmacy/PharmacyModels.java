@@ -14,7 +14,8 @@ class PharmacyModels {
     }
 
     record RuleRow(String code, String label, boolean requiresRx, String register, boolean duplicateRxCopy, Integer retentionYears,
-                   boolean refillSelfServeAllowed, String drugMasterFlag) {
+                   boolean refillSelfServeAllowed, String drugMasterFlag,
+                   boolean dispenseAckRequired, boolean pharmacistWarning) { // PHL-023
     }
 
     record SettingsRow(String mode, Instant modeChangedAt, String licenceJson, UUID pharmacistInChargeStaffId, UUID alertRecipientStaffId) {

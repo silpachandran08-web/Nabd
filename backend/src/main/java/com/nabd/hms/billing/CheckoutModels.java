@@ -26,7 +26,11 @@ final class CheckoutModels {
 
     record InvoiceRow(UUID id, String invoiceNumber, UUID queueEntryId, UUID patientId, UUID doctorId,
                        BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff,
-                       BigDecimal total, BigDecimal paid, String status, Instant createdAt) {
+                       BigDecimal total, BigDecimal paid, String status, Instant createdAt, BigDecimal payerShare) {
+        /** FIN-036: what the patient owes of the total (all of it unless the visit is insured). */
+        BigDecimal due() {
+            return total.subtract(payerShare);
+        }
     }
 
     record LineItemRow(String chargeCode, String chargeName, String category, int quantity,

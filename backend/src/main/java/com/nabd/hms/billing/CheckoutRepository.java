@@ -94,6 +94,19 @@ class CheckoutRepository {
         procedures.markVisitBilled(tenantId, queueEntryId);
     }
 
+    /** PHL-043: the price-list heads another module (lab orders) put on this visit's bill through billing.api.VisitCharges, not billed yet. */
+    List<UUID> pendingChargeItemIds(UUID tenantId, UUID queueEntryId) {
+        return jdbc.queryForList("SELECT charge_item_id FROM visit_pending_charges WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'pending'",
+                UUID.class, tenantId, queueEntryId);
+    }
+
+    /** PHL-043: the pending charges this checkout billed. One the desk took off the bill stays pending for the visit's next billing stop. */
+    void markPendingChargesBilled(UUID tenantId, UUID queueEntryId, UUID invoiceId, List<UUID> billedChargeItemIds) {
+        jdbc.update("UPDATE visit_pending_charges SET status = 'billed', invoice_id = ?, settled_at = now() "
+                        + "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'pending' AND charge_item_id = ANY (?)",
+                invoiceId, tenantId, queueEntryId, billedChargeItemIds.stream().filter(java.util.Objects::nonNull).toArray(UUID[]::new));
+    }
+
     /** PLT-035: through queue.api.VisitQueries (billing SQL never touches queue_entries). */
     Optional<QueueEntryContext> findQueueEntryContext(UUID tenantId, UUID queueEntryId) {
         return visits.visit(tenantId, queueEntryId)
@@ -342,7 +355,7 @@ class CheckoutRepository {
 
     private static final String INVOICE_SELECT =
             "SELECT id, invoice_number, queue_entry_id, patient_id, doctor_id, subtotal, discount, tax, round_off, " +
-                    "total, paid, status, created_at FROM invoices ";
+                    "total, paid, status, created_at, payer_share FROM invoices ";
 
     private RowMapper<InvoiceRow> invoiceMapper() {
         return (rs, i) -> new InvoiceRow(
@@ -350,7 +363,7 @@ class CheckoutRepository {
                 uuidOrNull(rs, "queue_entry_id"), uuidOrNull(rs, "patient_id"),
                 uuidOrNull(rs, "doctor_id"), rs.getBigDecimal("subtotal"), rs.getBigDecimal("discount"),
                 rs.getBigDecimal("tax"), rs.getBigDecimal("round_off"), rs.getBigDecimal("total"), rs.getBigDecimal("paid"),
-                rs.getString("status"), rs.getTimestamp("created_at").toInstant());
+                rs.getString("status"), rs.getTimestamp("created_at").toInstant(), rs.getBigDecimal("payer_share"));
     }
 
     /** NB-186: OTC sale invoices leave queue_entry_id/patient_id/doctor_id null. */

@@ -29,6 +29,9 @@ public interface VisitQueries {
 
     Optional<Visit> visit(UUID tenantId, UUID visitId);
 
+    /** FIN-036: the clinic date of a visit (a policy is checked against the day of the visit, not today); empty when unknown. */
+    Optional<LocalDate> visitDate(UUID tenantId, UUID visitId);
+
     /** FIN-015: the patient's completed visits with this doctor, newest clinic date first. */
     List<VisitDay> completedVisits(UUID tenantId, UUID patientId, UUID doctorId);
 

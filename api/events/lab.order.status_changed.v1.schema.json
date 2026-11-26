@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:lab.order.status_changed.v1",
+  "title": "lab.order.status_changed.v1",
+  "description": "An order's status changed in the lab worklist (ordered -> collected -> in_progress -> resulted -> validated). Ids and status only, no PHI. The lab worklist refetches.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "orderId",
+    "status",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "orderId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ordered",
+        "collected",
+        "in_progress",
+        "resulted",
+        "validated"
+      ],
+      "description": "The new status of the order in the lab workflow."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "orderId": "55555555-5555-4555-8555-555555555555",
+      "status": "collected",
+      "version": 1
+    }
+  ]
+}

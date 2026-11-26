@@ -34,10 +34,13 @@ public class InvoiceDocumentService {
     private final com.nabd.hms.common.TenantContext tenantContext;
     private final com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy;
     private final com.nabd.hms.organization.api.RegionRules regions;
+    private final com.nabd.hms.billing.einvoice.EinvoiceService einvoices; // FIN-011
 
     InvoiceDocumentService(CheckoutService checkout, InvoiceDocumentRepository repo, AuditService audit, ActorDirectory actors,
                            com.nabd.hms.common.ClinicClock clock, com.nabd.hms.common.TenantContext tenantContext,
-                           com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy, com.nabd.hms.organization.api.RegionRules regions) {
+                           com.nabd.hms.pharmacy.api.PharmacyTaxInputs pharmacy, com.nabd.hms.organization.api.RegionRules regions,
+                           com.nabd.hms.billing.einvoice.EinvoiceService einvoices) {
+        this.einvoices = einvoices;
         this.regions = regions;
         this.pharmacy = pharmacy;
         this.clock = clock;
@@ -69,8 +72,10 @@ public class InvoiceDocumentService {
         byte[] pdf = thermal ? SimplePdf.render(lines, 226.8f, 0, 12f, 7f, true) : SimplePdf.render(lines, 595.3f, 841.9f, 40f, 9f, false);
         String key = "tenants/" + tenantId + "/billing/" + invoiceId + "/" + kind + "-" + layout + "-v" + version + ".pdf";
         if (repo.store(tenantId, invoiceId, kind, layout, version, key, sha256(pdf), pdf)) {
-            String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
-            audit.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.document_rendered", "invoice", invoiceId, null,
+            // COM-050: staffId is null when the document is first rendered for the patient's own request in chat
+            String[] actor = staffId == null ? new String[]{"patient via edge", "patient-access-edge"}
+                    : actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
+            audit.record(tenantId, staffId == null ? "system" : "staff", staffId, actor[0], actor[1], null, "billing.document_rendered", "invoice", invoiceId, null,
                     Map.of("kind", kind, "layout", layout, "version", version));
             return pdf;
         }
@@ -97,8 +102,11 @@ public class InvoiceDocumentService {
             String batch = h == null ? null : batches.get(h);
             return zero == null ? batch : batch == null ? zero : zero + "\n" + batch;
         }).toList();
-        return InvoiceDocumentText.build(inv, supplier, kind, "receipt".equals(kind) ? repo.latestReceiptNumber(tenantId, invoiceId) : null,
-                cols, repo.sacHsn(tenantId, invoiceId), notes);
+        List<String> out = new java.util.ArrayList<>(InvoiceDocumentText.build(inv, supplier, kind,
+                "receipt".equals(kind) ? repo.latestReceiptNumber(tenantId, invoiceId) : null, cols, repo.sacHsn(tenantId, invoiceId), notes));
+        // FIN-011: IRN, Ack No and Ack date (or "IRN pending") of a B2B e-invoice, above the closing line
+        if (!"receipt".equals(kind)) for (String l : einvoices.printLines(invoiceId)) out.addAll(out.size() - 1, InvoiceDocumentText.wrap(l, cols));
+        return out;
     }
 
     private static String sha256(byte[] b) {

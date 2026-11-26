@@ -369,6 +369,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("organization.tenant.region_pinned.v1");
         expected.remove("organization.tenant.status_changed.v1"); // ADM-020: operator-plane lifecycle move, Adm020LifecycleApiTest
         expected.remove("organization.branch.created.v1"); // PLT-022: Plt022OwnerBranchApiTest
+        expected.remove("iam.branch.switched.v1"); // PLT-023: Plt023BranchSwitchApiTest
         expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type());
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         expected.remove("comms.inbound.received.v1");
@@ -396,6 +397,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("patient.guardian.handover_due.v1"); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove("patient.guardian.handover_completed.v1"); // IDC-012: Idc012ProfileClaimApiTest
         expected.remove("organization.export.ready.v1"); // ADM-015: Adm015DataExportApiTest
+        expected.remove("patient.dsr.received.v1"); // PLT-047: Plt047DsrApiTest
+        expected.remove("patient.dsr.export_ready.v1"); // PLT-047: produced by the export worker, Plt047DsrExportApiTest
         expected.remove("organization.offboarding.erased.v1"); // ADM-016: produced by the erasure worker, Adm016OffboardingApiTest
         expected.remove("comms.template.status_changed.v1"); // COM-013: Com013TemplateLifecycleApiTest
         expected.remove("scheduling.appointment.confirmed.v1"); // COM-043: Com043ReminderApiTest
@@ -412,6 +415,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("pharmacy.otc_sale.completed.v1"); // PHL-019: Phl019CounterSaleApiTest
         expected.remove("reporting.export.created.v1"); // ADM-047: Adm047ReportsLibraryApiTest
         expected.remove("lab.catalogue.changed.v1"); // PHL-041: Phl041LabCatalogueApiTest
+        expected.remove("lab.order.placed.v1"); // PHL-043: Phl043LabOrderApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

@@ -1,5 +1,6 @@
 package com.nabd.hms.auth.internal.token;
 
+import com.nabd.hms.auth.internal.store.BranchRepository;
 import com.nabd.hms.auth.internal.store.StaffDirectoryRepository;
 import com.nabd.hms.auth.internal.store.CredentialRepository;
 import com.nabd.hms.auth.internal.store.AuthSessionRepository;
@@ -10,6 +11,7 @@ import com.nabd.hms.auth.internal.breakglass.BreakGlassPolicy;
 import com.nabd.hms.auth.internal.breakglass.BreakGlassSession;
 import com.nabd.hms.auth.internal.guard.LoginGuard;
 import com.nabd.hms.auth.MfaPolicy;
+import com.nabd.hms.auth.dto.BranchChoiceResponse;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
 import com.nabd.hms.auth.dto.MfaSetupRequiredResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
@@ -62,9 +64,11 @@ public class TokenService {
     private final LoginGuard guard;
     private final MfaPolicy mfaPolicy;
     private final Clock clock;
+    private final BranchRepository branches;
 
     TokenService(AuthSessionRepository sessionRepo, CredentialRepository credentials, StaffDirectoryRepository staffDir, JwtEncoder jwtEncoder, AuthProperties props, ObjectMapper objectMapper,
-                 AuditService auditService, LoginGuard guard, MfaPolicy mfaPolicy, Clock clock) {
+                 AuditService auditService, LoginGuard guard, MfaPolicy mfaPolicy, Clock clock, BranchRepository branches) {
+        this.branches = branches;
         this.sessionRepo = sessionRepo; this.credentials = credentials; this.staffDir = staffDir;
         this.jwtEncoder = jwtEncoder;
         this.props = props;
@@ -83,7 +87,20 @@ public class TokenService {
         if (staff.mfaEnabled()) {
             return issueMfaChallenge(staff);
         }
-        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+        return signedIn(staff, false, ip, device, userAgent);
+    }
+
+    /** PLT-023: the end of a sign-in. A person linked to more than one open branch gets a branch choice (a single-use
+     * brand_select token: who signed in, where, second factor passed or not) and no session yet; everyone else the session as before. */
+    public Object signedIn(Staff staff, boolean mfaPassed, String ip, String device, String userAgent) {
+        List<BranchRepository.Branch> open = staff.brandLoginId() == null ? List.of()
+                : branches.branchesOf(staff.id(), staff.tenantId()).stream().filter(BranchRepository.Branch::open).toList();
+        if (open.size() < 2) {
+            return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+        }
+        JwtClaimsSet.Builder claims = mfaClaims(staff, "brand_select").id(UUID.randomUUID().toString()).claim("mfa", mfaPassed);
+        return new BranchChoiceResponse(encode(claims, TokenType.BRAND_SELECT, Audience.BRAND_SELECT), props.mfaChallengeTtlMinutes() * 60L,
+                open.stream().map(BranchRepository.Branch::summary).toList());
     }
 
     public void enforceIpRateLimit(String ip) {
@@ -125,12 +142,12 @@ public class TokenService {
     }
 
     public MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
-        String token = encode(mfaClaims(staff, "mfa_setup_required"), TokenType.MFA_SETUP);
+        String token = encode(mfaClaims(staff, "mfa_setup_required"), TokenType.MFA_SETUP, Audience.MFA);
         return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
 
     public MfaChallengeResponse issueMfaChallenge(Staff staff) {
-        String token = encode(mfaClaims(staff, "mfa_pending"), TokenType.MFA_PENDING);
+        String token = encode(mfaClaims(staff, "mfa_pending"), TokenType.MFA_PENDING, Audience.MFA);
         return new MfaChallengeResponse(token, "totp", props.mfaChallengeTtlMinutes() * 60L);
     }
 
@@ -145,8 +162,8 @@ public class TokenService {
                 .claim("tenantId", staff.tenantId().toString());
     }
 
-    private String encode(JwtClaimsSet.Builder claimsB, TokenType type) {
-        type.stamp(claimsB, Audience.MFA);
+    private String encode(JwtClaimsSet.Builder claimsB, TokenType type, Audience aud) {
+        type.stamp(claimsB, aud);
         return jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue();
     }
 
@@ -156,6 +173,11 @@ public class TokenService {
 
     /** PLT-012: bg != null mints the read-only emergency token for that grant (see BreakGlassService). */
     public TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent, BreakGlassSession bg) {
+        return mintTokenPair(staff, familyId, ip, device, userAgent, bg, false);
+    }
+
+    /** PLT-023: reportsOnly mints the 'All branches (reports)' session: reports grants only, and ReportsOnlyInterceptor refuses the rest. */
+    public TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent, BreakGlassSession bg, boolean reportsOnly) {
         Role role = staffDir.findRole(staff.roleId())
                 .orElseThrow(() -> new IllegalStateException("role missing for staff " + staff.id()));
         Tenant tenant = staffDir.findTenantById(staff.tenantId())
@@ -208,6 +230,13 @@ public class TokenService {
             }
         }
 
+        if (reportsOnly) {
+            permissions.removeIf(p -> !p.startsWith("reports:"));
+            if (!permissions.contains("reports:view")) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "REPORTS_NOT_ALLOWED", "Reports not allowed", "Your role in this branch cannot open reports.");
+            }
+        }
+
         UUID sessionId = bg != null ? bg.sessionId() : com.nabd.hms.shared.UuidV7.next();
         Instant now = Instant.now(clock);
         Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
@@ -236,9 +265,11 @@ public class TokenService {
         if (bg != null) {
             claimsB.claim("bg", bg.grantId().toString());
         }
-        if (!specialties.isEmpty()) {
+        if (!specialties.isEmpty() && !reportsOnly) {
             claimsB.claim("specialty", specialties.get(0)[0]); // the primary profile code, e.g. DERM
         }
+        if (staff.brandLoginId() != null) claimsB.claim("brandLogin", staff.brandLoginId().toString()); // PLT-023: display only, the shell then asks for the branch list
+        if (reportsOnly) claimsB.claim("reportsOnly", true);
         TokenType.ACCESS.stamp(claimsB, Audience.STAFF_API);
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue();
 
@@ -246,6 +277,7 @@ public class TokenService {
         Instant refreshExp = bg != null ? bg.expiresAt() : now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
         sessionRepo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent, now);
+        if (reportsOnly) sessionRepo.markReportsOnly(sessionId);
 
         return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),
                 Duration.between(now, refreshExp).toSeconds());

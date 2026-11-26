@@ -62,9 +62,22 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
 
     public enum Refusal { EXPIRED, LOCKED, RATE_LIMITED, OTP_INVALID, REVERIFY }
 
-    /** {@code packageCard} is set (and fileUrl/mime null) for a package_card link (COM-044). */
-    public record Opened(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard) {
+    /** {@code packageCard} is set (and fileUrl/mime null) for a package_card link (COM-044); {@code dataExport} for a data_export link (PLT-047). */
+    public record Opened(String fileUrl, String mime, String title, com.nabd.hms.patient.api.PackageCards.Card packageCard, ExportFile dataExport) {
     }
+
+    /** PLT-047: the patient's data package (a zip), handed over inline once the code is right.
+     * shortcut: base64 in the JSON answer (the package is capped by DsrExportService); stream it when packages grow past a few MB. */
+    @io.swagger.v3.oas.annotations.media.Schema(name = "SecureLinkExportFile")
+    public record ExportFile(String fileName, String contentBase64, String sha256) {
+    }
+
+    /** PLT-047: a minted data-export link. {@code url} carries the one-time-shown token: put it only in the message. */
+    public record ExportLink(UUID linkId, String url, String firstName, Instant expiresAt) {
+    }
+
+    static final Duration EXPORT_TTL = Duration.ofHours(72);
+    static final int EXPORT_MAX_OPENS = 3;
 
     public record Result<T>(T value, Refusal refusal) {
         static <T> Result<T> ok(T v) {
@@ -77,7 +90,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     }
 
     private record Link(UUID id, String documentType, UUID documentId, UUID patientId, UUID recipientId, Instant expiresAt, int maxOpens, int openCount,
-                        int failedOtps, Instant lockedUntil, String otpHash, Instant otpExpiresAt) {
+                        int failedOtps, Instant lockedUntil, String otpHash, Instant otpExpiresAt, UUID createdBy) {
     }
 
     private final JdbcTemplate jdbc;
@@ -91,12 +104,15 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     private final String baseUrl;
     private final com.nabd.hms.patient.internal.PhoneReverificationService reverifications;
     private final com.nabd.hms.patient.api.PackageCards packageCards;
+    private final com.nabd.hms.patient.internal.RecordAccess recordAccess;
 
     SecureLinkService(JdbcTemplate jdbc, TenantContext tenantContext, Clock clock, FileStore files, NotificationPort notifications,
                       SecureLinkOtpDelivery otpSender, AuditService audit, ActorDirectory actors,
                       @Value("${app.secure-links.base-url:http://localhost:3810}") String baseUrl,
                       com.nabd.hms.patient.internal.PhoneReverificationService reverifications,
-                      com.nabd.hms.patient.api.PackageCards packageCards) {
+                      com.nabd.hms.patient.api.PackageCards packageCards,
+                      com.nabd.hms.patient.internal.RecordAccess recordAccess) {
+        this.recordAccess = recordAccess;
         this.packageCards = packageCards;
         this.reverifications = reverifications;
         this.jdbc = jdbc;
@@ -149,21 +165,51 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     private record Minted(UUID id, String url, Instant expires) {
     }
 
-    /** Stores a new link (token shown once: only its hash is kept) and audits the issue. */
+    /** Stores a new link (token shown once: only its hash is kept) and audits the issue by the staff member. */
     private Minted mint(UUID staffId, String ip, String documentType, UUID documentId, UUID patient, UUID recipient, int days) {
+        UUID tenant = tenantContext.current();
+        Minted m = store(staffId, documentType, documentId, patient, recipient, clock.instant().plus(Duration.ofDays(days)));
+        ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Forbidden"));
+        audit.record(tenant, "staff", staffId, actor.name(), actor.role(), ip, "secure_link.issued", "secure_link", m.id(), null,
+                Map.of("documentType", documentType, "ttlDays", days));
+        return m;
+    }
+
+    private Minted store(UUID createdBy, String documentType, UUID documentId, UUID patient, UUID recipient, Instant expires) {
         UUID tenant = tenantContext.current();
         byte[] tenantBytes = ByteBuffer.allocate(16).putLong(tenant.getMostSignificantBits()).putLong(tenant.getLeastSignificantBits()).array();
         byte[] rnd = new byte[32];
         RANDOM.nextBytes(rnd);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteBuffer.allocate(48).put(tenantBytes).put(rnd).array());
-        Instant expires = clock.instant().plus(Duration.ofDays(days));
         UUID id = jdbc.queryForObject("INSERT INTO secure_links (tenant_id, token_hash, document_type, document_id, patient_id, recipient_patient_id, expires_at, created_by) "
                         + "VALUES (?,?,?,?,?,?,?,?) RETURNING id", UUID.class, tenant, sha256(token), documentType, documentId, patient, recipient,
-                java.sql.Timestamp.from(expires), staffId);
-        ActorDirectory.Actor actor = actors.findActor(tenant, staffId).orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "forbidden", "Forbidden", "Forbidden"));
-        audit.record(tenant, "staff", staffId, actor.name(), actor.role(), ip, "secure_link.issued", "secure_link", id, null,
-                Map.of("documentType", documentType, "ttlDays", days));
+                java.sql.Timestamp.from(expires), createdBy);
         return new Minted(id, baseUrl + "/l/" + token, expires);
+    }
+
+    /** COM-050: what the chat gets back; {@code url} carries the token (shown once). */
+    public record ChatLink(UUID linkId, String url, Instant expiresAt) {
+    }
+
+    /**
+     * COM-050: a link the patient asked for in the clinic's chat, to a stored file of {@code patient}. There is no staff actor, so
+     * created_by is null. The caller has decided that the recipient may see this patient's records (RecordAccess) and audits the
+     * issue; sendOtp and open ask RecordAccess again, so the link dies with the scope. Nothing is sent from here: the bot answers
+     * in the chat. Empty when the patient's data may not be processed (IDC-006) or the recipient has no number.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<ChatLink> issueFromChat(String documentType, UUID fileId, UUID patient, UUID recipient, Duration ttl) {
+        boolean stored = files.info(fileId).filter(i -> "available".equals(i.status()) && patient.equals(i.patientId())).isPresent();
+        if (!stored || !processable(patient) || recipient(recipient).isEmpty()) {
+            return Optional.empty();
+        }
+        Minted m = store(null, documentType, fileId, patient, recipient, clock.instant().plus(ttl));
+        return Optional.of(new ChatLink(m.id(), m.url(), m.expires()));
+    }
+
+    /** COM-050: a link with no staff creator was issued in chat on the strength of the recipient's record scope; that scope can end. */
+    private boolean scopeEnded(Link l) {
+        return l.createdBy() == null && !recordAccess.mayView(l.recipientId(), l.patientId());
     }
 
     /** COM-044: the package card link, to the patient only, with the clinic's default lifetime. Nothing is sent here. */
@@ -184,6 +230,18 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
     public com.nabd.hms.patient.api.SecureDocumentLinks.Issued issueForFile(UUID staffId, String ip, UUID fileId, UUID recipientPatientId, String language) {
         Issued i = issue(staffId, ip, new IssueRequest("document", fileId, recipientPatientId, null, true, language));
         return new com.nabd.hms.patient.api.SecureDocumentLinks.Issued(i.linkId(), i.expiresAt());
+    }
+
+    /** PLT-047: a data-export link (72h OTP, up to 3 opens). */
+    @Transactional
+    public Optional<ExportLink> issueDataExport(UUID requestId, UUID patientId, UUID recipientId) {
+        Optional<String> firstName = recipient(recipientId);
+        if (firstName.isEmpty() || !processable(patientId)) {
+            return Optional.empty();
+        }
+        Minted m = mint(null, null, "data_export", requestId, patientId, recipientId, 3); // 72 hours = 3 days
+        jdbc.update("UPDATE secure_links SET max_opens = ? WHERE id = ?", EXPORT_MAX_OPENS, m.id());
+        return Optional.of(new ExportLink(m.id(), m.url(), firstName.get(), m.expires()));
     }
 
     // ---------------------------------------------------------------- public: otp, open
@@ -207,7 +265,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         UUID tenant = tenantContext.current();
         Link l = lock(token);
         Instant now = clock.instant();
-        if (l == null || gone(l, now)) {
+        if (l == null || gone(l, now) || scopeEnded(l)) {
             if (l != null) {
                 logOpen(tenant, l.id(), ip, userAgent, "expired");
             }
@@ -253,7 +311,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         if (l == null) {
             return Result.no(Refusal.EXPIRED);
         }
-        if (gone(l, now) || !processable(l.patientId())) {
+        if (gone(l, now) || !processable(l.patientId()) || scopeEnded(l)) {
             logOpen(tenant, l.id(), ip, userAgent, "expired");
             return Result.no(Refusal.EXPIRED);
         }
@@ -288,7 +346,7 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
             logOpen(tenant, l.id(), ip, userAgent, "opened");
             audit.record(tenant, "system", null, "patient via secure link", "Patient", ip, "secure_link.opened", "secure_link", l.id(), null,
                     Map.of("documentType", l.documentType()));
-            return Result.ok(new Opened(null, null, "Package card", card.get()));
+            return Result.ok(new Opened(null, null, "Package card", card.get(), null));
         }
         Optional<FileStore.FileInfo> f = files.info(l.documentId()).filter(i -> "available".equals(i.status()) && l.patientId().equals(i.patientId()));
         if (f.isEmpty()) {
@@ -300,16 +358,22 @@ public class SecureLinkService implements com.nabd.hms.patient.api.SecureDocumen
         audit.record(tenant, "system", null, "patient via secure link", "Patient", ip, "secure_link.opened", "secure_link", l.id(), null,
                 Map.of("documentType", l.documentType()));
         FileStore.SignedUrl url = files.downloadUrl(l.documentId(), FILE_URL_TTL);
-        return Result.ok(new Opened(url.url(), f.get().contentType(), "report".equals(l.documentType()) ? "Report" : "Document", null));
+        return Result.ok(new Opened(url.url(), f.get().contentType(), switch (l.documentType()) {
+            case "report" -> "Report";
+            case "rx" -> "Prescription";
+            case "invoice" -> "Invoice";
+            default -> "Document";
+        }, null, null));
     }
 
     // ---------------------------------------------------------------- helpers
 
     private Link lock(String token) {
-        return jdbc.query("SELECT id, document_type, document_id, patient_id, recipient_patient_id, expires_at, max_opens, open_count, failed_otps, locked_until, otp_hash, otp_expires_at "
+        return jdbc.query("SELECT id, document_type, document_id, patient_id, recipient_patient_id, expires_at, max_opens, open_count, failed_otps, locked_until, otp_hash, otp_expires_at, created_by "
                         + "FROM secure_links WHERE token_hash = ? FOR UPDATE", (rs, i) -> new Link(rs.getObject(1, UUID.class), rs.getString(2), rs.getObject(3, UUID.class),
                         rs.getObject(4, UUID.class), rs.getObject(5, UUID.class), rs.getTimestamp(6).toInstant(), rs.getInt(7), rs.getInt(8), rs.getInt(9),
-                        rs.getTimestamp(10) == null ? null : rs.getTimestamp(10).toInstant(), rs.getString(11), rs.getTimestamp(12) == null ? null : rs.getTimestamp(12).toInstant()),
+                        rs.getTimestamp(10) == null ? null : rs.getTimestamp(10).toInstant(), rs.getString(11), rs.getTimestamp(12) == null ? null : rs.getTimestamp(12).toInstant(),
+                        rs.getObject(13, UUID.class)),
                 sha256(token)).stream().findFirst().orElse(null);
     }
 

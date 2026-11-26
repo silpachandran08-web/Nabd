@@ -115,7 +115,7 @@ test("every action type of the union has its own case, and each returns a state"
   const src = readFileSync(new URL("../../app/(auth)/login/loginMachine.ts", import.meta.url), "utf8");
   const union = [...src.slice(src.indexOf("export type LoginAction"), src.indexOf("export const initialLogin")).matchAll(/type: "(\w+)"/g)].map((m) => m[1]);
   const cases = [...src.matchAll(/case "(\w+)":/g)].map((m) => m[1]);
-  assert.equal(union.length, 20);
+  assert.equal(union.length, 21); // PLT-023: + branchChoice
   assert.deepEqual([...cases].sort(), [...union].sort());
   for (const type of union) assert.ok(loginReducer(initialLogin, { type, name: "pin", value: "", view: "otpRequest", message: "", errors: {}, body: SETUP, secretBase32: "", otpauthUri: "", recoveryCodes: [] }), type);
 });

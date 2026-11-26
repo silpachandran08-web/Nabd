@@ -1,0 +1,37 @@
+/* FIN-011 tax exports card. Logical properties only (RTL), --nb-* tokens, 44px targets. The chip's meaning is its text; colour only backs it. */
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nb-space-12);
+}
+
+.irnChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding-inline: var(--nb-space-8);
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-border-subtle);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ok {
+  composes: irnChip;
+  background: var(--nb-info-tint);
+}
+
+.bad {
+  composes: irnChip;
+  border-color: var(--nb-danger-500);
+  color: var(--nb-danger-500);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+  white-space: normal;
+}

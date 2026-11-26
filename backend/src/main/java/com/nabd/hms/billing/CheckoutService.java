@@ -72,6 +72,7 @@ public class CheckoutService {
     private final PaymentActedBy paymentActedBy; // IDC-011
     private final com.nabd.hms.organization.api.ClinicPolicies policies;
     private final DiscountApprovalService approvals; // FIN-018
+    private final PayerSplitService payerSplit; // FIN-036
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
@@ -79,7 +80,8 @@ public class CheckoutService {
                      EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
                      com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
                      com.nabd.hms.billing.tax.TaxService tax, PaymentActedBy paymentActedBy, com.nabd.hms.organization.api.ClinicPolicies policies,
-                     DiscountApprovalService approvals) {
+                     DiscountApprovalService approvals, PayerSplitService payerSplit) {
+        this.payerSplit = payerSplit;
         this.approvals = approvals;
         this.paymentActedBy = paymentActedBy;
         this.policies = policies;
@@ -108,8 +110,10 @@ public class CheckoutService {
         ConsultationTier.Context tierCtx = tierContext(tenantId, queueEntryId, ctx);
         boolean followUpEligible = tierCtx.followUpEligible();
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
-        List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
-                .map(this::toChargeResponse).toList();
+        List<UUID> ordered = repo.pendingChargeItemIds(tenantId, queueEntryId); // PHL-043: lab orders of this visit, pre-loaded like a finished procedure
+        List<ChargeResponse> pendingProcedures = java.util.stream.Stream.concat(
+                repo.listPendingProcedures(tenantId, queueEntryId).stream().map(this::toChargeResponse),
+                charges.stream().filter(c -> ordered.contains(c.id()))).toList();
         List<PrescribedItemResponse> prescribedItems = repo.findSignedPrescriptionItems(tenantId, queueEntryId).stream()
                 .map(p -> new PrescribedItemResponse(p.id(), p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions(),
                         p.quantity(), p.quantity() == null ? BigDecimal.ZERO : p.quantity().subtract(p.dispensed()).max(BigDecimal.ZERO)))
@@ -220,7 +224,9 @@ public class CheckoutService {
             log.info("invoice {} extended at queue entry {} by {} (tenant {}, new total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         }
+        payerSplit.apply(tenantId, queueEntryId, invoiceId); // FIN-036: nothing happens unless the visit is insured
         repo.markProceduresBilled(tenantId, queueEntryId); // NB-146: whatever wasn't already billed at this visit never will be pending again
+        repo.markPendingChargesBilled(tenantId, queueEntryId, invoiceId, lineItems.stream().map(LineItemInput::catalogueId).toList()); // PHL-043
 
         // Closes the loop NB-102 left open: a doctor's "Complete consultation" moves a visit to
         // checkout_pending; billing finishing at the TERMINAL checkpoint is what finally moves it
@@ -342,6 +348,8 @@ public class CheckoutService {
         // PHL-001: a counter sale of an Rx line needs a signed in-system prescription (the invoice then carries that patient)
         // or, PHL-020, a recorded outside prescription line.
         UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
+        // PHL-023: the second confirmation of a flagged schedule class, checked before the invoice number is taken
+        java.util.function.Consumer<UUID> counterSale = trusted ? null : rxGate.checkCounterSale(tenantId, counterLines(items, req.lineItems()), staffId, ip);
         Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
         UUID approvalId = trusted ? null : gate(tenantId, null, t, List.of(), BigDecimal.ZERO, req);
 
@@ -352,6 +360,7 @@ public class CheckoutService {
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId, approvalId);
         if (approvalId != null) approvals.markUsed(tenantId, approvalId, invoiceId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
+        if (!trusted) counterSale.accept(invoiceId);
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
@@ -360,6 +369,13 @@ public class CheckoutService {
     private static List<com.nabd.hms.pharmacy.RxGate.Line> rxLines(List<LineItemInput> items) {
         return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.Line(i.chargeCode(), i.catalogueId(), i.isRx(), i.quantity(),
                 i.prescriptionItemId(), i.paperRxLineId())).toList();
+    }
+
+    /** PHL-023: a confirmation given for a charge code covers every line of that code on the bill. */
+    private static List<com.nabd.hms.pharmacy.RxGate.CounterLine> counterLines(List<LineItemInput> items, List<com.nabd.hms.billing.dto.LineItemRequest> requested) {
+        java.util.Map<String, String> acks = new java.util.HashMap<>();
+        for (var r : requested) if (r.scheduleAckReason() != null) acks.putIfAbsent(r.chargeCode(), r.scheduleAckReason());
+        return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.CounterLine(i.chargeCode(), i.catalogueId(), acks.get(i.chargeCode()))).toList();
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,
@@ -570,7 +586,7 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-not-payable", "Invoice can't take payments",
                     "This invoice is " + invoice.status() + "; it can't take payments.");
         }
-        BigDecimal balance = invoice.total().subtract(invoice.paid());
+        BigDecimal balance = invoice.due().subtract(invoice.paid()); // FIN-036: the patient's balance; the payer's share is not the desk's to collect
         if (req.amount().compareTo(balance) > 0) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "overpayment", "Payment is more than the balance",
                     "The balance due is " + balance.toPlainString() + "; a payment can't be more than that.",
@@ -581,9 +597,9 @@ public class CheckoutService {
                 series.allocate(SeriesAllocator.Kind.RECEIPT).formatted());
         paymentActedBy.stamp(tenantId, paymentId, invoice.patientId(), req); // IDC-011
         BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
-        String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
+        String newStatus = InvoiceStatus.derive(invoice.status(), invoice.due(), newPaid);
         repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
-        BigDecimal newBalance = invoice.total().subtract(newPaid);
+        BigDecimal newBalance = invoice.due().subtract(newPaid);
 
         String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.payment_recorded", "invoice", invoiceId,
@@ -620,6 +636,7 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.CONFLICT, "invoice-has-payments", "Invoice has payments",
                     "Payments were taken on this invoice, so it can't be voided. Refund the payments first.");
         }
+        payerSplit.requireNoPayerPayments(tenantId, invoiceId); // FIN-036
         String reason = req.reason().trim();
         if (reason.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required", "A reason is required to void an invoice.");
@@ -669,9 +686,10 @@ public class CheckoutService {
                 : repo.findStaffName(tenantId, row.doctorId()).orElse("Unknown doctor");
         return new InvoiceResponse(row.id(), row.invoiceNumber(), row.queueEntryId(), row.patientId(), patientName,
                 row.doctorId(), doctorName, currencyFor(tenantId), row.subtotal(), row.discount(), row.tax(),
-                row.roundOff(), row.total(), row.paid(), row.total().subtract(row.paid()), row.status(),
+                row.roundOff(), row.total(), row.paid(), row.due().subtract(row.paid()), row.status(),
                 lineItems, payments, row.createdAt(),
-                com.nabd.hms.billing.tax.TaxService.BILL_OF_SUPPLY.equals(docMeta[0]) ? "Bill of Supply" : "Invoice", docMeta[1]);
+                com.nabd.hms.billing.tax.TaxService.BILL_OF_SUPPLY.equals(docMeta[0]) ? "Bill of Supply" : "Invoice", docMeta[1],
+                row.payerShare().signum() == 0 ? null : payerSplit.view(tenantId, row.id()));
     }
 
     private ChargeResponse toChargeResponse(ChargeRow c) {

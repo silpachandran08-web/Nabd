@@ -18,5 +18,9 @@ public record PrescriptionItemResponse(UUID id, String drugName, String dosage, 
                                         BigDecimal quantity, String quantityUnit,
                                         String drugId, boolean coded, String genericName,
                                         // CLN-024: what the prescriber asked for (validityDays null = class default) and what applies
-                                        Integer validityDays, int refills, RxLineValidityResponse validity) {
+                                        Integer validityDays, int refills, RxLineValidityResponse validity,
+                                        // CLN-032: "checked" = this line took part in the interaction and duplicate-therapy check;
+                                        // "not_checked" = a knowledge base is active but this line is free text (or its product is
+                                        // unknown), so nothing can be said about it; null = no knowledge base, nothing was checked.
+                                        String interactionCheck) {
 }

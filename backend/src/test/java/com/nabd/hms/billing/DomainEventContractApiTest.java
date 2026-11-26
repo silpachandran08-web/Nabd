@@ -289,6 +289,8 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.BOOKING_ROUTED.type()); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove(DomainEventType.APPOINTMENT_NO_SHOW.type()); // ACC-025: Acc025NoShowApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
+        expected.remove("patient.dsr.received.v1"); // PLT-047: Plt047DsrApiTest
+        expected.remove("patient.dsr.export_ready.v1"); // PLT-047: produced by the export worker, Plt047DsrExportApiTest
         expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
         expected.remove(DomainEventType.USAGE_REPORTED.type()); // COM-015: produced by services/comms-gateway (Com015UsageTest)
         expected.remove(DomainEventType.ATTACHMENT_SCANNED.type()); // PLT-029: produced by the file scan worker, Plt029FilesApiTest
@@ -318,8 +320,10 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.SPECIALTY_PHOTO_ADDED.type()); // CLN-047: Cln047DermPhotosApiTest
         expected.remove(DomainEventType.PHARMACY_OTC_SALE_COMPLETED.type()); // PHL-019: Phl019CounterSaleApiTest
         expected.remove(DomainEventType.ORGANIZATION_BRANCH_CREATED.type()); // PLT-022: Plt022OwnerBranchApiTest
+        expected.remove(DomainEventType.BRANCH_SWITCHED.type()); // PLT-023: Plt023BranchSwitchApiTest
         expected.remove(DomainEventType.REPORTING_EXPORT_CREATED.type()); // ADM-047: Adm047ReportsLibraryApiTest
         expected.remove(DomainEventType.LAB_CATALOGUE_CHANGED.type()); // PHL-041: Phl041LabCatalogueApiTest
+        expected.remove(DomainEventType.LAB_ORDER_PLACED.type()); // PHL-043: Phl043LabOrderApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

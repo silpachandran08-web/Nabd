@@ -32,6 +32,8 @@ public enum DomainEventType {
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),
+    /** PLT-023: a person entered another branch of their brand with the same login (BranchService). Consumer: core.audit. */
+    BRANCH_SWITCHED("iam.branch.switched.v1", "core/iam"),
     CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing"),
     NOTIFICATION_REQUESTED("comms.notification.requested.v1", "core/messaging"),
     NOTIFICATION_CANCELLED("comms.notification.cancelled.v1", "core/messaging"),
@@ -82,7 +84,24 @@ public enum DomainEventType {
     /** ADM-047: a report was exported (Excel, CSV or PDF) through the audited export path. Ids, format and row count only. */
     REPORTING_EXPORT_CREATED("reporting.export.created.v1", "core/reporting"),
     /** PHL-041: a lab test or panel of the clinic's catalogue was added or changed. Ids only. */
-    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab");
+    LAB_CATALOGUE_CHANGED("lab.catalogue.changed.v1", "core/lab"),
+    LAB_ORDER_PLACED("lab.order.placed.v1", "core/lab"),
+    /** PHL-045: samples were collected for a lab order. Order and sample ids. */
+    LAB_SAMPLE_COLLECTED("lab.sample.collected.v1", "core/lab"),
+    /** PHL-044: an order's status changed in the worklist (ordered -> collected -> ...). Ids only, no PHI. */
+    LAB_ORDER_STATUS_CHANGED("lab.order.status_changed.v1", "core/lab"),
+    /** ADM-042: an alert of the owner's live operations board became active (doctor late, pharmacy wait, booking requests waiting). A code and a severity only. */
+    REPORTING_OPS_ALERT_RAISED("reporting.ops_alert.raised.v1", "core/reporting"),
+    /** PLT-024: a patient linked to a sibling branch; staff can now access shared record (cross-brand). Ids only, no PHI. */
+    PATIENT_BRANCH_LINK_CREATED("patient.branch_link.created.v1", "core/patient"),
+    /** FIN-036: a clinic's insurance coverage set for one patient (payer + plan + policy). Ids and coverage dates only. */
+    INSURANCE_COVERAGE_SET("billing.insurance.coverage_set.v1", "core/billing"),
+    /** FIN-011: an invoice was accepted by the GSTR-1 export system (or rejected with reason). Invoice id and status only. */
+    EINVOICE_ACCEPTED("billing.einvoice.accepted.v1", "core/billing"),
+    /** PLT-047: a data subject request (DSR) was received for export. Subject id, clinics, submission date, deadline, status only. */
+    PATIENT_DSR_RECEIVED("patient.dsr.received.v1", "core/patient"),
+    /** PLT-047: a patient data export package was built and secured (72h OTP link issued). Package id, link, expiry only. */
+    PATIENT_DSR_EXPORT_READY("patient.dsr.export_ready.v1", "core/patient");
 
     private final String type;
     private final String source;

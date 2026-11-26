@@ -94,7 +94,7 @@ class RolePresetSeedApiTest extends ApiTestBase {
             }
             out.computeIfAbsent(c[0], k -> new HashMap<>()).put(c[1], f);
         }
-        assertThat(out.values().stream().mapToInt(Map::size).sum()).isEqualTo(84); // 5 matrix roles + PHL-041 lab_technician, each x (10 matrix + 4 extension modules)
+        assertThat(out.values().stream().mapToInt(Map::size).sum()).isEqualTo(90); // 5 matrix roles + PHL-041 lab_technician, each x (10 matrix + 5 extension modules: FIN-036 added insurance)
         out.get("owner").get("clinical")[4] = false; // MF-52
         Map<String, boolean[]> ownerDoctor = new HashMap<>();
         out.get("owner").forEach((module, o) -> {

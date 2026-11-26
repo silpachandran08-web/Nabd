@@ -12,7 +12,7 @@
 // IDC-015 (in this tree, Core): a link Core minted is opened on Core's own two public calls; the code is checked by `open`, which
 // answers with the content, so there is no session token.
 //   POST {base}/public/links/{token}/otp                -> 202 (no body)      (410 link-expired, 423 link-locked, 429)
-//   POST {base}/public/links/{token}/open {otp}         -> 200 {fileUrl, mime, title, packageCard}   (401 otp-invalid, 410, 423)
+//   POST {base}/public/links/{token}/open {otp}         -> 200 {fileUrl, mime, title, packageCard, dataExport}   (401 otp-invalid, 410, 423)
 //   GET  {base}/public/rx/keys                          -> JWKS               (CLN-023, public)
 //
 // The access token lives in component state only: never in a URL, storage or cookie.
@@ -42,9 +42,12 @@ export type PackageCard = {
   items: { name: string; used: number; total: number }[]; sessionsUsed: number; sessionsTotal: number;
   validUntil?: string | null; graceUntil?: string | null; paid: number; due: number; saved: number; currency?: string | null;
 };
+/** PLT-047: the patient's data package (core: SecureLinkOpenResponse.dataExport), a zip handed over once the code is right. */
+export type DataExportFile = { fileName: string; contentBase64: string; sha256: string };
 export type Resolved =
   | { kind: "document"; contentType: string; fileName?: string | null }
   | { kind: "package"; card: PackageCard }
+  | { kind: "dataExport"; file: DataExportFile }
   // shortcut: a Core file link (report, document) is not shown: this origin may not fetch Core's signed file URL (no CORS on the blob
   // path, CSP allows blob: frames only). Render it in DocumentView once security has decided how patient-web loads that URL.
   | { kind: "unsupported" }
@@ -108,8 +111,8 @@ export const patientApi = (f: Fetch = (...a) => fetch(...a)) => ({
   // IDC-015 / COM-044: Core's secure-link calls (see the header). Limits, lock and expiry are Core's; nothing is kept here.
   coreLinkOtp: async (token: string): Promise<void> => { await call(f, `/public/links/${enc(token)}/otp`, { method: "POST" }); },
   coreLinkOpen: async (token: string, otp: string): Promise<Resolved> => {
-    const r = (await (await call(f, `/public/links/${enc(token)}/open`, { method: "POST", body: JSON.stringify({ otp }) })).json()) as { packageCard?: PackageCard | null };
-    return r.packageCard ? { kind: "package", card: r.packageCard } : { kind: "unsupported" };
+    const r = (await (await call(f, `/public/links/${enc(token)}/open`, { method: "POST", body: JSON.stringify({ otp }) })).json()) as { packageCard?: PackageCard | null; dataExport?: DataExportFile | null };
+    return r.packageCard ? { kind: "package", card: r.packageCard } : r.dataExport ? { kind: "dataExport", file: r.dataExport } : { kind: "unsupported" };
   },
   proxyInvite: async (token: string): Promise<ProxyInvite> => (await call(f, `/proxy-invites/${enc(token)}`)).json(),
   proxyOtp: async (token: string): Promise<void> => { await call(f, `/proxy-invites/${enc(token)}/otp`, { method: "POST" }); },

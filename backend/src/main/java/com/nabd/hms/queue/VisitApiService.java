@@ -74,6 +74,12 @@ class VisitApiService implements VisitCommands, VisitQueries {
 
     @Override
     @Transactional
+    public Optional<java.time.LocalDate> visitDate(UUID tenantId, UUID visitId) {
+        return repo.visitDate(tenantId, visitId);
+    }
+
+    @Override
+    @Transactional
     public List<VisitDay> completedVisits(UUID tenantId, UUID patientId, UUID doctorId) {
         return repo.completedVisits(tenantId, patientId, doctorId);
     }

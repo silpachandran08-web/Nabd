@@ -201,6 +201,10 @@ public class RxDocumentService {
     }
 
     private void record(UUID tenantId, UUID staffId, String ip, String action, UUID prescriptionId, Object before, Object after) {
+        if (staffId == null) { // COM-050: the PDF was first stored for the patient's own request in chat, there is no staff actor
+            audit.record(tenantId, "system", null, "patient via edge", "patient-access-edge", ip, action, "prescription", prescriptionId, before, after);
+            return;
+        }
         ActorDirectory.Actor a = actors.findActor(tenantId, staffId).orElseThrow(ApiException::notFound);
         audit.record(tenantId, "staff", staffId, a.name(), a.role(), ip, action, "prescription", prescriptionId, before, after);
     }

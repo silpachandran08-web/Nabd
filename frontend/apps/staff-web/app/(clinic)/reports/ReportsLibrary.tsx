@@ -6,7 +6,7 @@ import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import { ApiError, api } from "../../lib/api";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
@@ -14,7 +14,8 @@ import { can } from "../../lib/permissions";
 import { usePaymentMethodLabel } from "../../lib/paymentMethodText";
 import { key as queryKey } from "../../lib/query";
 import { getIdentity } from "../../lib/session";
-import { GROUPS, decodeBase64, framePath, presetRange, rangeProblem, reportHref, visibleReports, words, type Preset } from "./libraryModel";
+import { GROUPS, decodeBase64, defaultRange, framePath, presetRange, rangeProblem, reportHref, tabsOf, visibleReports, words, type Preset } from "./libraryModel";
+import ReportTabs from "./ReportTabs";
 import s from "./library.module.css";
 
 // ADM-047: the reports library. Library list left, report right: range filters, KPI tiles (tap opens the rows behind them), the rule,
@@ -50,7 +51,9 @@ export default function ReportsLibrary() {
   const wanted = params.get("report");
   const missing = wanted !== null && catalog.length > 0 && !catalog.some((r) => r.key === wanted); // a stale or invented link must not open another report
   const def = missing ? undefined : catalog.find((r) => r.key === wanted) ?? catalog[0];
-  const dflt = useMemo(() => presetRange("d30", new Date()), []);
+  const dflt = defaultRange(def?.defaultDays, new Date()); // two strings: cheap, and equal on every render of the same day
+  // links carry only the dates the user chose, so each report opens on its own default range otherwise
+  const chosen = { from: params.get("from") ?? undefined, to: params.get("to") ?? undefined, branch: params.get("branch") ?? undefined };
   const from = params.get("from") ?? dflt.from;
   const to = params.get("to") ?? dflt.to;
   const branch = params.get("branch");
@@ -93,6 +96,7 @@ export default function ReportsLibrary() {
     if (c.type === "number") return num(v, 1);
     if (c.type === "date") return dayLabel(String(v), locale);
     if (c.type === "datetime") return when(v, { dateStyle: "medium", timeStyle: "short" });
+    if (c.key === "flag" || c.key === "winBack") return tx("flag", String(v), words(v)); // ADM-049: server codes with their own wording
     return c.key === "method" ? methodLabel(String(v)) : c.key === "status" || c.key === "source" ? words(v) : String(v);
   };
 
@@ -127,13 +131,13 @@ export default function ReportsLibrary() {
       <div className={s.layout}>
         <nav className={s.list} aria-label={t("listLabel")}>
           {GROUPS.map((g) => {
-            const items = catalog.filter((r) => r.group === g);
+            const items = catalog.filter((r) => r.group === g && !r.tabOf);
             return items.length === 0 ? null : (
               <div key={g} style={{ display: "contents" }}>
                 <p className={s.group}>{t(`group${g[0].toUpperCase()}${g.slice(1)}`)}</p>
                 {items.map((r) => (
-                  <Link key={r.key} href={reportHref(r.key, { from, to, branch: branch ?? undefined })} scroll={false} replace
-                    className={r.key === def.key ? s.itemOn : s.item} aria-current={r.key === def.key ? "page" : undefined}>
+                  <Link key={r.key} href={reportHref(r.key, chosen)} scroll={false} replace
+                    className={r.key === (def.tabOf ?? def.key) ? s.itemOn : s.item} aria-current={r.key === def.key ? "page" : undefined}>
                     {t(`report_${r.key}`)}
                   </Link>
                 ))}
@@ -149,6 +153,7 @@ export default function ReportsLibrary() {
               <p className={s.eyebrow}>{t(`group${def.group[0].toUpperCase()}${def.group.slice(1)}`)}</p>
               <h2 className={s.h2}>{t(`report_${def.key}`)}</h2>
             </div>
+            <ReportTabs tabs={tabsOf(def, catalog)} current={def.key} filters={chosen} />
 
             <div className={s.filters}>
               <div className={s.segmented} role="group" aria-label={t("presets")}>

@@ -252,6 +252,41 @@ schemas:
       prev_hash: operational
       row_hash: operational
       hash_v: operational
+    audit_log_unpartitioned:  # OPS-068: the pre-conversion copy of audit_log, kept for rollback; same columns, same tiers
+      id: operational
+      tenant_id: operational
+      actor_type: operational
+      actor_id: operational
+      actor_name: pii
+      actor_role: operational
+      ip_address: pii
+      action: operational
+      entity_type: operational
+      entity_id: operational
+      before: phi  # uncertain: entity snapshots, include clinical rows
+      after: phi  # uncertain: entity snapshots, include clinical rows
+      created_at: operational
+      prev_hash: operational
+      row_hash: operational
+      hash_v: operational
+    archive_manifests:
+      table_name: operational
+      partition_name: operational
+      month: operational
+      region: operational
+      object_key: operational
+      row_count: operational
+      sha256: operational
+      archived_at: operational
+      restored_at: operational
+    data_retention_policies:
+      region: operational
+      data_class: operational
+      online_months: operational
+      archive_years: operational
+      legal_basis: operational
+      approved_by: operational
+      approved_at: operational
     brands:
       id: operational
       owner_id: operational
@@ -260,6 +295,16 @@ schemas:
       created_at: operational
       updated_at: operational
       data_visibility_scope: operational
+      chain_sharing_profile: operational  # PLT-024: NONE | DEMOGRAPHICS
+    patient_branch_links:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      linked_tenant_id: operational
+      linked_patient_ref: pii  # PLT-024: pairwise reference of the other clinic's patient (a hash, not its id)
+      linked_by: operational
+      basis: operational
+      created_at: operational
     file_objects:
       id: operational
       tenant_id: operational
@@ -771,6 +816,10 @@ schemas:
       last_sent_day: operational
       updated_by: operational
       updated_at: operational
+    ops_alert_thresholds:  # ADM-042: owner live board alert thresholds (minutes and a flag)
+      tenant_id: operational
+      thresholds: operational
+      updated_at: operational
     dental_chart_entries:
       id: operational
       tenant_id: operational
@@ -971,6 +1020,7 @@ schemas:
       sha256: operational
       content: financial
       created_at: operational
+      file_id: operational
     payment_intents:
       id: operational
       tenant_id: operational
@@ -1164,6 +1214,29 @@ schemas:
       total_minor: financial
       issued_at: operational
       issued_by: operational
+    einvoice_documents:
+      id: operational
+      tenant_id: operational
+      document_type: operational
+      document_id: operational
+      regime: operational
+      status: operational
+      external_id: financial
+      ack_ref: financial
+      ack_at: operational
+      qr_payload: financial
+      request_object_key: operational
+      response_object_key: operational
+      errors: operational
+      attempts: operational
+      next_attempt_at: operational
+      created_at: operational
+      updated_at: operational
+    einvoice_settings:
+      tenant_id: operational
+      irp_enabled: operational
+      updated_by: operational
+      updated_at: operational
     credit_note_lines:
       id: operational
       tenant_id: operational
@@ -1242,6 +1315,37 @@ schemas:
       buyer_gstin: financial
       change_seq: operational
       updated_at: operational
+    lab_order_items:
+      id: operational
+      tenant_id: operational
+      order_id: operational
+      test_id: phi  # which test was ordered for a patient
+      panel_id: phi
+      status: operational
+      price_snapshot: financial
+      charge_line_ref: operational
+      display_order: operational
+    lab_orders:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      encounter_id: operational
+      queue_entry_id: operational
+      ordering_doctor_id: operational
+      referring_doctor_id: operational
+      source: operational
+      priority: operational
+      destination_kind: operational
+      partner_lab_id: operational
+      status: operational
+      clinical_note: phi
+      fasting_hours: phi
+      ordered_at: operational
+      cancelled_at: operational
+      cancelled_by: operational
+      cancel_reason: phi
+      change_seq: operational
+      updated_at: operational
     lab_panel_tests:
       tenant_id: operational
       panel_id: operational
@@ -1257,6 +1361,20 @@ schemas:
       created_at: operational
       updated_at: operational
       change_seq: operational
+    lab_reference_ranges:
+      id: operational
+      tenant_id: operational
+      test_id: operational
+      version: operational
+      sex: operational
+      age_min_days: operational
+      age_max_days: operational
+      low: operational
+      high: operational
+      critical_low: operational
+      critical_high: operational
+      text_range: operational
+      effective_from: operational
     lab_tests:
       id: operational
       tenant_id: operational
@@ -1542,6 +1660,7 @@ schemas:
       valid_until: operational
       created_by: operational
       created_at: operational
+      retain_until: operational
     patient_allergies:
       unconfirmed: operational
       id: operational
@@ -1631,6 +1750,7 @@ schemas:
       change_seq: operational
       updated_at: operational
     patients:
+      brand_directory_opt_out: pii  # PLT-024: the patient's choice not to be found from sibling branches
       registration_source: operational
       profile_completed_at: operational
       chat_completion_requested_at: operational
@@ -1737,6 +1857,8 @@ schemas:
       refill_self_serve_allowed: operational
       drug_master_flag: operational
       rx_validity_days: operational
+      dispense_ack_required: operational
+      pharmacist_warning: operational
     pharmacy_settings:
       tenant_id: operational
       mode: operational
@@ -1971,6 +2093,40 @@ schemas:
       otp_expires_at: operational
       created_by: operational
       created_at: operational
+    dsr_market_periods:
+      region_code: operational
+      access_days: operational
+      correction_days: operational
+      erasure_days: operational
+    dsr_requests:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      requester_type: operational
+      requester_patient_id: pii
+      type: operational
+      channel: operational
+      status: operational
+      details: phi  # PLT-047: free text the desk writes about a correction or erasure request
+      received_at: operational
+      due_at: operational
+      completed_at: operational
+      export_file_id: operational
+      export_link_id: operational
+      export_started_at: operational
+      export_attempts: operational
+      reminded_at: operational
+      closure_reason: operational
+      created_by: operational
+    dsr_request_events:
+      id: operational
+      tenant_id: operational
+      request_id: operational
+      at: operational
+      actor_type: operational
+      actor_id: operational
+      event: operational
+      note: operational
     secure_link_opens:
       id: operational
       tenant_id: operational
@@ -2343,6 +2499,44 @@ schemas:
       max_days: operational
       max_refills: operational
       fixed: operational
+    drug_interaction_versions:
+      id: operational
+      region: operational
+      kb_version: operational
+      kb: operational
+      data_month: operational
+      duplicate_ingredient_severity: operational
+      status: operational
+      feed_checksum: operational
+      cso_ack_ref: operational
+      created_by: operational
+      created_at: operational
+      activated_at: operational
+    drug_interactions:
+      region: operational
+      kb_version: operational
+      ingredient_a: operational
+      ingredient_b: operational
+      severity: operational
+      mechanism: operational
+      management: operational
+      source_ref: operational
+    drug_duplicate_classes:
+      region: operational
+      kb_version: operational
+      class_id: operational
+      severity: operational
+      source_ref: operational
+    patient_reported_medicines:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      drug_id: phi
+      text: phi
+      started_on: phi
+      stopped_on: phi
+      recorded_by: operational
+      recorded_at: operational
     service_points:
       id: operational
       tenant_id: operational
@@ -2563,6 +2757,17 @@ schemas:
       notes: phi
       administered_at: operational
       created_at: operational
+    visit_pending_charges:
+      id: operational
+      tenant_id: operational
+      queue_entry_id: operational
+      source: operational
+      source_ref: operational
+      charge_item_id: phi  # uncertain: a pending charge on a visit reveals the service ordered
+      status: operational
+      invoice_id: operational
+      created_at: operational
+      settled_at: operational
     vitals:
       id: operational
       tenant_id: operational

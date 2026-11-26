@@ -9,6 +9,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { createAutosave } from "../../../lib/autosave";
+import { onBranchSwitchFlush } from "../../../lib/branches";
 import { deleteDraft, writeDraft } from "../draftStore";
 import { LOCAL_DRAFT_MS } from "../note/noteLogic";
 import type { AuthedFetch, Prescription, PrescriptionItem, Problem } from "../shared";
@@ -16,7 +17,7 @@ import type { SignAuthority } from "../signAuthority";
 import type { SaveState } from "../visit/types";
 import { BLANK_RX_ITEM, padItems, rxFingerprint } from "./rxLogic";
 
-export type RxOverrideInput = { index: number; kind: string; reasonCode: string; note: string };
+export type RxOverrideInput = { index: number; kind: string; reasonCode: string; note: string; matched?: string };
 export type RxConflict = { mine: PrescriptionItem[]; server: PrescriptionItem[] };
 /** What the local draft holds: the lines and the fingerprint of the server copy they were based on. */
 export type RxDraftData = { items: PrescriptionItem[]; base: string };
@@ -111,7 +112,7 @@ export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
           brandName: i.brandName?.trim() || undefined, sigPattern: i.sigPattern || undefined, route: i.route || undefined,
           quantity: i.quantity ?? undefined, quantityUnit: i.quantityUnit?.trim() || undefined, drugId: i.drugId || undefined,
           validityDays: i.validityDays ?? undefined, refills: i.refills || undefined, // CLN-024
-          overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined }] : undefined,
+          overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined, matched: overrides.matched }] : undefined,
         }));
       const res = await authedFetch(`/clinical/prescriptions/${entryId}`, { method: "PATCH", body: JSON.stringify({ items }) });
       if (!res?.ok) {
@@ -147,6 +148,9 @@ export function useRxPad(authedFetch: AuthedFetch, entryId: string) {
     autosaveRef.current = saver;
     return () => { saver.cancel(); autosaveRef.current = null; if (localTimerRef.current) clearTimeout(localTimerRef.current); };
   }, []);
+
+  // PLT-023: a branch switch saves this prescription first (a failed save leaves the encrypted local draft).
+  useEffect(() => onBranchSwitchFlush(() => (dirtyRef.current ? saveRef.current(undefined, true) : undefined)), []);
 
   /** The doctor chose one version in the conflict dialog; "mine" is saved on the next tick, "server" replaces the pad. */
   function resolveRxConflict(keep: "mine" | "server") {

@@ -1,0 +1,183 @@
+.page {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.countCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.countLabel {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.countValue {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #000;
+}
+
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.filterSelect {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.filterSelect:hover {
+  border-color: #999;
+}
+
+.orders {
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.orderRow {
+  display: grid;
+  grid-template-columns: 60px 1fr 100px 150px;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.875rem;
+}
+
+.orderRow:last-child {
+  border-bottom: none;
+}
+
+.orderRow:nth-child(even) {
+  background: #fafafa;
+}
+
+.priorityBadge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.priorityBadge[data-priority="stat"] {
+  background: #ff4444;
+  color: #fff;
+}
+
+.priorityBadge[data-priority="urgent"] {
+  background: #ffaa00;
+  color: #fff;
+}
+
+.priorityBadge[data-priority="routine"] {
+  background: #4488ff;
+  color: #fff;
+}
+
+.orderInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.orderId {
+  font-weight: 600;
+  color: #000;
+}
+
+.orderMeta {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.status {
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  background: #eee;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.dueBadge {
+  text-align: right;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  background: #e0e0e0;
+  color: #000;
+}
+
+.dueBadge[data-overdue="true"] {
+  background: #ff6b6b;
+  color: #fff;
+  font-weight: 600;
+}
+
+.dueBadge[data-amber="true"] {
+  background: #ffc107;
+  color: #000;
+  font-weight: 600;
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: #999;
+}
+
+.error {
+  padding: 1rem;
+  background: #fee;
+  border: 1px solid #fcc;
+  color: #c33;
+  border-radius: 0.25rem;
+}
+
+@media (max-width: 768px) {
+  .orderRow {
+    grid-template-columns: 50px 1fr 80px;
+    gap: 0.5rem;
+  }
+
+  .dueBadge {
+    display: none;
+  }
+
+  .counts {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+}
